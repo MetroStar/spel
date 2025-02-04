@@ -1,10 +1,10 @@
 ## Changelog
 
-### [2025.01.1](https://github.com/plus3it/spel/releases/tag/2025.01.1)
+### [2025.01.1](https://github.com/MetroStar/spel/releases/tag/2025.01.1)
 
 **Released**: 2025.01.24
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2025.01.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2025.01.1/manifests>
 
 **Summary**:
 
@@ -13,11 +13,11 @@
     - ec2-utils-2.2.0-1.0.2
 
 
-### [2024.12.1](https://github.com/plus3it/spel/releases/tag/2024.12.1)
+### [2024.12.1](https://github.com/MetroStar/spel/releases/tag/2024.12.1)
 
 **Released**: 2024.12.23
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.12.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.12.1/manifests>
 
 **Summary**:
 
@@ -30,11 +30,11 @@
     - spel-wcf-certs-5.15-1
 
 
-### [2024.10.1](https://github.com/plus3it/spel/releases/tag/2024.10.1)
+### [2024.10.1](https://github.com/MetroStar/spel/releases/tag/2024.10.1)
 
 **Released**: 2024.10.24
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.10.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.10.1/manifests>
 
 **Summary**:
 
@@ -49,11 +49,11 @@
     - aws-cli/2.18.13
     - amazon-ssm-agent-3.3.987.0-1
 
-### [2024.09.1](https://github.com/plus3it/spel/releases/tag/2024.09.1)
+### [2024.09.1](https://github.com/MetroStar/spel/releases/tag/2024.09.1)
 
 **Released**: 2024.09.17
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.09.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.09.1/manifests>
 
 **Summary**:
 
@@ -62,17 +62,17 @@
     - amazon-ec2-net-utils-2.5.1-1
     - amazon-ssm-agent-3.3.859.0-1
 
-### [2024.08.1](https://github.com/plus3it/spel/releases/tag/2024.08.1)
+### [2024.08.1](https://github.com/MetroStar/spel/releases/tag/2024.08.1)
 
 **Released**: 2024.08.20
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.08.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.08.1/manifests>
 
 **Summary**:
 
 *   Updates EL9 images to process grub2 kernel options properly. This resolves
     an issue with network interface device names, as well as console output displaying
-    in AWS. See: https://github.com/plus3it/amigen9/issues/26
+    in AWS. See: https://github.com/MetroStar/amigen9/issues/26
 *   Removed manifests of EL7 images
 *   Removed `insights-client` from Red Hat 9 images, due to dependency leakage
     to CentOS Stream and unavailability of the package
@@ -80,11 +80,11 @@
 *   "Extra" packages updated in this release:
     - aws-cli/2.17.33
 
-### [2024.07.1](https://github.com/plus3it/spel/releases/tag/2024.07.1)
+### [2024.07.1](https://github.com/MetroStar/spel/releases/tag/2024.07.1)
 
 **Released**: 2024.07.23
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.07.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.07.1/manifests>
 
 **Summary**:
 
@@ -94,11 +94,11 @@
     - aws-cli/2.17.15
     - amazon-ssm-agent-3.3.551.0-1
 
-### [2024.06.1](https://github.com/plus3it/spel/releases/tag/2024.06.1)
+### [2024.06.1](https://github.com/MetroStar/spel/releases/tag/2024.06.1)
 
 **Released**: 2024.06.20
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.06.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.06.1/manifests>
 
 **Summary**:
 
@@ -109,11 +109,11 @@
     - aws-cli/2.16.12
     - amazon-ssm-agent-3.3.484.0-1
 
-### [2024.05.1](https://github.com/plus3it/spel/releases/tag/2024.05.1)
+### [2024.05.1](https://github.com/MetroStar/spel/releases/tag/2024.05.1)
 
 **Released**: 2024.05.21
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.05.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.05.1/manifests>
 
 **Summary**:
 
@@ -125,11 +125,11 @@
     - aws-cli/2.15.54
     - amazon-ssm-agent-3.3.418.0-1
 
-### [2024.04.1](https://github.com/plus3it/spel/releases/tag/2024.04.1)
+### [2024.04.1](https://github.com/MetroStar/spel/releases/tag/2024.04.1)
 
 **Released**: 2024.04.23
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.04.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.04.1/manifests>
 
 **Summary**:
 
@@ -152,11 +152,11 @@
     - (EL7/EL8) ec2-instance-connect-selinux-1.1-19
     - (EL8/EL9) ec2-utils-2.2.0-1
 
-### [2024.03.2](https://github.com/plus3it/spel/releases/tag/2024.03.2)
+### [2024.03.2](https://github.com/MetroStar/spel/releases/tag/2024.03.2)
 
 **Released**: 2024.04.11
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.03.2/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.03.2/manifests>
 
 **Summary**:
 
@@ -166,11 +166,11 @@
 *   "Extra" packages updated in this release:
     - aws-cli/2.15.37
 
-### [2024.03.1](https://github.com/plus3it/spel/releases/tag/2024.03.1)
+### [2024.03.1](https://github.com/MetroStar/spel/releases/tag/2024.03.1)
 
 **Released**: 2024.03.21
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.03.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.03.1/manifests>
 
 **Summary**:
 
@@ -183,11 +183,11 @@
     - amazon-ssm-agent-3.3.131.0-1
     - ec2-hibinit-agent-1.0.8-0
 
-### [2024.02.1](https://github.com/plus3it/spel/releases/tag/2024.02.1)
+### [2024.02.1](https://github.com/MetroStar/spel/releases/tag/2024.02.1)
 
 **Released**: 2024.02.21
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.02.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.02.1/manifests>
 
 **Summary**:
 
@@ -203,11 +203,11 @@
     - aws-cli/2.15.21
     - amazon-ssm-agent-3.2.2222.0-1
 
-### [2024.01.1](https://github.com/plus3it/spel/releases/tag/2024.01.1)
+### [2024.01.1](https://github.com/MetroStar/spel/releases/tag/2024.01.1)
 
 **Released**: 2024.01.25
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2024.01.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2024.01.1/manifests>
 
 **Summary**:
 
@@ -218,11 +218,11 @@
     - aws-cli/2.15.14
     - amazon-ssm-agent-3.2.2086.0-1
 
-### [2023.12.1](https://github.com/plus3it/spel/releases/tag/2023.12.1)
+### [2023.12.1](https://github.com/MetroStar/spel/releases/tag/2023.12.1)
 
 **Released**: 2023.12.20
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.12.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.12.1/manifests>
 
 **Summary**:
 
@@ -232,11 +232,11 @@
     - aws-cli/2.15.2
     - amazon-ssm-agent-3.2.2016.0-1
 
-### [2023.11.1](https://github.com/plus3it/spel/releases/tag/2023.11.1)
+### [2023.11.1](https://github.com/MetroStar/spel/releases/tag/2023.11.1)
 
 **Released**: 2023.11.21
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.11.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.11.1/manifests>
 
 **Summary**:
 
@@ -248,11 +248,11 @@
     - ec2-hibinit-agent-1.0.2-7
     - spel-release-8-4
 
-### [2023.10.1](https://github.com/plus3it/spel/releases/tag/2023.10.1)
+### [2023.10.1](https://github.com/MetroStar/spel/releases/tag/2023.10.1)
 
 **Released**: 2023.10.24
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.10.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.10.1/manifests>
 
 **Summary**:
 
@@ -265,11 +265,11 @@
     - amazon-ssm-agent-3.2.1705.0-1
     - ec2-hibinit-agent-1.0.2-5
 
-### [2023.09.1](https://github.com/plus3it/spel/releases/tag/2023.09.1)
+### [2023.09.1](https://github.com/MetroStar/spel/releases/tag/2023.09.1)
 
 **Released**: 2023.09.25
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.09.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.09.1/manifests>
 
 **Summary**:
 
@@ -283,11 +283,11 @@
     - aws-cli/2.13.20
     - amazon-ssm-agent-3.2.1542.0-1
 
-### [2023.08.1](https://github.com/plus3it/spel/releases/tag/2023.08.1)
+### [2023.08.1](https://github.com/MetroStar/spel/releases/tag/2023.08.1)
 
 **Released**: 2023.08.24
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.08.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.08.1/manifests>
 
 **Summary**:
 
@@ -298,11 +298,11 @@
     - amazon-ssm-agent-3.2.1377.0-1
     - spel-dod-certs-5.12-1
 
-### [2023.07.1](https://github.com/plus3it/spel/releases/tag/2023.07.1)
+### [2023.07.1](https://github.com/MetroStar/spel/releases/tag/2023.07.1)
 
 **Released**: 2023.07.19
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.07.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.07.1/manifests>
 
 **Summary**:
 
@@ -314,11 +314,11 @@
     - spel-dod-certs-5.11-1
     - spel-wcf-certs-5.14-1
 
-### [2023.06.1](https://github.com/plus3it/spel/releases/tag/2023.06.1)
+### [2023.06.1](https://github.com/MetroStar/spel/releases/tag/2023.06.1)
 
 **Released**: 2023.06.20
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.06.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.06.1/manifests>
 
 **Summary**:
 
@@ -328,11 +328,11 @@
     - aws-cli/2.12.1
     - amazon-ssm-agent-3.2.1041.0-1
 
-### [2023.05.2](https://github.com/plus3it/spel/releases/tag/2023.05.2)
+### [2023.05.2](https://github.com/MetroStar/spel/releases/tag/2023.05.2)
 
 **Released**: 2023.05.23
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.05.2/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.05.2/manifests>
 
 **Summary**:
 
@@ -343,11 +343,11 @@
 *   "Extra" packages updated in this release:
     - aws-cli/2.11.21
 
-### [2023.05.1](https://github.com/plus3it/spel/releases/tag/2023.05.1)
+### [2023.05.1](https://github.com/MetroStar/spel/releases/tag/2023.05.1)
 
 **Released**: 2023.05.11
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.05.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.05.1/manifests>
 
 **Summary**:
 
@@ -361,11 +361,11 @@
     - aws-cli/2.11.19
     - amazon-ssm-agent-3.2.923.0-1
 
-### [2023.04.1](https://github.com/plus3it/spel/releases/tag/2023.04.1)
+### [2023.04.1](https://github.com/MetroStar/spel/releases/tag/2023.04.1)
 
 **Released**: 2023.04.19
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.04.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.04.1/manifests>
 
 **Summary**:
 
@@ -377,11 +377,11 @@
     - amazon-ssm-agent-3.2.815.0-1
 
 
-### [2023.03.2](https://github.com/plus3it/spel/releases/tag/2023.03.2)
+### [2023.03.2](https://github.com/MetroStar/spel/releases/tag/2023.03.2)
 
 **Released**: 2023.03.28
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.03.2/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.03.2/manifests>
 
 **Summary**:
 
@@ -391,11 +391,11 @@
 *   "Extra" packages updated in this release:
     - aws-cli/2.11.6
 
-### [2023.03.1](https://github.com/plus3it/spel/releases/tag/2023.03.1)
+### [2023.03.1](https://github.com/MetroStar/spel/releases/tag/2023.03.1)
 
 **Released**: 2023.03.21
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.03.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.03.1/manifests>
 
 **Summary**:
 
@@ -408,11 +408,11 @@
     - ec2-hibinit-agent-1.0.2-4
 
 
-### [2023.02.1](https://github.com/plus3it/spel/releases/tag/2023.02.1)
+### [2023.02.1](https://github.com/MetroStar/spel/releases/tag/2023.02.1)
 
 **Released**: 2023.02.21
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.02.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.02.1/manifests>
 
 **Summary**:
 
@@ -424,9 +424,9 @@
 
 **Released**: 2023.01.24
 
-**Commit Delta**: [Change from 2022.12.1 release](https://github.com/plus3it/spel/compare/2022.12.1...2023.01.1)
+**Commit Delta**: [Change from 2022.12.1 release](https://github.com/MetroStar/spel/compare/2022.12.1...2023.01.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2023.01.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2023.01.1/manifests>
 
 **Summary**:
 
@@ -454,15 +454,15 @@
 
 **Released**: 2022.12.20
 
-**Commit Delta**: [Change from 2022.11.1 release](https://github.com/plus3it/spel/compare/2022.11.1...2022.12.1)
+**Commit Delta**: [Change from 2022.11.1 release](https://github.com/MetroStar/spel/compare/2022.11.1...2022.12.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.12.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.12.1/manifests>
 
 **Summary**:
 
 *   Oracle Linux 8 was skipped for this release, as their updated cloud-init package was badly broken.
     Waiting on a response to determine whether they are going to fix it, or if we need to handle the
-    brokenness. See also [amigen8/pull/69](https://github.com/plus3it/amigen8/pull/69).
+    brokenness. See also [amigen8/pull/69](https://github.com/MetroStar/amigen8/pull/69).
 
 *   "Extra" packages updated in this release:
     - aws-cli/2.9.8
@@ -473,16 +473,16 @@
 
 **Released**: 2022.11.23
 
-**Commit Delta**: [Change from 2022.10.1 release](https://github.com/plus3it/spel/compare/2022.10.1...2022.11.1)
+**Commit Delta**: [Change from 2022.10.1 release](https://github.com/MetroStar/spel/compare/2022.10.1...2022.11.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.11.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.11.1/manifests>
 
 **Summary**:
 
 *   Red Hat Enterprise Linux release 8.7 (Ootpa)
 *   Oracle Linux 8 was skipped for this release, as their updated cloud-init package was badly broken.
     Waiting on a response to determine whether they are going to fix it, or if we need to handle the
-    brokenness. See also [amigen8/pull/69](https://github.com/plus3it/amigen8/pull/69).
+    brokenness. See also [amigen8/pull/69](https://github.com/MetroStar/amigen8/pull/69).
 
 *   "Extra" packages updated in this release:
     - aws-cli/2.9.0
@@ -492,9 +492,9 @@
 
 **Released**: 2022.10.21
 
-**Commit Delta**: [Change from 2022.09.1 release](https://github.com/plus3it/spel/compare/2022.09.1...2022.10.1)
+**Commit Delta**: [Change from 2022.09.1 release](https://github.com/MetroStar/spel/compare/2022.09.1...2022.10.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.10.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.10.1/manifests>
 
 **Summary**:
 
@@ -509,9 +509,9 @@
 
 **Released**: 2022.09.20
 
-**Commit Delta**: [Change from 2022.08.1 release](https://github.com/plus3it/spel/compare/2022.08.1...2022.09.1)
+**Commit Delta**: [Change from 2022.08.1 release](https://github.com/MetroStar/spel/compare/2022.08.1...2022.09.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.09.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.09.1/manifests>
 
 **Summary**:
 
@@ -523,9 +523,9 @@
 
 **Released**: 2022.08.23
 
-**Commit Delta**: [Change from 2022.07.1 release](https://github.com/plus3it/spel/compare/2022.07.1...2022.08.1)
+**Commit Delta**: [Change from 2022.07.1 release](https://github.com/MetroStar/spel/compare/2022.07.1...2022.08.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.08.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.08.1/manifests>
 
 **Summary**:
 
@@ -537,9 +537,9 @@
 
 **Released**: 2022.07.19
 
-**Commit Delta**: [Change from 2022.06.1 release](https://github.com/plus3it/spel/compare/2022.06.1...2022.07.1)
+**Commit Delta**: [Change from 2022.06.1 release](https://github.com/MetroStar/spel/compare/2022.06.1...2022.07.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.07.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.07.1/manifests>
 
 **Summary**:
 
@@ -552,9 +552,9 @@
 
 **Released**: 2022.06.21
 
-**Commit Delta**: [Change from 2022.05.1 release](https://github.com/plus3it/spel/compare/2022.05.1...2022.06.1)
+**Commit Delta**: [Change from 2022.05.1 release](https://github.com/MetroStar/spel/compare/2022.05.1...2022.06.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.06.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.06.1/manifests>
 
 **Summary**:
 
@@ -567,9 +567,9 @@
 
 **Released**: 2022.05.24
 
-**Commit Delta**: [Change from 2022.04.1 release](https://github.com/plus3it/spel/compare/2022.04.1...2022.05.1)
+**Commit Delta**: [Change from 2022.04.1 release](https://github.com/MetroStar/spel/compare/2022.04.1...2022.05.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.05.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.05.1/manifests>
 
 **Summary**:
 
@@ -583,9 +583,9 @@
 
 **Released**: 2022.04.19
 
-**Commit Delta**: [Change from 2022.03.1 release](https://github.com/plus3it/spel/compare/2022.03.1...2022.04.1)
+**Commit Delta**: [Change from 2022.03.1 release](https://github.com/MetroStar/spel/compare/2022.03.1...2022.04.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.04.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.04.1/manifests>
 
 **Summary**:
 
@@ -599,9 +599,9 @@
 
 **Released**: 2022.03.22
 
-**Commit Delta**: [Change from 2022.02.1 release](https://github.com/plus3it/spel/compare/2022.02.1...2022.03.1)
+**Commit Delta**: [Change from 2022.02.1 release](https://github.com/MetroStar/spel/compare/2022.02.1...2022.03.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.03.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.03.1/manifests>
 
 **Summary**:
 
@@ -615,9 +615,9 @@
 
 **Released**: 2022.02.16
 
-**Commit Delta**: [Change from 2022.01.1 release](https://github.com/plus3it/spel/compare/2022.01.1...2022.02.1)
+**Commit Delta**: [Change from 2022.01.1 release](https://github.com/MetroStar/spel/compare/2022.01.1...2022.02.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.02.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.02.1/manifests>
 
 **Summary**:
 
@@ -630,9 +630,9 @@
 
 **Released**: 2022.01.18
 
-**Commit Delta**: [Change from 2021.12.1 release](https://github.com/plus3it/spel/compare/2021.12.1...2022.01.1)
+**Commit Delta**: [Change from 2021.12.1 release](https://github.com/MetroStar/spel/compare/2021.12.1...2022.01.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2022.01.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2022.01.1/manifests>
 
 **Summary**:
 
@@ -656,9 +656,9 @@
 
 **Released**: 2021.12.21
 
-**Commit Delta**: [Change from 2021.11.1 release](https://github.com/plus3it/spel/compare/2021.11.1...2021.12.1)
+**Commit Delta**: [Change from 2021.11.1 release](https://github.com/MetroStar/spel/compare/2021.11.1...2021.12.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.12.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.12.1/manifests>
 
 **Summary**:
 
@@ -672,9 +672,9 @@
 
 **Released**: 2021.11.23
 
-**Commit Delta**: [Change from 2021.10.1 release](https://github.com/plus3it/spel/compare/2021.10.1...2021.11.1)
+**Commit Delta**: [Change from 2021.10.1 release](https://github.com/MetroStar/spel/compare/2021.10.1...2021.11.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.11.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.11.1/manifests>
 
 **Summary**:
 
@@ -686,9 +686,9 @@
 
 **Released**: 2021.10.19
 
-**Commit Delta**: [Change from 2021.09.1 release](https://github.com/plus3it/spel/compare/2021.09.1...2021.10.1)
+**Commit Delta**: [Change from 2021.09.1 release](https://github.com/MetroStar/spel/compare/2021.09.1...2021.10.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.10.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.10.1/manifests>
 
 **Summary**:
 
@@ -700,9 +700,9 @@
 
 **Released**: 2021.09.23
 
-**Commit Delta**: [Change from 2021.08.1 release](https://github.com/plus3it/spel/compare/2021.08.1...2021.09.1)
+**Commit Delta**: [Change from 2021.08.1 release](https://github.com/MetroStar/spel/compare/2021.08.1...2021.09.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.09.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.09.1/manifests>
 
 **Summary**:
 
@@ -714,9 +714,9 @@
 
 **Released**: 2021.08.24
 
-**Commit Delta**: [Change from 2021.07.1 release](https://github.com/plus3it/spel/compare/2021.07.1...2021.08.1)
+**Commit Delta**: [Change from 2021.07.1 release](https://github.com/MetroStar/spel/compare/2021.07.1...2021.08.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.08.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.08.1/manifests>
 
 **Summary**:
 
@@ -728,9 +728,9 @@
 
 **Released**: 2021.07.21
 
-**Commit Delta**: [Change from 2021.06.1 release](https://github.com/plus3it/spel/compare/2021.06.1...2021.07.1)
+**Commit Delta**: [Change from 2021.06.1 release](https://github.com/MetroStar/spel/compare/2021.06.1...2021.07.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.07.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.07.1/manifests>
 
 **Summary**:
 
@@ -744,9 +744,9 @@
 
 **Released**: 2021.06.22
 
-**Commit Delta**: [Change from 2021.05.1 release](https://github.com/plus3it/spel/compare/2021.05.1...2021.06.1)
+**Commit Delta**: [Change from 2021.05.1 release](https://github.com/MetroStar/spel/compare/2021.05.1...2021.06.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.06.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.06.1/manifests>
 
 **Summary**:
 
@@ -758,9 +758,9 @@
 
 **Released**: 2021.05.19
 
-**Commit Delta**: [Change from 2021.04.1 release](https://github.com/plus3it/spel/compare/2021.04.1...2021.05.1)
+**Commit Delta**: [Change from 2021.04.1 release](https://github.com/MetroStar/spel/compare/2021.04.1...2021.05.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.05.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.05.1/manifests>
 
 **Summary**:
 
@@ -772,9 +772,9 @@
 
 **Released**: 2021.04.20
 
-**Commit Delta**: [Change from 2021.03.1 release](https://github.com/plus3it/spel/compare/2021.03.1...2021.04.1)
+**Commit Delta**: [Change from 2021.03.1 release](https://github.com/MetroStar/spel/compare/2021.03.1...2021.04.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.04.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.04.1/manifests>
 
 **Summary**:
 
@@ -786,9 +786,9 @@
 
 **Released**: 2021.03.23
 
-**Commit Delta**: [Change from 2021.02.1 release](https://github.com/plus3it/spel/compare/2021.02.1...2021.03.1)
+**Commit Delta**: [Change from 2021.02.1 release](https://github.com/MetroStar/spel/compare/2021.02.1...2021.03.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.03.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.03.1/manifests>
 
 **Summary**:
 
@@ -801,9 +801,9 @@
 
 **Released**: 2021.02.23
 
-**Commit Delta**: [Change from 2021.01.1 release](https://github.com/plus3it/spel/compare/2021.01.1...2021.02.1)
+**Commit Delta**: [Change from 2021.01.1 release](https://github.com/MetroStar/spel/compare/2021.01.1...2021.02.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.02.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.02.1/manifests>
 
 **Summary**:
 
@@ -815,9 +815,9 @@
 
 **Released**: 2020.01.26
 
-**Commit Delta**: [Change from 2020.12.1 release](https://github.com/plus3it/spel/compare/2020.12.1...2021.01.1)
+**Commit Delta**: [Change from 2020.12.1 release](https://github.com/MetroStar/spel/compare/2020.12.1...2021.01.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2021.01.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2021.01.1/manifests>
 
 **Summary**:
 
@@ -831,9 +831,9 @@
 
 **Released**: 2020.12.15
 
-**Commit Delta**: [Change from 2020.10.1 release](https://github.com/plus3it/spel/compare/2020.10.1...2020.12.1)
+**Commit Delta**: [Change from 2020.10.1 release](https://github.com/MetroStar/spel/compare/2020.10.1...2020.12.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.12.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.12.1/manifests>
 
 **Summary**:
 
@@ -848,9 +848,9 @@
 
 **Released**: 2020.10.27
 
-**Commit Delta**: [Change from 2020.09.1 release](http://github.com/plus3it/spel/compare/2020.09.1...2020.10.1)
+**Commit Delta**: [Change from 2020.09.1 release](http://github.com/MetroStar/spel/compare/2020.09.1...2020.10.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.10.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.10.1/manifests>
 
 **Summary**:
 
@@ -863,9 +863,9 @@
 
 **Released**: 2020.09.23
 
-**Commit Delta**: [Change from 2020.08.1 release](http://github.com/plus3it/spel/compare/2020.08.1...2020.09.1)
+**Commit Delta**: [Change from 2020.08.1 release](http://github.com/MetroStar/spel/compare/2020.08.1...2020.09.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.09.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.09.1/manifests>
 
 **Summary**:
 
@@ -876,9 +876,9 @@
 
 **Released**: 2020.08.25
 
-**Commit Delta**: [Change from 2020.07.1 release](https://github.com/plus3it/spel/compare/2020.07.1...2020.08.1)
+**Commit Delta**: [Change from 2020.07.1 release](https://github.com/MetroStar/spel/compare/2020.07.1...2020.08.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.08.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.08.1/manifests>
 
 **Summary**:
 
@@ -889,9 +889,9 @@
 
 **Released**: 2020.07.28
 
-**Commit Delta**: [Change from 2020.06.1 release](https://github.com/plus3it/spel/compare/2020.06.1...2020.07.1)
+**Commit Delta**: [Change from 2020.06.1 release](https://github.com/MetroStar/spel/compare/2020.06.1...2020.07.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.07.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.07.1/manifests>
 
 **Summary**:
 
@@ -902,9 +902,9 @@
 
 **Released**: 2020.06.23
 
-**Commit Delta**: [Change from 2020.05.1 release](https://github.com/plus3it/spel/compare/2020.05.1...2020.06.1)
+**Commit Delta**: [Change from 2020.05.1 release](https://github.com/MetroStar/spel/compare/2020.05.1...2020.06.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.06.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.06.1/manifests>
 
 **Summary**:
 
@@ -916,9 +916,9 @@
 
 **Released**: 2020.05.20
 
-**Commit Delta**: [Change from 2020.04.1 release](https://github.com/plus3it/spel/compare/2020.04.1...2020.05.1)
+**Commit Delta**: [Change from 2020.04.1 release](https://github.com/MetroStar/spel/compare/2020.04.1...2020.05.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.05.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.05.1/manifests>
 
 **Summary**:
 
@@ -932,9 +932,9 @@
 
 **Released**: 2020.04.21
 
-**Commit Delta**: [Change from 2020.03.1 release](https://github.com/plus3it/spel/compare/2020.03.1...2020.04.1)
+**Commit Delta**: [Change from 2020.03.1 release](https://github.com/MetroStar/spel/compare/2020.03.1...2020.04.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.04.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.04.1/manifests>
 
 **Summary**:
 
@@ -949,9 +949,9 @@
 
 **Released**: 2020.03.26
 
-**Commit Delta**: [Change from 2020.02.1 release](https://github.com/plus3it/spel/compare/2020.02.1...2020.03.1)
+**Commit Delta**: [Change from 2020.02.1 release](https://github.com/MetroStar/spel/compare/2020.02.1...2020.03.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.03.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.03.1/manifests>
 
 **Summary**:
 
@@ -965,9 +965,9 @@
 
 **Released**: 2020.02.18
 
-**Commit Delta**: [Change from 2020.01.1 release](https://github.com/plus3it/spel/compare/2020.01.1...2020.02.1)
+**Commit Delta**: [Change from 2020.01.1 release](https://github.com/MetroStar/spel/compare/2020.01.1...2020.02.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.02.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.02.1/manifests>
 
 **Summary**:
 
@@ -979,9 +979,9 @@
 
 **Released**: 2020.01.21
 
-**Commit Delta**: [Change from 2019.12.1 release](https://github.com/plus3it/spel/compare/2019.12.1...2020.01.1)
+**Commit Delta**: [Change from 2019.12.1 release](https://github.com/MetroStar/spel/compare/2019.12.1...2020.01.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2020.01.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2020.01.1/manifests>
 
 **Summary**:
 
@@ -993,9 +993,9 @@
 
 **Released**: 2019.12.17
 
-**Commit Delta**: [Change from 2019.11.1 release](https://github.com/plus3it/spel/compare/2019.11.1...2019.12.1)
+**Commit Delta**: [Change from 2019.11.1 release](https://github.com/MetroStar/spel/compare/2019.11.1...2019.12.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.12.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.12.1/manifests>
 
 **Summary**:
 
@@ -1006,9 +1006,9 @@
 
 **Released**: 2019.11.19
 
-**Commit Delta**: [Change from 2019.10.1 release](https://github.com/plus3it/spel/compare/2019.10.1...2019.11.1)
+**Commit Delta**: [Change from 2019.10.1 release](https://github.com/MetroStar/spel/compare/2019.10.1...2019.11.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.11.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.11.1/manifests>
 
 **Summary**:
 
@@ -1024,9 +1024,9 @@
 
 **Released**: 2019.10.18
 
-**Commit Delta**: [Change from 2019.09.1 release](https://github.com/plus3it/spel/compare/2019.09.1...2019.10.1)
+**Commit Delta**: [Change from 2019.09.1 release](https://github.com/MetroStar/spel/compare/2019.09.1...2019.10.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.10.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.10.1/manifests>
 
 **Summary**:
 
@@ -1038,9 +1038,9 @@
 
 **Released**: 2019.09.17
 
-**Commit Delta**: [Change from 2019.08.1 release](https://github.com/plus3it/spel/compare/2019.08.1...2019.09.1)
+**Commit Delta**: [Change from 2019.08.1 release](https://github.com/MetroStar/spel/compare/2019.08.1...2019.09.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.09.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.09.1/manifests>
 
 **Summary**:
 
@@ -1060,9 +1060,9 @@
 
 **Released**: 2019.08.13
 
-**Commit Delta**: [Change from 2019.07.1 release](https://github.com/plus3it/spel/compare/2019.07.1...2019.08.1)
+**Commit Delta**: [Change from 2019.07.1 release](https://github.com/MetroStar/spel/compare/2019.07.1...2019.08.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.08.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.08.1/manifests>
 
 **Summary**:
 
@@ -1079,9 +1079,9 @@
 
 **Released**: 2019.07.16
 
-**Commit Delta**: [Change from 2019.06.1 release](https://github.com/plus3it/spel/compare/2019.06.1...2019.07.1)
+**Commit Delta**: [Change from 2019.06.1 release](https://github.com/MetroStar/spel/compare/2019.06.1...2019.07.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.07.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.07.1/manifests>
 
 **Summary**:
 
@@ -1115,13 +1115,13 @@
 
 **Released**: 2019.06.19
 
-**Commit Delta**: [Change from 2019.05.1 release](https://github.com/plus3it/spel/compare/2019.05.1...2019.06.1)
+**Commit Delta**: [Change from 2019.05.1 release](https://github.com/MetroStar/spel/compare/2019.05.1...2019.06.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.06.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.06.1/manifests>
 
 **Summary**:
 
-*   Sets `/boot` partition to 512MB for vagrant boxes, see [PR #305](https://github.com/plus3it/spel/pull/305)
+*   Sets `/boot` partition to 512MB for vagrant boxes, see [PR #305](https://github.com/MetroStar/spel/pull/305)
 *   "Extra" package updates
     - aws-cli/1.16.181
     - amazon-ssm-agent-2.3.662.0-1
@@ -1130,9 +1130,9 @@
 
 **Released**: 2019.05.21
 
-**Commit Delta**: [Change from 2019.04.1 release](https://github.com/plus3it/spel/compare/2019.04.1...2019.05.1)
+**Commit Delta**: [Change from 2019.04.1 release](https://github.com/MetroStar/spel/compare/2019.04.1...2019.05.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.05.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.05.1/manifests>
 
 **Summary**:
 
@@ -1146,9 +1146,9 @@
 
 **Released**: 2019.04.16
 
-**Commit Delta**: [Change from 2019.03.1 release](https://github.com/plus3it/spel/compare/2019.03.1...2019.04.1)
+**Commit Delta**: [Change from 2019.03.1 release](https://github.com/MetroStar/spel/compare/2019.03.1...2019.04.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.04.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.04.1/manifests>
 
 **Summary**:
 
@@ -1162,9 +1162,9 @@
 
 **Released**: 2019.02.19
 
-**Commit Delta**: [Change from 2019.02.1 release](https://github.com/plus3it/spel/compare/2019.02.1...2019.03.1)
+**Commit Delta**: [Change from 2019.02.1 release](https://github.com/MetroStar/spel/compare/2019.02.1...2019.03.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.03.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.03.1/manifests>
 
 **Summary**:
 
@@ -1180,9 +1180,9 @@
 
 **Released**: 2019.02.19
 
-**Commit Delta**: [Change from 2019.01.1 release](https://github.com/plus3it/spel/compare/2019.01.1...2019.02.1)
+**Commit Delta**: [Change from 2019.01.1 release](https://github.com/MetroStar/spel/compare/2019.01.1...2019.02.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.02.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.02.1/manifests>
 
 **Summary**:
 
@@ -1196,9 +1196,9 @@
 
 **Released**: 2019.01.16
 
-**Commit Delta**: [Change from 2018.12.1 release](https://github.com/plus3it/spel/compare/2018.12.1...2019.01.1)
+**Commit Delta**: [Change from 2018.12.1 release](https://github.com/MetroStar/spel/compare/2018.12.1...2019.01.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2019.01.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2019.01.1/manifests>
 
 **Summary**:
 
@@ -1210,9 +1210,9 @@
 
 **Released**: 2018.12.11
 
-**Commit Delta**: [Change from 2018.11.2 release](https://github.com/plus3it/spel/compare/2018.11.2...2018.12.1)
+**Commit Delta**: [Change from 2018.11.2 release](https://github.com/MetroStar/spel/compare/2018.11.2...2018.12.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.12.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.12.1/manifests>
 
 **Summary**:
 
@@ -1227,9 +1227,9 @@
 
 **Released**: 2018.11.14
 
-**Commit Delta**: [Change from 2018.11.1 release](https://github.com/plus3it/spel/compare/2018.11.1...2018.11.2)
+**Commit Delta**: [Change from 2018.11.1 release](https://github.com/MetroStar/spel/compare/2018.11.1...2018.11.2)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.11.2/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.11.2/manifests>
 
 **Summary**:
 
@@ -1242,9 +1242,9 @@
 
 **Released**: 2018.11.13
 
-**Commit Delta**: [Change from 2018.10.1 release](https://github.com/plus3it/spel/compare/2018.10.1...2018.11.1)
+**Commit Delta**: [Change from 2018.10.1 release](https://github.com/MetroStar/spel/compare/2018.10.1...2018.11.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.11.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.11.1/manifests>
 
 **Summary**:
 
@@ -1263,9 +1263,9 @@
 
 **Released**: 2018.10.16
 
-**Commit Delta**: [Change from 2018.09.1 release](https://github.com/plus3it/spel/compare/2018.09.1...2018.10.1)
+**Commit Delta**: [Change from 2018.09.1 release](https://github.com/MetroStar/spel/compare/2018.09.1...2018.10.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.10.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.10.1/manifests>
 
 **Summary**:
 
@@ -1278,9 +1278,9 @@
 
 **Released**: 2018.09.18
 
-**Commit Delta**: [Change from 2018.08.1 release](https://github.com/plus3it/spel/compare/2018.08.1...2018.09.1)
+**Commit Delta**: [Change from 2018.08.1 release](https://github.com/MetroStar/spel/compare/2018.08.1...2018.09.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.09.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.09.1/manifests>
 
 **Summary**:
 
@@ -1293,13 +1293,13 @@
 
 **Released**: 2018.08.16
 
-**Commit Delta**: [Change from 2018.07.1 release](https://github.com/plus3it/spel/compare/2018.07.1...2018.08.1)
+**Commit Delta**: [Change from 2018.07.1 release](https://github.com/MetroStar/spel/compare/2018.07.1...2018.08.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.08.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.08.1/manifests>
 
 **Summary**:
 
-*   First publication to VagrantCloud of SPEL Vagrant Box for CentOS7, `plus3it/spel-minimal-centos-7`
+*   First publication to VagrantCloud of SPEL Vagrant Box for CentOS7, `MetroStar/spel-minimal-centos-7`
 *   "Extra" package updates
     -   aws-cli/1.15.77
     -   amazon-ssm-agent-2.2.916.0-1
@@ -1309,9 +1309,9 @@
 
 **Released**: 2018.07.17
 
-**Commit Delta**: [Change from 2018.06.1 release](https://github.com/plus3it/spel/compare/2018.06.1...2018.07.1)
+**Commit Delta**: [Change from 2018.06.1 release](https://github.com/MetroStar/spel/compare/2018.06.1...2018.07.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.07.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.07.1/manifests>
 
 **Summary**:
 
@@ -1326,9 +1326,9 @@
 
 **Released**: 2018.06.18
 
-**Commit Delta**: [Change from 2018.05.1 release](https://github.com/plus3it/spel/compare/2018.05.1...2018.06.1)
+**Commit Delta**: [Change from 2018.05.1 release](https://github.com/MetroStar/spel/compare/2018.05.1...2018.06.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.06.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.06.1/manifests>
 
 **Summary**:
 
@@ -1342,9 +1342,9 @@
 
 **Released**: 2018.05.16
 
-**Commit Delta**: [Change from 2018.04.1 release](https://github.com/plus3it/spel/compare/2018.04.1...2018.05.1)
+**Commit Delta**: [Change from 2018.04.1 release](https://github.com/MetroStar/spel/compare/2018.04.1...2018.05.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.05.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.05.1/manifests>
 
 **Summary**:
 
@@ -1368,9 +1368,9 @@
 
 **Released**: 2018.04.17
 
-**Commit Delta**: [Change from 2018.03.1 release](https://github.com/plus3it/spel/compare/2018.03.1...2018.04.1)
+**Commit Delta**: [Change from 2018.03.1 release](https://github.com/MetroStar/spel/compare/2018.03.1...2018.04.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.04.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.04.1/manifests>
 
 **Summary**:
 
@@ -1385,9 +1385,9 @@
 
 **Released**: 2018.03.15
 
-**Commit Delta**: [Change from 2018.02.2 release](https://github.com/plus3it/spel/compare/2018.02.2...2018.03.1)
+**Commit Delta**: [Change from 2018.02.2 release](https://github.com/MetroStar/spel/compare/2018.02.2...2018.03.1)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.03.1/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.03.1/manifests>
 
 **Summary**:
 
@@ -1397,14 +1397,14 @@
 
 **Released**: 2018.03.02
 
-**Commit Delta**: [Change from 2018.02.1 release](https://github.com/plus3it/spel/compare/2018.02.1...2018.02.2)
+**Commit Delta**: [Change from 2018.02.1 release](https://github.com/MetroStar/spel/compare/2018.02.1...2018.02.2)
 
-**Manifests**: <https://github.com/plus3it/spel/blob/2018.02.2/manifests>
+**Manifests**: <https://github.com/MetroStar/spel/blob/2018.02.2/manifests>
 
 **Summary**:
 
 *   [[Issue #154][154][PR #155][155] Updates volume group sizes in vagrant
     boxes to match the sizing in the AMIs
 
-[154]: https://github.com/plus3it/spel/issues/154
-[155]: https://github.com/plus3it/spel/issues/155
+[154]: https://github.com/MetroStar/spel/issues/154
+[155]: https://github.com/MetroStar/spel/issues/155

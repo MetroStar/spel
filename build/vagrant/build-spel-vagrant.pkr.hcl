@@ -38,7 +38,7 @@ variable "spel_repo_commit" {
 
 variable "spel_repo_url" {
   type    = string
-  default = "https://github.com/plus3it/spel.git"
+  default = "https://github.com/MetroStar/spel.git"
 }
 
 variable "spel_version" {
@@ -52,7 +52,7 @@ variable "vagrant_cloud_token" {
 
 variable "vagrant_cloud_user" {
   type    = string
-  default = "plus3it"
+  default = "MetroStar"
 }
 
 variable "virtualbox_iso_url_centos9stream" {

@@ -86,7 +86,7 @@ The spel-produced images are expected to act as a better starting-point in a
 larger hardening process.
 
 If your organization does not already have an automated hardening process,
-please see our tool, [Watchmaker](https://github.com/plus3it/watchmaker.git).
+please see our tool, [Watchmaker](https://github.com/MetroStar/watchmaker.git).
 This tool is meant to help spel-users (and users of other Enterprise Linux
 images) by performing launch-time hardening activities.
 
@@ -146,7 +146,7 @@ version-numbers found in the GovCloud region AMIs.
 
 | Vagrant Cloud Name                          | Vagrant Provider |
 |---------------------------------------------|------------------|
-| [plus3it/spel-minimal-centos-9stream][2002] | virtualbox       |
+| [MetroStar/spel-minimal-centos-9stream][2002] | virtualbox       |
 
 ## Official AWS Owner Account IDs for Images
 
@@ -196,7 +196,7 @@ The images remain public until the image deprecation period expires, typically
 
 | Vagrant Cloud Name                    | Vagrant Provider |
 |---------------------------------------|------------------|
-| [plus3it/spel-minimal-centos-7][2001] | virtualbox       |
+| [MetroStar/spel-minimal-centos-7][2001] | virtualbox       |
 
 [1000]: <https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Images:visibility=public-images;owner=174003430611;imageName=spel-minimal-rhel-7-hvm-2024.07.1>
 [1002]: <https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Images:visibility=public-images;owner=174003430611;imageName=spel-minimal-centos-7-hvm-2024.07.1>
@@ -253,8 +253,8 @@ The images remain public until the image deprecation period expires, typically
 [1067]: <https://console.amazonaws-us-gov.com/ec2/v2/home?region=us-gov-west-1#Images:visibility=public-images;owner=216406534498;imageName=spel-minimal-ol-9-hvm-2025.01.1>
 [1068]: <https://console.amazonaws-us-gov.com/ec2/v2/home?region=us-gov-east-1#Images:visibility=public-images;owner=216406534498;imageName=spel-minimal-ol-9-hvm-2025.01.1>
 
-[2001]: <https://app.vagrantup.com/plus3it/boxes/spel-minimal-centos-7>
-[2002]: <https://app.vagrantup.com/plus3it/boxes/spel-minimal-centos-9stream>
+[2001]: <https://app.vagrantup.com/MetroStar/boxes/spel-minimal-centos-7>
+[2002]: <https://app.vagrantup.com/MetroStar/boxes/spel-minimal-centos-9stream>
 
 ## Default Username
 
@@ -367,7 +367,7 @@ use `.\` preceding the path to the template. E.g.
 1.  Clone the repository:
 
     ```bash
-    git clone https://github.com/plus3it/spel && cd spel
+    git clone https://github.com/MetroStar/spel && cd spel
     ```
 
 2.  Validate the template (Optional):
@@ -595,8 +595,8 @@ packer build \
 [28]: https://docs.microsoft.com/en-us/azure/virtual-machines/linux/create-upload-centos#centos-70
 [29]: https://github.com/Azure/WALinuxAgent/issues/760
 [30]: https://docs.microsoft.com/en-us/azure/virtual-machines/windows/extensions-features
-[31]: https://github.com/plus3it/AMIgen7
-[32]: https://github.com/plus3it/AMIgen7/blob/master/Docs/README_CustomPartitioning.md
+[31]: https://github.com/MetroStar/AMIgen7
+[32]: https://github.com/MetroStar/AMIgen7/blob/master/Docs/README_CustomPartitioning.md
 [33]: https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2
 [34]: https://www.packer.io/docs/builders/openstack#insecure
 [35]: https://www.packer.io/docs/builders/openstack#flavor
@@ -604,14 +604,14 @@ packer build \
 [37]: https://www.packer.io/docs/builders/openstack#networks
 [38]: https://www.packer.io/docs/builders/openstack#security_groups
 [39]: https://www.packer.io/docs/builders/openstack#source_image_name
-[40]: https://github.com/plus3it/amigen8
+[40]: https://github.com/MetroStar/amigen8
 [41]: https://www.oracle.com/linux/
 [42]: https://rockylinux.org/
 [43]: https://almalinux.org/
 [44]: https://www.suse.com/products/suse-liberty-linux/
 [45]: https://developer.hashicorp.com/packer/guides/hcl/variables#from-environment-variables
-[46]: https://github.com/plus3it/spel/issues/new
-[47]: https://github.com/plus3it/amigen9
+[46]: https://github.com/MetroStar/spel/issues/new
+[47]: https://github.com/MetroStar/amigen9
 
 [^1]: Because spel is primarily an execution-wrapper for the AMIgenN projects, the "read the source" method for determining why things have changed from one spel-release to the next may require reviewing those projects' repositories
 [^2]: The default-user is a local user (i.e., managed in `/etc/passwd`/`/etc/shadow`/`/etc/group`) that is dynamically-created at initial system-boot &ndash; using either the default-information in the `/etc/cloud/cloud.cfg` file or as overridden in a userData payload's `#cloud-config` content. Typically this user's `${HOME}/.ssh/authorized_keys` file is prepopulated with a provisioner's public SSH key.

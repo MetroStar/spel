@@ -101,8 +101,8 @@ variable "aws_source_ami_filter_centos9stream_hvm" {
     name = "CentOS Stream 9 x86_64 *,spel-bootstrap-centos-9stream-*.x86_64-gp*"
     owners = [
       "125523088429", # CentOS Commercial, https://wiki.centos.org/Cloud/AWS
-      "174003430611", # SPEL Commercial, https://github.com/plus3it/spel
-      "216406534498", # SPEL GovCloud, https://github.com/plus3it/spel
+      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
+      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -117,8 +117,8 @@ variable "aws_source_ami_filter_ol8_hvm" {
     name = "OL8.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-8-hvm-*.x86_64-gp*,spel-bootstrap-ol-8-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "174003430611", # SPEL Commercial, https://github.com/plus3it/spel
-      "216406534498", # SPEL GovCloud, https://github.com/plus3it/spel
+      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
+      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -133,8 +133,8 @@ variable "aws_source_ami_filter_ol9_hvm" {
     name = "OL9.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-9-hvm-*.x86_64-gp*,spel-bootstrap-ol-9-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "174003430611", # SPEL Commercial, https://github.com/plus3it/spel
-      "216406534498", # SPEL GovCloud, https://github.com/plus3it/spel
+      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
+      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -150,8 +150,8 @@ variable "aws_source_ami_filter_rhel8_hvm" {
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "174003430611", # SPEL Commercial, https://github.com/plus3it/spel
-      "216406534498", # SPEL GovCloud, https://github.com/plus3it/spel
+      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
+      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -167,8 +167,8 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "174003430611", # SPEL Commercial, https://github.com/plus3it/spel
-      "216406534498", # SPEL GovCloud, https://github.com/plus3it/spel
+      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
+      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -474,7 +474,7 @@ variable "amigen8_source_branch" {
 variable "amigen8_source_url" {
   description = "URL that will be used to clone AMIgen8"
   type        = string
-  default     = "https://github.com/plus3it/AMIgen8.git"
+  default     = "https://github.com/MetroStar/AMIgen8.git"
 }
 
 variable "amigen8_storage_layout" {
@@ -572,7 +572,7 @@ variable "amigen9_source_branch" {
 variable "amigen9_source_url" {
   description = "URL that will be used to clone AMIgen9"
   type        = string
-  default     = "https://github.com/plus3it/AMIgen9.git"
+  default     = "https://github.com/MetroStar/AMIgen9.git"
 }
 
 variable "amigen9_storage_layout" {
@@ -633,7 +633,7 @@ variable "spel_deprecation_lifetime" {
 variable "spel_description_url" {
   description = "URL included in the AMI description"
   type        = string
-  default     = "https://github.com/plus3it/spel"
+  default     = "https://github.com/MetroStar/spel"
 }
 
 variable "spel_http_proxy" {

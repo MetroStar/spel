@@ -3,8 +3,8 @@ SHELL := /bin/bash
 ISO_URL_CENTOS9STREAM_BASE ?= http://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/iso
 ISO_URL_CENTOS9STREAM_FILTER ?= grep -Po '(?<=href=")CentOS-Stream-9-latest-x86_64-boot.iso(?=")' | sort -r | head -1
 
-CODEBUILD_SOURCE_REPO_URL ?= https://github.com/plus3it/spel.git
-CODEBUILD_SOURCE_VERSION  ?= dependabot/docker/plus3it/master
+CODEBUILD_SOURCE_REPO_URL ?= https://github.com/MetroStar/spel.git
+CODEBUILD_SOURCE_VERSION  ?= dependabot/docker/MetroStar/master
 
 SPEL_CI ?= false
 SPEL_IDENTIFIER ?= spel

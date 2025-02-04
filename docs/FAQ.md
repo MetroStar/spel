@@ -33,7 +33,7 @@ Notes:
 1. EPEL dependency is AWS-only
 2. EPEL dependency may be removed in later ELx versions as baked-in packages' dependencies permit
 
-Note: Initial functionality for any given ELx build orchestrated by spel starts with an AMIgen project. Functionality for EL8 will be trackable within the [AMIgen8 project](/plus3it/AMIgen8).
+Note: Initial functionality for any given ELx build orchestrated by spel starts with an AMIgen project. Functionality for EL8 will be trackable within the [AMIgen8 project](/MetroStar/AMIgen8).
 
 ### Q: What happened to support for EL6?
 
@@ -97,7 +97,7 @@ A. Many of our images' users leverage in-house build-workflows to handle
 initial provisioning of image-sourced instances. They use things like Chef,
 Puppet, Ansible, etc. Users that have no such in-house build-workflows, we
 typically recommend our launch-driver,
-[Watchmaker](https://github.com/plus3it/watchmaker.git).
+[Watchmaker](https://github.com/MetroStar/watchmaker.git).
 
 ### Q. Watchmaker looks promising: how do I use it?
 
@@ -145,6 +145,6 @@ A. The version of OpenSSH server on EL8, combined with associated security-setti
 to address. However, [community contributions](CONTRIBUTING.md) are always
 welcome! :smile:
 
-<sup>2</sup>: Currently (see [issue #87](https://github.com/plus3it/spel/issues/87)),
+<sup>2</sup>: Currently (see [issue #87](https://github.com/MetroStar/spel/issues/87)),
 there are no VirtualBox builders for EL7. However,
 [community contributions](../.github/CONTRIBUTING.md) are always welcome! :smile:

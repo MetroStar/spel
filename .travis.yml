@@ -14,12 +14,12 @@ jobs:
         - make -f Makefile.tardigrade-ci lint/install
       script: make -f Makefile.tardigrade-ci lint
     - stage: deploy
-      if: branch = master AND type = push AND repo = plus3it/spel
+      if: branch = master AND type = push AND repo = MetroStar/spel
       before_script:
         - |
           PRIOR_VERSION=$(git describe --abbrev=0 --tags)
           RELEASE_VERSION=$(grep current_version $TRAVIS_BUILD_DIR/.bumpversion.cfg | sed 's/^.*= //' )
-          RELEASE_BODY="* [SPEL v$RELEASE_VERSION CHANGELOG](https://github.com/plus3it/spel/blob/$RELEASE_VERSION/CHANGELOG.md)"
+          RELEASE_BODY="* [SPEL v$RELEASE_VERSION CHANGELOG](https://github.com/MetroStar/spel/blob/$RELEASE_VERSION/CHANGELOG.md)"
           export PRIOR_VERSION RELEASE_VERSION RELEASE_BODY
       script: skip
       before_deploy:
@@ -42,5 +42,5 @@ jobs:
         draft: false
         on:
           branch: master
-          repo: plus3it/spel
+          repo: MetroStar/spel
           condition: '"$PRIOR_VERSION" != "$RELEASE_VERSION"'

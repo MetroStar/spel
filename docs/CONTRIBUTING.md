@@ -35,7 +35,7 @@ Currently, this project links to a couple of services. When submitting a PR:
     Note: if the associated Travis CI job fails with a message like:
     ~~~
     Error: spel/README.md is out of date
-    make: *** [/home/travis/build/plus3it/spel/tardigrade-ci/Makefile:463: docs/lint/spel/README.md] Error 1
+    make: *** [/home/travis/build/MetroStar/spel/tardigrade-ci/Makefile:463: docs/lint/spel/README.md] Error 1
     The command "make -f Makefile.tardigrade-ci lint" exited with 2.
     ~~~
     It will be necesary to execute:
