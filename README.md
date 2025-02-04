@@ -6,7 +6,7 @@ STIG-Partitioned Enterprise Linux (_spel_) is a project that helps create and
 publish Enterprise Linux images that are partitioned according to the
 [DISA STIG][0]. The resulting images also use LVM to simplify volume management.
 The images are configured with help from the scripts and packages in the
-[`AMIgen7`][31], [`AMIgen8`][40], and  [`AMIgen9`][47] projects[^1].
+[`amigen7`][31], [`amigen8`][40], and  [`amigen9`][47] projects[^1].
 
 Notes on Lifecycle:
 
@@ -523,12 +523,12 @@ For expected values, see links below:
 * [openstack_security_group_names][38] (comma-separated list of strings)
 * [openstack_source_image_name][39] (string)
 
-## Testing With AMIgen
+## Testing With amigen
 
-The spel automation leverages the AMIgen8 and AMIgen9 projects as a
+The spel automation leverages the amigen8 and amigen9 projects as a
 build-helpers for creation of EL8 and EL9 Amazon Machine Images (Azure
 VM-templates, etc.), respectively.  Due to the closely-coupled nature of the
-two projects, it's recommended that any changes made to AMIgen8 or AMIgen9 be
+two projects, it's recommended that any changes made to amigen8 or amigen9 be
 tested with spel prior to merging changes to either project's master branch.
 
 To facilitate this testing, the following runtime-variables were added to spel:
@@ -539,12 +539,12 @@ To facilitate this testing, the following runtime-variables were added to spel:
 - `amigen9_source_url`
 
 Using these runtime-variables allows one to point spel to
-a fork/branch of AMIgen8 or AMIgen9 during a integration-test build. To test,
+a fork/branch of amigen8 or amigen9 during a integration-test build. To test,
 update your `packer` invocation by adding elements like:
 
 ```bash
 packer build \
-    -var 'amigen8_source_url=https://github.com/<FORK_USER>/AMIgen8.git' \
+    -var 'amigen8_source_url=https://github.com/<FORK_USER>/amigen8.git' \
     -var 'amigen8_source_branch=IssueNN' \
     ...
     minimal-linux.pkr.hcl
@@ -555,7 +555,7 @@ declarations[^4] (e.g., `PKR_VAR_amigen8_source_branch`). To do so, change the
 above example to:
 
 ```bash
-export PKR_VAR_amigen8_source_branch="=https://github.com/<FORK_USER>/AMIgen8.git"
+export PKR_VAR_amigen8_source_branch="=https://github.com/<FORK_USER>/amigen8.git"
 export PKR_VAR_amigen8_source_branch="IssueNN"
 
 packer build \
@@ -595,8 +595,8 @@ packer build \
 [28]: https://docs.microsoft.com/en-us/azure/virtual-machines/linux/create-upload-centos#centos-70
 [29]: https://github.com/Azure/WALinuxAgent/issues/760
 [30]: https://docs.microsoft.com/en-us/azure/virtual-machines/windows/extensions-features
-[31]: https://github.com/MetroStar/AMIgen7
-[32]: https://github.com/MetroStar/AMIgen7/blob/master/Docs/README_CustomPartitioning.md
+[31]: https://github.com/MetroStar/amigen7
+[32]: https://github.com/MetroStar/amigen7/blob/master/Docs/README_CustomPartitioning.md
 [33]: https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2
 [34]: https://www.packer.io/docs/builders/openstack#insecure
 [35]: https://www.packer.io/docs/builders/openstack#flavor
@@ -613,7 +613,7 @@ packer build \
 [46]: https://github.com/MetroStar/spel/issues/new
 [47]: https://github.com/MetroStar/amigen9
 
-[^1]: Because spel is primarily an execution-wrapper for the AMIgenN projects, the "read the source" method for determining why things have changed from one spel-release to the next may require reviewing those projects' repositories
+[^1]: Because spel is primarily an execution-wrapper for the amigenN projects, the "read the source" method for determining why things have changed from one spel-release to the next may require reviewing those projects' repositories
 [^2]: The default-user is a local user (i.e., managed in `/etc/passwd`/`/etc/shadow`/`/etc/group`) that is dynamically-created at initial system-boot &ndash; using either the default-information in the `/etc/cloud/cloud.cfg` file or as overridden in a userData payload's `#cloud-config` content. Typically this user's `${HOME}/.ssh/authorized_keys` file is prepopulated with a provisioner's public SSH key.
 [^3]: Overriding attributes of the default-user _must_ be done within a `#cloud-config` directive-block. If your userData is currently bare BASH (etc.), it will be necessary to format your userData payload as mixed, multi-part MIME.
 [^4]: Use of the `PKR_VAR_` method is recommended for setting up CI/CD frameworks for producing AMIs and other supported VM-templates

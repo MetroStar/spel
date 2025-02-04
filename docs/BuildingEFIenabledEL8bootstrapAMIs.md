@@ -48,8 +48,8 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
 
 4. Ensure to clone the following Git Repositories into the `root` user's `${HOME}`:
 
-    - https://github.com/MetroStar/AMIgen8
-    - https://github.com/MetroStar/AMIgen9
+    - https://github.com/MetroStar/amigen8
+    - https://github.com/MetroStar/amigen9
 
     The above assumes that your EC2 has clone access to GitHub-hosted resources. If this is not the case, it will be necessary to have mirrors of the above repos that _are_ `git`-reachable from your EC2.
 5. Install the cross-distro RPM signing/verification keys and `yum` repository definitions using the `Xdistro.sh` script. This will generally look like:
@@ -71,34 +71,34 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
     Note: Because the `<YUM_REPO_DEFS>` RPM for Oracle Linux has a naming-collision with the one published by Red Hat, it will be necessary to use `rpm2cpio`/`cpio` to unpack the RPM and then manually copy the unpacked GPG files to the `/etc/pki/rpm-gpg` directory
 7. Install the `${HOME}/RPM/<DISTRO_NAME>/<YUM_REPO_DEFS>` RPM
 8. Use the `yum-config-manager` utility to `--disable` the `yum` repository-definitions installed by the prior step
-9. Execute the AMIgen scripts, using the secondary EBS as the build target. Generically, this will look like:
+9. Execute the amigen scripts, using the secondary EBS as the build target. Generically, this will look like:
 
     ~~~bash
-    AMIgen8/DiskSetup.sh \
+    amigen8/DiskSetup.sh \
       -d /dev/xvdx \
       -f xfs \
       -l boot_dev \
       -L UEFI_DEV \
       -r root_dev \
       -X && \
-    AMIgen8/MkChrootTree.sh \
+    amigen8/MkChrootTree.sh \
       -d /dev/xvdx \
       -f xfs \
       --no-lvm \
       --rootlabel root_dev \
       --with-uefi && \
-    AMIgen9/OSpackages.sh \
+    amigen9/OSpackages.sh \
       -X \
       -a <REPO1>,<REPO2>,...,<REPOn>\
       -r /root/RPM/<DISTRO>/<CRITICAL_RPM_1>,/root/RPM/<DISTRO>/<CRITICAL_RPM_2>,...,/root/RPM/<DISTRO>/<CRITICAL_RPM_n> \
       -e <CRITICAL_RPM_1>,<CRITICAL_RPM_2>,...,<CRITICAL_RPM_n> \
       -x subscription-manager && \
-    AMIgen8/AWSutils.sh \
+    amigen8/AWSutils.sh \
       -c https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip \
       -n https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz \
       -s https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm \
       -t amazon-ssm-agent && \
-    AMIgen9/PostBuild.sh \
+    amigen9/PostBuild.sh \
       -f xfs \
       -X && \
     echo SUCCESS
@@ -107,7 +107,7 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
     - CentOS Stream 8 [example-invocation](buildIt-co8.txt)
     - Oracle Linux 8 [example-invocation](buildIt-ol8.txt)
 
-    Note: The references to `AMIgen9` are currently correct. Due to some inconsistencies in the `AMIgen8` project &ndash; due to its authoring _long_ before EFI-support was available for RHEL 8.x &ndash; use of the `AMIgen8` scripts will cause launch-errors in the stage-1 bootstrap-AMIs. Use of the noted `AMIgen9` scripts will avoid these launch-errors.
+    Note: The references to `amigen9` are currently correct. Due to some inconsistencies in the `amigen8` project &ndash; due to its authoring _long_ before EFI-support was available for RHEL 8.x &ndash; use of the `amigen8` scripts will cause launch-errors in the stage-1 bootstrap-AMIs. Use of the noted `amigen9` scripts will avoid these launch-errors.
 
     The above will partition the secondary EBS (seen by the OS as `/dev/xvdx`) into four partitions:
     
@@ -167,14 +167,14 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
 3. Ensure to clone the following Git Repositories into the `root` user's `${HOME}`:
 
     - https://github.com/MetroStar/spel
-    - https://github.com/MetroStar/AMIgen8
+    - https://github.com/MetroStar/amigen8
 
 4. Execute the "pivot-root" step
 
     1. SSH to the just-launched EC2
     2. Escallate privileges to `root`.
 
-        Note: because the `AMIgen` scripts create an SELinux-enabled operating system with pre-defined SELinux role-transitions configured into `sudo`'s configurations, it may be necessary to add the `-r unconfined_r` and `-t unconfined_t` flag-options to any use of `sudo`
+        Note: because the `amigen` scripts create an SELinux-enabled operating system with pre-defined SELinux role-transitions configured into `sudo`'s configurations, it may be necessary to add the `-r unconfined_r` and `-t unconfined_t` flag-options to any use of `sudo`
 
     3. Execute `bash <PATH_TO_SPEL_GIT_REPO>/spel/scripts/pivot-root.sh`. If this runs successfully, you will be logged out.
 
@@ -207,12 +207,12 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
     3. Zero-out the de-partitioned boot-disk. Something like `dd if=/dev/zero of=/dev/nvme0n1 bs=1024 count=$(( 1024 * 200 ))` should suffice
     4. Force kernel to reread the disk geometry with `partprobe /dev/nvme0n1`
 
-8. Because the stage-1 bootstrap AMIs will have already been configured with the necessary GPG keys, DNF variables, etc., it should be possible to run the AMIgen8 scripts with a minimal number of arguments. The following should be sufficient to rebuild the boot-disk the necessary contents:
+8. Because the stage-1 bootstrap AMIs will have already been configured with the necessary GPG keys, DNF variables, etc., it should be possible to run the amigen8 scripts with a minimal number of arguments. The following should be sufficient to rebuild the boot-disk the necessary contents:
 
     1. Setup the root-disk with basic partitioning:
 
         ~~~bash
-        AMIgen8/DiskSetup.sh \
+        amigen8/DiskSetup.sh \
           -d /dev/nvme0n1 \
           -f xfs \
           -B 17m \
@@ -226,7 +226,7 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
     2. Mount the setup root-disk:
 
         ~~~bash
-        AMIgen8/MkChrootTree.sh \
+        amigen8/MkChrootTree.sh \
           -d /dev/nvme0n1 \
           -f xfs \
           --no-lvm
@@ -235,13 +235,13 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
     3. Install the target-OS to the mounted root-disk:
 
         ~~~bash
-        AMIgen9/OSpackages.sh
+        amigen9/OSpackages.sh
         ~~~
 
     4. Install the AWS-enablement tools to the mounted root-disk:
 
         ~~~bash
-        AMIgen8/AWSutils.sh \
+        amigen8/AWSutils.sh \
           -c https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip \
           -n https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz \
           -s https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm \
@@ -251,7 +251,7 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
     5. Apply SELinux labels, clean out log files, etc.
 
         ~~~bash
-        AMIgen9/PostBuild.sh \
+        amigen9/PostBuild.sh \
           -f xfs \
           -X
         ~~~
