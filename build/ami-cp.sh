@@ -19,6 +19,10 @@ import_ami() {
         exit 1
     fi
 
+    # Create S3 buckets if they do not exist
+    aws s3api create-bucket --bucket "${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --create-bucket-configuration LocationConstraint="${AWS_DEFAULT_REGION}" --profile commercial || true
+    aws s3api create-bucket --bucket "${S3_BUCKET_GOV}" --region "us-gov-west-1" --create-bucket-configuration LocationConstraint="us-gov-west-1" --profile govcloud || true
+
     # Copy AMI from aws commercial
     STS=$(aws ec2 create-store-image-task \
         --image-id "${AMI_ID}" \
@@ -80,6 +84,13 @@ import_ami() {
     # Make the copied AMI public in other GovCloud region
     echo "Making copied AMI $COPY_AMI_ID in GovCloud region us-gov-east-1 public"
     aws ec2 modify-image-attribute --region "us-gov-east-1" --image-id "$COPY_AMI_ID" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
+
+    # Empty and delete S3 buckets
+    aws s3 rm "s3://${S3_BUCKET_COMMERCIAL}" --recursive --profile commercial
+    aws s3api delete-bucket --bucket "${S3_BUCKET_COMMERCIAL}" --profile commercial
+
+    aws s3 rm "s3://${S3_BUCKET_GOV}" --recursive --profile govcloud
+    aws s3api delete-bucket --bucket "${S3_BUCKET_GOV}" --profile govcloud
 }
 
 usage() {
