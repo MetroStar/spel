@@ -3,18 +3,18 @@
 set -u -o pipefail
 
 # Ensure required environment variables are set
-: "${YOUR_COMMERCIAL_ACCESS_KEY_ID:?}"
-: "${YOUR_COMMERCIAL_SECRET_ACCESS_KEY:?}"
-: "${YOUR_GOVCLOUD_ACCESS_KEY_ID:?}"
-: "${YOUR_GOVCLOUD_SECRET_ACCESS_KEY:?}"
+: "${COMMERCIAL_ACCESS_KEY_ID:?}"
+: "${COMMERCIAL_SECRET_ACCESS_KEY:?}"
+: "${GOVCLOUD_ACCESS_KEY_ID:?}"
+: "${GOVCLOUD_SECRET_ACCESS_KEY:?}"
 
 # Create AWS CLI configuration files
 mkdir -p ~/.aws
 
 cat <<EOL > ~/.aws/credentials
 [commercial]
-aws_access_key_id = ${YOUR_COMMERCIAL_ACCESS_KEY_ID}
-aws_secret_access_key = ${YOUR_COMMERCIAL_SECRET_ACCESS_KEY}
+aws_access_key_id = ${COMMERCIAL_ACCESS_KEY_ID}
+aws_secret_access_key = ${COMMERCIAL_SECRET_ACCESS_KEY}
 
 [govcloud]
 aws_access_key_id = ${YOUR_GOVCLOUD_ACCESS_KEY_ID}
