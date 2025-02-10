@@ -27,7 +27,7 @@ import_ami() {
 
     # Create S3 buckets
     aws s3api create-bucket --bucket "${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --create-bucket-configuration LocationConstraint="${AWS_DEFAULT_REGION}" --profile commercial
-    aws s3api create-bucket --bucket "${S3_BUCKET_GOV}" --region "us-gov-west-1" --create-bucket-configuration LocationConstraint="us-gov-west-1" --profile govcloud
+    aws s3api create-bucket --bucket "${S3_BUCKET_GOV}" --region "us-gov-east-1" --create-bucket-configuration LocationConstraint="us-gov-east-1" --profile govcloud
 
     # Copy AMI from aws commercial
     STS=$(aws ec2 create-store-image-task \
@@ -54,7 +54,7 @@ import_ami() {
     AMI_ID_BIN="${2}".bin
     AMI_NAME=${3:-ami-from-aws-commercial}
 
-    echo "AMI_ID=${2}, AMI_NAME="${TARGET_AMI_NAME}", S3_BUCKET_GOV="${S3_BUCKET_GOV}", AWS_REGION_GOV="us-gov-west-1""
+    echo "AMI_ID=${2}, AMI_NAME="${TARGET_AMI_NAME}", S3_BUCKET_GOV="${S3_BUCKET_GOV}", AWS_REGION_GOV="us-gov-east-1""
     echo "S3_BUCKET_COMMERCIAL="${S3_BUCKET_COMMERCIAL}", AWS_REGION_COMMERCIAL="${AWS_DEFAULT_REGION}""
 
     # Get image from commercial aws
@@ -72,24 +72,24 @@ import_ami() {
         --name "${AMI_NAME}" \
         --profile govcloud | jq -r .ImageId)
 
-    echo "Successfully copied ${AMI_ID} @ ${AWS_DEFAULT_REGION} --> ${AMI_ID_GOV} @ us-gov-west-1"
+    echo "Successfully copied ${AMI_ID} @ ${AWS_DEFAULT_REGION} --> ${AMI_ID_GOV} @ us-gov-east-1"
 
     # Wait for the copied AMI to become available
-    aws ec2 wait image-available --region "us-gov-west-1" --image-ids "$AMI_ID_GOV" --profile govcloud
+    aws ec2 wait image-available --region "us-gov-east-1" --image-ids "$AMI_ID_GOV" --profile govcloud
 
     echo "Making AMI $AMI_ID_GOV public"
     aws ec2 modify-image-attribute --image-id "$AMI_ID_GOV" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
 
     # Copy AMI to other GovCloud region
-    echo "Copying AMI $AMI_ID_GOV to region us-gov-east-1"
-    COPY_AMI_ID=$(aws ec2 copy-image --source-image-id "$AMI_ID_GOV" --source-region "us-gov-west-1" --region "us-gov-east-1" --name "$AMI_NAME" --query 'ImageId' --output text --profile govcloud)
+    echo "Copying AMI $AMI_ID_GOV to region us-gov-west-1"
+    COPY_AMI_ID=$(aws ec2 copy-image --source-image-id "$AMI_ID_GOV" --source-region "us-gov-east-1" --region "us-gov-west-1" --name "$AMI_NAME" --query 'ImageId' --output text --profile govcloud)
 
     # Wait for the copied AMI to become available
-    aws ec2 wait image-available --region "us-gov-east-1" --image-ids "$COPY_AMI_ID" --profile govcloud
+    aws ec2 wait image-available --region "us-gov-west-1" --image-ids "$COPY_AMI_ID" --profile govcloud
 
     # Make the copied AMI public in other GovCloud region
-    echo "Making copied AMI $COPY_AMI_ID in GovCloud region us-gov-east-1 public"
-    aws ec2 modify-image-attribute --region "us-gov-east-1" --image-id "$COPY_AMI_ID" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
+    echo "Making copied AMI $COPY_AMI_ID in GovCloud region us-gov-west-1 public"
+    aws ec2 modify-image-attribute --region "us-gov-west-1" --image-id "$COPY_AMI_ID" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
 
     # Empty and delete S3 buckets
     aws s3 rm "s3://${S3_BUCKET_COMMERCIAL}" --recursive --profile commercial

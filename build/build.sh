@@ -26,7 +26,7 @@ cat <<EOL > ~/.aws/config
 region = us-east-1
 
 [profile govcloud]
-region = us-gov-west-1
+region = us-gov-east-1
 EOL
 
 # Set default region if not already set
