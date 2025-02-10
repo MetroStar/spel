@@ -17,8 +17,8 @@ aws_access_key_id = ${COMMERCIAL_ACCESS_KEY_ID}
 aws_secret_access_key = ${COMMERCIAL_SECRET_ACCESS_KEY}
 
 [govcloud]
-aws_access_key_id = ${YOUR_GOVCLOUD_ACCESS_KEY_ID}
-aws_secret_access_key = ${YOUR_GOVCLOUD_SECRET_ACCESS_KEY}
+aws_access_key_id = ${GOVCLOUD_ACCESS_KEY_ID}
+aws_secret_access_key = ${GOVCLOUD_SECRET_ACCESS_KEY}
 EOL
 
 cat <<EOL > ~/.aws/config
