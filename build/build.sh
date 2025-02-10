@@ -69,6 +69,16 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
         -var "spel_version=${SPEL_VERSION:?}" \
         tests/minimal-linux.pkr.hcl
 
+    # Generate unique S3 bucket names
+    TIMESTAMP=$(date +%s)
+    RANDOM_STRING=$(openssl rand -hex 6)
+    S3_BUCKET_COMMERCIAL="commercial-bucket-${TIMESTAMP}-${RANDOM_STRING}"
+    S3_BUCKET_GOV="govcloud-bucket-${TIMESTAMP}-${RANDOM_STRING}"
+
+    # Create S3 buckets
+    aws s3api create-bucket --bucket "${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --create-bucket-configuration LocationConstraint="${AWS_DEFAULT_REGION}" --profile commercial
+    aws s3api create-bucket --bucket "${S3_BUCKET_GOV}" --region "us-gov-east-1" --create-bucket-configuration LocationConstraint="us-gov-east-1" --profile govcloud
+
     # Make AMIs public and copy to other regions
     for BUILDER in "${SUCCESS_BUILDS[@]}"; do
         BUILD_NAME="${BUILDER//*./}"
@@ -101,6 +111,13 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
             ./ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME
         fi
     done
+
+    # Empty and delete S3 buckets
+    aws s3 rm "s3://${S3_BUCKET_COMMERCIAL}" --recursive --profile commercial
+    aws s3api delete-bucket --bucket "${S3_BUCKET_COMMERCIAL}" --profile commercial
+
+    aws s3 rm "s3://${S3_BUCKET_GOV}" --recursive --profile govcloud
+    aws s3api delete-bucket --bucket "${S3_BUCKET_GOV}" --profile govcloud
 fi
 
 TESTEXIT=$?
