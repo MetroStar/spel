@@ -2,21 +2,29 @@
 # Do not use `set -e`, as we handle the errexit in the script
 set -u -o pipefail
 
+# Create AWS CLI configuration files
+mkdir -p ~/.aws
+
+cat <<EOL > ~/.aws/credentials
+[commercial]
+aws_access_key_id = YOUR_COMMERCIAL_ACCESS_KEY_ID
+aws_secret_access_key = YOUR_COMMERCIAL_SECRET_ACCESS_KEY
+
+[govcloud]
+aws_access_key_id = YOUR_GOVCLOUD_ACCESS_KEY_ID
+aws_secret_access_key = YOUR_GOVCLOUD_SECRET_ACCESS_KEY
+EOL
+
+cat <<EOL > ~/.aws/config
+[profile commercial]
+region = us-east-1
+
+[profile govcloud]
+region = us-gov-west-1
+EOL
+
 # Set default region if not already set
 AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)}
-
-# Function to get temporary credentials from instance metadata
-get_temp_credentials() {
-    local role_name=$1
-    local creds=$(curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$role_name)
-    export AWS_ACCESS_KEY_ID=$(echo $creds | jq -r '.AccessKeyId')
-    export AWS_SECRET_ACCESS_KEY=$(echo $creds | jq -r '.SecretAccessKey')
-    export AWS_SESSION_TOKEN=$(echo $creds | jq -r '.Token')
-}
-
-# Get temporary credentials for the commercial role
-COMMERCIAL_ROLE_NAME="YourCommercialRoleName"
-get_temp_credentials $COMMERCIAL_ROLE_NAME
 
 echo "==========STARTING BUILD=========="
 echo "Building packer template, spel/minimal-linux.pkr.hcl"
@@ -36,7 +44,7 @@ for BUILDER in ${SPEL_BUILDERS//,/ }; do
     BUILD_NAME="${BUILDER//*./}"
     AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
     BUILDER_ENV="${BUILDER//[.-]/_}"
-    BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text)
+    BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
     if [[ "$BUILDER_AMI" == "None" ]]
     then
         FAILED_BUILDS+=("$BUILDER")
@@ -60,34 +68,31 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
         BUILD_NAME="${BUILDER//*./}"
         AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
         BUILDER_ENV="${BUILDER//[.-]/_}"
-        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text)
+        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
 
         if [[ "$BUILDER_AMI" != "None" ]]; then
             echo "Making AMI $BUILDER_AMI public"
-            aws ec2 modify-image-attribute --image-id "$BUILDER_AMI" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}"
+            aws ec2 modify-image-attribute --image-id "$BUILDER_AMI" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile commercial
 
             # Copy AMI to other regions in the US
             REGIONS=("us-east-1" "us-east-2" "us-west-1" "us-west-2")
             for REGION in "${REGIONS[@]}"; do
                 if [[ "$REGION" != "$AWS_DEFAULT_REGION" ]]; then
                     echo "Copying AMI $BUILDER_AMI to region $REGION"
-                    COPY_AMI_ID=$(aws ec2 copy-image --source-image-id "$BUILDER_AMI" --source-region "$AWS_DEFAULT_REGION" --region "$REGION" --name "$AMI_NAME" --query 'ImageId' --output text)
-                    
+                    COPY_AMI_ID=$(aws ec2 copy-image --source-image-id "$BUILDER_AMI" --source-region "$AWS_DEFAULT_REGION" --region "$REGION" --name "$AMI_NAME" --query 'ImageId' --output text --profile commercial)
+
                     # Wait for the copied AMI to become available
-                    aws ec2 wait image-available --region "$REGION" --image-ids "$COPY_AMI_ID"
-                    
+                    aws ec2 wait image-available --region "$REGION" --image-ids "$COPY_AMI_ID" --profile commercial
+
                     # Make the copied AMI public
                     echo "Making copied AMI $COPY_AMI_ID in region $REGION public"
-                    aws ec2 modify-image-attribute --region "$REGION" --image-id "$COPY_AMI_ID" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}"
+                    aws ec2 modify-image-attribute --region "$REGION" --image-id "$COPY_AMI_ID" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile commercial
                 fi
             done
 
             # Copy AMI to GovCloud partition using the script from the repository
             echo "Copying AMI $BUILDER_AMI to GovCloud partition"
             ./ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME
-
-            # Reassume the commercial role
-            get_temp_credentials $COMMERCIAL_ROLE_NAME
         fi
     done
 fi
@@ -96,7 +101,7 @@ TESTEXIT=$?
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
-    echo "ERROR: Failed builds: ${FAILED_BUILDERS}"
+    echo "ERROR: Failed builds: ${FAILED_BUILDS}"
     echo "ERROR: Build failed. Scroll up past the test to see the packer error and review the build logs."
     exit $BUILDEXIT
 fi
