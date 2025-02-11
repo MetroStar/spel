@@ -5,7 +5,7 @@ PACKER_LOG ?= '1'
 PACKER_LOG_PATH = .spel/$(SPEL_VERSION)/packer.log
 CHECKPOINT_DISABLE ?= '1'
 SPEL_CI ?= true
-SPEL_BUILDERS ?= amazon-ebssurrogate.*
+SPEL_BUILDERS ?= amazon-ebssurrogate.minimal-centos-9stream-hvm,amazon-ebssurrogate.minimal-ol-9-hvm,amazon-ebssurrogate.minimal-rhel-9-hvm,amazon-ebssurrogate.minimal-ol-8-hvm,amazon-ebssurrogate.minimal-rhel-8-hvm
 BUILDER_REGION = $(or $(PKR_VAR_aws_region),$(AWS_REGION))
 export PATH := $(HOME)/bin:$(PATH)
 
