@@ -2,6 +2,39 @@
 # Do not use `set -e`, as we handle the errexit in the script
 set -u -o pipefail
 
+# Function to check and manage AMI quotas
+check_and_manage_ami_quotas() {
+    REGIONS=("us-east-1" "us-east-2" "us-west-1" "us-west-2")
+
+    for REGION in "${REGIONS[@]}"; do
+        echo "Checking AMI quotas in region $REGION"
+
+        # Get the service quota limit for public AMIs
+        QUOTA_LIMIT=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A --region "$REGION" --query 'Quota.Value' --output text)
+
+        # Get the current number of public AMIs
+        CURRENT_PUBLIC_AMIS=$(aws ec2 describe-images --owners self --filters Name=is-public,Values=true --region "$REGION" --query 'Images[*].ImageId' --output text | wc -w)
+
+        # Calculate the difference
+        DIFFERENCE=$((QUOTA_LIMIT - CURRENT_PUBLIC_AMIS))
+
+        echo "Quota limit: $QUOTA_LIMIT, Current public AMIs: $CURRENT_PUBLIC_AMIS, Difference: $DIFFERENCE"
+
+        # If the difference is less than 5, make the 5 oldest AMIs private
+        if [ "$DIFFERENCE" -lt 5 ]; then
+            echo "Making the 5 oldest AMIs private in region $REGION"
+            OLDEST_AMIS=$(aws ec2 describe-images --owners self --filters Name=is-public,Values=true --region "$REGION" --query 'Images | sort_by(@, &CreationDate)[:5].ImageId' --output text)
+            for AMI_ID in $OLDEST_AMIS; do
+                echo "Making AMI $AMI_ID private"
+                aws ec2 modify-image-attribute --image-id "$AMI_ID" --launch-permission "{\"Remove\": [{\"Group\":\"all\"}]}" --region "$REGION"
+            done
+        fi
+    done
+}
+
+# Check and manage AMI quotas before starting the build
+check_and_manage_ami_quotas
+
 echo "==========STARTING BUILD=========="
 echo "Building packer template, spel/minimal-linux.pkr.hcl"
 
