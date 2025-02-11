@@ -10,7 +10,7 @@ check_and_manage_ami_quotas() {
         echo "Checking AMI quotas in region $REGION"
 
         # Get the service quota limit for public AMIs
-        QUOTA_LIMIT=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A --region "$REGION" --query 'Quota.Value' --output text)
+        QUOTA_LIMIT=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-0E3CBAB9 --region "$REGION" --query 'Quota.Value' --output text)
 
         # Get the current number of public AMIs
         CURRENT_PUBLIC_AMIS=$(aws ec2 describe-images --owners self --filters Name=is-public,Values=true --region "$REGION" --query 'Images[*].ImageId' --output text | wc -w)
