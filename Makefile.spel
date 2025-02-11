@@ -64,7 +64,7 @@ pre_build build post_build: export AWS_REGION := $(BUILDER_REGION)
 pre_gov_build gov_build: export PKR_VAR_aws_ami_regions = ["us-gov-west-1" "us-gov-east-1"]
 
 # Set the source security group cidr
-pre_build build post_build: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
+pre_build pre_gov_build build gov_build post_build: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
 
 pre_build:
 	bash ./build/pre_build.sh
