@@ -98,7 +98,7 @@ variable "aws_source_ami_filter_centos9stream_hvm" {
     owners = list(string)
   })
   default = {
-    name = "CentOS Stream 9 x86_64 *,spel-bootstrap-centos-9stream-*.x86_64-gp*"
+    name = "CentOS Stream 9 x86_64 *,spel-minimal-centos-9stream-hvm-*.x86_64-gp*"
     owners = [
       "125523088429", # CentOS Commercial, https://wiki.centos.org/Cloud/AWS
       "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
@@ -114,7 +114,7 @@ variable "aws_source_ami_filter_ol8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "OL8.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-8-hvm-*.x86_64-gp*,spel-bootstrap-ol-8-*.x86_64-gp*"
+    name = "OL8.*-x86_64-HVM-*,spel-minimal-ol-8-hvm-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
       "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
@@ -130,7 +130,7 @@ variable "aws_source_ami_filter_ol9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "OL9.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-9-hvm-*.x86_64-gp*,spel-bootstrap-ol-9-*.x86_64-gp*"
+    name = "OL9.*-x86_64-HVM-*,spel-minimal-ol-9-hvm-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
       "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
@@ -146,7 +146,7 @@ variable "aws_source_ami_filter_rhel8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "RHEL-8.*_HVM-*-x86_64-*-Hourly*-GP*,spel-bootstrap-rhel-8-*.x86_64-gp*"
+    name = "RHEL-8.*_HVM-*-x86_64-*-Hourly*-GP*,spel-minimal-rhel-8-hvm-*.x86_64-gp*"
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
@@ -163,7 +163,7 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "RHEL-9.*_HVM-*-x86_64-*-Hourly*-GP*,spel-bootstrap-rhel-9-*.x86_64-gp*"
+    name = "RHEL-9.*_HVM-*-x86_64-*-Hourly*-GP*,spel-minimal-rhel-9-hvm-*.x86_64-gp*"
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
