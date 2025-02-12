@@ -1,6 +1,7 @@
 variable "aws_region" {
   type    = string
   default = "us-east-1"
+}
 
 variable "aws_source_ami_centos9stream_hvm" {
   type    = string
