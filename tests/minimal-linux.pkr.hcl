@@ -1,12 +1,6 @@
 variable "aws_region" {
   type    = string
   default = "us-east-1"
-}
-
-variable "aws_source_ami_centos8stream_hvm" {
-  type    = string
-  default = env("amazon_ebssurrogate_minimal_centos_8stream_hvm")
-}
 
 variable "aws_source_ami_centos9stream_hvm" {
   type    = string
@@ -103,11 +97,6 @@ source "amazon-ebs" "base" {
 }
 
 build {
-  source "amazon-ebs.base" {
-    source_ami = var.aws_source_ami_centos8stream_hvm
-    name       = "minimal-centos-8stream-hvm"
-  }
-
   source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_centos9stream_hvm
     name       = "minimal-centos-9stream-hvm"
