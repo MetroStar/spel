@@ -135,8 +135,8 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
     # Generate unique S3 bucket names
     TIMESTAMP=$(date +%s)
     RANDOM_STRING=$(openssl rand -hex 6)
-    S3_BUCKET_COMMERCIAL="commercial-bucket-${TIMESTAMP}-${RANDOM_STRING}"
-    S3_BUCKET_GOV="govcloud-bucket-${TIMESTAMP}-${RANDOM_STRING}"
+    export S3_BUCKET_COMMERCIAL="commercial-bucket-${TIMESTAMP}-${RANDOM_STRING}"
+    export S3_BUCKET_GOV="govcloud-bucket-${TIMESTAMP}-${RANDOM_STRING}"
 
     # Create S3 buckets
     aws s3 mb "s3://${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --profile commercial
