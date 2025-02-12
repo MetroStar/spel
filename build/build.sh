@@ -8,6 +8,9 @@ set -u -o pipefail
 : "${GOVCLOUD_ACCESS_KEY_ID:?}"
 : "${GOVCLOUD_SECRET_ACCESS_KEY:?}"
 
+# Set default region if not already set
+AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)}
+
 # Create AWS CLI configuration files
 mkdir -p ~/.aws
 
@@ -23,7 +26,7 @@ EOL
 
 cat <<EOL > ~/.aws/config
 [profile commercial]
-region = us-east-1
+region = ${AWS_DEFAULT_REGION}
 
 [profile govcloud]
 region = us-gov-east-1
@@ -91,9 +94,6 @@ check_and_manage_ami_quotas() {
 
 # Check and manage AMI quotas before starting the build
 check_and_manage_ami_quotas
-
-# Set default region if not already set
-AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)}
 
 echo "==========STARTING BUILD=========="
 echo "Building packer template, spel/minimal-linux.pkr.hcl"

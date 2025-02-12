@@ -11,7 +11,7 @@ import_ami() {
     TARGET_AMI_NAME="${3:-my-cool-ami}"
 
     if test -n "${AMI_ID}"; then
-        echo "Importing ${AMI_ID} @ ${AWS_DEFAULT_REGION} -> ${TARGET_AMI_NAME} @ ${AWS_REGION_GOV}"
+        echo "Importing ${AMI_ID} @ ${AWS_DEFAULT_REGION} -> ${TARGET_AMI_NAME} @ us-gov-east-1"
     else
         echo "Usage: ./ami-cp.sh import_ami ami-id"
         echo "missing source ami-id"
