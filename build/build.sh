@@ -39,6 +39,9 @@ check_and_manage_ami_quotas() {
         # Get the service quota limit for public AMIs
         QUOTA_LIMIT=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-0E3CBAB9 --region "$REGION" --query 'Quota.Value' --output text --profile commercial)
 
+        # Convert QUOTA_LIMIT to an integer
+        QUOTA_LIMIT=${QUOTA_LIMIT%.*}
+
         # Get the current number of public AMIs
         CURRENT_PUBLIC_AMIS=$(aws ec2 describe-images --owners self --filters Name=is-public,Values=true --region "$REGION" --query 'Images[*].ImageId' --output text --profile commercial | wc -w)
 
