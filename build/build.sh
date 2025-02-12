@@ -139,8 +139,8 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
     S3_BUCKET_GOV="govcloud-bucket-${TIMESTAMP}-${RANDOM_STRING}"
 
     # Create S3 buckets
-    aws s3api create-bucket --bucket "${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --create-bucket-configuration LocationConstraint="${AWS_DEFAULT_REGION}" --profile commercial
-    aws s3api create-bucket --bucket "${S3_BUCKET_GOV}" --region "us-gov-east-1" --create-bucket-configuration LocationConstraint="us-gov-east-1" --profile govcloud
+    aws s3 mb "s3://${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --profile commercial
+    aws s3 mb "s3://${S3_BUCKET_GOV}" --region "us-gov-east-1" --profile govcloud
 
     # Copy AMI to GovCloud partition using the script from the repository
     for BUILDER in "${SUCCESS_BUILDS[@]}"; do
@@ -156,11 +156,9 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
     done
 
     # Empty and delete S3 buckets
-    aws s3 rm "s3://${S3_BUCKET_COMMERCIAL}" --recursive --profile commercial
-    aws s3api delete-bucket --bucket "${S3_BUCKET_COMMERCIAL}" --profile commercial
+    aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --profile commercial
 
-    aws s3 rm "s3://${S3_BUCKET_GOV}" --recursive --profile govcloud
-    aws s3api delete-bucket --bucket "${S3_BUCKET_GOV}" --profile govcloud
+    aws s3 rb "s3://${S3_BUCKET_GOV}" --force --profile govcloud
 fi
 
 TESTEXIT=$?

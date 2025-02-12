@@ -49,7 +49,6 @@ import_ami() {
 
     # Get image from commercial aws
     aws s3 cp "s3://${S3_BUCKET_COMMERCIAL}"/${AMI_ID_BIN} ${AMI_ID_BIN} --profile commercial
-    aws s3 rm "s3://${S3_BUCKET_COMMERCIAL}"/${AMI_ID_BIN} --profile commercial
 
     # Upload image to gov s3
     aws s3 cp "${AMI_ID_BIN}" "s3://${S3_BUCKET_GOV}" --profile govcloud
