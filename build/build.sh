@@ -8,9 +8,6 @@ set -u -o pipefail
 : "${GOVCLOUD_ACCESS_KEY_ID:?}"
 : "${GOVCLOUD_SECRET_ACCESS_KEY:?}"
 
-# Set default region if not already set
-AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)}
-
 # Create AWS CLI configuration files
 mkdir -p ~/.aws
 
