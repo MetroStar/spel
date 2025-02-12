@@ -151,7 +151,7 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
 
         if [[ "$BUILDER_AMI" != "None" ]]; then
             echo "Copying AMI $BUILDER_AMI to GovCloud partition"
-            ./ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME
+            bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME
         fi
     done
 
