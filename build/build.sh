@@ -98,29 +98,40 @@ check_and_manage_ami_quotas
 echo "==========STARTING BUILD=========="
 echo "Building packer template, spel/minimal-linux.pkr.hcl"
 
-packer build \
-    -only "${SPEL_BUILDERS:?}" \
-    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-    -var "spel_version=${SPEL_VERSION:?}" \
-    spel/minimal-linux.pkr.hcl
-
-BUILDEXIT=$?
-
 FAILED_BUILDS=()
 SUCCESS_BUILDS=()
 
-for BUILDER in ${SPEL_BUILDERS//,/ }; do
-    BUILD_NAME="${BUILDER//*./}"
-    AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
-    BUILDER_ENV="${BUILDER//[.-]/_}"
-    BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
-    if [[ "$BUILDER_AMI" == "None" ]]
-    then
-        FAILED_BUILDS+=("$BUILDER")
-    else
-        SUCCESS_BUILDS+=("$BUILDER")
-        export "$BUILDER_ENV"="$BUILDER_AMI"
-    fi
+build_packer_templates() {
+    packer build \
+        -only "${SPEL_BUILDERS:?}" \
+        -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+        -var "spel_version=${SPEL_VERSION:?}" \
+        spel/minimal-linux.pkr.hcl
+
+    BUILDEXIT=$?
+
+    for BUILDER in ${SPEL_BUILDERS//,/ }; do
+        BUILD_NAME="${BUILDER//*./}"
+        AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
+        BUILDER_ENV="${BUILDER//[.-]/_}"
+        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
+        if [[ "$BUILDER_AMI" == "None" ]]
+        then
+            FAILED_BUILDS+=("$BUILDER")
+        else
+            SUCCESS_BUILDS+=("$BUILDER")
+            export "$BUILDER_ENV"="$BUILDER_AMI"
+        fi
+    done
+}
+
+build_packer_templates
+
+# Retry failed builds until there are no more failed builds
+while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
+    echo "Retrying failed builds: ${FAILED_BUILDS[*]}"
+    SPEL_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
+    build_packer_templates
 done
 
 if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
