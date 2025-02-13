@@ -707,7 +707,6 @@ source "amazon-ebssurrogate" "base" {
   ssh_interface = var.aws_ssh_interface
   ssh_port      = 22
   ssh_pty       = true
-  ssh_timeout   = "30m"
   ssh_username  = var.spel_ssh_username
   ssh_key_exchange_algorithms = [
     "ecdh-sha2-nistp521",
