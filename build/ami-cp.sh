@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 status() {
     watch -n 1 "\
