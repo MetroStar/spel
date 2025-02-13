@@ -156,7 +156,7 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
     done
 
     # Empty and delete S3 buckets
-    aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --profile commercial
+    aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --force --profile commercial
 
     aws s3 rb "s3://${S3_BUCKET_GOV}" --force --profile govcloud
 fi
