@@ -62,6 +62,7 @@ import_ami() {
     AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
     aws s3 cp "s3://${S3_BUCKET_COMMERCIAL}/${AMI_ID_BIN}" "${AMI_ID_BIN}" --profile commercial
+    aws s3 rm "s3://${S3_BUCKET_COMMERCIAL}/${AMI_ID_BIN}" --profile commercial
 
     # Upload image to gov s3
     AWS_REGION="us-gov-east-1" \
@@ -113,6 +114,8 @@ import_ami() {
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
     aws ec2 modify-image-attribute --region "us-gov-west-1" --image-id "${COPY_AMI_ID}" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
+
+    aws s3 rm "s3://${S3_BUCKET_GOV}/${AMI_ID_BIN}" --profile govcloud
 }
 
 usage() {
