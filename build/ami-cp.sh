@@ -6,7 +6,7 @@ status() {
     AWS_REGION="${AWS_DEFAULT_REGION}" \
     AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
-    aws ec2 describe-store-image-tasks"
+    aws ec2 describe-store-image-tasks --profile commercial"
 }
 
 import_ami() {
@@ -28,14 +28,15 @@ import_ami() {
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
     aws ec2 create-store-image-task \
         --image-id "${AMI_ID}" \
-        --bucket "${S3_BUCKET_COMMERCIAL}" | jq .OriginKey)
+        --bucket "${S3_BUCKET_COMMERCIAL}" \
+        --profile commercial | jq .OriginKey)
 
     # Check status of ami export
     STS=$(AWS_REGION="${AWS_DEFAULT_REGION}" \
     AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
     aws ec2 describe-store-image-tasks \
-        |  jq -c ".StoreImageTaskResults | map(select(.AmiId == \"${AMI_ID}\"))[0].ProgressPercentage")
+        --profile commercial |  jq -c ".StoreImageTaskResults | map(select(.AmiId == \"${AMI_ID}\"))[0].ProgressPercentage")
 
     i=1
     sp="/-\|"
@@ -47,7 +48,7 @@ import_ami() {
         AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
         AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
         aws ec2 describe-store-image-tasks \
-            |  jq -c ".StoreImageTaskResults | map(select(.AmiId == \"${AMI_ID}\"))[0].ProgressPercentage")
+            --profile commercial |  jq -c ".StoreImageTaskResults | map(select(.AmiId == \"${AMI_ID}\"))[0].ProgressPercentage")
     done
 
     AMI_ID_BIN="${2}".bin
@@ -60,13 +61,13 @@ import_ami() {
     AWS_REGION="${AWS_DEFAULT_REGION}" \
     AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
-    aws s3 cp "s3://${S3_BUCKET_COMMERCIAL}"/${AMI_ID_BIN} ${AMI_ID_BIN}
+    aws s3 cp "s3://${S3_BUCKET_COMMERCIAL}"/${AMI_ID_BIN} ${AMI_ID_BIN} --profile commercial
 
     # Upload image to gov s3
     AWS_REGION="us-gov-east-1" \
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws s3 cp "${AMI_ID_BIN}" "s3://${S3_BUCKET_GOV}"
+    aws s3 cp "${AMI_ID_BIN}" "s3://${S3_BUCKET_GOV}" --profile govcloud
     rm "${AMI_ID_BIN}"
 
     # Load image to EC2
@@ -76,7 +77,8 @@ import_ami() {
     aws ec2 create-restore-image-task \
         --object-key "${AMI_ID_BIN}" \
         --bucket "${S3_BUCKET_GOV}" \
-        --name "${AMI_NAME}" | jq -r .ImageId)
+        --name "${AMI_NAME}" \
+        --profile govcloud | jq -r .ImageId)
 
     echo "Successfully copied ${AMI_ID} @ ${AWS_DEFAULT_REGION} --> ${AMI_ID_GOV} @ us-gov-east-1"
 
@@ -84,33 +86,33 @@ import_ami() {
     AWS_REGION="us-gov-east-1" \
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 wait image-available --region "us-gov-east-1" --image-ids "$AMI_ID_GOV"
+    aws ec2 wait image-available --region "us-gov-east-1" --image-ids "$AMI_ID_GOV" --profile govcloud
 
     echo "Making AMI $AMI_ID_GOV public"
     AWS_REGION="us-gov-east-1" \
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 modify-image-attribute --image-id "$AMI_ID_GOV" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}"
+    aws ec2 modify-image-attribute --image-id "$AMI_ID_GOV" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
 
     # Copy AMI to other GovCloud region
     echo "Copying AMI $AMI_ID_GOV to region us-gov-west-1"
     COPY_AMI_ID=$(AWS_REGION="us-gov-east-1" \
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 copy-image --source-image-id "$AMI_ID_GOV" --source-region "us-gov-east-1" --region "us-gov-west-1" --name "$AMI_NAME" --query 'ImageId' --output text)
+    aws ec2 copy-image --source-image-id "$AMI_ID_GOV" --source-region "us-gov-east-1" --region "us-gov-west-1" --name "$AMI_NAME" --query 'ImageId' --output text --profile govcloud)
 
     # Wait for the copied AMI to become available
     AWS_REGION="us-gov-east-1" \
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 wait image-available --region "us-gov-west-1" --image-ids "$COPY_AMI_ID"
+    aws ec2 wait image-available --region "us-gov-west-1" --image-ids "$COPY_AMI_ID" --profile govcloud
 
     # Make the copied AMI public in other GovCloud region
     echo "Making copied AMI $COPY_AMI_ID in GovCloud region us-gov-west-1 public"
     AWS_REGION="us-gov-east-1" \
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 modify-image-attribute --region "us-gov-west-1" --image-id "$COPY_AMI_ID" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}"
+    aws ec2 modify-image-attribute --region "us-gov-west-1" --image-id "$COPY_AMI_ID" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
 }
 
 usage() {
