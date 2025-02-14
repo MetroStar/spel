@@ -58,7 +58,6 @@ install:
 # targets. For the region targets, do not use "?=" because we *always* want to
 # override this in codebuild. We cannot set these in the buildspec because that
 # breaks codebuild when building for GovCloud.
-pre_build build post_build: export AWS_PROFILE ?= $(SPEL_IDENTIFIER)
 pre_build build post_build: export AWS_DEFAULT_REGION := $(BUILDER_REGION)
 pre_build build post_build: export AWS_REGION := $(BUILDER_REGION)
 pre_gov_build gov_build: export PKR_VAR_aws_ami_regions = ["us-gov-west-1","us-gov-east-1"]
