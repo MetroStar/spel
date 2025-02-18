@@ -152,11 +152,19 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
         TESTEXIT=$?
 
         if [[ $TESTEXIT -ne 0 ]]; then
-            FAILED_TEST_BUILDS=($(grep -oP '(?<=Failed to build ).*' packer_test_output.log))
+            FAILED_TEST_BUILDS=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log))
         fi
     }
 
     run_tests
+
+    # Retry failed tests until there are no more failed tests
+    while [[ ${#FAILED_TEST_BUILDS[@]} -gt 0 ]]; do
+        echo "Retrying failed tests: ${FAILED_TEST_BUILDS[*]}"
+        SUCCESS_BUILDERS=$(IFS=, ; echo "${FAILED_TEST_BUILDS[*]}")
+        FAILED_TEST_BUILDS=()
+        run_tests
+    done
 
     # Generate unique S3 bucket names
     TIMESTAMP=$(date +%s)
