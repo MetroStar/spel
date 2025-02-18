@@ -164,13 +164,15 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
 
         if [[ "$BUILDER_AMI" != "None" ]]; then
             echo "Copying AMI $BUILDER_AMI to GovCloud partition"
-            bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME
+            bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME &
         fi
     done
 
+    # Wait for all background processes to complete
+    wait
+
     # Empty and delete S3 buckets
     aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --force --profile commercial
-
     aws s3 rb "s3://${S3_BUCKET_GOV}" --force --profile govcloud
 fi
 
