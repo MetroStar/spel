@@ -139,11 +139,24 @@ done
 if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
     SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
     echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
-    packer build \
-        -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
-        -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-        -var "spel_version=${SPEL_VERSION:?}" \
-        tests/minimal-linux.pkr.hcl
+
+    FAILED_TEST_BUILDS=()
+
+    run_tests() {
+        packer build \
+            -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
+            -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+            -var "spel_version=${SPEL_VERSION:?}" \
+            tests/minimal-linux.pkr.hcl | tee packer_test_output.log
+
+        TESTEXIT=$?
+
+        if [[ $TESTEXIT -ne 0 ]]; then
+            FAILED_TEST_BUILDS=($(grep -oP '(?<=Failed to build ).*' packer_test_output.log))
+        fi
+    }
+
+    run_tests
 
     # Generate unique S3 bucket names
     TIMESTAMP=$(date +%s)
