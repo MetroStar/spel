@@ -138,70 +138,52 @@ while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
     build_packer_templates
 done
 
-if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
-    SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
-    echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
+SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
+echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
 
-    FAILED_TEST_BUILDS=()
+FAILED_TEST_BUILDS=()
 
-    run_tests() {
-        packer build \
-            -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
-            -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-            -var "spel_version=${SPEL_VERSION:?}" \
-            tests/minimal-linux.pkr.hcl | tee packer_test_output.log
-
-        TESTEXIT=$?
-
-        if [[ $TESTEXIT -ne 0 ]]; then
-            FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
-        fi
-
-        echo "ERROR: Test failed for builders: ${FAILED_TEST_BUILDS[*]}"
-    }
-
-    run_tests
-
-    # Retry failed tests until there are no more failed tests
-    while [[ ${#FAILED_TEST_BUILDS[@]} -gt 0 ]]; do
-        echo "Retrying failed tests: ${FAILED_TEST_BUILDS[*]}"
-        SUCCESS_BUILDERS=$(IFS=, ; echo "${FAILED_TEST_BUILDS[*]}")
-        FAILED_TEST_BUILDS=()
-        run_tests
-    done
-
-    # Generate unique S3 bucket names
-    TIMESTAMP=$(date +%s)
-    RANDOM_STRING=$(openssl rand -hex 6)
-    export S3_BUCKET_COMMERCIAL="commercial-bucket-${TIMESTAMP}-${RANDOM_STRING}"
-    export S3_BUCKET_GOV="govcloud-bucket-${TIMESTAMP}-${RANDOM_STRING}"
-
-    # Create S3 buckets
-    aws s3 mb "s3://${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --profile commercial
-    aws s3 mb "s3://${S3_BUCKET_GOV}" --region "us-gov-east-1" --profile govcloud
-
-    # Copy AMI to GovCloud partition using the script from the repository
-    for BUILDER in "${SUCCESS_BUILDS[@]}"; do
-        BUILD_NAME="${BUILDER//*./}"
-        AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
-        BUILDER_ENV="${BUILDER//[.-]/_}"
-        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
-
-        if [[ "$BUILDER_AMI" != "None" ]]; then
-            echo "Copying AMI $BUILDER_AMI to GovCloud partition"
-            bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME &
-        fi
-    done
-
-    # Wait for all background processes to complete
-    wait
-
-    # Delete S3 buckets
-    aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --profile commercial
-    aws s3 rb "s3://${S3_BUCKET_GOV}" --profile govcloud
-fi
+packer build \
+    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
+    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+    -var "spel_version=${SPEL_VERSION:?}" \
+    tests/minimal-linux.pkr.hcl | tee packer_test_output.log
 
 TESTEXIT=$?
+
+if [[ $TESTEXIT -ne 0 ]]; then
+    FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
+fi
+
+# Generate unique S3 bucket names
+TIMESTAMP=$(date +%s)
+RANDOM_STRING=$(openssl rand -hex 6)
+export S3_BUCKET_COMMERCIAL="commercial-bucket-${TIMESTAMP}-${RANDOM_STRING}"
+export S3_BUCKET_GOV="govcloud-bucket-${TIMESTAMP}-${RANDOM_STRING}"
+
+# Create S3 buckets
+aws s3 mb "s3://${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --profile commercial
+aws s3 mb "s3://${S3_BUCKET_GOV}" --region "us-gov-east-1" --profile govcloud
+
+# Copy AMI to GovCloud partition using the script from the repository
+for BUILDER in "${SUCCESS_BUILDS[@]}"; do
+    BUILD_NAME="${BUILDER//*./}"
+    AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
+    BUILDER_ENV="${BUILDER//[.-]/_}"
+    BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
+
+    if [[ "$BUILDER_AMI" != "None" ]]; then
+        echo "Copying AMI $BUILDER_AMI to GovCloud partition"
+        bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME &
+    fi
+done
+
+# Wait for all background processes to complete
+wait
+
+# Delete S3 buckets
+aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --profile commercial
+aws s3 rb "s3://${S3_BUCKET_GOV}" --profile govcloud
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
@@ -211,6 +193,5 @@ if [[ $BUILDEXIT -ne 0 ]]; then
 fi
 
 if [[ $TESTEXIT -ne 0 ]]; then
-    echo "ERROR: Test failed. Review the test logs for the error."
-    exit $TESTEXIT
+    echo "ERROR: Test failed for builders: ${FAILED_TEST_BUILDS[*]}"
 fi
