@@ -125,6 +125,8 @@ build_packer_templates() {
             export "$BUILDER_ENV"="$BUILDER_AMI"
         fi
     done
+
+    echo "ERROR: Failed builds: ${FAILED_BUILDS[*]}"
 }
 
 build_packer_templates
