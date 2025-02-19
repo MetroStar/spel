@@ -32,6 +32,16 @@ import_ami() {
         --bucket "${S3_BUCKET_COMMERCIAL}" \
         --profile commercial | jq .OriginKey
 
+    # Wait for the AMI to be copied to S3
+    echo "Waiting for AMI ${AMI_ID} to be copied to S3 in ${AWS_DEFAULT_REGION}"
+    AWS_REGION="${AWS_DEFAULT_REGION}" \
+    AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
+    aws ec2 wait store-image-task-complete \
+        --bucket "${S3_BUCKET_COMMERCIAL}" \
+        --profile commercial
+    echo "Successfully copied ${AMI_ID} to ${S3_BUCKET_COMMERCIAL}"
+
     AMI_ID_BIN="${2}".bin
     AMI_NAME=${3:-ami-from-aws-commercial}
 
@@ -56,58 +66,45 @@ import_ami() {
 
     # Load image to EC2 in both regions in parallel
     echo "Restoring AMI ${AMI_ID} from ${S3_BUCKET_GOV} to us-gov-east-1 and us-gov-west-1"
-    AMI_ID_GOV_EAST=$(AWS_REGION="us-gov-east-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 create-restore-image-task \
-        --object-key "${AMI_ID_BIN}" \
-        --bucket "${S3_BUCKET_GOV}" \
-        --name "${AMI_NAME}" \
-        --profile govcloud | jq -r .ImageId) &
-
-    AMI_ID_GOV_WEST=$(AWS_REGION="us-gov-west-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 create-restore-image-task \
-        --object-key "${AMI_ID_BIN}" \
-        --bucket "${S3_BUCKET_GOV}" \
-        --name "${AMI_NAME}" \
-        --profile govcloud | jq -r .ImageId) &
+    declare -A AMI_IDS
+    for REGION in "us-gov-east-1" "us-gov-west-1"; do
+        AMI_IDS[$REGION]=$(AWS_REGION="$REGION" \
+        AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+        AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+        aws ec2 create-restore-image-task \
+            --object-key "${AMI_ID_BIN}" \
+            --bucket "${S3_BUCKET_GOV}" \
+            --name "${AMI_NAME}" \
+            --profile govcloud | jq -r .ImageId) &
+    done
 
     wait
 
-    echo "Successfully copied ${AMI_ID} @ ${AWS_DEFAULT_REGION} --> ${AMI_ID_GOV_EAST} @ us-gov-east-1 and ${AMI_ID_GOV_WEST} @ us-gov-west-1"
+    echo "Successfully copied ${AMI_ID} @ ${AWS_DEFAULT_REGION} --> ${AMI_IDS[us-gov-east-1]} @ us-gov-east-1 and ${AMI_IDS[us-gov-west-1]} @ us-gov-west-1"
 
     # Wait for the copied AMIs to become available
-    echo "Waiting for AMI ${AMI_ID_GOV_EAST} to become available in GovCloud region us-gov-east-1"
-    AWS_REGION="us-gov-east-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 wait image-available --region "us-gov-east-1" --image-ids "${AMI_ID_GOV_EAST}" --profile govcloud &
-
-    echo "Waiting for AMI ${AMI_ID_GOV_WEST} to become available in GovCloud region us-gov-west-1"
-    AWS_REGION="us-gov-west-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 wait image-available --region "us-gov-west-1" --image-ids "${AMI_ID_GOV_WEST}" --profile govcloud &
+    for REGION in "us-gov-east-1" "us-gov-west-1"; do
+        echo "Waiting for AMI ${AMI_IDS[$REGION]} to become available in GovCloud region $REGION"
+        AWS_REGION="$REGION" \
+        AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+        AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+        aws ec2 wait image-available --region "$REGION" --image-ids "${AMI_IDS[$REGION]}" --profile govcloud &
+    done
 
     wait
 
-    echo "Making AMI ${AMI_ID_GOV_EAST} public in us-gov-east-1"
-    AWS_REGION="us-gov-east-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 modify-image-attribute --image-id "${AMI_ID_GOV_EAST}" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud &
-
-    echo "Making AMI ${AMI_ID_GOV_WEST} public in us-gov-west-1"
-    AWS_REGION="us-gov-west-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 modify-image-attribute --image-id "${AMI_ID_GOV_WEST}" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud &
+    # Make the AMIs public
+    for REGION in "us-gov-east-1" "us-gov-west-1"; do
+        echo "Making AMI ${AMI_IDS[$REGION]} public in $REGION"
+        AWS_REGION="$REGION" \
+        AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+        AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+        aws ec2 modify-image-attribute --image-id "${AMI_IDS[$REGION]}" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud &
+    done
 
     wait
 
-    echo "Successfully copied ${AMI_ID} @ ${AWS_DEFAULT_REGION} --> ${AMI_ID_GOV_EAST} @ us-gov-east-1 and ${AMI_ID_GOV_WEST} @ us-gov-west-1"
+    echo "Successfully copied ${AMI_ID} @ ${AWS_DEFAULT_REGION} --> ${AMI_IDS[us-gov-east-1]} @ us-gov-east-1 and ${AMI_IDS[us-gov-west-1]} @ us-gov-west-1"
     AWS_REGION="us-gov-east-1" \
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \

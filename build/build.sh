@@ -194,9 +194,9 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
     # Wait for all background processes to complete
     wait
 
-    # Empty and delete S3 buckets
-    aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --force --profile commercial
-    aws s3 rb "s3://${S3_BUCKET_GOV}" --force --profile govcloud
+    # Delete S3 buckets
+    aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --profile commercial
+    aws s3 rb "s3://${S3_BUCKET_GOV}" --profile govcloud
 fi
 
 TESTEXIT=$?
