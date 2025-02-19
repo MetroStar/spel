@@ -116,7 +116,7 @@ build_packer_templates() {
         BUILD_NAME="${BUILDER//*./}"
         AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
         BUILDER_ENV="${BUILDER//[.-]/_}"
-        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
+        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
         if [[ "$BUILDER_AMI" == "None" ]]
         then
             FAILED_BUILDS+=("$BUILDER")
