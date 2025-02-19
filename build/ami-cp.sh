@@ -39,7 +39,9 @@ import_ami() {
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
     aws ec2 wait store-image-task-complete \
         --image-id "${AMI_ID}" \
-        --profile commercial
+        --profile commercial \
+        --max-attempts 80 \
+        --delay 30
     echo "Successfully copied ${AMI_ID} to ${S3_BUCKET_COMMERCIAL}"
 
     AMI_ID_BIN="${2}".bin
