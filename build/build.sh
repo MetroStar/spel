@@ -182,8 +182,8 @@ done
 wait
 
 # Delete S3 buckets
-aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --profile commercial
-aws s3 rb "s3://${S3_BUCKET_GOV}" --profile govcloud
+aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --force --profile commercial
+aws s3 rb "s3://${S3_BUCKET_GOV}" --force --profile govcloud
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
