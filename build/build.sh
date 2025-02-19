@@ -163,12 +163,12 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
     run_tests
 
     # Retry failed tests until there are no more failed tests
-    # while [[ ${#FAILED_TEST_BUILDS[@]} -gt 0 ]]; do
-    #     echo "Retrying failed tests: ${FAILED_TEST_BUILDS[*]}"
-    #     SUCCESS_BUILDERS=$(IFS=, ; echo "${FAILED_TEST_BUILDS[*]}")
-    #     FAILED_TEST_BUILDS=()
-    #     run_tests
-    # done
+    while [[ ${#FAILED_TEST_BUILDS[@]} -gt 0 ]]; do
+        echo "Retrying failed tests: ${FAILED_TEST_BUILDS[*]}"
+        SUCCESS_BUILDERS=$(IFS=, ; echo "${FAILED_TEST_BUILDS[*]}")
+        FAILED_TEST_BUILDS=()
+        run_tests
+    done
 
     # Generate unique S3 bucket names
     TIMESTAMP=$(date +%s)
