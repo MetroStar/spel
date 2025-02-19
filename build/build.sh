@@ -154,7 +154,7 @@ if [[ -n "${SUCCESS_BUILDS:-}" ]]; then
         TESTEXIT=$?
 
         if [[ $TESTEXIT -ne 0 ]]; then
-            FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log))
+            FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
         fi
 
         echo "ERROR: Test failed for builders: ${FAILED_TEST_BUILDS[*]}"
