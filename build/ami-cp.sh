@@ -30,7 +30,7 @@ import_ami() {
     aws ec2 create-store-image-task \
         --image-id "${AMI_ID}" \
         --bucket "${S3_BUCKET_COMMERCIAL}" \
-        --profile commercial | jq .OriginKey
+        --profile commercial
 
     # Wait for the AMI to be copied to S3
     echo "Waiting for AMI ${AMI_ID} to be copied to S3 in ${AWS_DEFAULT_REGION}"
@@ -38,7 +38,7 @@ import_ami() {
     AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
     aws ec2 wait store-image-task-complete \
-        --bucket "${S3_BUCKET_COMMERCIAL}" \
+        --image-id "${AMI_ID}" \
         --profile commercial
     echo "Successfully copied ${AMI_ID} to ${S3_BUCKET_COMMERCIAL}"
 
