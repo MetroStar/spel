@@ -125,8 +125,6 @@ build_packer_templates() {
             export "$BUILDER_ENV"="$BUILDER_AMI"
         fi
     done
-
-    echo "ERROR: Failed builds: ${FAILED_BUILDS[*]}"
 }
 
 build_packer_templates
@@ -163,7 +161,6 @@ for BUILDER in "${SUCCESS_BUILDS[@]}"; do
     BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
 
     if [[ "$BUILDER_AMI" != "None" ]]; then
-        echo "Copying AMI $BUILDER_AMI to GovCloud partition"
         bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME
     fi
 done
