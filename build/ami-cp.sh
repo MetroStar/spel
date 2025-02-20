@@ -77,7 +77,7 @@ import_ami() {
     aws s3 cp "s3://${S3_BUCKET_COMMERCIAL}/${AMI_ID_BIN}" "${AMI_ID_BIN}" --profile commercial
     echo "Successfully downloaded ${TARGET_AMI_NAME} from ${S3_BUCKET_COMMERCIAL}"
 
-    echo "Deleting ${TARGET_AMI_NAME} in ${S3_BUCKET_COMMERCIAL}
+    echo "Deleting ${TARGET_AMI_NAME} in ${S3_BUCKET_COMMERCIAL}"
     AWS_REGION="us-east-1" \
     AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
