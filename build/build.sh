@@ -23,7 +23,7 @@ EOL
 
 cat <<EOL > ~/.aws/config
 [profile commercial]
-region = ${AWS_DEFAULT_REGION}
+region = us-east-1
 
 [profile govcloud]
 region = us-gov-east-1
@@ -155,16 +155,6 @@ if [[ $TESTEXIT -ne 0 ]]; then
     FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
 fi
 
-# Generate unique S3 bucket names
-TIMESTAMP=$(date +%s)
-RANDOM_STRING=$(openssl rand -hex 6)
-export S3_BUCKET_COMMERCIAL="commercial-bucket-${TIMESTAMP}-${RANDOM_STRING}"
-export S3_BUCKET_GOV="govcloud-bucket-${TIMESTAMP}-${RANDOM_STRING}"
-
-# Create S3 buckets
-aws s3 mb "s3://${S3_BUCKET_COMMERCIAL}" --region "${AWS_DEFAULT_REGION}" --profile commercial
-aws s3 mb "s3://${S3_BUCKET_GOV}" --region "us-gov-east-1" --profile govcloud
-
 # Copy AMI to GovCloud partition using the script from the repository
 for BUILDER in "${SUCCESS_BUILDS[@]}"; do
     BUILD_NAME="${BUILDER//*./}"
@@ -174,16 +164,9 @@ for BUILDER in "${SUCCESS_BUILDS[@]}"; do
 
     if [[ "$BUILDER_AMI" != "None" ]]; then
         echo "Copying AMI $BUILDER_AMI to GovCloud partition"
-        bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME &
+        bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME
     fi
 done
-
-# Wait for all background processes to complete
-wait
-
-# Delete S3 buckets
-aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --force --profile commercial
-aws s3 rb "s3://${S3_BUCKET_GOV}" --force --profile govcloud
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
