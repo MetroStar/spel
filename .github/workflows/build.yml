@@ -2,9 +2,8 @@ name: Build STIGed AMI's
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: '0 9 1 * *'
 
 permissions:
   id-token: write
