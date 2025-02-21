@@ -1,0 +1,78 @@
+name: Build STIGed AMI's
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_COMMERCIAL_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_COMMERCIAL_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::204182206073:role/Packer_Amazon
+          role-duration-seconds: 43200
+
+      - name: Set up environment
+        run: |
+          echo "Setting up environment variables"
+
+          echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
+          echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+          echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
+
+          echo "AWS_COMMERCIAL_ACCESS_KEY_ID=${{ secrets.AWS_COMMERCIAL_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "AWS_COMMERCIAL_SECRET_ACCESS_KEY=${{ secrets.AWS_COMMERCIAL_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          echo "AWS_GOVCLOUD_ACCESS_KEY_ID=${{ secrets.AWS_GOVCLOUD_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "AWS_GOVCLOUD_SECRET_ACCESS_KEY=${{ secrets.AWS_GOVCLOUD_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+
+      - name: Install necessary packages
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y \
+            xz-utils \
+            curl \
+            jq \
+            unzip \
+            make \
+            vim \
+            build-essential \
+            libssl-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            llvm \
+            libncursesw5-dev \
+            tk-dev \
+            libxml2-dev \
+            libxmlsec1-dev \
+            libffi-dev \
+            liblzma-dev \
+            && sudo rm -rf /var/lib/apt/lists/*
+
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+
+      - name: Install Packer
+        run: |
+          make -f Makefile.spel install
+
+      - name: Build STIGed AMI's
+        run: |
+          make -f Makefile.spel build
