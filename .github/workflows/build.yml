@@ -62,12 +62,6 @@ jobs:
             liblzma-dev \
             && sudo rm -rf /var/lib/apt/lists/*
 
-      - name: Install AWS CLI
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
-
       - name: Install Packer
         run: |
           make -f Makefile.spel install
