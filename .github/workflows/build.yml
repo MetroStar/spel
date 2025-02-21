@@ -1,6 +1,7 @@
 name: Build STIGed AMI's
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
