@@ -137,41 +137,12 @@ while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
 done
 
 SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
-echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
-
-FAILED_TEST_BUILDS=()
-
-packer build \
-    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
-    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-    -var "spel_version=${SPEL_VERSION:?}" \
-    tests/minimal-linux.pkr.hcl | tee packer_test_output.log
-
-TESTEXIT=$?
-
-if [[ $TESTEXIT -ne 0 ]]; then
-    FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
-fi
-
-# Copy AMI to GovCloud partition using the script from the repository
-for BUILDER in "${SUCCESS_BUILDS[@]}"; do
-    BUILD_NAME="${BUILDER//*./}"
-    AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
-    BUILDER_ENV="${BUILDER//[.-]/_}"
-    BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text --profile commercial)
-
-    if [[ "$BUILDER_AMI" != "None" ]]; then
-        bash ./build/ami-cp.sh import_ami $BUILDER_AMI $AMI_NAME
-    fi
-done
+echo "SUCCESS_BUILDERS=${SUCCESS_BUILDERS}" >> $GITHUB_ENV
+echo "SUCCESS_BUILDS=${SUCCESS_BUILDS[*]}" >> $GITHUB_ENV
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
     echo "ERROR: Failed builds: ${FAILED_BUILDERS}"
     echo "ERROR: Build failed. Scroll up past the test to see the packer error and review the build logs."
     exit $BUILDEXIT
-fi
-
-if [[ $TESTEXIT -ne 0 ]]; then
-    echo "ERROR: Test failed for builders: ${FAILED_TEST_BUILDS[*]}"
 fi

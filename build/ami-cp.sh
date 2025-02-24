@@ -10,8 +10,8 @@ status() {
 }
 
 import_ami() {
-    AMI_ID="${2}"
-    TARGET_AMI_NAME="${3:-my-cool-ami}"
+    AMI_ID="${1}"
+    TARGET_AMI_NAME="${2:-my-cool-ami}"
 
     if test -n "${AMI_ID}"; then
         echo "Importing ${TARGET_AMI_NAME} -> us-gov-east-1 and us-gov-west-1"
@@ -34,16 +34,6 @@ import_ami() {
     AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
     aws s3 mb "s3://${S3_BUCKET_COMMERCIAL}" --region "us-east-1" --profile commercial
-
-    AWS_REGION="us-gov-east-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws s3 mb "s3://${S3_BUCKET_GOV_EAST}" --region "us-gov-east-1" --profile govcloud
-
-    AWS_REGION="us-gov-west-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws s3 mb "s3://${S3_BUCKET_GOV_WEST}" --region "us-gov-west-1" --profile govcloud
 
     # Copy AMI from aws commercial
     echo "Copying ${TARGET_AMI_NAME} to ${S3_BUCKET_COMMERCIAL}"
@@ -83,6 +73,21 @@ import_ami() {
     AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
     aws s3 rm "s3://${S3_BUCKET_COMMERCIAL}/${AMI_ID_BIN}" --profile commercial
     echo "Successfully deleted ${TARGET_AMI_NAME} in ${S3_BUCKET_COMMERCIAL}"
+
+    AWS_REGION="us-east-1" \
+    AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
+    aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --force --region "us-east-1" --profile commercial
+
+    AWS_REGION="us-gov-east-1" \
+    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+    aws s3 mb "s3://${S3_BUCKET_GOV_EAST}" --region "us-gov-east-1" --profile govcloud
+
+    AWS_REGION="us-gov-west-1" \
+    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+    aws s3 mb "s3://${S3_BUCKET_GOV_WEST}" --region "us-gov-west-1" --profile govcloud
 
     # Upload image to gov s3
     echo "Uploading ${TARGET_AMI_NAME} to ${S3_BUCKET_GOV_EAST}"
@@ -205,12 +210,19 @@ import_ami() {
     AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
     AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
     aws s3 rb "s3://${S3_BUCKET_GOV_WEST}" --force --region "us-gov-west-1" --profile govcloud
-
-    AWS_REGION="us-east-1" \
-    AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
-    aws s3 rb "s3://${S3_BUCKET_COMMERCIAL}" --force --region "us-east-1" --profile commercial
 }
+
+# Copy AMI to GovCloud partition using the script from the repository
+for BUILDER in "${SUCCESS_BUILDS[@]}"; do
+    BUILD_NAME="${BUILDER//*./}"
+    AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
+    BUILDER_ENV="${BUILDER//[.-]/_}"
+    BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
+
+    if [[ "$BUILDER_AMI" != "None" ]]; then
+        import_ami $BUILDER_AMI $AMI_NAME
+    fi
+done
 
 usage() {
     echo "usage: $0 [ import_ami | status ]"

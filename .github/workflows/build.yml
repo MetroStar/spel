@@ -68,3 +68,11 @@ jobs:
       - name: Build STIGed AMI's
         run: |
           make -f Makefile.spel build
+
+      - name: Test STIGed AMI's
+        run: |
+          make -f Makefile.spel test
+
+      - name: Copy STIGed AMI's to GovCloud
+        run: |
+          make -f Makefile.spel copy
