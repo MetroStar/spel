@@ -70,5 +70,11 @@ pre_build:
 build: pre_build
 	bash ./build/build.sh
 
+test:
+	bash ./build/test.sh
+
+copy:
+	bash ./build/ami-cp.sh
+
 post_build:
 	bash ./build/post_build.sh
