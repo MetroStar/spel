@@ -143,6 +143,34 @@ import_ami() {
     aws ec2 wait image-available --region "us-gov-west-1" --image-ids "${AMI_ID_GOV_WEST}" --profile govcloud
     echo "${TARGET_AMI_NAME} now available in us-gov-west-1"
 
+    # Get the snapshot ID associated with the AMI in us-gov-east-1
+    SNAPSHOT_ID_GOV_EAST=$(AWS_REGION="us-gov-east-1" \
+    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+    aws ec2 describe-images --image-ids "${AMI_ID_GOV_EAST}" --query "Images[0].BlockDeviceMappings[0].Ebs.SnapshotId" --output text --profile govcloud)
+
+    # Get the snapshot ID associated with the AMI in us-gov-west-1
+    SNAPSHOT_ID_GOV_WEST=$(AWS_REGION="us-gov-west-1" \
+    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+    aws ec2 describe-images --image-ids "${AMI_ID_GOV_WEST}" --query "Images[0].BlockDeviceMappings[0].Ebs.SnapshotId" --output text --profile govcloud)
+
+    # Wait for the snapshot to become available in us-gov-east-1
+    echo "Waiting for snapshot ${SNAPSHOT_ID_GOV_EAST} to become available in us-gov-east-1"
+    AWS_REGION="us-gov-east-1" \
+    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+    aws ec2 wait snapshot-completed --snapshot-ids "${SNAPSHOT_ID_GOV_EAST}" --profile govcloud
+    echo "Snapshot ${SNAPSHOT_ID_GOV_EAST} is now available in us-gov-east-1"
+
+    # Wait for the snapshot to become available in us-gov-west-1
+    echo "Waiting for snapshot ${SNAPSHOT_ID_GOV_WEST} to become available in us-gov-west-1"
+    AWS_REGION="us-gov-west-1" \
+    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+    aws ec2 wait snapshot-completed --snapshot-ids "${SNAPSHOT_ID_GOV_WEST}" --profile govcloud
+    echo "Snapshot ${SNAPSHOT_ID_GOV_WEST} is now available in us-gov-west-1"
+
     # Make the AMIs public
     echo "Making ${TARGET_AMI_NAME} public in us-gov-east-1"
     AWS_REGION="us-gov-east-1" \
