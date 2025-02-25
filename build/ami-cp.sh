@@ -205,7 +205,8 @@ import_ami() {
 }
 
 # Copy AMI to GovCloud partition using the script from the repository
-for BUILDER in "${SUCCESS_BUILDS[@]}"; do
+IFS=' ' read -r -a SUCCESS_BUILDS_ARRAY <<< "${SUCCESS_BUILDS}"
+for BUILDER in "${SUCCESS_BUILDS_ARRAY[@]}"; do
     BUILD_NAME="${BUILDER//*./}"
     AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
     BUILDER_ENV="${BUILDER//[.-]/_}"
