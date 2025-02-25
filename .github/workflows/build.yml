@@ -31,6 +31,7 @@ jobs:
           echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
           echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
           echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
+          echo "PACKER_GITHUB_API_TOKEN=${{ secrets.PACKER_GITHUB_API_TOKEN }}" >> $GITHUB_ENV
 
           echo "AWS_COMMERCIAL_ACCESS_KEY_ID=${{ secrets.AWS_COMMERCIAL_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "AWS_COMMERCIAL_SECRET_ACCESS_KEY=${{ secrets.AWS_COMMERCIAL_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
