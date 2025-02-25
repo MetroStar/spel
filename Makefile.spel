@@ -38,7 +38,7 @@ $(shell mkdir -p ".spel/$(SPEL_VERSION)")
 endif
 
 ifeq ($(SPEL_CI),true)
-export PKR_VAR_aws_ami_groups = ["all"]
+export PKR_VAR_aws_ami_groups = []
 export PKR_VAR_aws_ami_regions = ["us-east-1","us-east-2","us-west-1","us-west-2"]
 endif
 

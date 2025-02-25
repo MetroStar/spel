@@ -169,19 +169,19 @@ import_ami() {
     echo "Snapshot ${SNAPSHOT_ID_GOV_WEST} is now available in us-gov-west-1"
 
     # Make the AMIs public
-    echo "Making ${TARGET_AMI_NAME} public in us-gov-east-1"
-    AWS_REGION="us-gov-east-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 modify-image-attribute --image-id "${AMI_ID_GOV_EAST}" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
-    echo "${TARGET_AMI_NAME} now public in us-gov-east-1"
+    # echo "Making ${TARGET_AMI_NAME} public in us-gov-east-1"
+    # AWS_REGION="us-gov-east-1" \
+    # AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+    # AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+    # aws ec2 modify-image-attribute --image-id "${AMI_ID_GOV_EAST}" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
+    # echo "${TARGET_AMI_NAME} now public in us-gov-east-1"
 
-    echo "Making ${TARGET_AMI_NAME} public in us-gov-west-1"
-    AWS_REGION="us-gov-west-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 modify-image-attribute --image-id "${AMI_ID_GOV_WEST}" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
-    echo "${TARGET_AMI_NAME} now public in us-gov-west-1"
+    # echo "Making ${TARGET_AMI_NAME} public in us-gov-west-1"
+    # AWS_REGION="us-gov-west-1" \
+    # AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+    # AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+    # aws ec2 modify-image-attribute --image-id "${AMI_ID_GOV_WEST}" --launch-permission "{\"Add\": [{\"Group\":\"all\"}]}" --profile govcloud
+    # echo "${TARGET_AMI_NAME} now public in us-gov-west-1"
 
     echo "Successfully imported ${TARGET_AMI_NAME} --> us-gov-east-1 and us-gov-west-1"
 
