@@ -40,13 +40,23 @@ import_ami() {
 
     # Wait for the AMI to be copied to S3
     echo "Waiting for ${TARGET_AMI_NAME} to be copied to ${S3_BUCKET_COMMERCIAL}"
-    AWS_REGION="us-east-1" \
-    AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
-    aws ec2 wait store-image-task-complete \
-        --image-id "${AMI_ID}" \
-        --profile commercial
-    echo "Successfully copied ${TARGET_AMI_NAME} to ${S3_BUCKET_COMMERCIAL}"
+    while true; do
+        TASK_STATE=$(AWS_REGION="us-east-1" \
+            AWS_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}" \
+            AWS_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}" \
+            aws ec2 describe-store-image-tasks --image-id "${AMI_ID}" --query "StoreImageTaskResults[0].StoreTaskState" --output text --profile commercial)
+
+        if [ "$TASK_STATE" == "Completed" ]; then
+            echo "Successfully copied ${TARGET_AMI_NAME} to ${S3_BUCKET_COMMERCIAL}"
+            break
+        elif [ "$TASK_STATE" == "Failed" ]; then
+            echo "Failed to copy ${TARGET_AMI_NAME} to ${S3_BUCKET_COMMERCIAL}"
+            exit 1
+        else
+            echo "Current state: $TASK_STATE. Waiting..."
+            sleep 30
+        fi
+    done
 
     AMI_ID_BIN="${1}".bin
     AMI_NAME=${2:-ami-from-aws-commercial}
