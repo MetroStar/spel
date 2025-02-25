@@ -1,14 +1,6 @@
 #!/bin/bash
 set -e
 
-status() {
-    watch -n 1 "\
-    AWS_REGION=\"us-east-1\" \
-    AWS_ACCESS_KEY_ID=\"${AWS_COMMERCIAL_ACCESS_KEY_ID}\" \
-    AWS_SECRET_ACCESS_KEY=\"${AWS_COMMERCIAL_SECRET_ACCESS_KEY}\" \
-    aws ec2 describe-store-image-tasks --profile commercial"
-}
-
 import_ami() {
     AMI_ID="${1}"
     TARGET_AMI_NAME="${2:-my-cool-ami}"
@@ -223,15 +215,3 @@ for BUILDER in "${SUCCESS_BUILDS[@]}"; do
         import_ami $BUILDER_AMI $AMI_NAME
     fi
 done
-
-usage() {
-    echo "usage: $0 [ import_ami | status ]"
-    exit 1
-}
-
-case "${1}"
-in
-    ("import_ami") import_ami ${@} ;;
-    ("status") status ;;
-    (*) usage ;;
-esac
