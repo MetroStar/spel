@@ -137,7 +137,18 @@ while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
 done
 
 SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
-echo "SUCCESS_BUILDERS=${SUCCESS_BUILDERS}" >> $GITHUB_ENV
+echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
+
+FAILED_TEST_BUILDS=()
+
+packer build \
+    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
+    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+    -var "spel_version=${SPEL_VERSION:?}" \
+    tests/minimal-linux.pkr.hcl | tee packer_test_output.log
+
+TESTEXIT=$?
+
 echo "SUCCESS_BUILDS=${SUCCESS_BUILDS[*]}" >> $GITHUB_ENV
 
 if [[ $BUILDEXIT -ne 0 ]]; then
@@ -145,4 +156,8 @@ if [[ $BUILDEXIT -ne 0 ]]; then
     echo "ERROR: Failed builds: ${FAILED_BUILDERS}"
     echo "ERROR: Build failed. Scroll up past the test to see the packer error and review the build logs."
     exit $BUILDEXIT
+fi
+
+if [[ $TESTEXIT -ne 0 ]]; then
+    FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
 fi
