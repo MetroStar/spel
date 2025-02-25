@@ -56,8 +56,8 @@ import_ami() {
         --profile commercial
     echo "Successfully copied ${TARGET_AMI_NAME} to ${S3_BUCKET_COMMERCIAL}"
 
-    AMI_ID_BIN="${2}".bin
-    AMI_NAME=${3:-ami-from-aws-commercial}
+    AMI_ID_BIN="${1}".bin
+    AMI_NAME=${2:-ami-from-aws-commercial}
 
     # Get image from commercial aws
     echo "Downloading ${TARGET_AMI_NAME} from ${S3_BUCKET_COMMERCIAL}"
