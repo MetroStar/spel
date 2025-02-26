@@ -47,41 +47,41 @@ jobs:
           echo "AWS_GOVCLOUD_ACCESS_KEY_ID=${{ secrets.AWS_GOVCLOUD_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "AWS_GOVCLOUD_SECRET_ACCESS_KEY=${{ secrets.AWS_GOVCLOUD_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
 
-      # - name: Install necessary packages
-      #   run: |
-      #     sudo apt-get update -y && sudo apt-get install -y \
-      #       xz-utils \
-      #       curl \
-      #       jq \
-      #       unzip \
-      #       make \
-      #       vim \
-      #       build-essential \
-      #       libssl-dev \
-      #       zlib1g-dev \
-      #       libbz2-dev \
-      #       libreadline-dev \
-      #       libsqlite3-dev \
-      #       llvm \
-      #       libncursesw5-dev \
-      #       tk-dev \
-      #       libxml2-dev \
-      #       libxmlsec1-dev \
-      #       libffi-dev \
-      #       liblzma-dev \
-      #       && sudo rm -rf /var/lib/apt/lists/*
+      - name: Install necessary packages
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y \
+            xz-utils \
+            curl \
+            jq \
+            unzip \
+            make \
+            vim \
+            build-essential \
+            libssl-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            llvm \
+            libncursesw5-dev \
+            tk-dev \
+            libxml2-dev \
+            libxmlsec1-dev \
+            libffi-dev \
+            liblzma-dev \
+            && sudo rm -rf /var/lib/apt/lists/*
 
-      # - name: Install Packer
-      #   run: |
-      #     make -f Makefile.spel install
+      - name: Install Packer
+        run: |
+          make -f Makefile.spel install
 
-      # - name: Build STIGed AMI's
-      #   run: |
-      #     make -f Makefile.spel build
+      - name: Build STIGed AMI's
+        run: |
+          make -f Makefile.spel build
 
-      # - name: Copy STIGed AMI's to GovCloud
-      #   run: |
-      #     make -f Makefile.spel copy
+      - name: Copy STIGed AMI's to GovCloud
+        run: |
+          make -f Makefile.spel copy
 
       - name: Check if README.md needs update
         id: check_readme
