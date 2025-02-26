@@ -92,7 +92,7 @@ check_and_manage_ami_quotas() {
     done
 }
 
-if [ "$PUBLIC" = "true" ]; then
+if [ $PUBLIC = "true" ]; then
   # Check and manage AMI quotas before starting the build
   check_and_manage_ami_quotas
 fi
@@ -118,7 +118,7 @@ build_packer_templates() {
         BUILD_NAME="${BUILDER//*./}"
         AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
         BUILDER_ENV="${BUILDER//[.-]/_}"
-        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values="$(date +%Y-%m-%dT*)" --owners self --query 'Images[0].ImageId' --out text --profile commercial)
+        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
         if [[ "$BUILDER_AMI" == "None" ]]
         then
             FAILED_BUILDS+=("$BUILDER")
@@ -141,17 +141,25 @@ done
 SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
 echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
 
+FAILED_TEST_BUILDS=()
+
 packer build \
     -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
     -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
     -var "spel_version=${SPEL_VERSION:?}" \
     tests/minimal-linux.pkr.hcl | tee packer_test_output.log
 
-echo "SUCCESS_BUILDS=${SUCCESS_BUILDS[*]}" >> "$GITHUB_ENV"
+TESTEXIT=$?
+
+echo "SUCCESS_BUILDS=${SUCCESS_BUILDS[*]}" >> $GITHUB_ENV
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
     echo "ERROR: Failed builds: ${FAILED_BUILDERS}"
     echo "ERROR: Build failed. Scroll up past the test to see the packer error and review the build logs."
     exit $BUILDEXIT
+fi
+
+if [[ $TESTEXIT -ne 0 ]]; then
+    FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
 fi
