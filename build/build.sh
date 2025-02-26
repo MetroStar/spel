@@ -92,7 +92,7 @@ check_and_manage_ami_quotas() {
     done
 }
 
-if [ $PUBLIC = "true" ]; then
+if [ "$PUBLIC" = "true" ]; then
   # Check and manage AMI quotas before starting the build
   check_and_manage_ami_quotas
 fi
@@ -118,7 +118,7 @@ build_packer_templates() {
         BUILD_NAME="${BUILDER//*./}"
         AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
         BUILDER_ENV="${BUILDER//[.-]/_}"
-        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
+        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values="$(date +%Y-%m-%dT*)" --owners self --query 'Images[0].ImageId' --out text --profile commercial)
         if [[ "$BUILDER_AMI" == "None" ]]
         then
             FAILED_BUILDS+=("$BUILDER")
@@ -151,7 +151,7 @@ packer build \
 
 TESTEXIT=$?
 
-echo "SUCCESS_BUILDS=${SUCCESS_BUILDS[*]}" >> $GITHUB_ENV
+echo "SUCCESS_BUILDS=${SUCCESS_BUILDS[*]}" >> "$GITHUB_ENV"
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
@@ -161,5 +161,6 @@ if [[ $BUILDEXIT -ne 0 ]]; then
 fi
 
 if [[ $TESTEXIT -ne 0 ]]; then
-    FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
+    mapfile -t failed_builds < <(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g")
+    IFS=',' read -r -a FAILED_TEST_BUILDS <<< "${failed_builds[*]}"
 fi

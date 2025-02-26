@@ -178,7 +178,7 @@ import_ami() {
     aws ec2 wait snapshot-completed --snapshot-ids "${SNAPSHOT_ID_GOV_WEST}" --profile govcloud
     echo "Snapshot ${SNAPSHOT_ID_GOV_WEST} is now available in us-gov-west-1"
 
-    if [ $PUBLIC = "true" ]; then
+    if [ "$PUBLIC" = "true" ]; then
         # Make the AMIs public
         echo "Making ${TARGET_AMI_NAME} public in us-gov-east-1"
         AWS_REGION="us-gov-east-1" \
@@ -221,10 +221,9 @@ IFS=' ' read -r -a SUCCESS_BUILDS_ARRAY <<< "${SUCCESS_BUILDS}"
 for BUILDER in "${SUCCESS_BUILDS_ARRAY[@]}"; do
     BUILD_NAME="${BUILDER//*./}"
     AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
-    BUILDER_ENV="${BUILDER//[.-]/_}"
-    BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
+    BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values="$(date +%Y-%m-%dT*)" --owners self --query 'Images[0].ImageId' --out text --profile commercial)
 
     if [[ "$BUILDER_AMI" != "None" ]]; then
-        import_ami $BUILDER_AMI $AMI_NAME
+        import_ami "$BUILDER_AMI" "$AMI_NAME"
     fi
 done
