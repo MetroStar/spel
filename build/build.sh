@@ -92,8 +92,10 @@ check_and_manage_ami_quotas() {
     done
 }
 
-# Check and manage AMI quotas before starting the build
-check_and_manage_ami_quotas
+if [ $PUBLIC = "true" ]; then
+  # Check and manage AMI quotas before starting the build
+  check_and_manage_ami_quotas
+fi
 
 echo "==========STARTING BUILD=========="
 echo "Building packer template, spel/minimal-linux.pkr.hcl"
