@@ -147,8 +147,6 @@ packer build \
     -var "spel_version=${SPEL_VERSION:?}" \
     tests/minimal-linux.pkr.hcl | tee packer_test_output.log
 
-TESTEXIT=$?
-
 echo "SUCCESS_BUILDS=${SUCCESS_BUILDS[*]}" >> "$GITHUB_ENV"
 
 if [[ $BUILDEXIT -ne 0 ]]; then
