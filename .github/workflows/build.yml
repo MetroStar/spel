@@ -36,16 +36,10 @@ jobs:
           echo "Setting up environment variables"
 
           echo "PUBLIC=${{ github.event.inputs.public }}" >> $GITHUB_ENV
-          if [ $PUBLIC = "true" ]; then
-            echo "export PKR_VAR_aws_ami_groups = ['all']" >> $GITHUB_ENV
-          else
-            echo "export PKR_VAR_aws_ami_groups=[]" >> $GITHUB_ENV
-          fi
 
           echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
           echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
           echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
-          export "PKR_VAR_aws_ami_regions = ['us-east-1','us-east-2','us-west-1','us-west-2']" >> $GITHUB_ENV
           echo "PACKER_GITHUB_API_TOKEN=${{ secrets.PACKER_GITHUB_API_TOKEN }}" >> $GITHUB_ENV
 
           echo "AWS_COMMERCIAL_ACCESS_KEY_ID=${{ secrets.AWS_COMMERCIAL_ACCESS_KEY_ID }}" >> $GITHUB_ENV
