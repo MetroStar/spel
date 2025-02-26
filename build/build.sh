@@ -157,7 +157,3 @@ if [[ $BUILDEXIT -ne 0 ]]; then
     echo "ERROR: Build failed. Scroll up past the test to see the packer error and review the build logs."
     exit $BUILDEXIT
 fi
-
-if [[ $TESTEXIT -ne 0 ]]; then
-    mapfile -t failed_builds < <(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g")
-fi
