@@ -82,3 +82,7 @@ jobs:
       - name: Copy STIGed AMI's to GovCloud
         run: |
           make -f Makefile.spel copy
+
+      - name: Update README.md with current month
+        run: |
+          sed -i "s/$(date -d 'last month' +%Y.%m)/$(date +%Y.%m)/g" README.md
