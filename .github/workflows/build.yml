@@ -86,8 +86,11 @@ jobs:
       - name: Update README.md with current month
         run: |
           sed -i "s/$(date -d 'last month' +%Y.%m)/$(date +%Y.%m)/g" README.md
-          git add .
-          git commit -m "Bump version to $(date +%Y.%m).1"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.PACKER_GITHUB_API_TOKEN }}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -a -m "Bump version to $(date +%Y.%m).1"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          force_with_lease: true
