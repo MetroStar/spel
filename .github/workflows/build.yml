@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       public:
-        description: "Set AMI's to public or private"
+        description: "Set AMI's to public"
         required: true
         default: false
         type: boolean
