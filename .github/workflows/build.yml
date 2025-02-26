@@ -85,8 +85,8 @@ jobs:
 
       - name: Update README.md with current month
         run: |
-          sed -i "s/$(date -d 'last month' +%Y.%m)/$(date +%Y.%m)/g" README.md
+          sed -i "s/$(date +%Y.%m)/$(date -d 'last month' +%Y.%m)/g" README.md
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -a -m "Bump version to $(date +%Y.%m).1"
+          git commit -a -m "Dump version to $(date -d 'last month' +%Y.%m).1"
           git push
