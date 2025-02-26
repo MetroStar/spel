@@ -141,8 +141,6 @@ done
 SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
 echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
 
-FAILED_TEST_BUILDS=()
-
 packer build \
     -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
     -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
