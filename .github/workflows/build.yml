@@ -83,10 +83,20 @@ jobs:
       #   run: |
       #     make -f Makefile.spel copy
 
-      - name: Update README.md with current month
+      - name: Check if README.md needs update
+        id: check_readme
         run: |
-          sed -i "s/$(date +%Y.%m)/$(date -d 'last month' +%Y.%m)/g" README.md
+          if grep -q "$(date +%Y.%m)" README.md; then
+            echo "update_needed=false" >> $GITHUB_ENV
+          else
+            echo "update_needed=true" >> $GITHUB_ENV
+          fi
+
+      - name: Update README.md with current month
+        if: env.update_needed == 'true'
+        run: |
+          sed -i "s/$(date -d 'last month' +%Y.%m)/$(date +%Y.%m)/g" README.md
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -a -m "Dump version to $(date -d 'last month' +%Y.%m).1"
+          git commit -a -m "Bump version to $(date +%Y.%m).1"
           git push
