@@ -162,5 +162,4 @@ fi
 
 if [[ $TESTEXIT -ne 0 ]]; then
     mapfile -t failed_builds < <(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g")
-    IFS=',' read -r -a FAILED_TEST_BUILDS <<< "${failed_builds[*]}"
 fi
