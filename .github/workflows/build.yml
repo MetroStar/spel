@@ -9,7 +9,7 @@ on:
         default: false
         type: boolean
   schedule:
-    - cron: '0 9 1 * *'
+    - cron: '0 9 28 2 *'
 
 permissions:
   id-token: write
