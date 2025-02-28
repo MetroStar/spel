@@ -134,21 +134,37 @@ import_ami() {
         --profile govcloud | jq -r .ImageId)
     echo "Successfully copied ${TARGET_AMI_NAME} --> ${AMI_ID_GOV_WEST} @ us-gov-west-1"
 
+    # Function to wait for AMI to become available with retries
+    wait_for_ami() {
+        local region=$1
+        local ami_id=$2
+        local max_retries=10
+        local attempt=0
+
+        while [ $attempt -lt $max_retries ]; do
+            echo "Waiting for ${TARGET_AMI_NAME} to become available in ${region} (attempt $((attempt + 1))/$max_retries)"
+            if AWS_REGION="${region}" \
+            AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
+            AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+            aws ec2 wait image-available --region "${region}" --image-ids "${ami_id}" --profile govcloud; then
+                echo "${TARGET_AMI_NAME} now available in ${region}"
+                return 0
+            else
+                echo "Failed to wait for ${TARGET_AMI_NAME} in ${region}. Retrying..."
+                attempt=$((attempt + 1))
+                sleep 60
+            fi
+        done
+
+        echo "Failed to wait for ${TARGET_AMI_NAME} in ${region} after ${max_retries} attempts"
+        return 1
+    }
+
     # Wait for the copied AMI to become available in us-gov-east-1
-    echo "Waiting for ${TARGET_AMI_NAME} to become available in us-gov-east-1"
-    AWS_REGION="us-gov-east-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 wait image-available --region "us-gov-east-1" --image-ids "${AMI_ID_GOV_EAST}" --profile govcloud
-    echo "${TARGET_AMI_NAME} now available in us-gov-east-1"
+    wait_for_ami "us-gov-east-1" "${AMI_ID_GOV_EAST}"
 
     # Wait for the copied AMI to become available in us-gov-west-1
-    echo "Waiting for ${TARGET_AMI_NAME} to become available in us-gov-west-1"
-    AWS_REGION="us-gov-west-1" \
-    AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-    AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
-    aws ec2 wait image-available --region "us-gov-west-1" --image-ids "${AMI_ID_GOV_WEST}" --profile govcloud
-    echo "${TARGET_AMI_NAME} now available in us-gov-west-1"
+    wait_for_ami "us-gov-west-1" "${AMI_ID_GOV_WEST}"
 
     # Get the snapshot ID associated with the AMI in us-gov-east-1
     SNAPSHOT_ID_GOV_EAST=$(AWS_REGION="us-gov-east-1" \
