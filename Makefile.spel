@@ -21,7 +21,7 @@ export PKR_VAR_spel_deprecation_lifetime ?= 8760h
 # to export AWS_PROFILE with a valid profile. For CodeBuild CI, it is set to $SPEL_IDENTIFIER,
 # and `make install` will create it.
 
-.PHONY: all install pre_build build test copy post_build docs
+.PHONY: all install pre_build build copy post_build docs
 .EXPORT_ALL_VARIABLES:
 
 $(info SPEL_IDENTIFIER=$(SPEL_IDENTIFIER))
@@ -63,11 +63,11 @@ install:
 # targets. For the region targets, do not use "?=" because we *always* want to
 # override this in codebuild. We cannot set these in the buildspec because that
 # breaks codebuild when building for GovCloud.
-pre_build build test copy post_build: export AWS_DEFAULT_REGION := $(BUILDER_REGION)
-pre_build build test copy post_build: export AWS_REGION := $(BUILDER_REGION)
+pre_build build copy post_build: export AWS_DEFAULT_REGION := $(BUILDER_REGION)
+pre_build build copy post_build: export AWS_REGION := $(BUILDER_REGION)
 
 # Set the source security group cidr
-pre_build build test copy post_build: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
+pre_build build copy post_build: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
 
 pre_build:
 	bash ./build/pre_build.sh
