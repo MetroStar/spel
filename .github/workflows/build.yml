@@ -28,7 +28,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-region: us-east-1
-          role-to-assume: arn:aws:iam::204182206073:role/Packer_Amazon
+          role-to-assume: arn:aws:iam::879381286673:role/Packer_Amazon
           role-duration-seconds: 43200
 
       - name: Set up environment
