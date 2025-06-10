@@ -8,6 +8,17 @@ on:
         required: true
         default: false
         type: boolean
+      builders:
+        description: "Select SPEL builders to run"
+        required: true
+        default: "amazon-ebssurrogate.minimal-centos-9stream-hvm,amazon-ebssurrogate.minimal-ol-9-hvm,amazon-ebssurrogate.minimal-rhel-9-hvm,amazon-ebssurrogate.minimal-ol-8-hvm,amazon-ebssurrogate.minimal-rhel-8-hvm"
+        type: choice
+        options:
+          - amazon-ebssurrogate.minimal-centos-9stream-hvm
+          - amazon-ebssurrogate.minimal-ol-9-hvm
+          - amazon-ebssurrogate.minimal-rhel-9-hvm
+          - amazon-ebssurrogate.minimal-ol-8-hvm
+          - amazon-ebssurrogate.minimal-rhel-8-hvm
   schedule:
     - cron: '0 9 1 * *'
 
@@ -36,6 +47,7 @@ jobs:
           echo "Setting up environment variables"
 
           echo "PUBLIC=${{ github.event.inputs.public }}" >> $GITHUB_ENV
+          echo "SPEL_BUILDERS=$(echo ${{ github.event.inputs.builders }} | sed 's/,/ /g')" >> $GITHUB_ENV
 
           echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
           echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
