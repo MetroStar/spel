@@ -176,7 +176,8 @@ function BuildChroot {
     PrepBuildDevice
 
     # Harden the AMI
-    python3 -m pip install --user ansible
+    python3 -m pip install ansible
+    export PATH="/root/.local/bin:$PATH"
     git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
     cd RHEL9-STIG && ansible-playbook -i localhost, -c local site.yml
 
