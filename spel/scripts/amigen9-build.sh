@@ -180,7 +180,7 @@ function BuildChroot {
     export PATH="/usr/local/bin:$PATH"
     which ansible-playbook
     git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
-    cd RHEL9-STIG && ansible-playbook -i localhost, -c local site.yml
+    cd RHEL9-STIG && ansible-playbook -i localhost, -c local site.yml -e "system_is_ec2=true"
 
     # Invoke disk-partitioner
     bash -euxo pipefail "${ELBUILD}"/$( ComposeDiskSetupString ) || \
