@@ -177,9 +177,10 @@ function BuildChroot {
 
     # Harden the AMI
     python3 -m pip install ansible
+    export PATH="/usr/local/bin:$PATH"
     which ansible-playbook
     git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
-    cd RHEL9-STIG && export PATH=$PATH:/root/.local/bin && ansible-playbook -i localhost, -c local site.yml
+    cd RHEL9-STIG && ansible-playbook -i localhost, -c local site.yml
 
     # Invoke disk-partitioner
     bash -euxo pipefail "${ELBUILD}"/$( ComposeDiskSetupString ) || \
