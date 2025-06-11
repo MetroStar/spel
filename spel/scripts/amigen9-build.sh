@@ -187,12 +187,6 @@ function BuildChroot {
     bash -euxo pipefail "${ELBUILD}"/$( ComposeOSpkgString ) || \
         err_exit "Failure encountered with OSpackages.sh"
 
-    # Harden the AMI
-    python3 -m pip install ansible
-    export PATH="/usr/local/bin:$PATH"
-    git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
-    ansible-playbook -i localhost, -c local RHEL9-STIG/site.yml -e "system_is_ec2=true"
-
     # Invoke CSP-specific utilities scripts
     case "${CLOUDPROVIDER}" in
         # Invoke AWSutils installer
@@ -217,6 +211,12 @@ function BuildChroot {
             err_exit "${STATUS_MSG}" NONE
             ;;
     esac
+
+    # Harden the AMI
+    python3 -m pip install ansible
+    export PATH="/usr/local/bin:$PATH"
+    git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
+    ansible-playbook -i localhost, -c local RHEL9-STIG/site.yml -e "system_is_ec2=true"
 
     # Post-installation configurator
     bash -euxo pipefail "${ELBUILD}"/$( PostBuildString ) || \
