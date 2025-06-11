@@ -179,16 +179,15 @@ function BuildChroot {
     bash -euxo pipefail "${ELBUILD}"/$( ComposeDiskSetupString ) || \
         err_exit "Failure encountered with DiskSetup.sh"
 
-    # Harden the AMI
-    python3 -m pip install ansible
-    export PATH="/usr/local/bin:$PATH"
-    which ansible-playbook
-    git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
-    cd RHEL9-STIG && ansible-playbook -i localhost, -c local site.yml -e "system_is_ec2=true"
-
     # Invoke chroot-env disk-mounter
     bash -euxo pipefail "${ELBUILD}"/$( ComposeChrootMountString ) || \
         err_exit "Failure encountered with MkChrootTree.sh"
+
+    # Harden the AMI
+    python3 -m pip install ansible
+    export PATH="/usr/local/bin:$PATH"
+    git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
+    ansible-playbook -i localhost, -c local RHEL9-STIG/site.yml -e "system_is_ec2=true"
 
     # Invoke OS software installer
     bash -euxo pipefail "${ELBUILD}"/$( ComposeOSpkgString ) || \
