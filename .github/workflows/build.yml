@@ -105,6 +105,7 @@ jobs:
           make -f Makefile.spel build
 
       - name: Copy STIGed AMI's to GovCloud
+        if: github.event.inputs.develop == 'false'
         run: |
           make -f Makefile.spel copy
 
@@ -112,13 +113,13 @@ jobs:
         id: check_readme
         run: |
           if grep -q "$(date +%Y.%m)" README.md; then
-            echo "update_needed=false" >> $GITHUB_ENV
+            echo "::set-output name=update_needed::false"
           else
-            echo "update_needed=true" >> $GITHUB_ENV
+            echo "::set-output name=update_needed::true"
           fi
 
       - name: Update README.md with current month
-        if: env.update_needed == 'true'
+        if: steps.check_readme.outputs.update_needed == 'true'
         run: |
           sed -i "s/$(date -d 'last month' +%Y.%m)/$(date +%Y.%m)/g" README.md
           git config user.name "github-actions[bot]"
