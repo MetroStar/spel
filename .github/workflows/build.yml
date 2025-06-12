@@ -59,8 +59,10 @@ jobs:
           if [ "${{ github.event.inputs.develop }}" == "true" ]; then
             echo "SPEL_VERSION=$(date +%Y.%m).dev" >> $GITHUB_ENV
             echo "PKR_VAR_aws_force_deregister=true" >> $GITHUB_ENV
+            echo "PKR_VAR_aws_ami_regions=['us-east-1']" >> $GITHUB_ENV
           else
             echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+            echo "PKR_VAR_aws_ami_regions=['us-east-1','us-east-2','us-west-1','us-west-2']" >> $GITHUB_ENV
           fi
           echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
           echo "PACKER_GITHUB_API_TOKEN=${{ secrets.PACKER_GITHUB_API_TOKEN }}" >> $GITHUB_ENV
