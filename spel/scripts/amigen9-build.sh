@@ -219,15 +219,15 @@ function BuildChroot {
     # Collect insallation-manifest
     CollectManifest
 
+    # Invoke unmounter
+    bash -euxo pipefail "${ELBUILD}"/Umount.sh -c "${AMIGENCHROOT}" || \
+        err_exit "Failure encountered with Umount.sh"
+
     # Harden the AMI
     python3 -m pip install ansible
     export PATH="/usr/local/bin:$PATH"
     git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
     ansible-playbook -i localhost, -c local RHEL9-STIG/site.yml -e '{"system_is_ec2": true, "setup_audit": true, "run_audit": true, "fetch_audit_output": true}'
-
-    # Invoke unmounter
-    bash -euxo pipefail "${ELBUILD}"/Umount.sh -c "${AMIGENCHROOT}" || \
-        err_exit "Failure encountered with Umount.sh"
 }
 
 # Create a record of the build
