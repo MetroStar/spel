@@ -224,6 +224,7 @@ function BuildChroot {
         err_exit "Failure encountered with Umount.sh"
 
     # Harden the AMI
+    mount -a
     python3 -m pip install ansible
     export PATH="/usr/local/bin:$PATH"
     git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
