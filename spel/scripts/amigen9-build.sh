@@ -223,7 +223,8 @@ function BuildChroot {
     python3 -m pip install ansible
     export PATH="/usr/local/bin:$PATH"
     git clone --depth=1 -b devel https://github.com/ansible-lockdown/RHEL9-STIG.git
-    ansible-playbook -i localhost, -c local RHEL9-STIG/site.yml -e '{"system_is_ec2": true, "setup_audit": true, "run_audit": true, "audit_output_collection_method": "copy", "audit_output_destination": "/opt/hardening/audit/"}'
+    ansible-playbook -i localhost, -c local RHEL9-STIG/site.yml -e '{"system_is_ec2": true, "setup_audit": true, "run_audit": true}'
+    aws s3 cp /opt/audit_summaries/ s3://spel-stig-ansible-lockdown-audit/ --recursive
 
     # Invoke unmounter
     bash -euxo pipefail "${ELBUILD}"/Umount.sh -c "${AMIGENCHROOT}" || \
