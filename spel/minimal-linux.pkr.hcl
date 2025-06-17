@@ -1053,7 +1053,13 @@ build {
     ]
     scripts = [
       "${path.root}/scripts/amigen9-build.sh",
-      "/bin/sudo reboot",
+    ]
+  }
+
+  provisioner "shell" {
+    inline = ["/bin/sudo reboot"]
+    only = [
+      "amazon-ebssurrogate.minimal-rhel-9-hvm",
     ]
     expect_disconnect = true
   }
