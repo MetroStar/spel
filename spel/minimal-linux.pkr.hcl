@@ -1056,31 +1056,6 @@ build {
     ]
   }
 
-  provisioner "shell" {
-    inline = ["/bin/sudo reboot"]
-    only = [
-      "amazon-ebssurrogate.minimal-rhel-9-hvm",
-    ]
-    expect_disconnect = true
-  }
-
-  provisioner "shell" {
-    pause_before = "45s"
-    start_retry_timeout = "5m"
-    only = [
-      "amazon-ebssurrogate.minimal-rhel-9-hvm",
-    ]
-    execute_command = "sudo -E bash '{{.Path}}'"
-    inline = [
-      "echo 'Running Ansible Lockdown'",
-      "python3 -m pip install ansible",
-      "export PATH=/usr/local/bin:$PATH",
-      "which ansible-galaxy",
-      "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL9-STIG.git",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
-    ]
-  }
-
   # Azure EL8 provisioners
   provisioner "shell" {
     environment_vars = [
