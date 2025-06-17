@@ -52,6 +52,7 @@ jobs:
         run: |
           echo "Setting up environment variables"
 
+          echo "PUBLIC=${{ github.event.inputs.public }}" >> $GITHUB_ENV
           echo "SPEL_BUILDERS=${{ github.event.inputs.builders }}" >> $GITHUB_ENV
           echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
 
