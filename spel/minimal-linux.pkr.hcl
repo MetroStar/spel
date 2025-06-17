@@ -1074,9 +1074,8 @@ build {
       "echo 'Running Ansible Lockdown'",
       "python3 -m pip install --user ansible",
       "export PATH=$HOME/.local/bin:$PATH",
-      "which ansible-galaxy",
       "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL9-STIG.git",
-      "ansible-playbook -i localhost, -c local /etc/ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
+      "ansible-playbook -i localhost, -c local /home/spel/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
     ]
   }
 
