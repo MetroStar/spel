@@ -657,3 +657,4 @@ build {
       "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
     ]
   }
+}
