@@ -36,12 +36,6 @@ else
 $(shell mkdir -p ".spel/$(SPEL_VERSION)")
 endif
 
-ifeq ($(PUBLIC),true)
-export PKR_VAR_aws_ami_groups = ["all"]
-else
-export PKR_VAR_aws_ami_groups = []
-endif
-
 all: build
 
 docs/lint:
