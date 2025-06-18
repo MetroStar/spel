@@ -505,12 +505,6 @@ source "amazon-ebssurrogate" "base" {
     volume_size           = var.spel_root_volume_size
     volume_type           = "gp3"
   }
-  launch_block_device_mappings {
-    delete_on_termination = true
-    device_name           = "/dev/xvdf"
-    volume_size           = var.spel_root_volume_size
-    volume_type           = "gp3"
-  }
   max_retries   = 20
   region        = var.aws_region
   sriov_support = true
