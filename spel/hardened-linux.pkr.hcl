@@ -499,12 +499,6 @@ source "amazon-ebssurrogate" "base" {
   ena_support                 = true
   force_deregister            = var.aws_force_deregister
   instance_type               = var.aws_instance_type
-  launch_block_device_mappings {
-    delete_on_termination = true
-    device_name           = "/dev/sda1"
-    volume_size           = var.spel_root_volume_size
-    volume_type           = "gp3"
-  }
   max_retries   = 20
   region        = var.aws_region
   sriov_support = true
