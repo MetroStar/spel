@@ -625,7 +625,7 @@ build {
     pause_before = "45s"
     start_retry_timeout = "5m"
     only = [
-      "amazon-ebs.base.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-rhel-9-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [

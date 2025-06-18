@@ -142,7 +142,7 @@ SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
 echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
 
 packer build \
-    -only "amazon-ebssurrogate.hardened-rhel-9-hvm" \
+    -only "amazon-ebs.hardened-rhel-9-hvm" \
     -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
     -var "spel_version=${SPEL_VERSION:?}" \
     spel/hardened-linux.pkr.hcl
