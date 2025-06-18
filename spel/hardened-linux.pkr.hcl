@@ -482,7 +482,7 @@ variable "spel_version" {
 
 source "amazon-ebssurrogate" "base" {
   ami_root_device {
-    source_device_name    = "/dev/xvdf"
+    source_device_name    = "/dev/sda1"
     delete_on_termination = true
     device_name           = "/dev/sda1"
     volume_size           = var.spel_root_volume_size
