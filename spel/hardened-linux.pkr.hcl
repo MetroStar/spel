@@ -551,7 +551,7 @@ locals {
 
 # amigen builds
 build {
-  source "amazon-ebssurrogate.base" {
+  source "amazon-ebs.base" {
     ami_description = format(local.description, "CentOS Stream 9 AMI")
     name            = "minimal-centos-9stream-hvm"
     source_ami_filter {
@@ -565,7 +565,7 @@ build {
     }
   }
 
-  source "amazon-ebssurrogate.base" {
+  source "amazon-ebs.base" {
     ami_description = format(local.description, "Oracle Linux 8 AMI")
     name            = "minimal-ol-8-hvm"
     source_ami_filter {
@@ -579,7 +579,7 @@ build {
     }
   }
 
-  source "amazon-ebssurrogate.base" {
+  source "amazon-ebs.base" {
     ami_description = format(local.description, "Oracle Linux 9 AMI")
     name            = "minimal-ol-9-hvm"
     source_ami_filter {
@@ -593,7 +593,7 @@ build {
     }
   }
 
-  source "amazon-ebssurrogate.base" {
+  source "amazon-ebs.base" {
     ami_description = format(local.description, "RHEL 8 AMI")
     name            = "minimal-rhel-8-hvm"
     source_ami_filter {
@@ -625,7 +625,7 @@ build {
     pause_before = "45s"
     start_retry_timeout = "5m"
     only = [
-      "amazon-ebssurrogate.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-rhel-9-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
