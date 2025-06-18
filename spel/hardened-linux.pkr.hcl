@@ -480,14 +480,7 @@ variable "spel_version" {
 # Start of source blocks
 ###
 
-source "amazon-ebssurrogate" "base" {
-  ami_root_device {
-    source_device_name    = "/dev/sda1"
-    delete_on_termination = true
-    device_name           = "/dev/sda1"
-    volume_size           = var.spel_root_volume_size
-    volume_type           = "gp3"
-  }
+source "amazon-ebs" "base" {
   ami_groups                  = var.aws_ami_groups
   ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
   ami_regions                 = var.aws_ami_regions
@@ -517,7 +510,6 @@ source "amazon-ebssurrogate" "base" {
   subnet_id                             = var.aws_subnet_id
   tags                                  = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
-  use_create_image                      = true
   user_data_file                        = "${path.root}/userdata/userdata.cloud"
 }
 
@@ -615,7 +607,7 @@ build {
     }
   }
 
-  source "amazon-ebssurrogate.base" {
+  source "amazon-ebs.base" {
     ami_description = format(local.description, "RHEL 9 AMI")
     name            = "hardened-rhel-9-hvm"
     source_ami_filter {
