@@ -635,20 +635,4 @@ build {
       "cloud-init clean --logs",
     ]
   }
-
-  provisioner "file" {
-    destination = ".spel/${var.spel_version}/${var.spel_identifier}-${source.name}.${source.type}.manifest.txt"
-    direction   = "download"
-    source      = "/tmp/manifest.txt"
-  }
-
-  post-processor "artifice" {
-    files = [
-      ".spel/${var.spel_version}/${var.spel_identifier}-${source.name}.${source.type}.manifest.txt",
-    ]
-  }
-
-  post-processor "manifest" {
-    output = ".spel/${var.spel_version}/packer-manifest.json"
-  }
 }

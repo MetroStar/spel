@@ -139,6 +139,18 @@ while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
 done
 
 SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
+echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
+
+FAILED_TEST_BUILDS=()
+
+packer build \
+    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
+    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+    -var "spel_version=${SPEL_VERSION:?}" \
+    tests/minimal-linux.pkr.hcl | tee packer_test_output.log
+
+TESTEXIT=$?
+
 ANSIBLE_LOCKDOWNS=${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}
 
 ansible_lockdowns() {
@@ -169,7 +181,7 @@ ansible_lockdowns() {
 
 ansible_lockdowns
 
-# Retry failed builds until there are no more failed builds
+# Retry failed lockdowns until there are no more failed lockdowns
 while [[ ${#FAILED_LOCKDOWNS[@]} -gt 0 ]]; do
     echo "Retrying failed builds: ${FAILED_LOCKDOWNS[*]}"
     ANSIBLE_LOCKDOWNS=$(IFS=, ; echo "${FAILED_LOCKDOWNS[*]}")
@@ -177,18 +189,6 @@ while [[ ${#FAILED_LOCKDOWNS[@]} -gt 0 ]]; do
 done
 
 SUCCESS_LOCKERS=$(IFS=, ; echo "${SUCCESS_LOCKDOWNS[*]}")
-
-echo "Successful builds being tested: ${SUCCESS_LOCKERS}"
-
-FAILED_TEST_BUILDS=()
-
-packer build \
-    -only "${SUCCESS_LOCKERS}" \
-    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-    -var "spel_version=${SPEL_VERSION:?}" \
-    tests/minimal-linux.pkr.hcl | tee packer_test_output.log
-
-TESTEXIT=$?
 
 echo "SUCCESS_BUILDS=${SUCCESS_LOCKERS[*]}" >> $GITHUB_ENV
 
@@ -199,13 +199,13 @@ if [[ $BUILDEXIT -ne 0 ]]; then
     exit $BUILDEXIT
 fi
 
+if [[ $TESTEXIT -ne 0 ]]; then
+    FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
+fi
+
 if [[ $LOCKEXIT -ne 0 ]]; then
     FAILED_LOCKERS=$(IFS=, ; echo "${FAILED_LOCKDOWNS[*]}")
     echo "ERROR: Failed lockdowns: ${FAILED_LOCKERS}"
     echo "ERROR: Lockdown build failed. Scroll up past the test to see the packer error and review the build logs."
     exit $LOCKEXIT
-fi
-
-if [[ $TESTEXIT -ne 0 ]]; then
-    FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
 fi
