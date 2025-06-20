@@ -5,27 +5,27 @@ variable "aws_region" {
 
 variable "aws_source_ami_centos9stream_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_hardened_centos_9stream_hvm")
+  default = env("amazon_ebs_hardened_centos_9stream_hvm")
 }
 
 variable "aws_source_ami_ol_8_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_hardened_ol_8_hvm")
+  default = env("amazon_ebs_hardened_ol_8_hvm")
 }
 
 variable "aws_source_ami_ol_9_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_hardened_ol_9_hvm")
+  default = env("amazon_ebs_hardened_ol_9_hvm")
 }
 
 variable "aws_source_ami_rhel8_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_hardened_rhel_8_hvm")
+  default = env("amazon_ebs_hardened_rhel_8_hvm")
 }
 
 variable "aws_source_ami_rhel9_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_hardened_rhel_9_hvm")
+  default = env("amazon_ebs_hardened_rhel_9_hvm")
 }
 
 variable "aws_ssh_interface" {
