@@ -146,12 +146,12 @@ packer build \
     -var "spel_version=${SPEL_VERSION:?}" \
     spel/hardened-linux.pkr.hcl
 
-echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
+echo "Successful builds being tested: ${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}"
 
 FAILED_TEST_BUILDS=()
 
 packer build \
-    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
+    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}" \
     -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
     -var "spel_version=${SPEL_VERSION:?}" \
     tests/minimal-linux.pkr.hcl | tee packer_test_output.log
