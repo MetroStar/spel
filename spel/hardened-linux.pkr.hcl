@@ -82,11 +82,9 @@ variable "aws_source_ami_filter_centos9stream_hvm" {
     owners = list(string)
   })
   default = {
-    name = "CentOS Stream 9 x86_64 *,spel-bootstrap-centos-9stream-*.x86_64-gp*"
+    name = "spel-minimal-centos-9stream-hvm-*.x86_64-gp*"
     owners = [
-      "125523088429", # CentOS Commercial, https://wiki.centos.org/Cloud/AWS
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "879381286673",
     ]
   }
 }
@@ -98,11 +96,9 @@ variable "aws_source_ami_filter_ol8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "OL8.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-8-hvm-*.x86_64-gp*,spel-bootstrap-ol-8-*.x86_64-gp*"
+    name = "spel-minimal-ol-8-hvm-*.x86_64-gp*"
     owners = [
-      "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "879381286673",
     ]
   }
 }
@@ -114,11 +110,9 @@ variable "aws_source_ami_filter_ol9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "OL9.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-9-hvm-*.x86_64-gp*,spel-bootstrap-ol-9-*.x86_64-gp*"
+    name = "spel-minimal-ol-9-hvm-*.x86_64-gp*"
     owners = [
-      "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "879381286673",
     ]
   }
 }
@@ -130,12 +124,9 @@ variable "aws_source_ami_filter_rhel8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "RHEL-8.*_HVM-*-x86_64-*-Hourly*-GP*,spel-bootstrap-rhel-8-*.x86_64-gp*"
+    name = "spel-minimal-rhel-8-hvm-*.x86_64-gp*"
     owners = [
-      "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
-      "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "879381286673",
     ]
   }
 }
@@ -619,6 +610,31 @@ build {
     start_retry_timeout = "5m"
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-ol-9-hvm",
+      "amazon-ebs.hardened-centos-9stream-hvm",
+    ]
+    execute_command = "sudo -E bash '{{.Path}}'"
+    inline = [
+      "echo 'Running Ansible Lockdown'",
+      "python3 -m pip install ansible",
+      "export PATH=/usr/local/bin:$PATH",
+      "yum install -y git",
+      "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL9-STIG.git",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
+      "rm -rf /var/lib/cloud/seed/nocloud-net",
+      "rm -rf /var/lib/cloud/sem",
+      "rm -rf /var/lib/cloud/data",
+      "rm -rf /var/lib/cloud/instance",
+      "cloud-init clean --logs",
+    ]
+  }
+
+  provisioner "shell" {
+    pause_before = "45s"
+    start_retry_timeout = "5m"
+    only = [
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
