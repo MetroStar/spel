@@ -139,32 +139,71 @@ while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
 done
 
 SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
+ANSIBLE_LOCKDOWNS=${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}
 
-packer build \
-    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}" \
-    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-    -var "spel_version=${SPEL_VERSION:?}" \
-    spel/hardened-linux.pkr.hcl
+ansible_lockdowns() {
+    packer build \
+        -only "${ANSIBLE_LOCKDOWNS}" \
+        -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+        -var "spel_version=${SPEL_VERSION:?}" \
+        spel/hardened-linux.pkr.hcl
 
-echo "Successful builds being tested: ${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}"
+    LOCKEXIT=$?
+
+    FAILED_LOCKDOWNS=()
+
+    for LOCKDOWN in ${ANSIBLE_LOCKDOWNS//,/ }; do
+        LOCKDOWN_NAME="${LOCKDOWN//*./}"
+        AMI_NAME="${SPEL_IDENTIFIER}-${LOCKDOWN_NAME}-${SPEL_VERSION}.x86_64-gp3"
+        LOCKDOWN_ENV="${LOCKDOWN//[.-]/_}"
+        LOCKDOWN_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
+        if [[ "$LOCKDOWN_AMI" == "None" ]]
+        then
+            FAILED_LOCKDOWNS+=("$LOCKDOWN")
+        else
+            SUCCESS_LOCKDOWNS+=("$LOCKDOWN")
+            export "$LOCKDOWN_ENV"="$LOCKDOWN_AMI"
+        fi
+    done
+}
+
+ansible_lockdowns
+
+# Retry failed builds until there are no more failed builds
+while [[ ${#FAILED_LOCKDOWNS[@]} -gt 0 ]]; do
+    echo "Retrying failed builds: ${FAILED_LOCKDOWNS[*]}"
+    ANSIBLE_LOCKDOWNS=$(IFS=, ; echo "${FAILED_LOCKDOWNS[*]}")
+    ansible_lockdowns
+done
+
+SUCCESS_LOCKERS=$(IFS=, ; echo "${SUCCESS_LOCKDOWNS[*]}")
+
+echo "Successful builds being tested: ${SUCCESS_LOCKERS}"
 
 FAILED_TEST_BUILDS=()
 
 packer build \
-    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}" \
+    -only "${SUCCESS_LOCKERS}" \
     -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
     -var "spel_version=${SPEL_VERSION:?}" \
     tests/minimal-linux.pkr.hcl | tee packer_test_output.log
 
 TESTEXIT=$?
 
-echo "SUCCESS_BUILDS=${SUCCESS_BUILDS[*]}" >> $GITHUB_ENV
+echo "SUCCESS_BUILDS=${SUCCESS_LOCKERS[*]}" >> $GITHUB_ENV
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
     echo "ERROR: Failed builds: ${FAILED_BUILDERS}"
     echo "ERROR: Build failed. Scroll up past the test to see the packer error and review the build logs."
     exit $BUILDEXIT
+fi
+
+if [[ $LOCKEXIT -ne 0 ]]; then
+    FAILED_LOCKERS=$(IFS=, ; echo "${FAILED_LOCKDOWNS[*]}")
+    echo "ERROR: Failed lockdowns: ${FAILED_LOCKERS}"
+    echo "ERROR: Lockdown build failed. Scroll up past the test to see the packer error and review the build logs."
+    exit $LOCKEXIT
 fi
 
 if [[ $TESTEXIT -ne 0 ]]; then
