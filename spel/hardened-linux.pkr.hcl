@@ -498,7 +498,7 @@ source "amazon-ebs" "base" {
   ssh_interface = var.aws_ssh_interface
   ssh_port      = 22
   ssh_pty       = true
-  ssh_username  = var.spel_ssh_username
+  ssh_username  = "maintuser"
   ssh_key_exchange_algorithms = [
     "ecdh-sha2-nistp521",
     "ecdh-sha2-nistp256",
@@ -510,7 +510,6 @@ source "amazon-ebs" "base" {
   subnet_id                             = var.aws_subnet_id
   tags                                  = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
-  user_data_file                        = "${path.root}/userdata/userdata.cloud"
 }
 
 ###
