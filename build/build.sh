@@ -139,13 +139,14 @@ while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
 done
 
 SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
-echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
 
 packer build \
-    -only "amazon-ebs.hardened-rhel-9-hvm" \
+    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}" \
     -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
     -var "spel_version=${SPEL_VERSION:?}" \
     spel/hardened-linux.pkr.hcl
+
+echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
 
 FAILED_TEST_BUILDS=()
 

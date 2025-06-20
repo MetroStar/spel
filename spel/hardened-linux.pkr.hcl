@@ -463,12 +463,6 @@ variable "spel_root_volume_size" {
   default     = 20
 }
 
-variable "spel_ssh_username" {
-  description = "Name of the user for the ssh connection to the instance. Defaults to `spel`, which is set by cloud-config userdata. If your starting image does not have `cloud-init` installed, override the default user name"
-  type        = string
-  default     = "spel"
-}
-
 variable "spel_version" {
   description = "Version appended to the name of the built images"
   type        = string
@@ -552,7 +546,7 @@ locals {
 build {
   source "amazon-ebs.base" {
     ami_description = format(local.description, "CentOS Stream 9 AMI")
-    name            = "minimal-centos-9stream-hvm"
+    name            = "hardened-centos-9stream-hvm"
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -566,7 +560,7 @@ build {
 
   source "amazon-ebs.base" {
     ami_description = format(local.description, "Oracle Linux 8 AMI")
-    name            = "minimal-ol-8-hvm"
+    name            = "hardened-ol-8-hvm"
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -580,7 +574,7 @@ build {
 
   source "amazon-ebs.base" {
     ami_description = format(local.description, "Oracle Linux 9 AMI")
-    name            = "minimal-ol-9-hvm"
+    name            = "hardened-ol-9-hvm"
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -594,7 +588,7 @@ build {
 
   source "amazon-ebs.base" {
     ami_description = format(local.description, "RHEL 8 AMI")
-    name            = "minimal-rhel-8-hvm"
+    name            = "hardened-rhel-8-hvm"
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"

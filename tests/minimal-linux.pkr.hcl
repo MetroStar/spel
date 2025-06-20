@@ -5,27 +5,27 @@ variable "aws_region" {
 
 variable "aws_source_ami_centos9stream_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_minimal_centos_9stream_hvm")
+  default = env("amazon_ebssurrogate_hardened_centos_9stream_hvm")
 }
 
 variable "aws_source_ami_ol_8_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_minimal_ol_8_hvm")
+  default = env("amazon_ebssurrogate_hardened_ol_8_hvm")
 }
 
 variable "aws_source_ami_ol_9_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_minimal_ol_9_hvm")
+  default = env("amazon_ebssurrogate_hardened_ol_9_hvm")
 }
 
 variable "aws_source_ami_rhel8_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_minimal_rhel_8_hvm")
+  default = env("amazon_ebssurrogate_hardened_rhel_8_hvm")
 }
 
 variable "aws_source_ami_rhel9_hvm" {
   type    = string
-  default = env("amazon_ebssurrogate_minimal_rhel_9_hvm")
+  default = env("amazon_ebssurrogate_hardened_rhel_9_hvm")
 }
 
 variable "aws_ssh_interface" {
@@ -100,27 +100,27 @@ source "amazon-ebs" "base" {
 build {
   source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_centos9stream_hvm
-    name       = "minimal-centos-9stream-hvm"
+    name       = "hardened-centos-9stream-hvm"
   }
 
   source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_ol_8_hvm
-    name       = "minimal-ol-8-hvm"
+    name       = "hardened-ol-8-hvm"
   }
 
   source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_ol_9_hvm
-    name       = "minimal-ol-9-hvm"
+    name       = "hardened-ol-9-hvm"
   }
 
   source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_rhel8_hvm
-    name       = "minimal-rhel-8-hvm"
+    name       = "hardened-rhel-8-hvm"
   }
 
   source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_rhel9_hvm
-    name       = "minimal-rhel-9-hvm"
+    name       = "hardened-rhel-9-hvm"
   }
 
   provisioner "shell" {
