@@ -484,6 +484,7 @@ source "amazon-ebs" "base" {
   ssh_port      = 22
   ssh_pty       = true
   ssh_username  = "maintuser"
+  ssh_timeout   = 10m
   ssh_key_exchange_algorithms = [
     "ecdh-sha2-nistp521",
     "ecdh-sha2-nistp256",
