@@ -477,14 +477,14 @@ source "amazon-ebs" "base" {
   ena_support                 = true
   force_deregister            = var.aws_force_deregister
   instance_type               = var.aws_instance_type
-  max_retries   = 20
-  region        = var.aws_region
-  sriov_support = true
-  ssh_interface = var.aws_ssh_interface
-  ssh_port      = 22
-  ssh_pty       = true
-  ssh_username  = "maintuser"
-  ssh_timeout   = 10m
+  max_retries                 = 20
+  region                      = var.aws_region
+  sriov_support               = true
+  ssh_interface               = var.aws_ssh_interface
+  ssh_port                    = 22
+  ssh_pty                     = true
+  ssh_username                = "maintuser"
+  ssh_timeout                 = "10m"
   ssh_key_exchange_algorithms = [
     "ecdh-sha2-nistp521",
     "ecdh-sha2-nistp256",
@@ -607,7 +607,7 @@ build {
   }
 
   provisioner "shell" {
-    pause_before = "45s"
+    pause_before        = "45s"
     start_retry_timeout = "5m"
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
@@ -631,7 +631,7 @@ build {
   }
 
   provisioner "shell" {
-    pause_before = "45s"
+    pause_before        = "45s"
     start_retry_timeout = "5m"
     only = [
       "amazon-ebs.hardened-rhel-8-hvm",
