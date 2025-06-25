@@ -190,7 +190,7 @@ done
 
 SUCCESS_LOCKERS=$(IFS=, ; echo "${SUCCESS_LOCKDOWNS[*]}")
 
-echo "SUCCESS_BUILDS=${SUCCESS_LOCKERS[*]}" >> $GITHUB_ENV
+export SUCCESS_BUILDS=${SUCCESS_LOCKERS[*]}
 
 if [[ $BUILDEXIT -ne 0 ]]; then
     FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
