@@ -644,7 +644,7 @@ build {
       "export PATH=/usr/local/bin:$PATH",
       "yum install -y git",
       "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL8-STIG.git",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
       "rm -rf /var/lib/cloud/data",
