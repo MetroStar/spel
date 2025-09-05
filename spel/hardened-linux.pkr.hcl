@@ -611,7 +611,6 @@ build {
     start_retry_timeout = "5m"
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
-      "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-centos-9stream-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
@@ -622,6 +621,28 @@ build {
       "yum install -y git",
       "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL9-STIG.git",
       "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
+      "rm -rf /var/lib/cloud/seed/nocloud-net",
+      "rm -rf /var/lib/cloud/sem",
+      "rm -rf /var/lib/cloud/data",
+      "rm -rf /var/lib/cloud/instance",
+      "cloud-init clean --logs",
+    ]
+  }
+
+  provisioner "shell" {
+    pause_before        = "45s"
+    start_retry_timeout = "5m"
+    only = [
+      "amazon-ebs.hardened-ol-9-hvm",
+    ]
+    execute_command = "sudo -E bash '{{.Path}}'"
+    inline = [
+      "echo 'Running Ansible Lockdown'",
+      "python3 -m pip install ansible",
+      "export PATH=/usr/local/bin:$PATH",
+      "yum install -y git",
+      "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL9-STIG.git",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_09_214010\": false}'",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
       "rm -rf /var/lib/cloud/data",
