@@ -8,6 +8,10 @@ packer {
       source  = "github.com/hashicorp/amazon"
       version = ">= 1.3.3"
     }
+    ansible = {
+      version = ">= 1.1.0"
+      source = "github.com/hashicorp/ansible"
+    }
   }
 }
 
@@ -141,6 +145,33 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     name = "spel-minimal-rhel-9-hvm-*.x86_64-gp*"
     owners = [
       "879381286673",
+    ]
+  }
+}
+
+variable "aws_source_ami_filter_windows2016_hvm" {
+  description = "Object with source AMI filters for Windows Server 2016 HVM builds"
+  type = object({
+    name   = string
+    owners = list(string)
+  })
+  default = {
+    name = "Windows_Server-2016-English-Full-Base-*"
+    owners = [
+      "amazon",
+    ]
+  }
+}
+variable "aws_source_ami_filter_windows2019_hvm" {
+  description = "Object with source AMI filters for Windows Server 2019 HVM builds"
+  type = object({
+    name   = string
+    owners = list(string)
+  })
+  default = {
+    name = "Windows_Server-2019-English-Full-Base-*"
+    owners = [
+      "amazon",
     ]
   }
 }
@@ -498,6 +529,65 @@ source "amazon-ebs" "base" {
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
 }
 
+source "amazon-ebs" "windows-2016-base" {
+  ami_groups                  = var.aws_ami_groups
+  ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
+  ami_regions                 = var.aws_ami_regions
+  ami_users                   = var.aws_ami_users
+  ami_virtualization_type     = "hvm"
+  associate_public_ip_address = true
+  communicator                = "winrm"
+  deprecate_at                = local.aws_ami_deprecate_at
+  ena_support                 = true
+  force_deregister            = true
+  instance_type               = var.aws_instance_type
+  max_retries                 = 20
+  region                      = var.aws_region
+  sriov_support               = true
+  subnet_id                   = var.aws_subnet_id
+  tags                        = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
+  temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
+  user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
+  winrm_insecure              = true
+  winrm_timeout               = "15m"
+  winrm_use_ssl               = true
+  winrm_use_ntlm              = true
+  winrm_username              = "TempPackerUser"
+  winrm_password              = "ComplexP@ssw0rd123!"
+
+  launch_block_device_mappings {
+    device_name = "/dev/sda1"
+    volume_type = "gp3"
+    delete_on_termination = true
+  }
+}
+
+source "amazon-ebs" "windows-2019-base" {
+  ami_groups                  = var.aws_ami_groups
+  ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
+  ami_regions                 = var.aws_ami_regions
+  ami_users                   = var.aws_ami_users
+  ami_virtualization_type     = "hvm"
+  associate_public_ip_address = true
+  communicator                = "winrm"
+  deprecate_at                = local.aws_ami_deprecate_at
+  ena_support                 = true
+  force_deregister            = true
+  instance_type               = var.aws_instance_type
+  max_retries                 = 20
+  region                      = var.aws_region
+  sriov_support               = true
+  subnet_id                   = var.aws_subnet_id
+  tags                        = { Name = "" }
+  temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
+  user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
+  winrm_insecure              = true
+  winrm_timeout               = "10m"
+  winrm_use_ssl               = true
+  winrm_use_ntlm              = true
+  winrm_username              = "Administrator"
+}
+
 ###
 # End of source blocks
 ###
@@ -519,8 +609,9 @@ locals {
   amigen9_repo_sources   = join(",", var.amigen9_repo_sources)
   amigen9_storage_layout = join(",", var.amigen9_storage_layout)
 
-  # Template the description string
+  # Template the description strings
   description = "STIG-partitioned [*HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.spel_description_url}."
+  windows_description = "STIG-partitioned [*HARDENED*] %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.spel_description_url}."
 
   # Calculate AWS AMI deprecate_at timestamp
   aws_ami_deprecate_at = var.spel_deprecation_lifetime != null ? timeadd(local.timestamp, var.spel_deprecation_lifetime) : null
@@ -606,6 +697,34 @@ build {
     }
   }
 
+  source "amazon-ebs.windows-2016-base" {
+    ami_description = format(local.windows_description, "Windows Server 2016 AMI")
+    name            = "hardened-windows-2016-hvm"
+    source_ami_filter {
+      filters = {
+        virtualization-type = "hvm"
+        name                = var.aws_source_ami_filter_windows2016_hvm.name
+        root-device-type    = "ebs"
+      }
+      owners      = var.aws_source_ami_filter_windows2016_hvm.owners
+      most_recent = true
+    }
+  }
+
+    source "amazon-ebs.windows-2019-base" {
+      ami_description = format(local.windows_description, "Windows Server 2019 AMI")
+      name            = "hardened-windows-2019-hvm"
+      source_ami_filter {
+        filters = {
+          virtualization-type = "hvm"
+          name                = var.aws_source_ami_filter_windows2019_hvm.name
+          root-device-type    = "ebs"
+        }
+        owners      = var.aws_source_ami_filter_windows2019_hvm.owners
+        most_recent = true
+      }
+    }
+
   provisioner "shell" {
     pause_before        = "45s"
     start_retry_timeout = "5m"
@@ -679,6 +798,156 @@ build {
       "rm -rf /var/lib/cloud/data",
       "rm -rf /var/lib/cloud/instance",
       "cloud-init clean --logs",
+    ]
+  }
+
+  provisioner "ansible" {
+    pause_before         = "30s"
+    timeout              = "30m"
+    only                 = ["amazon-ebs.hardened-windows-2016-hvm"]
+    galaxy_file          = "requirements.yml"
+    galaxy_force_install = true
+    playbook_file        = "${path.root}/ansible/windows-2016-stig-playbook.yml"
+    use_proxy            = false
+    user = "TempPackerUser"
+    extra_arguments = [
+      "--connection", "winrm",
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16stig_newadministratorname': 'maintuser'}",
+      "-vvv"
+    ]
+  }
+
+  provisioner "ansible" {
+    pause_before = "30s"
+    timeout      = "30m"
+    only = [
+      "amazon-ebs.hardened-windows-2019-hvm",
+    ]
+    galaxy_file = "requirements.yml"
+    galaxy_force_install = true
+    playbook_file = "${path.root}/ansible/windows-2019-stig-playbook.yml"
+    use_proxy     = false
+    user = "Administrator"
+    extra_arguments = [
+      "--connection", "winrm",
+      "--extra-vars", "ansible_winrm_server_cert_validation=ignore",
+      "--extra-vars", "ansible_port=5986",
+      "--extra-vars", "ansible_system_vendor='NA'",
+      "--extra-vars", "ansible_virtualization_type='hvm'",
+      "--extra-vars", "ansible_windows_domain_role='Member server'",
+      "--extra-vars", "ansible_windows_domain_member=true",
+      "--extra-vars", "win_skip_for_test=false",
+      "--extra-vars", "wn19stig_newadministratorname='maintuser'"
+    ]
+  }
+
+  provisioner "powershell" {
+    inline = [
+      # === 1. Confirm maintuser exists ===
+      "Write-Output 'Verifying maintuser exists...'",
+      "if (-not (Get-LocalUser -Name 'maintuser' -ErrorAction SilentlyContinue)) {",
+      "  Write-Output 'maintuser missing – aborting'",
+      "  exit 1",
+      "}",
+      "Write-Output 'maintuser confirmed'",
+
+      # === 2. Fix profile path ===
+      "Write-Output 'Fixing profile path for maintuser...'",
+      "try {",
+      "  $user = Get-LocalUser -Name 'maintuser'",
+      "  $sid = $user.SID.Value",
+      "  $reg = \"HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\$sid\"",
+      "  if (Test-Path $reg) {",
+      "    Set-ItemProperty -Path $reg -Name 'ProfileImagePath' -Value 'C:\\Users\\maintuser' -Force",
+      "    Write-Output 'Profile path fixed'",
+      "  }",
+      "} catch { Write-Output 'Profile fix failed: $_' }",
+
+      # === 3. Run InitializeInstance.ps1 ===
+      "Write-Output 'Running InitializeInstance.ps1 -Schedule...'",
+      "& 'C:/ProgramData/Amazon/EC2-Windows/Launch/Scripts/InitializeInstance.ps1' -Schedule",
+
+      # === 4. Create custom unattend.xml ===
+      "Write-Output 'Creating custom unattend.xml...'",
+      "$unattendPath = 'C:/Windows/Temp/unattend.xml'",
+      "Set-Content -Path $unattendPath -Value '<?xml version=\"1.0\" encoding=\"utf-8\"?>'",
+      "Add-Content -Path $unattendPath -Value '<unattend xmlns=\"urn:schemas-microsoft-com:unattend\">'",
+      "Add-Content -Path $unattendPath -Value '  <settings pass=\"specialize\">'",
+      "Add-Content -Path $unattendPath -Value '    <component name=\"Microsoft-Windows-Security-SPP-UX\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">'",
+      "Add-Content -Path $unattendPath -Value '      <SkipAutoActivation>true</SkipAutoActivation>'",
+      "Add-Content -Path $unattendPath -Value '    </component>'",
+      "Add-Content -Path $unattendPath -Value '    <component name=\"Microsoft-Windows-Deployment\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">'",
+      "Add-Content -Path $unattendPath -Value '      <RunSynchronous>'",
+      "Add-Content -Path $unattendPath -Value '        <RunSynchronousCommand wcm:action=\"add\">'",
+      "Add-Content -Path $unattendPath -Value '          <Order>1</Order>'",
+      "Add-Content -Path $unattendPath -Value '          <Path>net user maintuser /active:yes</Path>'",
+      "Add-Content -Path $unattendPath -Value '          <Description>Activate maintuser</Description>'",
+      "Add-Content -Path $unattendPath -Value '        </RunSynchronousCommand>'",
+      "Add-Content -Path $unattendPath -Value '      </RunSynchronous>'",
+      "Add-Content -Path $unattendPath -Value '    </component>'",
+      "Add-Content -Path $unattendPath -Value '  </settings>'",
+      "Add-Content -Path $unattendPath -Value '  <settings pass=\"oobeSystem\">'",
+      "Add-Content -Path $unattendPath -Value '    <component name=\"Microsoft-Windows-Shell-Setup\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">'",
+      "Add-Content -Path $unattendPath -Value '      <UserAccounts>'",
+      "Add-Content -Path $unattendPath -Value '        <LocalAccounts>'",
+      "Add-Content -Path $unattendPath -Value '          <LocalAccount wcm:action=\"add\">'",
+      "Add-Content -Path $unattendPath -Value '            <Name>maintuser</Name>'",
+      "Add-Content -Path $unattendPath -Value '            <Group>Administrators</Group>'",
+      "Add-Content -Path $unattendPath -Value '            <Description>Built-in account for administering the computer/domain</Description>'",
+      "Add-Content -Path $unattendPath -Value '            <DisplayName>maintuser</DisplayName>'",
+      "Add-Content -Path $unattendPath -Value '          </LocalAccount>'",
+      "Add-Content -Path $unattendPath -Value '        </LocalAccounts>'",
+      "Add-Content -Path $unattendPath -Value '      </UserAccounts>'",
+      "Add-Content -Path $unattendPath -Value '      <OOBE>'",
+      "Add-Content -Path $unattendPath -Value '        <HideEULAPage>true</HideEULAPage>'",
+      "Add-Content -Path $unattendPath -Value '        <SkipMachineOOBE>true</SkipMachineOOBE>'",
+      "Add-Content -Path $unattendPath -Value '        <SkipUserOOBE>true</SkipUserOOBE>'",
+      "Add-Content -Path $unattendPath -Value '      </OOBE>'",
+      "Add-Content -Path $unattendPath -Value '    </component>'",
+      "Add-Content -Path $unattendPath -Value '  </settings>'",
+      "Add-Content -Path $unattendPath -Value '  <cpi:offlineImage cpi:source=\"wim:c:/windows/system32/oobe/wim/wim.wim#Windows Server 2016 SERVERSTANDARD\" xmlns:cpi=\"urn:schemas-microsoft-com:cpi\" />'",
+      "Add-Content -Path $unattendPath -Value '</unattend>'",
+
+      # === 5. Create fallback rename script ===
+      "Write-Output 'Creating fallback rename script...'",
+      "$renameScript = 'C:/Windows/Temp/RenameAdmin.ps1'",
+      "Set-Content -Path $renameScript -Value 'Start-Sleep -Seconds 10'",
+      "Add-Content -Path $renameScript -Value 'try {'",
+      "Add-Content -Path $renameScript -Value '  $admin = Get-WmiObject -Class Win32_UserAccount -Filter \"Name=''Administrator'' AND LocalAccount=True\"'",
+      "Add-Content -Path $renameScript -Value '  if ($admin) {'",
+      "Add-Content -Path $renameScript -Value '    $result = $admin.Rename(''maintuser'')'",
+      "Add-Content -Path $renameScript -Value '    if ($result.ReturnValue -eq 0) {'",
+      "Add-Content -Path $renameScript -Value '      Write-Output ''Fallback rename successful'''",
+      "Add-Content -Path $renameScript -Value '      $sid = (New-Object System.Security.Principal.NTAccount(''maintuser'')).Translate([System.Security.Principal.SecurityIdentifier]).Value'",
+      "Add-Content -Path $renameScript -Value '      $reg = \"HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\$sid\"'",
+      "Add-Content -Path $renameScript -Value '      if (Test-Path $reg) {'",
+      "Add-Content -Path $renameScript -Value '        Set-ItemProperty -Path $reg -Name ''ProfileImagePath'' -Value ''C:\\Users\\maintuser'' -Force'",
+      "Add-Content -Path $renameScript -Value '      }'",
+      "Add-Content -Path $renameScript -Value '    }'",
+      "Add-Content -Path $renameScript -Value '  }'",
+      "Add-Content -Path $renameScript -Value '}'",
+      "Add-Content -Path $renameScript -Value 'catch { Write-Output ''Fallback rename failed: $_'' }'",
+
+      # === 6. Schedule fallback rename task ===
+      "Write-Output 'Scheduling fallback rename task...'",
+      "$taskName = 'RenameAdminAfterSysprep'",
+      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-NoProfile -ExecutionPolicy Bypass -File $renameScript\"",
+      "$trigger = New-ScheduledTaskTrigger -AtStartup",
+      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable",
+      "Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -User 'SYSTEM' -Force",
+      "Write-Output 'Fallback task scheduled'",
+
+      # === 7. Remove TempPackerUser ===
+      "Write-Output 'Removing TempPackerUser...'",
+      "Remove-LocalUser -Name 'TempPackerUser' -ErrorAction SilentlyContinue",
+
+      # === 8. Clean up temporary files ===
+      "Write-Output 'Cleaning up temporary files...'",
+      "Remove-Item -Path 'C:/Windows/Temp/packer-*' -Force -ErrorAction SilentlyContinue",
+
+      # === 9. Run sysprep directly ===
+      "Write-Output 'Running sysprep with custom unattend.xml...'",
+      "& 'C:/Windows/System32/Sysprep/Sysprep.exe' /generalize /oobe /quit /unattend:$unattendPath"
     ]
   }
 }
