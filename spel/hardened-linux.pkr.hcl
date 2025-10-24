@@ -915,7 +915,7 @@ build {
       "Add-Content -Path $unattendPath -Value '  <cpi:offlineImage cpi:source=\"wim:c:/windows/system32/oobe/wim/wim.wim#Windows Server 2016 SERVERSTANDARD\" xmlns:cpi=\"urn:schemas-microsoft-com:cpi\" />'",
       "Add-Content -Path $unattendPath -Value '</unattend>'",
 
-      # === 5. Create fallback rename script with cleanup and profile fix ===
+      # === 5. Create fallback rename script ===
       "Write-Output 'Creating fallback rename script...'",
       "$renameScript = 'C:/Windows/Temp/RenameAdmin.ps1'",
       "Set-Content -Path $renameScript -Value 'Start-Sleep -Seconds 10'",
@@ -945,33 +945,50 @@ build {
       "Add-Content -Path $renameScript -Value '    if (Test-Path $reg) {'",
       "Add-Content -Path $renameScript -Value '      Set-ItemProperty -Path $reg -Name ''ProfileImagePath'' -Value $profilePath -Force'",
       "Add-Content -Path $renameScript -Value '      Write-Output ''Profile path set in registry'''",
+      "Add-Content -Path $renameScript -Value '    } else {'",
+      "Add-Content -Path $renameScript -Value '      Write-Output ''Profile registry path not found for SID: $sid'''",
       "Add-Content -Path $renameScript -Value '    }'",
+      "Add-Content -Path $renameScript -Value '  } else {'",
+      "Add-Content -Path $renameScript -Value '    Write-Output ''maintuser not found after rename attempt'''",
       "Add-Content -Path $renameScript -Value '  }'",
       "Add-Content -Path $renameScript -Value '  Remove-Item -Path ''C:/Windows/Temp/unattend.xml'' -Force -ErrorAction SilentlyContinue'",
-      "Add-Content -Path $renameScript -Value '  Remove-Item -Path ''$($MyInvocation.MyCommand.Path)'' -Force -ErrorAction SilentlyContinue'",
-      "Add-Content -Path $renameScript -Value '  Unregister-ScheduledTask -TaskName ''RenameAdminAfterSysprep'' -Confirm:$false -ErrorAction SilentlyContinue'",
+      "Add-Content -Path $renameScript -Value '  Write-Output ''Completed rename and profile tasks'''",
       "Add-Content -Path $renameScript -Value '}'",
-      "Add-Content -Path $renameScript -Value 'catch { Write-Output ''Fallback rename or cleanup failed: $_'' }'",
+      "Add-Content -Path $renameScript -Value 'catch { Write-Output ''Fallback rename or profile fix failed: $_'' }'",
       "Add-Content -Path $renameScript -Value 'Stop-Transcript'",
 
-      # === 6. Schedule fallback rename task ===
-      "Write-Output 'Scheduling fallback rename task...'",
+      # === 6. Create cleanup wrapper script ===
+      "Write-Output 'Creating cleanup wrapper script...'",
+      "$cleanupScript = 'C:/Windows/Temp/CleanupRename.ps1'",
+      "Set-Content -Path $cleanupScript -Value 'Start-Sleep -Seconds 15'",
+      "Add-Content -Path $cleanupScript -Value 'try {'",
+      "Add-Content -Path $cleanupScript -Value '  Start-Process -FilePath ''powershell.exe'' -ArgumentList ''-NoProfile -ExecutionPolicy Bypass -File C:/Windows/Temp/RenameAdmin.ps1'' -Wait'",
+      "Add-Content -Path $cleanupScript -Value '  Remove-Item -Path ''C:/Windows/Temp/RenameAdmin.ps1'' -Force -ErrorAction SilentlyContinue'",
+      "Add-Content -Path $cleanupScript -Value '  Remove-Item -Path ''C:/Windows/Temp/CleanupRename.ps1'' -Force -ErrorAction SilentlyContinue'",
+      "Add-Content -Path $cleanupScript -Value '  Remove-Item -Path ''C:/Windows/Temp/RenameAdmin.log'' -Force -ErrorAction SilentlyContinue'",
+      "Add-Content -Path $cleanupScript -Value '  Unregister-ScheduledTask -TaskName ''RenameAdminAfterSysprep'' -Confirm:$false -ErrorAction SilentlyContinue'",
+      "Add-Content -Path $cleanupScript -Value '  Write-Output ''Cleanup completed'''",
+      "Add-Content -Path $cleanupScript -Value '}'",
+      "Add-Content -Path $cleanupScript -Value 'catch { Write-Output ''Cleanup failed: $_'' }'",
+
+      # === 7. Schedule cleanup wrapper task ===
+      "Write-Output 'Scheduling cleanup wrapper task...'",
       "$taskName = 'RenameAdminAfterSysprep'",
-      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-NoProfile -ExecutionPolicy Bypass -File $renameScript\"",
+      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-NoProfile -ExecutionPolicy Bypass -File $cleanupScript\"",
       "$trigger = New-ScheduledTaskTrigger -AtStartup",
       "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable",
       "Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -User 'SYSTEM' -Force",
-      "Write-Output 'Fallback task scheduled'",
+      "Write-Output 'Cleanup task scheduled'",
 
-      # === 7. Remove TempPackerUser ===
+      # === 8. Remove TempPackerUser ===
       "Write-Output 'Removing TempPackerUser...'",
       "Remove-LocalUser -Name 'TempPackerUser' -ErrorAction SilentlyContinue",
 
-      # === 8. Clean up temporary files ===
+      # === 9. Clean up temporary files ===
       "Write-Output 'Cleaning up temporary files...'",
       "Remove-Item -Path 'C:/Windows/Temp/packer-*' -Force -ErrorAction SilentlyContinue",
 
-      # === 9. Run sysprep directly ===
+      # === 10. Run sysprep directly ===
       "Write-Output 'Running sysprep with custom unattend.xml...'",
       "& 'C:/Windows/System32/Sysprep/Sysprep.exe' /generalize /oobe /quit /unattend:$unattendPath"
     ]
