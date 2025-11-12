@@ -52,6 +52,14 @@ function err_exit {
 
 # Setup per-builder values
 case $( rpm -qf /etc/os-release --qf '%{name}' ) in
+    almalinux-release)
+        BUILDER=alma-9
+        DEFAULTREPOS=(
+            baseos
+            appstream
+            extras
+        )
+        ;;
     centos-linux-release | centos-stream-release )
         BUILDER=centos-9stream
 
@@ -59,6 +67,15 @@ case $( rpm -qf /etc/os-release --qf '%{name}' ) in
             baseos
             appstream
             extras-common
+        )
+        ;;
+    oraclelinux-release)
+        BUILDER=ol-9
+
+        DEFAULTREPOS=(
+            ol9_UEKR7
+            ol9_appstream
+            ol9_baseos_latest
         )
         ;;
     redhat-release-server|redhat-release)
@@ -70,13 +87,20 @@ case $( rpm -qf /etc/os-release --qf '%{name}' ) in
             rhui-client-config-server-9
         )
         ;;
-    oraclelinux-release)
-        BUILDER=ol-9
+    rocky-release)
+        BUILDER=rl-9
+        DEFAULTREPOS=(
+            baseos
+            appstream
+            extras
+        )
+        ;;
+    system-release) # Amazon should be shot for this
+        BUILDER=amzn-2023
 
         DEFAULTREPOS=(
-            ol9_UEKR7
-            ol9_appstream
-            ol9_baseos_latest
+            amazonlinux
+            kernel-livepatch
         )
         ;;
     *)
@@ -211,6 +235,7 @@ do
     } {out}>&1 || echo "$STDERR" | grep "Error: Nothing to do"
 done
 
+# Enable any extra repos that have been specified
 echo "Enabling repos in the builder box"
 yum-config-manager --disable "*" > /dev/null
 yum-config-manager --enable "$ENABLEDREPOS" > /dev/null

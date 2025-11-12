@@ -100,7 +100,11 @@ an appropriate FAQ entry.
 
 SPEL AMIs are published monthly. The AMI table below contains links to the AWS
 Console that search by AMI Name and sort the result by creation date. The most
-recent AMI of each build will be at the top when viewed in the AWS Console.
+recent AMI of each build will be at the top when viewed in the AWS Console. From
+there it is simple to launch an instance from the chosen image. Note that you must
+be logged in for the console link to work.
+
+AMI IDs for each region are also published as a table in [manifests/IMAGES.md](manifests/IMAGES).
 
 RPM Manifests for published images are available in the [manifests](manifests)
 directory.
@@ -117,32 +121,38 @@ version-numbers found in the GovCloud region AMIs.
 |               | [spel-minimal-ol-8-hvm][1045]           |
 |               | [spel-minimal-rhel-9-hvm][1051]         |
 |               | [spel-minimal-ol-9-hvm][1063]           |
-|               | [spel-minimal-centos-9stream-hvm][1057] |
+|               | [spel-minimal-centos-9stream-hvm][1069] |
+|               | [spel-minimal-amzn-2023-hvm][1057]      |
 | us-east-2     | [spel-minimal-rhel-8-hvm][1029]         |
 |               | [spel-minimal-ol-8-hvm][1046]           |
 |               | [spel-minimal-rhel-9-hvm][1052]         |
 |               | [spel-minimal-ol-9-hvm][1064]           |
-|               | [spel-minimal-centos-9stream-hvm][1058] |
+|               | [spel-minimal-centos-9stream-hvm][1070] |
+|               | [spel-minimal-amzn-2023-hvm][1057]      |
 | us-west-1     | [spel-minimal-rhel-8-hvm][1031]         |
 |               | [spel-minimal-ol-8-hvm][1047]           |
 |               | [spel-minimal-rhel-9-hvm][1053]         |
 |               | [spel-minimal-ol-9-hvm][1065]           |
-|               | [spel-minimal-centos-9stream-hvm][1059] |
+|               | [spel-minimal-centos-9stream-hvm][1071] |
+|               | [spel-minimal-amzn-2023-hvm][1057]      |
 | us-west-2     | [spel-minimal-rhel-8-hvm][1033]         |
 |               | [spel-minimal-ol-8-hvm][1048]           |
 |               | [spel-minimal-rhel-9-hvm][1054]         |
 |               | [spel-minimal-ol-9-hvm][1066]           |
-|               | [spel-minimal-centos-9stream-hvm][1060] |
+|               | [spel-minimal-centos-9stream-hvm][1072] |
+|               | [spel-minimal-amzn-2023-hvm][1057]      |
 | us-gov-west-1 | [spel-minimal-rhel-8-hvm][1035]         |
 |               | [spel-minimal-ol-8-hvm][1049]           |
 |               | [spel-minimal-rhel-9-hvm][1055]         |
 |               | [spel-minimal-ol-9-hvm][1067]           |
-|               | [spel-minimal-centos-9stream-hvm][1061] |
+|               | [spel-minimal-centos-9stream-hvm][1073] |
+|               | [spel-minimal-amzn-2023-hvm][1057]      |
 | us-gov-east-1 | [spel-minimal-rhel-8-hvm][1037]         |
 |               | [spel-minimal-ol-8-hvm][1050]           |
 |               | [spel-minimal-rhel-9-hvm][1056]         |
 |               | [spel-minimal-ol-9-hvm][1068]           |
 |               | [spel-minimal-centos-9stream-hvm][1062] |
+|               | [spel-minimal-amzn-2023-hvm][1074]      |
 
 | Vagrant Cloud Name                          | Vagrant Provider |
 |---------------------------------------------|------------------|
@@ -595,8 +605,8 @@ packer build \
 [28]: https://docs.microsoft.com/en-us/azure/virtual-machines/linux/create-upload-centos#centos-70
 [29]: https://github.com/Azure/WALinuxAgent/issues/760
 [30]: https://docs.microsoft.com/en-us/azure/virtual-machines/windows/extensions-features
-[31]: https://github.com/MetroStar/amigen7
-[32]: https://github.com/MetroStar/amigen7/blob/master/Docs/README_CustomPartitioning.md
+[31]: https://github.com/MetroStar/AMIgen7
+[32]: https://github.com/MetroStar/AMIgen7/blob/master/Docs/README_CustomPartitioning.md
 [33]: https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2
 [34]: https://www.packer.io/docs/builders/openstack#insecure
 [35]: https://www.packer.io/docs/builders/openstack#flavor

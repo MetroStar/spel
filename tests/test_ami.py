@@ -75,14 +75,12 @@ def test_fips_disabled(host):  # noqa: D103
 @pytest.mark.parametrize(
     "names",
     [
-        (
-            [
-                "python3",
-                "python36",
-                "python38",
-                "python39",
-            ]
-        )
+        [
+            "python3",
+            "python36",
+            "python38",
+            "python39",
+        ]
     ],
 )
 def test_python3_installed(host, names):  # noqa: D103
@@ -115,7 +113,7 @@ def test_python3_symlink(host, realpaths, link):  # noqa: D103
     assert python3_symlink in realpaths
 
 
-@pytest.mark.parametrize("versions", [(["3.6", "3.8", "3.9"])])
+@pytest.mark.parametrize("versions", [["3.6", "3.8", "3.9"]])
 def test_python3_version(host, versions):  # noqa: D103
     cmd = "python3 --version"
     python3_version = host.run(cmd)
@@ -156,6 +154,14 @@ def test_systemd_services(host, service):  # noqa: D103
 
 
 @pytest.mark.el8
+def test_emergency_service_override(host):  # noqa: D103
+    emergency_service_override = host.file(
+        "/etc/systemd/system/emergency.service.d/override.conf"
+    )
+    assert emergency_service_override.exists
+
+
+@pytest.mark.el8
 @pytest.mark.parametrize(
     "name",
     [
@@ -163,7 +169,6 @@ def test_systemd_services(host, service):  # noqa: D103
         ("spel-dod-certs"),
         ("spel-wcf-certs"),
         ("amazon-ssm-agent"),
-        ("amazon-ec2-net-utils"),
         ("ec2-hibinit-agent"),
         ("ec2-instance-connect"),
         ("ec2-instance-connect-selinux"),
@@ -187,7 +192,6 @@ def test_spel_packages_el8(host, name):  # noqa: D103
         ("spel-dod-certs"),
         ("spel-wcf-certs"),
         ("amazon-ssm-agent"),
-        ("amazon-ec2-net-utils"),
         ("ec2-hibinit-agent"),
         ("ec2-utils"),
     ],

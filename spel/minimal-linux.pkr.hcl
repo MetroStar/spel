@@ -91,6 +91,36 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "aws_source_ami_filter_al2023_hvm" {
+  description = "Object with source AMI filters for Amazon Linux 2023 HVM builds"
+  type = object({
+    name   = string
+    owners = list(string)
+  })
+  default = {
+    name = "al2023-ami-minimal-*-x86_64"
+    owners = [
+      "amazon",
+    ]
+  }
+}
+
+variable "aws_source_ami_filter_alma9_hvm" {
+  description = "Object with source AMI filters for Alma Linux 9 HVM builds"
+  type = object({
+    name   = string
+    owners = list(string)
+  })
+  default = {
+    name = "AlmaLinux OS 9.* x86_64-*,spel-bootstrap-alma-9*.x86_64-gp*"
+    owners = [
+      "679593333241", # Alma Commercial, https://wiki.almalinux.org/cloud/AWS.html#aws-marketplace
+      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
+      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
+    ]
+  }
+}
+
 variable "aws_source_ami_filter_centos9stream_hvm" {
   description = "Object with source AMI filters for CentOS Stream 9 HVM builds"
   type = object({
@@ -167,6 +197,22 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
+      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
+      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+    ]
+  }
+}
+
+variable "aws_source_ami_filter_rl9_hvm" {
+  description = "Object with source AMI filters for Rocky Linux 9 HVM builds"
+  type = object({
+    name   = string
+    owners = list(string)
+  })
+  default = {
+    name = "Rocky-9-EC2-Base-9.*-*.x86_64,spel-bootstrap-rl-9-*.x86_64-gp*"
+    owners = [
+      "792107900819", # Rocky Linux, https://rockylinux.org/download (search for "AWS" tag and click)
       "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
       "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
@@ -423,7 +469,6 @@ variable "amigen8_extra_rpms" {
     "spel-release",
     "spel-dod-certs",
     "spel-wcf-certs",
-    "amazon-ec2-net-utils",
     "ec2-hibinit-agent",
     "ec2-instance-connect",
     "ec2-instance-connect-selinux",
@@ -460,7 +505,6 @@ variable "amigen8_repo_sources" {
   description = "List of yum package refs (names or urls to .rpm files) that install yum repo definitions in EL8 builders and images"
   type        = list(string)
   default = [
-    "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm",
     "https://spel-packages.cloudarmor.io/spel-packages/repo/spel-release-latest-8.noarch.rpm",
   ]
 }
@@ -520,7 +564,6 @@ variable "amigen9_extra_rpms" {
     "spel-release",
     "spel-dod-certs",
     "spel-wcf-certs",
-    "amazon-ec2-net-utils",
     "ec2-hibinit-agent",
     "ec2-utils",
     "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm",
@@ -545,11 +588,16 @@ variable "amigen9_package_manifest" {
   default     = ""
 }
 
+variable "amigen9_package_manifest_al2023" {
+  description = "File containing a list of RPMs to use as the build manifest for AL2023 images"
+  type        = string
+  default     = "/tmp/el-build/install-manifests/al2023-minimal.txt"
+}
+
 variable "amigen9_repo_names" {
   description = "List of yum repo names to enable in the EL9 builders and EL9 images"
   type        = list(string)
   default = [
-    "epel",
     "spel",
   ]
 }
@@ -558,7 +606,6 @@ variable "amigen9_repo_sources" {
   description = "List of yum package refs (names or urls to .rpm files) that install yum repo definitions in EL9 builders and images"
   type        = list(string)
   default = [
-    "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm",
     "https://spel-packages.cloudarmor.io/spel-packages/repo/spel-release-latest-9.noarch.rpm",
   ]
 }
@@ -674,7 +721,7 @@ source "amazon-ebssurrogate" "base" {
   ami_root_device {
     source_device_name    = "/dev/xvdf"
     delete_on_termination = true
-    device_name           = "/dev/sda1"
+    device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
     volume_size           = var.spel_root_volume_size
     volume_type           = "gp3"
   }
@@ -691,7 +738,7 @@ source "amazon-ebssurrogate" "base" {
   instance_type               = var.aws_instance_type
   launch_block_device_mappings {
     delete_on_termination = true
-    device_name           = "/dev/sda1"
+    device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
     volume_size           = var.spel_root_volume_size
     volume_type           = "gp3"
   }
@@ -718,7 +765,6 @@ source "amazon-ebssurrogate" "base" {
     "diffie-hellman-group1-sha1"
   ]
   subnet_id                             = var.aws_subnet_id
-  tags                                  = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
   use_create_image                      = true
   user_data_file                        = "${path.root}/userdata/userdata.cloud"
@@ -825,6 +871,34 @@ locals {
 # amigen builds
 build {
   source "amazon-ebssurrogate.base" {
+    ami_description = format(local.description, "Alma Linux 9 AMI")
+    name            = "minimal-alma-9-hvm"
+    source_ami_filter {
+      filters = {
+        virtualization-type = "hvm"
+        name                = var.aws_source_ami_filter_alma9_hvm.name
+        root-device-type    = "ebs"
+      }
+      owners      = var.aws_source_ami_filter_alma9_hvm.owners
+      most_recent = true
+    }
+  }
+
+  source "amazon-ebssurrogate.base" {
+    ami_description = format(local.description, "Amazon Linux 2023 AMI")
+    name            = "minimal-amzn-2023-hvm"
+    source_ami_filter {
+      filters = {
+        virtualization-type = "hvm"
+        name                = var.aws_source_ami_filter_al2023_hvm.name
+        root-device-type    = "ebs"
+      }
+      owners      = var.aws_source_ami_filter_al2023_hvm.owners
+      most_recent = true
+    }
+  }
+
+  source "amazon-ebssurrogate.base" {
     ami_description = format(local.description, "CentOS Stream 9 AMI")
     name            = "minimal-centos-9stream-hvm"
     source_ami_filter {
@@ -894,6 +968,20 @@ build {
     }
   }
 
+  source "amazon-ebssurrogate.base" {
+    ami_description = format(local.description, "Rocky Linux 9 AMI")
+    name            = "minimal-rl-9-hvm"
+    source_ami_filter {
+      filters = {
+        virtualization-type = "hvm"
+        name                = var.aws_source_ami_filter_rl9_hvm.name
+        root-device-type    = "ebs"
+      }
+      owners      = var.aws_source_ami_filter_rl9_hvm.owners
+      most_recent = true
+    }
+  }
+
   source "azure-arm.base" {
     azure_tags = {
       Description = format(local.description, "RHEL 8 image")
@@ -903,13 +991,24 @@ build {
     name                                     = "minimal-rhel-8-image"
   }
 
+  # Update the rhui-azure RPM before the broader-scope `yum udate`
+  provisioner "shell" {
+    execute_command = "{{ .Vars }} sudo -E sh -ex '{{ .Path }}'"
+    inline = [
+      "dnf update -y --disablerepo='*' --enablerepo='*microsoft*'",
+    ]
+    only = [
+      "azure-arm.minimal-rhel-8-image",
+    ]
+  }
+
   # Common provisioners
   provisioner "shell" {
     environment_vars = [
       "DNF_VAR_ociregion=",
       "DNF_VAR_ocidomain=oracle.com",
     ]
-    execute_command = "{{ .Vars }} sudo -E /bin/sh -ex '{{ .Path }}'"
+    execute_command = "{{ .Vars }} sudo -E /bin/bash -ex '{{ .Path }}'"
     inline = [
       "/usr/bin/cloud-init status --wait",
       "setenforce 0",
@@ -925,6 +1024,7 @@ build {
       "SPEL_AMIGEN9SOURCE=${var.amigen9_source_url}",
       "SPEL_AMIGENREPOS=${local.amigen9_repo_names}",
       "SPEL_AMIGENREPOSRC=${local.amigen9_repo_sources}",
+      "SPEL_BUILDDEPS=dosfstools git lvm2 parted python3-pip unzip yum-utils",
       "SPEL_EXTRARPMS=${local.amigen9_extra_rpms}",
       "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
     ]
@@ -933,9 +1033,30 @@ build {
       "${path.root}/scripts/builder-prep-9.sh",
     ]
     only = [
+      "amazon-ebssurrogate.minimal-alma-9-hvm",
       "amazon-ebssurrogate.minimal-centos-9stream-hvm",
       "amazon-ebssurrogate.minimal-ol-9-hvm",
       "amazon-ebssurrogate.minimal-rhel-9-hvm",
+      "amazon-ebssurrogate.minimal-rl-9-hvm",
+    ]
+  }
+
+  # Want to try to run this pre-step early on AL2023
+  provisioner "shell" {
+    environment_vars = [
+      "SPEL_AMIGEN9SOURCE=${var.amigen9_source_url}",
+      "SPEL_AMIGENREPOS=${local.amigen9_repo_names}",
+      "SPEL_AMIGENREPOSRC=${local.amigen9_repo_sources}",
+      "SPEL_BUILDDEPS=dnf-utils dosfstools git lvm2 parted python3-pip unzip",
+      "SPEL_EXTRARPMS=${local.amigen9_extra_rpms}",
+      "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+    ]
+    execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
+    scripts = [
+      "${path.root}/scripts/builder-prep-9.sh",
+    ]
+    only = [
+      "amazon-ebssurrogate.minimal-amzn-2023-hvm",
     ]
   }
 
@@ -1006,7 +1127,7 @@ build {
       "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
       "SPEL_USEROOTDEVICE=false",
     ]
-    execute_command = "{{ .Vars }} sudo -E /bin/sh '{{ .Path }}'"
+    execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     only = [
       "amazon-ebssurrogate.minimal-ol-8-hvm",
       "amazon-ebssurrogate.minimal-rhel-8-hvm",
@@ -1028,6 +1149,7 @@ build {
       "SPEL_AMIGENBRANCH=${var.amigen9_source_branch}",
       "SPEL_AMIGENCHROOT=/mnt/ec2-root",
       "SPEL_AMIGENMANFST=${var.amigen9_package_manifest}",
+      "SPEL_AMIGENMANFSTAL2023=${var.amigen9_package_manifest_al2023}",
       "SPEL_AMIGENPKGGRP=${local.amigen9_package_groups}",
       "SPEL_AMIGENREPOS=${local.amigen9_repo_names}",
       "SPEL_AMIGENREPOSRC=${local.amigen9_repo_sources}",
@@ -1046,11 +1168,14 @@ build {
       "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
       "SPEL_USEROOTDEVICE=false",
     ]
-    execute_command = "{{ .Vars }} sudo -E /bin/sh '{{ .Path }}'"
+    execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     only = [
+      "amazon-ebssurrogate.minimal-alma-9-hvm",
+      "amazon-ebssurrogate.minimal-amzn-2023-hvm",
       "amazon-ebssurrogate.minimal-centos-9stream-hvm",
       "amazon-ebssurrogate.minimal-ol-9-hvm",
       "amazon-ebssurrogate.minimal-rhel-9-hvm",
+      "amazon-ebssurrogate.minimal-rl-9-hvm",
     ]
     scripts = [
       "${path.root}/scripts/amigen9-build.sh",
@@ -1093,7 +1218,7 @@ build {
   }
 
   provisioner "shell" {
-    execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh -ex '{{ .Path }}'"
+    execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E bash -ex '{{ .Path }}'"
     inline = [
       "chkconfig waagent on",
       "/usr/sbin/waagent -force -deprovision",
@@ -1139,7 +1264,7 @@ build {
   }
 
   provisioner "shell" {
-    execute_command = "echo 'vagrant'|sudo -S -E /bin/sh -ex '{{ .Path }}'"
+    execute_command = "echo 'vagrant'|sudo -S -E /bin/bash -ex '{{ .Path }}'"
     scripts = [
       "${path.root}/scripts/base.sh",
       "${path.root}/scripts/virtualbox.sh",

@@ -116,7 +116,7 @@ case $( rpm -qf /etc/os-release --qf '%{name}' ) in
         exit 1
         ;;
 esac
-DEFAULTREPOS+=(epel epel-modular)
+DEFAULTREPOS+=()
 
 # Default to enabling default repos
 ENABLEDREPOS=$(IFS=,; echo "${DEFAULTREPOS[*]}")
@@ -227,6 +227,14 @@ function BuildChroot {
     # Post-installation configurator
     bash -euxo pipefail "${ELBUILD}"/$( PostBuildString ) || \
         err_exit "Failure encountered with PostBuild.sh"
+
+    # Workaround for systemd race condition that enters emergency mode
+    err_exit "Creating emergency.service override for systemd race condition..." NONE
+    install -Dm 000644 <(
+        echo "[Service]"
+        echo "ExecStartPost=/bin/bash -c \"if journalctl -b | grep \\\"Failed with result 'protocol'\\\"; then logger \\\"Bypassing emergency mode: system will reboot\\\"; sleep 2; reboot -f; fi\""
+    ) "${AMIGENCHROOT}/etc/systemd/system/emergency.service.d/override.conf" || err_exit "Failed"
+    err_exit "Success" NONE
 
     # Collect insallation-manifest
     CollectManifest
@@ -557,25 +565,30 @@ function PrepBuildDevice {
     local ROOT_DISK
     local DISKS
 
-    # Select the disk to use for the build
-    err_exit "Detecting the root device..." NONE
-    ROOT_DEV="$( grep ' / ' /proc/mounts | cut -d " " -f 1 )"
-    if [[ ${ROOT_DEV} == /dev/nvme* ]]
+    if [[ -n ${SPEL_AMIGENBUILDDEV:-} ]]
     then
-      ROOT_DISK="${ROOT_DEV//p*/}"
-      IFS=" " read -r -a DISKS <<< "$(echo /dev/nvme*n1)"
+      AMIGENBUILDDEV="${SPEL_AMIGENBUILDDEV}"
     else
-      err_exit "ERROR: This script supports nvme device naming. Could not determine root disk from device name: ${ROOT_DEV}"
-    fi
+      # Select the disk to use for the build
+      err_exit "Detecting the root device..." NONE
+      ROOT_DEV="$( grep ' / ' /proc/mounts | cut -d " " -f 1 )"
+      if [[ ${ROOT_DEV} == /dev/nvme* ]]
+      then
+        ROOT_DISK="${ROOT_DEV//p*/}"
+        IFS=" " read -r -a DISKS <<< "$(echo /dev/nvme*n1)"
+      else
+        err_exit "ERROR: This script supports nvme device naming. Could not determine root disk from device name: ${ROOT_DEV}"
+      fi
 
-    if [[ "$USEROOTDEVICE" = "true" ]]
-    then
-      AMIGENBUILDDEV="${ROOT_DISK}"
-    elif [[ ${#DISKS[@]} -gt 2 ]]
-    then
-      err_exit "ERROR: This script supports at most 2 attached disks. Detected ${#DISKS[*]} disks"
-    else
-      AMIGENBUILDDEV="$(echo "${DISKS[@]/$ROOT_DISK}" | tr -d '[:space:]')"
+      if [[ "$USEROOTDEVICE" = "true" ]]
+      then
+        AMIGENBUILDDEV="${ROOT_DISK}"
+      elif [[ ${#DISKS[@]} -gt 2 ]]
+      then
+        err_exit "ERROR: This script supports at most 2 attached disks. Detected ${#DISKS[*]} disks"
+      else
+        AMIGENBUILDDEV="$(echo "${DISKS[@]/$ROOT_DISK}" | tr -d '[:space:]')"
+      fi
     fi
     err_exit "Using ${AMIGENBUILDDEV} as the build device." NONE
 

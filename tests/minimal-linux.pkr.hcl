@@ -3,6 +3,21 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
+variable "aws_source_ami_alma9_hvm" {
+  type    = string
+  default = env("amazon_ebssurrogate_minimal_alma_9_hvm")
+}
+
+variable "aws_source_ami_amzn2023_hvm" {
+  type    = string
+  default = env("amazon_ebssurrogate_minimal_amzn_2023_hvm")
+}
+
+variable "aws_source_ami_centos8stream_hvm" {
+  type    = string
+  default = env("amazon_ebssurrogate_minimal_centos_8stream_hvm")
+}
+
 variable "aws_source_ami_centos9stream_hvm" {
   type    = string
   default = env("amazon_ebssurrogate_minimal_centos_9stream_hvm")
@@ -26,6 +41,11 @@ variable "aws_source_ami_rhel8_hvm" {
 variable "aws_source_ami_rhel9_hvm" {
   type    = string
   default = env("amazon_ebssurrogate_minimal_rhel_9_hvm")
+}
+
+variable "aws_source_ami_rl9_hvm" {
+  type    = string
+  default = env("amazon_ebssurrogate_minimal_rl_9_hvm")
 }
 
 variable "aws_ssh_interface" {
@@ -78,7 +98,7 @@ source "amazon-ebs" "base" {
   instance_type               = "t3.large"
   launch_block_device_mappings {
     delete_on_termination = true
-    device_name           = "/dev/sda1"
+    device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
     volume_size           = 21
     volume_type           = "gp3"
   }
@@ -92,12 +112,22 @@ source "amazon-ebs" "base" {
   ssh_pty                               = true
   ssh_username                          = "spel"
   subnet_id                             = var.aws_subnet_id
-  tags                                  = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
   user_data_file                        = "${path.root}/userdata/validation.cloud"
 }
 
 build {
+
+  source "amazon-ebs.base" {
+    source_ami = var.aws_source_ami_alma9_hvm
+    name       = "minimal-alma-9-hvm"
+  }
+
+  source "amazon-ebs.base" {
+    source_ami = var.aws_source_ami_amzn2023_hvm
+    name       = "minimal-amzn-2023-hvm"
+  }
+
   source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_centos9stream_hvm
     name       = "minimal-centos-9stream-hvm"
@@ -121,6 +151,11 @@ build {
   source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_rhel9_hvm
     name       = "minimal-rhel-9-hvm"
+  }
+
+  source "amazon-ebs.base" {
+    source_ami = var.aws_source_ami_rl9_hvm
+    name       = "minimal-rl-9-hvm"
   }
 
   provisioner "shell" {
@@ -155,7 +190,6 @@ build {
       "PYPI_URL=$${PYPI_URL:-https://pypi.org/simple}",
       "ls -alR /tmp",
       "python3 -m ensurepip",
-      "python3 -m pip install --index-url=\"$PYPI_URL\" --upgrade pip setuptools",
       "python3 -m pip install --index-url=\"$PYPI_URL\" -r /tmp/spel/tests/requirements.txt",
       "for DEV in $(lsblk -ln | awk '/ part /{ print $1}'); do pvresize /dev/$${DEV} || true; done",
     ]

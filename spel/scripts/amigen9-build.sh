@@ -13,6 +13,7 @@ AMIGENCHROOT="${SPEL_AMIGENCHROOT:-/mnt/ec2-root}"
 AMIGENFSTYPE="${SPEL_AMIGENFSTYPE:-xfs}"
 AMIGENICNCTURL="${SPEL_AMIGENICNCTURL}"
 AMIGENMANFST="${SPEL_AMIGENMANFST}"
+AMIGENMANFSTAL2023="${SPEL_AMIGENMANFSTAL2023}"
 AMIGENPKGGRP="${SPEL_AMIGENPKGGRP:-core}"
 AMIGENREPOS="${SPEL_AMIGENREPOS}"
 AMIGENREPOSRC="${SPEL_AMIGENREPOSRC}"
@@ -72,6 +73,14 @@ function err_exit {
 
 # Setup per-builder values
 case $( rpm -qf /etc/os-release --qf '%{name}' ) in
+    almalinux-release)
+        BUILDER=alma-9
+        DEFAULTREPOS=(
+            baseos
+            appstream
+            extras
+        )
+        ;;
     centos-linux-release | centos-stream-release )
         BUILDER=centos-9stream
 
@@ -79,6 +88,15 @@ case $( rpm -qf /etc/os-release --qf '%{name}' ) in
             baseos
             appstream
             extras-common
+        )
+        ;;
+    oraclelinux-release)
+        BUILDER=ol-9
+
+        DEFAULTREPOS=(
+            ol9_UEKR7
+            ol9_appstream
+            ol9_baseos_latest
         )
         ;;
     redhat-release-server|redhat-release)
@@ -90,13 +108,22 @@ case $( rpm -qf /etc/os-release --qf '%{name}' ) in
             rhui-client-config-server-9
         )
         ;;
-    oraclelinux-release)
-        BUILDER=ol-9
+    rocky-release)
+        BUILDER=rl-9
 
         DEFAULTREPOS=(
-            ol9_UEKR7
-            ol9_appstream
-            ol9_baseos_latest
+            baseos
+            appstream
+            extras
+        )
+        ;;
+
+    system-release) # Amazon should be shot for this
+        BUILDER=amzn-2023
+
+        DEFAULTREPOS=(
+            amazonlinux
+            kernel-livepatch
         )
         ;;
     *)
@@ -481,11 +508,15 @@ function ComposeOSpkgString {
     fi
 
     # Add custom manifest file
-    if [[ -z ${AMIGENMANFST:-} ]]
+    if [[ "$BUILDER" == "amzn-2023" ]] && [[ -n ${AMIGENMANFSTAL2023:-} ]]
     then
-        err_exit "Installing no custom manifest" NONE
+        # Use custom manifest env for Amazon Linux 2023
+        OSPACKAGESTRING+="-M ${AMIGENMANFSTAL2023} "
+    elif [[ -n ${AMIGENMANFST:-} ]]
+    then
+        OSPACKAGESTRING+="-M ${AMIGENMANFST} "
     else
-        OSPACKAGESTRING+="-M ${AMIGENREPOSRC} "
+        err_exit "Installing no custom manifest" NONE
     fi
 
     # Add custom pkg group
@@ -554,19 +585,35 @@ function PostBuildString {
 }
 
 function PrepBuildDevice {
-    local ROOT_DEV
-    local ROOT_DISK
-    local DISKS
+    local -a DISKS
+    local    ROOT_DEV
+    local    ROOT_DISK
 
     # Select the disk to use for the build
     err_exit "Detecting the root device..." NONE
     ROOT_DEV="$( grep ' / ' /proc/mounts | cut -d " " -f 1 )"
+
+    # Use alternate method to find ROOT_DEV (mostly for Azure)
+    if [[ ${ROOT_DEV} == "none" ]]
+    then
+      ROOT_DEV="$(
+        blkid | grep "$(
+          awk '/\s\s*\/\s\s*/{ print $1 }' /etc/fstab | cut -d '=' -f 2
+        )" | sed -e 's/:.*$//'
+      )"
+    fi
+
+    # Check if root-dev type is supported
     if [[ ${ROOT_DEV} == /dev/nvme* ]]
     then
       ROOT_DISK="${ROOT_DEV//p*/}"
-      IFS=" " read -r -a DISKS <<< "$(echo /dev/nvme*n1)"
+      mapfile -t DISKS < <( echo /dev/nvme*n1 )
+    elif [[ ${ROOT_DEV} == /dev/sd* ]]
+    then
+      ROOT_DISK="${ROOT_DEV%?}"
+      mapfile -t DISKS < <( echo /dev/sd[a-z] )
     else
-      err_exit "ERROR: This script supports nvme device naming. Could not determine root disk from device name: ${ROOT_DEV}"
+      err_exit "ERROR: This script supports sd or nvme device naming, only. Could not determine root disk from device name: ${ROOT_DEV}"
     fi
 
     if [[ "$USEROOTDEVICE" = "true" ]]
@@ -600,9 +647,6 @@ function PrepBuildDevice {
 set -x
 set -e
 set -o pipefail
-
-echo "Restarting networkd/resolved for DNS resolution"
-systemctl restart systemd-networkd systemd-resolved
 
 # Ensure build-tools directory exists
 if [[ ! -d ${ELBUILD} ]]
