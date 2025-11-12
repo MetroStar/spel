@@ -16,21 +16,22 @@ param(
 )
 
 Set-StrictMode -Version Latest
-$ProgressPreference = 'SilentlyContinue'
-$ErrorActionPreference = 'Stop'
-$ConfirmPreference = 'None'  # Suppress all confirmation prompts
+$ProgressPreference     = 'SilentlyContinue'
+$ErrorActionPreference  = 'Stop'
+$ConfirmPreference      = 'None'  # Suppress all confirmation prompts
 
-# Use the built-in -Verbose parameter functionality
-# No need to manually set VerbosePreference as [CmdletBinding()] handles this
+# Make sure verbose/information messages are visible in non-interactive runs (Packer)
+$VerbosePreference     = 'Continue'
+$InformationPreference = 'Continue'
 
-# Trap for debugging. If any command fails, this block executes.
+# Trap: on any terminating error, emit structured output (no color by default)
 trap {
-    Write-Host
-    Write-Host "ERROR: $_" -ForegroundColor Red
-    ($_.ScriptStackTrace -split '\r?\n') -replace '^(.*)$','ERROR: $1' | Write-Host -ForegroundColor Red
-    ($_.Exception.ToString() -split '\r?\n') -replace '^(.*)$','ERROR EXCEPTION: $1' | Write-Host -ForegroundColor Red
-    Write-Host
-    Write-Host 'Script failed. Sleeping for 60m for manual inspection before self-destruction...' -ForegroundColor Yellow
+    Write-Output
+    Write-Output "ERROR: $_"
+    ($_.ScriptStackTrace -split '\r?\n') -replace '^(.*)$','ERROR: $1' | Write-Output
+    ($_.Exception.ToString() -split '\r?\n') -replace '^(.*)$','ERROR EXCEPTION: $1' | Write-Output
+    Write-Output
+    Write-Output 'Script failed. Sleeping for 60m for manual inspection before self-destruction...'
     Start-Sleep -Seconds (60*60)
     Exit 1
 }
@@ -41,22 +42,22 @@ $osName = (Get-WmiObject -Class Win32_OperatingSystem).Caption
 $isServer2019OrLater = [Version]$osVersion -ge [Version]"10.0.17763"
 $isServer2016 = [Version]$osVersion -ge [Version]"10.0.14393" -and [Version]$osVersion -lt [Version]"10.0.17763"
 
-Write-Host "Detected OS: $osName (Version: $osVersion)" -ForegroundColor Green
+Write-Output "Detected OS: $osName (Version: $osVersion)"
 if ($isServer2019OrLater) {
-    Write-Host "Using Windows Server 2019+ optimizations..." -ForegroundColor Green
+    Write-Output "Using Windows Server 2019+ optimizations..."
 } elseif ($isServer2016) {
-    Write-Host "Using Windows Server 2016 optimizations..." -ForegroundColor Green
+    Write-Output "Using Windows Server 2016 optimizations..."
 } else {
-    Write-Host "Warning: Unsupported Windows version detected!" -ForegroundColor Yellow
+    Write-Output "Warning: Unsupported Windows version detected!"
 }
 
-Write-Host "Starting enhanced Windows Server EC2 AMI cleanup..." -ForegroundColor Green
+Write-Output "Starting enhanced Windows Server EC2 AMI cleanup..."
 
 # -------------------------------------------------------------------
 ## Section 1: Stop Services & Clear Logs / Temp Files
 # -------------------------------------------------------------------
 
-Write-Host 'Stopping services that might interfere with file removal...' -ForegroundColor Yellow
+Write-Output 'Stopping services that might interfere with file removal...'
 function Stop-ServiceForReal($name) {
     while ($true) {
         $svc = Get-Service $name -ErrorAction SilentlyContinue
@@ -70,7 +71,7 @@ function Stop-ServiceForReal($name) {
             break
         }
         
-        Write-Host "Stopping service $name..." -ForegroundColor Cyan
+        Write-Output "Stopping service $name..."
         Stop-Service -Name $name -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 2
     }
@@ -93,7 +94,7 @@ foreach ($service in $servicesToStop) {
     Stop-ServiceForReal $service
 }
 
-Write-Host 'Clearing all event logs...' -ForegroundColor Yellow
+Write-Output 'Clearing all event logs...'
 try {
     Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | ForEach-Object {
         # Check if the object has a LogName property and it's not null/empty
@@ -110,7 +111,7 @@ try {
     }
 } catch {
     Write-Verbose "Error accessing event logs: $($_.Exception.Message)"
-    Write-Host "Falling back to alternative log clearing method..." -ForegroundColor Yellow
+    Write-Output "Falling back to alternative log clearing method..."
     
     # Alternative method using wevtutil directly
     try {
@@ -126,7 +127,7 @@ try {
     }
 }
 
-Write-Host "Cleaning comprehensive temp file locations..." -ForegroundColor Yellow
+Write-Output "Cleaning comprehensive temp file locations..."
 $tempPaths = @(
     "$env:windir\Temp\*",
     "$env:windir\Logs\*",
@@ -175,24 +176,28 @@ foreach ($path in $tempPaths) {
         # This is a wildcard path, get the parent directory
         $parentPath = Split-Path $path -Parent
         if (Test-Path $parentPath) {
-            Write-Host "Removing temporary files from $path..." -ForegroundColor Cyan
+            Write-Output "Removing temporary files from $path..."
             try {
                 # Get items matching the pattern
-                $itemsToRemove = Get-ChildItem $path -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike 'packer-*' }
-                if ($itemsToRemove) {
+                $itemsToRemove = @(Get-ChildItem $path -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike 'packer-*' })
+                if ($itemsToRemove -and $itemsToRemove.Count -gt 0) {
                     foreach ($item in $itemsToRemove) {
                         try {
-                            takeown.exe /D Y /R /F "$($item.FullName)" 2>&1 | Out-Null
-                            icacls.exe "$($item.FullName)" /grant:r Administrators:F /T /C /Q 2>&1 | Out-Null
-                            if ($item.PSIsContainer) {
-                                Remove-Item "$($item.FullName)" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
-                            } else {
-                                Remove-Item "$($item.FullName)" -Force -Confirm:$false -ErrorAction SilentlyContinue
+                            if ($item -and $item.FullName) {
+                                takeown.exe /D Y /R /F "$($item.FullName)" 2>&1 | Out-Null
+                                icacls.exe "$($item.FullName)" /grant:r Administrators:F /T /C /Q 2>&1 | Out-Null
+                                if ($item.PSIsContainer) {
+                                    Remove-Item "$($item.FullName)" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+                                } else {
+                                    Remove-Item "$($item.FullName)" -Force -Confirm:$false -ErrorAction SilentlyContinue
+                                }
                             }
                         } catch {
-                            Write-Verbose "Ignoring failure to remove ${item.FullName}: $($_.Exception.Message)"
+                            Write-Verbose "Ignoring failure to remove item: $($_.Exception.Message)"
                         }
                     }
+                } else {
+                    Write-Verbose "No items to remove in $path"
                 }
             } catch {
                 Write-Verbose "Ignoring failure to process ${path}: $($_.Exception.Message)"
@@ -202,7 +207,7 @@ foreach ($path in $tempPaths) {
         # This is a direct directory path
         $items = Get-ChildItem $path -ErrorAction SilentlyContinue
         if ($items) {
-            Write-Host "Removing directory contents from $path..." -ForegroundColor Cyan
+            Write-Output "Removing directory contents from $path..."
             try {
                 takeown.exe /D Y /R /F $path 2>&1 | Out-Null
                 icacls.exe $path /grant:r Administrators:F /T /C /Q 2>&1 | Out-Null
@@ -212,8 +217,7 @@ foreach ($path in $tempPaths) {
             }
         }
     } elseif (Test-Path $path -PathType Leaf) {
-        # This is a direct file path
-        Write-Host "Removing file $path..." -ForegroundColor Cyan
+        Write-Output "Removing file $path..."
         Remove-Item $path -Force -Confirm:$false -ErrorAction SilentlyContinue
     }
 }
@@ -222,10 +226,10 @@ foreach ($path in $tempPaths) {
 ## Section 2: AWS-Specific Cleanup
 # -------------------------------------------------------------------
 
-Write-Host "Performing AWS-specific cleanup..." -ForegroundColor Yellow
+Write-Output "Performing AWS-specific cleanup..."
 
 # Clear AWS EC2 instance metadata cache
-Write-Host "Clearing EC2 instance metadata cache..." -ForegroundColor Cyan
+Write-Output "Clearing EC2 instance metadata cache..."
 $ec2ConfigLog = "C:\Program Files\Amazon\Ec2ConfigService\Logs"
 if (Test-Path $ec2ConfigLog) {
     Remove-Item "$ec2ConfigLog\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
@@ -247,7 +251,7 @@ if ($isServer2019OrLater) {
 
 foreach ($logPath in $ec2LaunchLogs) {
     if (Test-Path $logPath) {
-        Write-Host "Clearing EC2Launch logs: $logPath" -ForegroundColor Cyan
+        Write-Output "Clearing EC2Launch logs: $logPath"
         Remove-Item $logPath -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
     }
 }
@@ -265,16 +269,16 @@ if (Test-Path $ssmLogs) {
 }
 
 # Reset network adapter configurations
-Write-Host "Resetting network configurations..." -ForegroundColor Cyan
+Write-Output "Resetting network configurations..."
 try {
     # Clear DNS cache
     ipconfig /flushdns | Out-Null
     
     # Reset network adapters to DHCP
-    Get-NetAdapter | Where-Object {$_.Status -eq "Up"} | ForEach-Object {
-        Set-NetIPInterface -InterfaceIndex $_.InterfaceIndex -Dhcp Enabled -ErrorAction SilentlyContinue
-        Set-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex -ResetServerAddresses -ErrorAction SilentlyContinue
-    }
+    # Get-NetAdapter | Where-Object {$_.Status -eq "Up"} | ForEach-Object {
+    #     Set-NetIPInterface -InterfaceIndex $_.InterfaceIndex -Dhcp Enabled -ErrorAction SilentlyContinue
+    #     Set-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex -ResetServerAddresses -ErrorAction SilentlyContinue
+    # }
 } catch {
     Write-Verbose "Network reset had issues: $_"
 }
@@ -283,7 +287,7 @@ try {
 ## Section 3: Registry Cleanup
 # -------------------------------------------------------------------
 
-Write-Host "Performing registry cleanup..." -ForegroundColor Yellow
+Write-Output "Performing registry cleanup..."
 
 # Clear MRU (Most Recently Used) lists
 $mruPaths = @(
@@ -295,7 +299,7 @@ $mruPaths = @(
 
 foreach ($mruPath in $mruPaths) {
     if (Test-Path $mruPath) {
-        Write-Host "Clearing registry path: $mruPath" -ForegroundColor Cyan
+        Write-Output "Clearing registry path: $mruPath"
         try {
             Remove-Item $mruPath -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
         } catch {
@@ -305,12 +309,12 @@ foreach ($mruPath in $mruPaths) {
 }
 
 # Clear maintuser-specific registry paths and user profile data
-Write-Host "Cleaning maintuser-specific registry and profile data..." -ForegroundColor Cyan
+Write-Output "Cleaning maintuser-specific registry and profile data..."
 try {
     # Load maintuser hive if it exists and clean it
     $maintUserProfilePath = "C:\Users\maintuser"
     if (Test-Path $maintUserProfilePath) {
-        Write-Host "Found maintuser profile, performing comprehensive cleanup..." -ForegroundColor Cyan
+        Write-Output "Found maintuser profile, performing comprehensive cleanup..."
         
         # Get maintuser SID for registry operations
         try {
@@ -337,14 +341,16 @@ try {
         }
         
         # Reset maintuser profile permissions and ownership
-        try {
-            Write-Host "Resetting maintuser profile permissions..." -ForegroundColor Cyan
-            takeown.exe /D Y /R /F "$maintUserProfilePath" /A 2>&1 | Out-Null
-            icacls.exe "$maintUserProfilePath" /reset /T /C /Q 2>&1 | Out-Null
-            icacls.exe "$maintUserProfilePath" /grant:r "maintuser:(OI)(CI)F" /T /C /Q 2>&1 | Out-Null
-        } catch {
-            Write-Verbose "Failed to reset maintuser profile permissions: $($_.Exception.Message)"
-        }
+        # Note: Skipping recursive permission reset as it can take very long on large profiles
+        # Files will be cleaned up anyway, so permission reset is not critical
+        # try {
+        #     Write-Output "Resetting maintuser profile permissions..."
+        #     takeown.exe /D Y /R /F "$maintUserProfilePath" /A 2>&1 | Out-Null
+        #     icacls.exe "$maintUserProfilePath" /reset /T /C /Q 2>&1 | Out-Null
+        #     icacls.exe "$maintUserProfilePath" /grant:r "maintuser:(OI)(CI)F" /T /C /Q 2>&1 | Out-Null
+        # } catch {
+        #     Write-Verbose "Failed to reset maintuser profile permissions: $($_.Exception.Message)"
+        # }
         
         # Clear maintuser PowerShell history
         $maintUserPSHistory = "$maintUserProfilePath\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
@@ -373,10 +379,19 @@ try {
 }
 
 # Clear Windows activation cache
-Write-Host "Clearing Windows activation cache..." -ForegroundColor Cyan
+Write-Output "Clearing Windows activation cache..."
 try {
-    slmgr.vbs /cpky
-    slmgr.vbs /ckms
+    # Run slmgr commands with timeout to prevent hanging
+    $slmgrJob1 = Start-Job -ScriptBlock { cscript.exe //nologo C:\Windows\System32\slmgr.vbs /cpky }
+    $slmgrJob2 = Start-Job -ScriptBlock { cscript.exe //nologo C:\Windows\System32\slmgr.vbs /ckms }
+    
+    # Wait max 30 seconds for each command
+    Wait-Job -Job $slmgrJob1 -Timeout 30 | Out-Null
+    Wait-Job -Job $slmgrJob2 -Timeout 30 | Out-Null
+    
+    # Clean up jobs
+    Remove-Job -Job $slmgrJob1 -Force -ErrorAction SilentlyContinue
+    Remove-Job -Job $slmgrJob2 -Force -ErrorAction SilentlyContinue
 } catch {
     Write-Verbose "Windows activation cache clear failed: $_"
 }
@@ -385,16 +400,16 @@ try {
 ## Section 4: Windows Update & BITS Cleanup
 # -------------------------------------------------------------------
 
-Write-Host "Resetting Windows Update and BITS..." -ForegroundColor Yellow
+Write-Output "Resetting Windows Update and BITS..."
 
-Write-Host "Clearing BITS jobs..." -ForegroundColor Cyan
+Write-Output "Clearing BITS jobs..."
 try {
     Get-BitsTransfer -AllUsers | Remove-BitsTransfer
 } catch {
     Write-Verbose "Failed to clear BITS jobs (likely no jobs to clear)."
 }
 
-Write-Host "Resetting Windows Update components..." -ForegroundColor Cyan
+Write-Output "Resetting Windows Update components..."
 try {
     # Rename SoftwareDistribution folder
     if (Test-Path "$env:windir\SoftwareDistribution") {
@@ -417,17 +432,17 @@ try {
 ## Section 5: System Optimization (WinSxS & Features)
 # -------------------------------------------------------------------
 
-Write-Host 'Cleaning up the WinSxS Component Store...' -ForegroundColor Yellow
+Write-Output 'Cleaning up the WinSxS Component Store...'
 try {
-    Write-Host "Running DISM cleanup operations..." -ForegroundColor Cyan
+    Write-Output "Running DISM cleanup operations..."
     dism.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
     dism.exe /Online /Cleanup-Image /SPSuperseded
 } catch {
-    Write-Host "DISM failed with Exit Code $LASTEXITCODE. Trying scheduled task fallback..." -ForegroundColor Yellow
+    Write-Output "DISM failed with Exit Code $LASTEXITCODE. Trying scheduled task fallback..."
     try {
         schtasks.exe /Run /TN "\Microsoft\Windows\Servicing\StartComponentCleanup"
-        
-        Write-Host "Waiting for StartComponentCleanup task to finish..." -ForegroundColor Cyan
+
+        Write-Output "Waiting for StartComponentCleanup task to finish..."
         $taskRunning = $true
         $timeout = 0
         while ($taskRunning -and $timeout -lt 60) {
@@ -436,13 +451,13 @@ try {
             try {
                 $taskState = (Get-ScheduledTask -TaskName "StartComponentCleanup" -TaskPath "\Microsoft\Windows\Servicing\").State
                 if ($taskState -ne "Running") {
-                    Write-Host "Task finished with state: $taskState" -ForegroundColor Green
+                    Write-Output "Task finished with state: $taskState"
                     $taskRunning = $false
                 } else {
-                    Write-Host "Task is still running... ($timeout/60)" -ForegroundColor Cyan
+                    Write-Output "Task is still running... ($timeout/60)"
                 }
             } catch {
-                Write-Host "Could not check task state, assuming it finished." -ForegroundColor Yellow
+                Write-Output "Could not check task state, assuming it finished."
                 $taskRunning = $false
             }
         }
@@ -451,7 +466,7 @@ try {
     }
 }
 
-Write-Host "Removing disabled Windows Features..." -ForegroundColor Yellow
+Write-Output "Removing disabled Windows Features..."
 try {
     if ($isServer2019OrLater) {
         # Server 2019+ has better feature management
@@ -479,27 +494,31 @@ try {
     Write-Verbose "Could not remove all disabled features: $_"
 }
 
-Write-Host 'Analyzing WinSxS folder post-cleanup...' -ForegroundColor Yellow
+Write-Output 'Analyzing WinSxS folder post-cleanup...'
 dism.exe /Online /Cleanup-Image /AnalyzeComponentStore
 
 # -------------------------------------------------------------------
 ## Section 6: Security and Privacy Cleanup
 # -------------------------------------------------------------------
 
-Write-Host "Performing security and privacy cleanup..." -ForegroundColor Yellow
+Write-Output "Performing security and privacy cleanup..."
 
 # Clear certificate stores of user certificates
-Write-Host "Clearing user certificate stores..." -ForegroundColor Cyan
+Write-Output "Clearing user certificate stores..."
 try {
-    Get-ChildItem Cert:\CurrentUser\My | Remove-Item -Force -Confirm:$false -ErrorAction SilentlyContinue
-    Get-ChildItem Cert:\CurrentUser\Root | Where-Object {$_.Subject -notlike "*Microsoft*" -and $_.Subject -notlike "*Windows*"} | Remove-Item -Force -Confirm:$false -ErrorAction SilentlyContinue
+    # Clear My store (personal certificates) - this should work without UI
+    Get-ChildItem Cert:\CurrentUser\My -ErrorAction SilentlyContinue | Remove-Item -Force -Confirm:$false -ErrorAction SilentlyContinue
+    
+    # Skip Root store cleanup - requires UI in non-interactive sessions
+    # Get-ChildItem Cert:\CurrentUser\Root | Where-Object {$_.Subject -notlike "*Microsoft*" -and $_.Subject -notlike "*Windows*"} | Remove-Item -Force -Confirm:$false -ErrorAction SilentlyContinue
     
     # Clear maintuser certificates if profile exists
     $maintUserCertPath = "C:\Users\maintuser\AppData\Roaming\Microsoft\SystemCertificates"
     if (Test-Path $maintUserCertPath) {
-        Write-Host "Clearing maintuser certificate stores..." -ForegroundColor Cyan
+        Write-Output "Clearing maintuser certificate stores..."
         Remove-Item "$maintUserCertPath\My\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
-        Remove-Item "$maintUserCertPath\Root\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+        # Skip root certs - they require UI
+        # Remove-Item "$maintUserCertPath\Root\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
         Remove-Item "$maintUserCertPath\TrustedPeople\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
     }
 } catch {
@@ -507,9 +526,13 @@ try {
 }
 
 # Clear PowerShell execution policy and profiles
-Write-Host "Resetting PowerShell configuration..." -ForegroundColor Cyan
+Write-Output "Resetting PowerShell configuration..."
 try {
-    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force
+    # Skip execution policy change - Packer already sets it via command line
+    # and GPO may override it anyway
+    # Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force
+    
+    # Clear PowerShell profiles
     if (Test-Path $PROFILE.AllUsersAllHosts) {
         Remove-Item $PROFILE.AllUsersAllHosts -Force -Confirm:$false -ErrorAction SilentlyContinue
     }
@@ -521,16 +544,16 @@ try {
 ## Section 7: Final System Hygiene
 # -------------------------------------------------------------------
 
-Write-Host 'Performing final system hygiene...' -ForegroundColor Yellow
+Write-Output 'Performing final system hygiene...'
 
-Write-Host 'Clearing pagefile registry key...' -ForegroundColor Cyan
+Write-Output 'Clearing pagefile registry key...'
 try {
     New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management' -Name PagingFiles -Value '' -PropertyType String -Force | Out-Null
 } catch {
     Write-Verbose "Pagefile registry clear failed: $_"
 }
 
-Write-Host "Clearing PowerShell history..." -ForegroundColor Cyan
+Write-Output "Clearing PowerShell history..."
 try {
     Remove-Item (Get-PSReadlineOption).HistorySavePath -Force -Confirm:$false -ErrorAction SilentlyContinue
     Remove-Item "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt" -Force -Confirm:$false -ErrorAction SilentlyContinue
@@ -552,7 +575,7 @@ try {
     Write-Verbose "PowerShell history clear failed: $_"
 }
 
-Write-Host "Clearing browser caches and data..." -ForegroundColor Cyan
+Write-Output "Clearing browser caches and data..."
 try {
     # Clear IE/Edge cache
     RunDll32.exe InetCpl.cpl,ClearMyTracksByProcess 4351
@@ -567,7 +590,7 @@ try {
     # Clear maintuser browser caches
     $maintUserChromePath = "C:\Users\maintuser\AppData\Local\Google\Chrome\User Data\Default"
     if (Test-Path $maintUserChromePath) {
-        Write-Host "Clearing maintuser Chrome cache..." -ForegroundColor Cyan
+        Write-Output "Clearing maintuser Chrome cache..."
         Remove-Item "$maintUserChromePath\Cache\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
         Remove-Item "$maintUserChromePath\History*" -Force -Confirm:$false -ErrorAction SilentlyContinue
         Remove-Item "$maintUserChromePath\Cookies*" -Force -Confirm:$false -ErrorAction SilentlyContinue
@@ -577,7 +600,7 @@ try {
     # Clear maintuser Firefox cache if present
     $maintUserFirefoxPath = "C:\Users\maintuser\AppData\Local\Mozilla\Firefox\Profiles"
     if (Test-Path $maintUserFirefoxPath) {
-        Write-Host "Clearing maintuser Firefox cache..." -ForegroundColor Cyan
+        Write-Output "Clearing maintuser Firefox cache..."
         Get-ChildItem $maintUserFirefoxPath -Directory | ForEach-Object {
             Remove-Item "$($_.FullName)\cache2\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
             Remove-Item "$($_.FullName)\cookies.sqlite*" -Force -Confirm:$false -ErrorAction SilentlyContinue
@@ -588,7 +611,7 @@ try {
     # Clear maintuser Edge cache
     $maintUserEdgePath = "C:\Users\maintuser\AppData\Local\Microsoft\Edge\User Data\Default"
     if (Test-Path $maintUserEdgePath) {
-        Write-Host "Clearing maintuser Edge cache..." -ForegroundColor Cyan
+        Write-Output "Clearing maintuser Edge cache..."
         Remove-Item "$maintUserEdgePath\Cache\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
         Remove-Item "$maintUserEdgePath\History*" -Force -Confirm:$false -ErrorAction SilentlyContinue
         Remove-Item "$maintUserEdgePath\Cookies*" -Force -Confirm:$false -ErrorAction SilentlyContinue
@@ -598,7 +621,7 @@ try {
 }
 
 # Optimize system drive (version-specific optimizations)
-Write-Host "Optimizing system drive..." -ForegroundColor Cyan
+Write-Output "Optimizing system drive..."
 try {
     if ($isServer2019OrLater) {
         # Server 2019+ supports better optimization options
@@ -613,16 +636,29 @@ try {
 }
 
 # Clear Windows Defender definitions and reset (they'll be updated on first boot)
-Write-Host "Clearing Windows Defender definitions..." -ForegroundColor Cyan
+Write-Output "Clearing Windows Defender definitions..."
 try {
     if ($isServer2019OrLater) {
         # Server 2019+ has better Defender integration
-        Remove-MpDefinition -All -Force -ErrorAction SilentlyContinue
+        # Stop Windows Defender service first
+        Stop-Service -Name WinDefend -Force -ErrorAction SilentlyContinue
+        
+        # Clear definition files and scan history
         Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Definition Updates\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
         Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Scans\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+        
+        # Clear quarantine and network inspection cache
+        Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Quarantine\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+        Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Network Inspection System\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+        
+        # Restart service to let it download fresh definitions on first boot
+        Start-Service -Name WinDefend -ErrorAction SilentlyContinue
     } else {
         # Server 2016 cleanup
+        Stop-Service -Name WinDefend -Force -ErrorAction SilentlyContinue
         Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Definition Updates\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+        Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Scans\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+        Start-Service -Name WinDefend -ErrorAction SilentlyContinue
     }
 } catch {
     Write-Verbose "Windows Defender cleanup failed: $_"
@@ -633,16 +669,16 @@ try {
 # -------------------------------------------------------------------
 
 if (-not $SkipSysprep) {
-    Write-Host "=" * 60 -ForegroundColor Red
-    Write-Host "FINAL STEP: EC2Launch Sysprep Generalization" -ForegroundColor Red
-    Write-Host "=" * 60 -ForegroundColor Red
-    Write-Host "The instance will SHUT DOWN automatically upon completion." -ForegroundColor Yellow
-    Write-Host "Ensure you create the AMI after the instance reaches 'stopped' state." -ForegroundColor Yellow
+    Write-Output ("=" * 60)
+    Write-Output "FINAL STEP: EC2Launch Sysprep Generalization"
+    Write-Output ("=" * 60)
+    Write-Output "The instance will SHUT DOWN automatically upon completion."
+    Write-Output "Ensure you create the AMI after the instance reaches 'stopped' state."
 
     try {
         if ($isServer2019OrLater) {
             # Windows Server 2019+ uses EC2Launch v2
-            Write-Host "Using EC2Launch v2 for Windows Server 2019+..." -ForegroundColor Cyan
+            Write-Output "Using EC2Launch v2 for Windows Server 2019+..."
             
             # Check if EC2Launch v2 is installed
             $ec2LaunchV2Path = "C:\Program Files\Amazon\EC2Launch\EC2Launch.exe"
@@ -651,35 +687,37 @@ if (-not $SkipSysprep) {
                 & $ec2LaunchV2Path sysprep --shutdown
             } else {
                 # Fallback to EC2Launch v1 if v2 is not available
-                Write-Host "EC2Launch v2 not found, falling back to v1..." -ForegroundColor Yellow
+                Write-Output "EC2Launch v2 not found, falling back to v1..."
                 Import-Module "C:\ProgramData\Amazon\EC2-Windows\Launch\Module\Ec2Launch.psd1" -ErrorAction Stop
                 Set-EC2LaunchConfiguration -ExecuteSysprep $true -ComputerName 'Random' -AdministratorPassword 'Random' -Schedule 
                 C:\ProgramData\Amazon\EC2-Windows\Launch\Scripts\Ec2LaunchSysprep.ps1
             }
         } else {
             # Windows Server 2016 uses EC2Launch v1
-            Write-Host "Using EC2Launch v1 for Windows Server 2016..." -ForegroundColor Cyan
+            Write-Output "Using EC2Launch v1 for Windows Server 2016..."
             Import-Module "C:\ProgramData\Amazon\EC2-Windows\Launch\Module\Ec2Launch.psd1" -ErrorAction Stop
             Set-EC2LaunchConfiguration -ExecuteSysprep $true -ComputerName 'Random' -AdministratorPassword 'Random' -Schedule 
             C:\ProgramData\Amazon\EC2-Windows\Launch\Scripts\Ec2LaunchSysprep.ps1
         }
     } catch {
-        Write-Host "EC2Launch Sysprep failed: $_" -ForegroundColor Red
-        Write-Host "Attempting manual Sysprep..." -ForegroundColor Yellow
-        
+        Write-Output "EC2Launch Sysprep failed: $_"
+        Write-Output "Attempting manual Sysprep..."
+
         # Fallback to manual sysprep
         $sysprepPath = "$env:windir\System32\Sysprep\sysprep.exe"
         if (Test-Path $sysprepPath) {
             & $sysprepPath /generalize /oobe /shutdown /unattend:C:\ProgramData\Amazon\EC2-Windows\Launch\Sysprep\Unattend.xml
         } else {
-            Write-Host "Sysprep executable not found. Manual intervention required." -ForegroundColor Red
+            Write-Output "Sysprep executable not found. Manual intervention required."
             Exit 1
         }
     }
 } else {
-    Write-Host "Sysprep skipped due to -SkipSysprep parameter." -ForegroundColor Yellow
-    Write-Host "AMI cleanup completed successfully!" -ForegroundColor Green
+    Write-Output "Sysprep skipped due to -SkipSysprep parameter."
+    Write-Output "AMI cleanup completed successfully!"
+    return
 }
 
 # The script will not reach this point if Sysprep runs, as it shuts down the OS.
-Write-Host "Script execution completed." -ForegroundColor Green
+Write-Output "Script execution completed."
+Exit 0

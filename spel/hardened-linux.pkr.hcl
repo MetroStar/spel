@@ -12,6 +12,10 @@ packer {
       version = ">= 1.1.0"
       source = "github.com/hashicorp/ansible"
     }
+    windows-update = {
+      version = ">= 0.17.1"
+      source  = "github.com/rgl/windows-update"
+    }
   }
 }
 
@@ -64,7 +68,7 @@ variable "aws_ami_users" {
 variable "aws_instance_type" {
   description = "EC2 instance type to use while building the AMIs"
   type        = string
-  default     = "t3.2xlarge"
+  default     = "m8i.96xlarge"
 }
 
 variable "aws_force_deregister" {
@@ -582,10 +586,17 @@ source "amazon-ebs" "windows-2019-base" {
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
   user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
   winrm_insecure              = true
-  winrm_timeout               = "10m"
+  winrm_timeout               = "15m"
   winrm_use_ssl               = true
   winrm_use_ntlm              = true
-  winrm_username              = "Administrator"
+  winrm_username              = "TempPackerUser"
+  winrm_password              = "ComplexP@ssw0rd123!"
+
+  launch_block_device_mappings {
+    device_name = "/dev/sda1"
+    volume_type = "gp3"
+    delete_on_termination = true
+  }
 }
 
 ###
@@ -801,6 +812,14 @@ build {
     ]
   }
 
+  provisioner "windows-update" {
+    pause_before = "30s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
+  }
+
   provisioner "ansible" {
     pause_before         = "30s"
     timeout              = "30m"
@@ -812,185 +831,63 @@ build {
     user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16stig_newadministratorname': 'maintuser'}",
-      "-vvv"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16stig_newadministratorname': 'maintuser'}"
     ]
   }
 
   provisioner "ansible" {
     pause_before = "30s"
     timeout      = "30m"
-    only = [
-      "amazon-ebs.hardened-windows-2019-hvm",
-    ]
+    only = ["amazon-ebs.hardened-windows-2019-hvm"]
     galaxy_file = "requirements.yml"
     galaxy_force_install = true
     playbook_file = "${path.root}/ansible/windows-2019-stig-playbook.yml"
     use_proxy     = false
-    user = "Administrator"
+    user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "ansible_winrm_server_cert_validation=ignore",
-      "--extra-vars", "ansible_port=5986",
-      "--extra-vars", "ansible_system_vendor='NA'",
-      "--extra-vars", "ansible_virtualization_type='hvm'",
-      "--extra-vars", "ansible_windows_domain_role='Member server'",
-      "--extra-vars", "ansible_windows_domain_member=true",
-      "--extra-vars", "win_skip_for_test=false",
-      "--extra-vars", "wn19stig_newadministratorname='maintuser'"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19stig_newadministratorname': 'maintuser'}"
     ]
   }
 
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
+    source      = "${path.root}/scripts/cleanup-sysprep.ps1"
+    destination = "C:/Windows/Temp/cleanup-sysprep.ps1"
+  }
+
   provisioner "powershell" {
+    pause_before = "30s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
     inline = [
-      # === 1. Confirm maintuser exists ===
-      "Write-Output 'Verifying maintuser exists...'",
-      "if (-not (Get-LocalUser -Name 'maintuser' -ErrorAction SilentlyContinue)) {",
-      "  Write-Output 'maintuser missing – aborting'",
-      "  exit 1",
-      "}",
-      "Write-Output 'maintuser confirmed'",
+      "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
+      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose"
+    ]
+  }
 
-      # === 2. Fix profile path and create directory ===
-      "Write-Output 'Fixing profile path for maintuser...'",
-      "try {",
-      "  $user = Get-LocalUser -Name 'maintuser'",
-      "  $sid = $user.SID.Value",
-      "  $reg = \"HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\$sid\"",
-      "  $profilePath = 'C:\\Users\\maintuser'",
-      "  if (-not (Test-Path $profilePath)) {",
-      "    New-Item -Path $profilePath -ItemType Directory -Force | Out-Null",
-      "    Write-Output 'Created profile directory C:\\Users\\maintuser'",
-      "  }",
-      "  if (Test-Path $reg) {",
-      "    Set-ItemProperty -Path $reg -Name 'ProfileImagePath' -Value $profilePath -Force",
-      "    Write-Output 'Profile path set in registry'",
-      "  } else {",
-      "    Write-Output 'Profile registry path not found'",
-      "  }",
-      "} catch { Write-Output 'Profile fix failed: $_' }",
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
+    source      = "${path.root}/scripts/SetupComplete.cmd"
+    destination = "C:/Windows/Setup/Scripts/SetupComplete.cmd"
+  }
 
-      # === 3. Run InitializeInstance.ps1 ===
-      "Write-Output 'Running InitializeInstance.ps1 -Schedule...'",
-      "& 'C:/ProgramData/Amazon/EC2-Windows/Launch/Scripts/InitializeInstance.ps1' -Schedule",
-
-      # === 4. Create custom unattend.xml ===
-      "Write-Output 'Creating custom unattend.xml...'",
-      "$unattendPath = 'C:/Windows/Temp/unattend.xml'",
-      "Set-Content -Path $unattendPath -Value '<?xml version=\"1.0\" encoding=\"utf-8\"?>'",
-      "Add-Content -Path $unattendPath -Value '<unattend xmlns=\"urn:schemas-microsoft-com:unattend\">'",
-      "Add-Content -Path $unattendPath -Value '  <settings pass=\"specialize\">'",
-      "Add-Content -Path $unattendPath -Value '    <component name=\"Microsoft-Windows-Security-SPP-UX\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">'",
-      "Add-Content -Path $unattendPath -Value '      <SkipAutoActivation>true</SkipAutoActivation>'",
-      "Add-Content -Path $unattendPath -Value '    </component>'",
-      "Add-Content -Path $unattendPath -Value '    <component name=\"Microsoft-Windows-Deployment\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">'",
-      "Add-Content -Path $unattendPath -Value '      <RunSynchronous>'",
-      "Add-Content -Path $unattendPath -Value '        <RunSynchronousCommand wcm:action=\"add\">'",
-      "Add-Content -Path $unattendPath -Value '          <Order>1</Order>'",
-      "Add-Content -Path $unattendPath -Value '          <Path>net user maintuser /active:yes</Path>'",
-      "Add-Content -Path $unattendPath -Value '          <Description>Activate maintuser</Description>'",
-      "Add-Content -Path $unattendPath -Value '        </RunSynchronousCommand>'",
-      "Add-Content -Path $unattendPath -Value '      </RunSynchronous>'",
-      "Add-Content -Path $unattendPath -Value '    </component>'",
-      "Add-Content -Path $unattendPath -Value '  </settings>'",
-      "Add-Content -Path $unattendPath -Value '  <settings pass=\"oobeSystem\">'",
-      "Add-Content -Path $unattendPath -Value '    <component name=\"Microsoft-Windows-Shell-Setup\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">'",
-      "Add-Content -Path $unattendPath -Value '      <UserAccounts>'",
-      "Add-Content -Path $unattendPath -Value '        <LocalAccounts>'",
-      "Add-Content -Path $unattendPath -Value '          <LocalAccount wcm:action=\"add\">'",
-      "Add-Content -Path $unattendPath -Value '            <Name>maintuser</Name>'",
-      "Add-Content -Path $unattendPath -Value '            <Group>Administrators</Group>'",
-      "Add-Content -Path $unattendPath -Value '            <Description>Built-in account for administering the computer/domain</Description>'",
-      "Add-Content -Path $unattendPath -Value '            <DisplayName>maintuser</DisplayName>'",
-      "Add-Content -Path $unattendPath -Value '          </LocalAccount>'",
-      "Add-Content -Path $unattendPath -Value '        </LocalAccounts>'",
-      "Add-Content -Path $unattendPath -Value '      </UserAccounts>'",
-      "Add-Content -Path $unattendPath -Value '      <OOBE>'",
-      "Add-Content -Path $unattendPath -Value '        <HideEULAPage>true</HideEULAPage>'",
-      "Add-Content -Path $unattendPath -Value '        <SkipMachineOOBE>true</SkipMachineOOBE>'",
-      "Add-Content -Path $unattendPath -Value '        <SkipUserOOBE>true</SkipUserOOBE>'",
-      "Add-Content -Path $unattendPath -Value '      </OOBE>'",
-      "Add-Content -Path $unattendPath -Value '    </component>'",
-      "Add-Content -Path $unattendPath -Value '  </settings>'",
-      "Add-Content -Path $unattendPath -Value '  <cpi:offlineImage cpi:source=\"wim:c:/windows/system32/oobe/wim/wim.wim#Windows Server 2016 SERVERSTANDARD\" xmlns:cpi=\"urn:schemas-microsoft-com:cpi\" />'",
-      "Add-Content -Path $unattendPath -Value '</unattend>'",
-
-      # === 5. Create fallback rename script ===
-      "Write-Output 'Creating fallback rename script...'",
-      "$renameScript = 'C:/Windows/Temp/RenameAdmin.ps1'",
-      "Set-Content -Path $renameScript -Value 'Start-Sleep -Seconds 10'",
-      "Add-Content -Path $renameScript -Value 'Start-Transcript -Path \"C:/Windows/Temp/RenameAdmin.log\" -Append'",
-      "Add-Content -Path $renameScript -Value 'try {'",
-      "Add-Content -Path $renameScript -Value '  Write-Output \"Running fallback rename script at $(Get-Date)\"'",
-      "Add-Content -Path $renameScript -Value '  $admin = Get-WmiObject -Class Win32_UserAccount -Filter \"Name=''Administrator'' AND LocalAccount=True\"'",
-      "Add-Content -Path $renameScript -Value '  if ($admin) {'",
-      "Add-Content -Path $renameScript -Value '    $result = $admin.Rename(''maintuser'')'",
-      "Add-Content -Path $renameScript -Value '    if ($result.ReturnValue -eq 0) {'",
-      "Add-Content -Path $renameScript -Value '      Write-Output ''Fallback rename successful'''",
-      "Add-Content -Path $renameScript -Value '    } else {'",
-      "Add-Content -Path $renameScript -Value '      Write-Output ''Fallback rename failed with code: $result.ReturnValue'''",
-      "Add-Content -Path $renameScript -Value '    }'",
-      "Add-Content -Path $renameScript -Value '  } else {'",
-      "Add-Content -Path $renameScript -Value '    Write-Output ''No Administrator account found, assuming maintuser already set'''",
-      "Add-Content -Path $renameScript -Value '  }'",
-      "Add-Content -Path $renameScript -Value '  $user = Get-LocalUser -Name ''maintuser'' -ErrorAction SilentlyContinue'",
-      "Add-Content -Path $renameScript -Value '  if ($user) {'",
-      "Add-Content -Path $renameScript -Value '    $sid = $user.SID.Value'",
-      "Add-Content -Path $renameScript -Value '    $reg = \"HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\$sid\"'",
-      "Add-Content -Path $renameScript -Value '    $profilePath = ''C:\\Users\\maintuser'''",
-      "Add-Content -Path $renameScript -Value '    if (-not (Test-Path $profilePath)) {'",
-      "Add-Content -Path $renameScript -Value '      New-Item -Path $profilePath -ItemType Directory -Force | Out-Null'",
-      "Add-Content -Path $renameScript -Value '      Write-Output ''Created profile directory C:\\Users\\maintuser'''",
-      "Add-Content -Path $renameScript -Value '    }'",
-      "Add-Content -Path $renameScript -Value '    if (Test-Path $reg) {'",
-      "Add-Content -Path $renameScript -Value '      Set-ItemProperty -Path $reg -Name ''ProfileImagePath'' -Value $profilePath -Force'",
-      "Add-Content -Path $renameScript -Value '      Write-Output ''Profile path set in registry'''",
-      "Add-Content -Path $renameScript -Value '    } else {'",
-      "Add-Content -Path $renameScript -Value '      Write-Output ''Profile registry path not found for SID: $sid'''",
-      "Add-Content -Path $renameScript -Value '    }'",
-      "Add-Content -Path $renameScript -Value '  } else {'",
-      "Add-Content -Path $renameScript -Value '    Write-Output ''maintuser not found after rename attempt'''",
-      "Add-Content -Path $renameScript -Value '  }'",
-      "Add-Content -Path $renameScript -Value '  Remove-Item -Path ''C:/Windows/Temp/unattend.xml'' -Force -ErrorAction SilentlyContinue'",
-      "Add-Content -Path $renameScript -Value '  Write-Output ''Completed rename and profile tasks'''",
-      "Add-Content -Path $renameScript -Value '}'",
-      "Add-Content -Path $renameScript -Value 'catch { Write-Output ''Fallback rename or profile fix failed: $_'' }'",
-      "Add-Content -Path $renameScript -Value 'Stop-Transcript'",
-
-      # === 6. Create cleanup wrapper script ===
-      "Write-Output 'Creating cleanup wrapper script...'",
-      "$cleanupScript = 'C:/Windows/Temp/CleanupRename.ps1'",
-      "Set-Content -Path $cleanupScript -Value 'Start-Sleep -Seconds 15'",
-      "Add-Content -Path $cleanupScript -Value 'try {'",
-      "Add-Content -Path $cleanupScript -Value '  Start-Process -FilePath ''powershell.exe'' -ArgumentList ''-NoProfile -ExecutionPolicy Bypass -File C:/Windows/Temp/RenameAdmin.ps1'' -Wait'",
-      "Add-Content -Path $cleanupScript -Value '  Remove-Item -Path ''C:/Windows/Temp/RenameAdmin.ps1'' -Force -ErrorAction SilentlyContinue'",
-      "Add-Content -Path $cleanupScript -Value '  Remove-Item -Path ''C:/Windows/Temp/CleanupRename.ps1'' -Force -ErrorAction SilentlyContinue'",
-      "Add-Content -Path $cleanupScript -Value '  Remove-Item -Path ''C:/Windows/Temp/RenameAdmin.log'' -Force -ErrorAction SilentlyContinue'",
-      "Add-Content -Path $cleanupScript -Value '  Unregister-ScheduledTask -TaskName ''RenameAdminAfterSysprep'' -Confirm:$false -ErrorAction SilentlyContinue'",
-      "Add-Content -Path $cleanupScript -Value '  Write-Output ''Cleanup completed'''",
-      "Add-Content -Path $cleanupScript -Value '}'",
-      "Add-Content -Path $cleanupScript -Value 'catch { Write-Output ''Cleanup failed: $_'' }'",
-
-      # === 7. Schedule cleanup wrapper task ===
-      "Write-Output 'Scheduling cleanup wrapper task...'",
-      "$taskName = 'RenameAdminAfterSysprep'",
-      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-NoProfile -ExecutionPolicy Bypass -File $cleanupScript\"",
-      "$trigger = New-ScheduledTaskTrigger -AtStartup",
-      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable",
-      "Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -User 'SYSTEM' -Force",
-      "Write-Output 'Cleanup task scheduled'",
-
-      # === 8. Remove TempPackerUser ===
-      "Write-Output 'Removing TempPackerUser...'",
-      "Remove-LocalUser -Name 'TempPackerUser' -ErrorAction SilentlyContinue",
-
-      # === 9. Clean up temporary files ===
-      "Write-Output 'Cleaning up temporary files...'",
-      "Remove-Item -Path 'C:/Windows/Temp/packer-*' -Force -ErrorAction SilentlyContinue",
-
-      # === 10. Run sysprep directly ===
-      "Write-Output 'Running sysprep with custom unattend.xml...'",
-      "& 'C:/Windows/System32/Sysprep/Sysprep.exe' /generalize /oobe /quit /unattend:$unattendPath"
+  provisioner "powershell" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
+    inline = [
+      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
+      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown"
     ]
   }
 }
