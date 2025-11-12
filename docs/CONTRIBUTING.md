@@ -1,6 +1,6 @@
 # How to contribute
 
-This project originated as an engine for driving the [AMIgen6](https://github.com/ferricoxide/AMIgen6.git) and [AMIgen7](https://github.com/ferricoxide/AMIgen7.git) tool-sets. The initial objective was to ease and speed the creation of AWS AMIs so that the task:
+This project originated as an engine for driving the [amigen6](https://github.com/ferricoxide/amigen6.git) and [amigen7](https://github.com/ferricoxide/amigen7.git) tool-sets. The initial objective was to ease and speed the creation of AWS AMIs so that the task:
 
 * could be turned over to less-experienced staff
 * increase the velocity of AMI-releases

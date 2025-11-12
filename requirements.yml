@@ -1,0 +1,7 @@
+# requirements.yml for ansible-galaxy
+# This file allows ansible-galaxy to install the Ansible Lockdown roles from GitHub
+roles:
+  - src: git+https://github.com/ansible-lockdown/Windows-2016-STIG.git
+    name: Windows-2016-STIG
+  - src: git+https://github.com/ansible-lockdown/Windows-2019-STIG.git
+    name: Windows-2019-STIG

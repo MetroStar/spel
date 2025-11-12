@@ -129,11 +129,6 @@ build {
   }
 
   source "amazon-ebs.base" {
-    source_ami = var.aws_source_ami_centos8stream_hvm
-    name       = "minimal-centos-8stream-hvm"
-  }
-
-  source "amazon-ebs.base" {
     source_ami = var.aws_source_ami_centos9stream_hvm
     name       = "minimal-centos-9stream-hvm"
   }

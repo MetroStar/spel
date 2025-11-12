@@ -33,7 +33,7 @@ Notes:
 1. EPEL dependency is AWS-only
 2. EPEL dependency may be removed in later ELx versions as baked-in packages' dependencies permit
 
-Note: Initial functionality for any given ELx build orchestrated by spel starts with an AMIgen project. Functionality for EL8 will be trackable within the [AMIgen8 project](/MetroStar/AMIgen8).
+Note: Initial functionality for any given ELx build orchestrated by spel starts with an amigen project. Functionality for EL8 will be trackable within the [amigen8 project](/MetroStar/amigen8).
 
 ### Q: What happened to support for EL6?
 

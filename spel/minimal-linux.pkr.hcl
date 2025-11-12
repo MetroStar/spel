@@ -37,7 +37,7 @@ packer {
 #   * azure - azure-arm builder
 #   * openstack - openstack builder
 #   * virtualbox - virtualbox builder
-#   * amigen - used across AMIgen versions ( amigen8 and amigen9)
+#   * amigen - used across amigen versions ( amigen8 and amigen9)
 #   * amigen8 - amigen8 only
 #   * amigen9 - amigen9 only
 #   * spel - everything else
@@ -131,8 +131,8 @@ variable "aws_source_ami_filter_centos9stream_hvm" {
     name = "CentOS Stream 9 x86_64 *,spel-bootstrap-centos-9stream-*.x86_64-gp*"
     owners = [
       "125523088429", # CentOS Commercial, https://wiki.centos.org/Cloud/AWS
-      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
-      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
+      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -147,8 +147,8 @@ variable "aws_source_ami_filter_ol8_hvm" {
     name = "OL8.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-8-hvm-*.x86_64-gp*,spel-bootstrap-ol-8-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
-      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
+      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -163,8 +163,8 @@ variable "aws_source_ami_filter_ol9_hvm" {
     name = "OL9.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-9-hvm-*.x86_64-gp*,spel-bootstrap-ol-9-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
-      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
+      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -180,8 +180,8 @@ variable "aws_source_ami_filter_rhel8_hvm" {
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
-      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
+      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -197,8 +197,8 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
-      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
+      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -213,8 +213,8 @@ variable "aws_source_ami_filter_rl9_hvm" {
     name = "Rocky-9-EC2-Base-9.*-*.x86_64,spel-bootstrap-rl-9-*.x86_64-gp*"
     owners = [
       "792107900819", # Rocky Linux, https://rockylinux.org/download (search for "AWS" tag and click)
-      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
-      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
+      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
     ]
   }
 }
@@ -443,7 +443,7 @@ variable "amigen_use_default_repos" {
 }
 
 ###
-# Variables used by AMIgen8
+# Variables used by amigen8
 ###
 
 variable "amigen8_bootdev_mult" {
@@ -510,15 +510,15 @@ variable "amigen8_repo_sources" {
 }
 
 variable "amigen8_source_branch" {
-  description = "Branch that will be checked out when cloning AMIgen8"
+  description = "Branch that will be checked out when cloning amigen8"
   type        = string
   default     = "master"
 }
 
 variable "amigen8_source_url" {
-  description = "URL that will be used to clone AMIgen8"
+  description = "URL that will be used to clone amigen8"
   type        = string
-  default     = "https://github.com/MetroStar/AMIgen8.git"
+  default     = "https://github.com/MetroStar/amigen8.git"
 }
 
 variable "amigen8_storage_layout" {
@@ -536,7 +536,7 @@ variable "amigen8_storage_layout" {
 }
 
 ###
-# Variables used by AMIgen9
+# Variables used by amigen9
 ###
 variable "amigen9_boot_dev_size" {
   description = "Size of the partition hosting the '/boot' partition"
@@ -611,15 +611,15 @@ variable "amigen9_repo_sources" {
 }
 
 variable "amigen9_source_branch" {
-  description = "Branch that will be checked out when cloning AMIgen9"
+  description = "Branch that will be checked out when cloning amigen9"
   type        = string
   default     = "main"
 }
 
 variable "amigen9_source_url" {
-  description = "URL that will be used to clone AMIgen9"
+  description = "URL that will be used to clone amigen9"
   type        = string
-  default     = "https://github.com/MetroStar/AMIgen9.git"
+  default     = "https://github.com/MetroStar/amigen9.git"
 }
 
 variable "amigen9_storage_layout" {
@@ -754,8 +754,8 @@ source "amazon-ebssurrogate" "base" {
   ssh_interface = var.aws_ssh_interface
   ssh_port      = 22
   ssh_pty       = true
-  ssh_timeout   = "60m"
   ssh_username  = var.spel_ssh_username
+  ssh_timeout   = "10m"
   ssh_key_exchange_algorithms = [
     "ecdh-sha2-nistp521",
     "ecdh-sha2-nistp256",
@@ -839,8 +839,8 @@ source "virtualbox-iso" "base" {
 ###
 
 locals {
-  # Join lists to create strings appropriate for environment variables and AMIgen
-  # expectations. AMIgen expects some vars to be comma-delimited, and others to
+  # Join lists to create strings appropriate for environment variables and amigen
+  # expectations. amigen expects some vars to be comma-delimited, and others to
   # be space-delimited.
   amigen8_extra_rpms     = join(",", var.amigen8_extra_rpms)
   amigen8_package_groups = join(" ", var.amigen8_package_groups) # space-delimited
@@ -868,7 +868,7 @@ locals {
 # Start of build blocks
 ###
 
-# AMIgen builds
+# amigen builds
 build {
   source "amazon-ebssurrogate.base" {
     ami_description = format(local.description, "Alma Linux 9 AMI")
