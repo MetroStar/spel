@@ -1,365 +1,167 @@
-name: Build images
+name: Build STIGed AMI's
+
 on:
-  pull_request_review:
-    types: [submitted]
-  schedule:
-    - cron: '15 12 21 10 *'  # 21 October 2025
-    - cron: '15 12 18 11 *'  # 18 November 2025
-    - cron: '15 12 23 12 *'  # 23 December 2025
-    - cron: '15 12 20 01 *'  # 20 January 2026
-    - cron: '15 12 17 02 *'  # 17 February 2026
-    - cron: '15 12 24 03 *'  # 24 March 2026
-    - cron: '15 12 21 04 *'  # 21 April 2026
-    - cron: '15 12 19 05 *'  # 19 May 2026
-    - cron: '15 12 23 06 *'  # 23 June 2026
-    - cron: '15 12 21 07 *'  # 21 July 2026
-    - cron: '15 12 18 08 *'  # 18 August 2026
-    - cron: '15 12 22 09 *'  # 22 September 2026
   workflow_dispatch:
     inputs:
-      # Currently limited to only 10 inputs. Workaround is to use JSON as the input and parse it in a job.
-      # See issue: https://github.com/orgs/community/discussions/8774
-      SPEL_VERSION:
-        description: 'SPEL_VERSION: Version to build'
-        type: string
-      SPEL_CI:
-        description: 'SPEL_CI: Toggles whether to keep the image (false), or delete it after running tests (true)'
-        type: boolean
+      public:
+        description: "Set AMI's to public"
+        required: true
         default: true
-      SPEL_RELEASE:
-        description: 'SPEL_RELEASE: Whether to create a PR for the release after the build (true), or not (false)'
         type: boolean
+      develop:
+        description: "Set AMI's to develop"
+        required: true
         default: false
-      SPEL_BUILDERS:
-        description: |
-          SPEL_BUILDERS: JSON-encoded list of Packer builds to run, e.g.
-          ["amazon-ebssurrogate.minimal-alma-9-hvm", "amazon-ebssurrogate.minimal-amzn-2023-hvm"]
-        type: string
-      SPEL_PROJECTS:
-        description: |
-          SPEL_PROJECTS: JSON-encoded list of Codebuild Projects to run, e.g.
-          ["spel-commercial", "spel-govcloud"]
-        type: string
-      AMI_GROUPS:
-        description: |
-          AMI_GROUPS: JSON-encoded list of AMI groups to copy AMIs to, e.g.
-          ["all"]
-        type: string
-      AMI_REGIONS:
-        description: |
-          AMI_REGIONS: JSON-encoded map of projects and regions to copy the AMI to, e.g.
-          {"spel-commercial": ["us-east-1", "us-east-2", "us-west-1", "us-west-2"], "spel-govcloud": ["us-gov-west-1", "us-gov-east-1"]}
-        type: string
-      AMIGEN8_SOURCE:
-        description: |
-          AMIGEN8_SOURCE: JSON-encoded map of Amigen8 url and/or branch, e.g.
-          {"url": "https://github.com/MetroStar/amigen8.git", "branch": "master"}
-        type: string
-      AMIGEN9_SOURCE:
-        description: |
-          AMIGEN9_SOURCE: JSON-encoded map of Amigen9 url and/or branch, e.g.
-          {"url": "https://github.com/MetroStar/amigen9.git", "branch": "main"}
-        type: string
-      AWS_SOURCE_AMI_FILTERS:
-        description: |
-          AWS_SOURCE_AMI_FILTERS: JSON-encoded map of source AMI filters to use for each builder, e.g.
-          {"alma9": {"name": "AlmaLinux OS 9.* x86_64-*,spel-bootstrap-alma-9-hvm-*.x86_64-gp*", "owners": ["679593333241", "216406534498"]}, "amzn2023": {"name": "al2023-ami-minimal-2023.*-kernel-6.1-x86_64", "owners": ["amazon"]}}
-        type: string
+        type: boolean
+      run_centos9:
+        description: "Run CentOS 9 Stream builder"
+        required: false
+        default: false
+        type: boolean
+      run_ol9:
+        description: "Run Oracle Linux 9 builder"
+        required: false
+        default: false
+        type: boolean
+      run_rhel9:
+        description: "Run RHEL 9 builder"
+        required: false
+        default: false
+        type: boolean
+      run_ol8:
+        description: "Run Oracle Linux 8 builder"
+        required: false
+        default: false
+        type: boolean
+      run_rhel8:
+        description: "Run RHEL 8 builder"
+        required: false
+        default: false
+        type: boolean
+
+  schedule:
+    - cron: '0 9 1 * *'
 
 permissions:
-  contents: read
+  id-token: write
+  contents: write
 
 jobs:
-  trigger:
-    runs-on: ubuntu-latest
-    if: contains(github.event.review.body, '/build') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    env:
-      SPEL_CI: ${{ github.event_name != 'schedule' }}
-      SPEL_BUILDERS: >-
-        [
-          "amazon-ebssurrogate.minimal-alma-9-hvm",
-          "amazon-ebssurrogate.minimal-amzn-2023-hvm",
-          "amazon-ebssurrogate.minimal-centos-9stream-hvm",
-          "amazon-ebssurrogate.minimal-ol-8-hvm",
-          "amazon-ebssurrogate.minimal-ol-9-hvm",
-          "amazon-ebssurrogate.minimal-rhel-8-hvm",
-          "amazon-ebssurrogate.minimal-rhel-9-hvm",
-          "amazon-ebssurrogate.minimal-rl-9-hvm"
-        ]
-      SPEL_PROJECTS: >-
-        [
-          "spel-commercial",
-          "spel-govcloud"
-        ]
-      SPEL_VERSION: ${{ inputs.SPEL_VERSION }}
-      AMI_GROUPS: '["all"]'
-      AMI_REGIONS: >-
-        {
-          "spel-commercial": [
-            "us-east-1",
-            "us-east-2",
-            "us-west-1",
-            "us-west-2"
-          ],
-          "spel-govcloud": [
-            "us-gov-west-1",
-            "us-gov-east-1"
-          ]
-        }
-      AMIGEN8_SOURCE_URL: "https://github.com/MetroStar/amigen8.git"
-      AMIGEN8_SOURCE_BRANCH: "master"
-      AMIGEN9_SOURCE_URL: "https://github.com/MetroStar/amigen9.git"
-      AMIGEN9_SOURCE_BRANCH: "main"
-      AWS_SOURCE_AMI_FILTER_ALMA9_HVM: '{"name": "AlmaLinux OS 9.* x86_64-*,spel-bootstrap-alma-9-hvm-*.x86_64-gp*", "owners": ["679593333241", "216406534498"]}'
-      AWS_SOURCE_AMI_FILTER_AMZN2023_HVM: '{"name": "al2023-ami-minimal-2023.*-kernel-6.1-x86_64", "owners": ["amazon"]}'
-      AWS_SOURCE_AMI_FILTER_CENTOS9STREAM_HVM: '{"name": "spel-bootstrap-centos-9stream-hvm-*.x86_64-gp*", "owners": ["174003430611", "216406534498"]}'
-      AWS_SOURCE_AMI_FILTER_OL8_HVM: '{"name": "spel-bootstrap-ol-8-hvm-*.x86_64-gp*", "owners": ["174003430611", "216406534498"]}'
-      AWS_SOURCE_AMI_FILTER_OL9_HVM: '{"name": "spel-bootstrap-ol-9-hvm-*.x86_64-gp*", "owners": ["174003430611", "216406534498"]}'
-      AWS_SOURCE_AMI_FILTER_RHEL8_HVM: '{"name": "RHEL-8.*_HVM-*-x86_64-*-Hourly*-GP*", "owners": ["309956199498", "219670896067"]}'
-      AWS_SOURCE_AMI_FILTER_RHEL9_HVM: '{"name": "RHEL-9.*_HVM-*-x86_64-*-Hourly*-GP*", "owners": ["309956199498", "219670896067"]}'
-      AWS_SOURCE_AMI_FILTER_RL9_HVM: '{"name": "Rocky-9-EC2-Base-9.*-*.x86_64,spel-bootstrap-rl-9-hvm-*.x86_64-gp*", "owners": ["792107900819", "216406534498"]}'
-    outputs:
-      builders: ${{ steps.variables.outputs.builders }}
-      ci: ${{ steps.variables.outputs.ci }}
-      projects: ${{ steps.variables.outputs.projects }}
-      version: ${{ steps.variables.outputs.version }}
-      ami_groups: ${{ steps.variables.outputs.ami_groups }}
-      ami_regions: ${{ steps.variables.outputs.ami_regions }}
-      amigen8_source_url: ${{ steps.variables.outputs.amigen8_source_url }}
-      amigen8_source_branch: ${{ steps.variables.outputs.amigen8_source_branch }}
-      amigen9_source_url: ${{ steps.variables.outputs.amigen9_source_url }}
-      amigen9_source_branch: ${{ steps.variables.outputs.amigen9_source_branch }}
-      aws_source_ami_filter_alma9_hvm: ${{ steps.variables.outputs.aws_source_ami_filter_alma9_hvm }}
-      aws_source_ami_filter_amzn2023_hvm: ${{ steps.variables.outputs.aws_source_ami_filter_amzn2023_hvm }}
-      aws_source_ami_filter_centos9stream_hvm: ${{ steps.variables.outputs.aws_source_ami_filter_centos9stream_hvm }}
-      aws_source_ami_filter_ol8_hvm: ${{ steps.variables.outputs.aws_source_ami_filter_ol8_hvm }}
-      aws_source_ami_filter_ol9_hvm: ${{ steps.variables.outputs.aws_source_ami_filter_ol9_hvm }}
-      aws_source_ami_filter_rhel8_hvm: ${{ steps.variables.outputs.aws_source_ami_filter_rhel8_hvm }}
-      aws_source_ami_filter_rhel9_hvm: ${{ steps.variables.outputs.aws_source_ami_filter_rhel9_hvm }}
-      aws_source_ami_filter_rl9_hvm: ${{ steps.variables.outputs.aws_source_ami_filter_rl9_hvm }}
-    steps:
-      - name: Set spel inputs
-        id: variables
-        run: |
-          builders='${{ inputs.SPEL_BUILDERS }}'
-          ci='${{ inputs.SPEL_CI }}'
-          projects='${{ inputs.SPEL_PROJECTS }}'
-          version="${SPEL_VERSION:-${{ github.event_name == 'schedule' && '$(date +%Y.%m.1)' || '$(date +%Y.%m.dev%s)' }}}"
-
-          ami_groups='${{ inputs.AMI_GROUPS }}'
-          ami_regions='${{ inputs.AMI_REGIONS }}'
-
-          amigen8_source_url="$(jq -r .url <<< '${{ inputs.AMIGEN8_SOURCE }}')"
-          amigen8_source_branch="$(jq -r .branch <<< '${{ inputs.AMIGEN8_SOURCE }}')"
-          amigen9_source_url="$(jq -r .url <<< '${{ inputs.AMIGEN9_SOURCE }}')"
-          amigen9_source_branch="$(jq -r .branch <<< '${{ inputs.AMIGEN9_SOURCE }}')"
-
-          aws_source_ami_filter_alma9_hvm="$(jq -c .alma9 <<< '${{ inputs.AWS_SOURCE_AMI_FILTERS }}')"
-          aws_source_ami_filter_amzn2023_hvm="$(jq -c .amzn2023 <<< '${{ inputs.AWS_SOURCE_AMI_FILTERS }}')"
-          aws_source_ami_filter_centos9stream_hvm="$(jq -c .centos9stream <<< '${{ inputs.AWS_SOURCE_AMI_FILTERS }}')"
-          aws_source_ami_filter_ol8_hvm="$(jq -c .ol8 <<< '${{ inputs.AWS_SOURCE_AMI_FILTERS }}')"
-          aws_source_ami_filter_ol9_hvm="$(jq -c .ol9 <<< '${{ inputs.AWS_SOURCE_AMI_FILTERS }}')"
-          aws_source_ami_filter_rhel8_hvm="$(jq -c .rhel8 <<< '${{ inputs.AWS_SOURCE_AMI_FILTERS }}')"
-          aws_source_ami_filter_rhel9_hvm="$(jq -c .rhel9 <<< '${{ inputs.AWS_SOURCE_AMI_FILTERS }}')"
-          aws_source_ami_filter_rl9_hvm="$(jq -c .rl9 <<< '${{ inputs.AWS_SOURCE_AMI_FILTERS }}')"
-
-          {
-            echo "builders=${builders:-$(jq -c <<< '${{ env.SPEL_BUILDERS }}')}"
-            echo "ci=${ci:-$(jq -c <<< '${{ env.SPEL_CI }}')}"
-            echo "projects=${projects:-$(jq -c <<< '${{ env.SPEL_PROJECTS }}')}"
-            echo "version=${version}"
-            echo "ami_groups=${ami_groups:-$(jq -c <<< '${{ env.AMI_GROUPS }}')}"
-            echo "ami_regions=${ami_regions:-$(jq -c <<< '${{ env.AMI_REGIONS }}')}"
-            echo "amigen8_source_url=${amigen8_source_url:-${{ env.AMIGEN8_SOURCE_URL }}}"
-            echo "amigen8_source_branch=${amigen8_source_branch:-${{ env.AMIGEN8_SOURCE_BRANCH }}}"
-            echo "amigen9_source_url=${amigen9_source_url:-${{ env.AMIGEN9_SOURCE_URL }}}"
-            echo "amigen9_source_branch=${amigen9_source_branch:-${{ env.AMIGEN9_SOURCE_BRANCH }}}"
-            echo "aws_source_ami_filter_alma9_hvm=${aws_source_ami_filter_alma9_hvm:-$(jq -c <<< '${{ env.AWS_SOURCE_AMI_FILTER_ALMA9_HVM }}')}"
-            echo "aws_source_ami_filter_amzn2023_hvm=${aws_source_ami_filter_amzn2023_hvm:-$(jq -c <<< '${{ env.AWS_SOURCE_AMI_FILTER_AMZN2023_HVM }}')}"
-            echo "aws_source_ami_filter_centos9stream_hvm=${aws_source_ami_filter_centos9stream_hvm:-$(jq -c <<< '${{ env.AWS_SOURCE_AMI_FILTER_CENTOS9STREAM_HVM }}')}"
-            echo "aws_source_ami_filter_ol8_hvm=${aws_source_ami_filter_ol8_hvm:-$(jq -c <<< '${{ env.AWS_SOURCE_AMI_FILTER_OL8_HVM }}')}"
-            echo "aws_source_ami_filter_ol9_hvm=${aws_source_ami_filter_ol9_hvm:-$(jq -c <<< '${{ env.AWS_SOURCE_AMI_FILTER_OL9_HVM }}')}"
-            echo "aws_source_ami_filter_rhel8_hvm=${aws_source_ami_filter_rhel8_hvm:-$(jq -c <<< '${{ env.AWS_SOURCE_AMI_FILTER_RHEL8_HVM }}')}"
-            echo "aws_source_ami_filter_rhel9_hvm=${aws_source_ami_filter_rhel9_hvm:-$(jq -c <<< '${{ env.AWS_SOURCE_AMI_FILTER_RHEL9_HVM }}')}"
-            echo "aws_source_ami_filter_rl9_hvm=${aws_source_ami_filter_rl9_hvm:-$(jq -c <<< '${{ env.AWS_SOURCE_AMI_FILTER_RL9_HVM }}')}"
-          } >> "$GITHUB_OUTPUT"
-
-          echo "SPEL_VERSION=${version}"
-
   build:
-    runs-on:
-      - codebuild-${{ matrix.project }}-${{ github.run_id }}-${{ github.run_attempt }}
-        instance-size:small
-    needs: trigger
-    strategy:
-      fail-fast: false
-      matrix:
-        project: ${{ fromJSON(needs.trigger.outputs.projects) }}
-        builder: ${{ fromJSON(needs.trigger.outputs.builders) }}
-    env:
-      PACKER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      SPEL_CI: ${{ needs.trigger.outputs.ci }}
-      SPEL_VERSION: ${{ needs.trigger.outputs.version }}
-      SPEL_BUILDERS: ${{ matrix.builder }}
-      PKR_VAR_ami_groups: ${{ needs.trigger.outputs.ami_groups }}
-      PKR_VAR_ami_regions: ${{ toJson(fromJSON(needs.trigger.outputs.ami_regions)[matrix.project]) }}
-      PKR_VAR_amigen8_source_url: ${{ needs.trigger.outputs.amigen8_source_url }}
-      PKR_VAR_amigen8_source_branch: ${{ needs.trigger.outputs.amigen8_source_branch }}
-      PKR_VAR_amigen9_source_url: ${{ needs.trigger.outputs.amigen9_source_url }}
-      PKR_VAR_amigen9_source_branch: ${{ needs.trigger.outputs.amigen9_source_branch }}
-      PKR_VAR_aws_source_ami_filter_alma9_hvm: ${{ needs.trigger.outputs.aws_source_ami_filter_alma9_hvm }}
-      PKR_VAR_aws_source_ami_filter_amzn2023_hvm: ${{ needs.trigger.outputs.aws_source_ami_filter_amzn2023_hvm }}
-      PKR_VAR_aws_source_ami_filter_centos9stream_hvm: ${{ needs.trigger.outputs.aws_source_ami_filter_centos9stream_hvm }}
-      PKR_VAR_aws_source_ami_filter_ol8_hvm: ${{ needs.trigger.outputs.aws_source_ami_filter_ol8_hvm }}
-      PKR_VAR_aws_source_ami_filter_ol9_hvm: ${{ needs.trigger.outputs.aws_source_ami_filter_ol9_hvm }}
-      PKR_VAR_aws_source_ami_filter_rhel8_hvm: ${{ needs.trigger.outputs.aws_source_ami_filter_rhel8_hvm }}
-      PKR_VAR_aws_source_ami_filter_rhel9_hvm: ${{ needs.trigger.outputs.aws_source_ami_filter_rhel9_hvm }}
-      PKR_VAR_aws_source_ami_filter_rl9_hvm: ${{ needs.trigger.outputs.aws_source_ami_filter_rl9_hvm }}
+    name: Build SPEL AMI's
+    runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - run: make -f Makefile.spel install
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::879381286673:role/Packer_Amazon
+          role-duration-seconds: 43200
 
-      - run: make -f Makefile.spel build
-
-      - name: List built AMIs
+      - name: Set up environment
         run: |
-          (
-            for region in $(jq -c -r '.[]' <<< "$PKR_VAR_ami_regions")
-            do
-              BUILD_NAME="${SPEL_BUILDERS//*./}"
-              AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${{ needs.trigger.outputs.version}}.*"
-              aws ec2 describe-images \
-                --profile "$SPEL_IDENTIFIER" \
-                --region "$region" \
-                --owners self \
-                --filters "Name=name,Values=${AMI_NAME}" \
-                --query "sort_by(Images[], &Name)[*].{Name:Name, ImageId:ImageId, Region:'$region'}" \
-                --output json
-            done
-          ) | jq -s 'add' | tee "images-${{ matrix.project }}-${{ matrix.builder }}.json"
+          echo "Setting up environment variables"
 
-      - name: Upload images list
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
-        with:
-          name: images-${{ matrix.project }}-${{ matrix.builder }}
-          path: images-${{ matrix.project }}-${{ matrix.builder }}.json
-          if-no-files-found: error
-          retention-days: 7
+          echo "PUBLIC=${{ github.event.inputs.public }}" >> $GITHUB_ENV
+          echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
 
-      # Save manifests
-      - name: Upload manifest
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
-        with:
-          name: manifest-${{ matrix.project }}-${{ matrix.builder }}
-          path: |
-            .spel/*/*.manifest.txt
-          if-no-files-found: error
-          include-hidden-files: true
-          retention-days: 7
+          builders=""
+          if [[ "${{ github.event.inputs.run_centos9 }}" == "true" ]]; then
+            builders+="amazon-ebssurrogate.minimal-centos-9stream-hvm,"
+          fi
+          if [[ "${{ github.event.inputs.run_ol9 }}" == "true" ]]; then
+            builders+="amazon-ebssurrogate.minimal-ol-9-hvm,"
+          fi
+          if [[ "${{ github.event.inputs.run_rhel9 }}" == "true" ]]; then
+            builders+="amazon-ebssurrogate.minimal-rhel-9-hvm,"
+          fi
+          if [[ "${{ github.event.inputs.run_ol8 }}" == "true" ]]; then
+            builders+="amazon-ebssurrogate.minimal-ol-8-hvm,"
+          fi
+          if [[ "${{ github.event.inputs.run_rhel8 }}" == "true" ]]; then
+            builders+="amazon-ebssurrogate.minimal-rhel-8-hvm,"
+          fi
+          builders="${builders%,}"
+          echo "SPEL_BUILDERS=$builders" >> $GITHUB_ENV
 
-      # Cleanup steps
-      - run: make -f Makefile.spel post_build
-        if: always()
+          if [ "${{ github.event.inputs.develop }}" == "true" ]; then
+            echo "SPEL_VERSION=$(date +%Y.%m).dev" >> $GITHUB_ENV
+            echo "PKR_VAR_aws_force_deregister=true" >> $GITHUB_ENV
+            echo "PKR_VAR_aws_ami_regions=[\"us-east-1\"]" >> $GITHUB_ENV
+          else
+            echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+            echo "PKR_VAR_aws_ami_regions=[\"us-east-1\",\"us-east-2\",\"us-west-1\",\"us-west-2\"]" >> $GITHUB_ENV
+          fi
 
-      - run: find . -type f \( -name '*.box' -o -name '*.ova' \) -print0 | xargs -0 rm -f
-        if: always()
+          if [ "${{ github.event.inputs.public }}" == "true" ]; then
+            echo "PKR_VAR_aws_ami_groups=[\"all\"]" >> $GITHUB_ENV
+          else
+            echo "PKR_VAR_aws_ami_groups=[]" >> $GITHUB_ENV
+          fi
 
-      - name: Slack Failure Notification
-        if: failure() && github.event_name == 'schedule'
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661
-        env:
-          SLACK_TITLE: Scheduled Build Failed
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
+          echo "PACKER_GITHUB_API_TOKEN=${{ secrets.PACKER_GITHUB_API_TOKEN }}" >> $GITHUB_ENV
 
-  manifests:
-    runs-on: ubuntu-latest
-    needs:
-      - trigger
-      - build
-    steps:
-      - name: Retrieve all manifests
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
-        with:
-          pattern: manifest-spel-commercial-*
-          path: .spel
-          merge-multiple: true
+          echo "AWS_COMMERCIAL_ACCESS_KEY_ID=${{ secrets.AWS_COMMERCIAL_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "AWS_COMMERCIAL_SECRET_ACCESS_KEY=${{ secrets.AWS_COMMERCIAL_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          echo "AWS_GOVCLOUD_ACCESS_KEY_ID=${{ secrets.AWS_GOVCLOUD_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "AWS_GOVCLOUD_SECRET_ACCESS_KEY=${{ secrets.AWS_GOVCLOUD_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
 
-      - name: Upload all manifests
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
-        with:
-          name: manifests-${{ needs.trigger.outputs.version}}
-          path: |
-            .spel/*/*.manifest.txt
-          if-no-files-found: error
-          include-hidden-files: true
-          retention-days: 7
+      - name: Install necessary packages
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y \
+            xz-utils \
+            curl \
+            jq \
+            unzip \
+            make \
+            vim \
+            build-essential \
+            libssl-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            llvm \
+            libncursesw5-dev \
+            tk-dev \
+            libxml2-dev \
+            libxmlsec1-dev \
+            libffi-dev \
+            liblzma-dev \
+            && sudo rm -rf /var/lib/apt/lists/*
 
-  release-pr:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || inputs.SPEL_RELEASE
-    needs:
-      - trigger
-      - manifests
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+      - name: Install Packer
+        run: |
+          make -f Makefile.spel install
 
-      - name: Retrieve all manifests
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
-        with:
-          name: manifests-${{ needs.trigger.outputs.version}}
-          path: .spel/
+      - name: Build STIGed AMI's
+        run: |
+          make -f Makefile.spel build
 
-      - name: Move manifests
-        run: mv -f .spel/*/*.manifest.txt manifests/
+      - name: Copy STIGed AMI's to GovCloud
+        if: github.event.inputs.develop == 'false'
+        run: |
+          make -f Makefile.spel copy
 
-      - name: Retrieve image lists
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
-        with:
-          pattern: images-*
-          merge-multiple: true
+      - name: Check if README.md needs update
+        id: check_readme
+        run: |
+          if grep -q "$(date +%Y.%m)" README.md; then
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Combine image lists
-        run: jq -s 'add' images-* | tee images.json
-
-      - name: Generate images markdown table
-        uses: buildingcash/json-to-markdown-table-action@b442169239ef35f1dc4e5c8c3d47686c081a7e65
-        id: images
-        with:
-          json_file_path: images.json
-
-      - name: Write images table to file
-        run: echo "${{ steps.images.outputs.table }}" > manifests/IMAGES.md
-
-      - name: Remove images json files
-        run: rm -f images-*.json images.json
-
-      - name: Install Bumpversion
-        run: pip install bump2version
-
-      - name: Bump version
-        run: bump2version --no-commit --allow-dirty ${{ endsWith(github.event.schedule, '01 *') && 'major' || 'minor' }}
-
-      - name: Create Pull Request
-        id: pr
-        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e
-        with:
-          branch: 'release/${{ needs.trigger.outputs.version }}'
-          title: 'Releases ${{ needs.trigger.outputs.version }}'
-          commit-message: 'Releases ${{ needs.trigger.outputs.version }}'
-          sign-commits: true
-
-      - name: Slack Notification
-        if: always()
-        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661
-        env:
-          SLACK_TITLE: Release PR Status - ${{ job.status }}
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_MESSAGE_ON_SUCCESS: '@team-spel Release PR for ${{ needs.trigger.outputs.version}}: ${{ steps.pr.outputs.pull-request-url }}'
+      - name: Update README.md with current month
+        if: steps.check_readme.outputs.update_needed == 'true'
+        run: |
+          sed -i "s/$(date -d 'last month' +%Y.%m)/$(date +%Y.%m)/g" README.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -a -m "Bump version to $(date +%Y.%m).1"
+          git push
