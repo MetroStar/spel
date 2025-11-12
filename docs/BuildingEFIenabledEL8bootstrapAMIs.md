@@ -48,8 +48,8 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
 
 4. Ensure to clone the following Git Repositories into the `root` user's `${HOME}`:
 
-    - https://github.com/plus3it/AMIgen8
-    - https://github.com/plus3it/AMIgen9
+    - https://github.com/MetroStar/AMIgen8
+    - https://github.com/MetroStar/AMIgen9
 
     The above assumes that your EC2 has clone access to GitHub-hosted resources. If this is not the case, it will be necessary to have mirrors of the above repos that _are_ `git`-reachable from your EC2.
 5. Install the cross-distro RPM signing/verification keys and `yum` repository definitions using the `Xdistro.sh` script. This will generally look like:
@@ -166,8 +166,8 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
 
 3. Ensure to clone the following Git Repositories into the `root` user's `${HOME}`:
 
-    - https://github.com/plus3it/spel
-    - https://github.com/plus3it/AMIgen8
+    - https://github.com/MetroStar/spel
+    - https://github.com/MetroStar/AMIgen8
 
 4. Execute the "pivot-root" step
 

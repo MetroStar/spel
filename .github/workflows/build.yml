@@ -53,12 +53,12 @@ on:
       AMIGEN8_SOURCE:
         description: |
           AMIGEN8_SOURCE: JSON-encoded map of Amigen8 url and/or branch, e.g.
-          {"url": "https://github.com/plus3it/amigen8.git", "branch": "master"}
+          {"url": "https://github.com/MetroStar/amigen8.git", "branch": "master"}
         type: string
       AMIGEN9_SOURCE:
         description: |
           AMIGEN9_SOURCE: JSON-encoded map of Amigen9 url and/or branch, e.g.
-          {"url": "https://github.com/plus3it/amigen9.git", "branch": "main"}
+          {"url": "https://github.com/MetroStar/amigen9.git", "branch": "main"}
         type: string
       AWS_SOURCE_AMI_FILTERS:
         description: |
@@ -106,9 +106,9 @@ jobs:
             "us-gov-east-1"
           ]
         }
-      AMIGEN8_SOURCE_URL: "https://github.com/plus3it/amigen8.git"
+      AMIGEN8_SOURCE_URL: "https://github.com/MetroStar/amigen8.git"
       AMIGEN8_SOURCE_BRANCH: "master"
-      AMIGEN9_SOURCE_URL: "https://github.com/plus3it/amigen9.git"
+      AMIGEN9_SOURCE_URL: "https://github.com/MetroStar/amigen9.git"
       AMIGEN9_SOURCE_BRANCH: "main"
       AWS_SOURCE_AMI_FILTER_ALMA9_HVM: '{"name": "AlmaLinux OS 9.* x86_64-*,spel-bootstrap-alma-9-hvm-*.x86_64-gp*", "owners": ["679593333241", "216406534498"]}'
       AWS_SOURCE_AMI_FILTER_AMZN2023_HVM: '{"name": "al2023-ami-minimal-2023.*-kernel-6.1-x86_64", "owners": ["amazon"]}'
