@@ -29,7 +29,7 @@ region = us-east-1
 region = us-gov-east-1
 EOL
 
-# Function to check and manage AMI quotas
+Function to check and manage AMI quotas
 check_and_manage_ami_quotas() {
     REGIONS=("us-east-1" "us-east-2" "us-west-1" "us-west-2")
 
@@ -98,110 +98,90 @@ if [ $PUBLIC = "true" ]; then
 fi
 
 echo "==========STARTING BUILD=========="
-echo "Building packer template, spel/minimal-linux.pkr.hcl"
 
-FAILED_BUILDS=()
-SUCCESS_BUILDS=()
+if [[ -n "$SPEL_BUILDERS" ]]; then
+    FAILED_BUILDS=()
+    SUCCESS_BUILDS=()
 
-build_packer_templates() {
-    packer build \
+    packer init spel/.
+
+    packer validate \
         -only "${SPEL_BUILDERS:?}" \
         -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
         -var "spel_version=${SPEL_VERSION:?}" \
         spel/minimal-linux.pkr.hcl
 
-    BUILDEXIT=$?
+    build_packer_templates() {
+        packer build \
+            -only "${SPEL_BUILDERS:?}" \
+            -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+            -var "spel_version=${SPEL_VERSION:?}" \
+            -var "aws_ami_groups=[]" \
+            spel/minimal-linux.pkr.hcl
 
-    FAILED_BUILDS=()
+        BUILDEXIT=$?
 
-    for BUILDER in ${SPEL_BUILDERS//,/ }; do
-        BUILD_NAME="${BUILDER//*./}"
-        AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
-        BUILDER_ENV="${BUILDER//[.-]/_}"
-        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
-        if [[ "$BUILDER_AMI" == "None" ]]
-        then
-            FAILED_BUILDS+=("$BUILDER")
-        else
-            SUCCESS_BUILDS+=("$BUILDER")
-            export "$BUILDER_ENV"="$BUILDER_AMI"
-        fi
-    done
-}
+        FAILED_BUILDS=()
 
-build_packer_templates
+        for BUILDER in ${SPEL_BUILDERS//,/ }; do
+            BUILD_NAME="${BUILDER//*./}"
+            AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
+            BUILDER_ENV="${BUILDER//[.-]/_}"
+            BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
+            if [[ "$BUILDER_AMI" == "None" ]]
+            then
+                FAILED_BUILDS+=("$BUILDER")
+            else
+                SUCCESS_BUILDS+=("$BUILDER")
+                export "$BUILDER_ENV"="$BUILDER_AMI"
+            fi
+        done
+    }
 
-# Retry failed builds until there are no more failed builds
-while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
-    echo "Retrying failed builds: ${FAILED_BUILDS[*]}"
-    SPEL_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
     build_packer_templates
-done
 
-SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
-echo "Successful builds being tested: ${SUCCESS_BUILDERS}"
+    # Retry failed builds until there are no more failed builds
+    while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
+        echo "Retrying failed builds: ${FAILED_BUILDS[*]}"
+        SPEL_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
+        build_packer_templates
+    done
 
-FAILED_TEST_BUILDS=()
+    SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
 
-packer build \
-    -only "${SUCCESS_BUILDERS//amazon-ebssurrogate./amazon-ebs.}" \
-    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-    -var "spel_version=${SPEL_VERSION:?}" \
-    tests/minimal-linux.pkr.hcl | tee packer_test_output.log
-
-TESTEXIT=$?
+    if [[ $BUILDEXIT -ne 0 ]]; then
+        FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
+        echo "ERROR: Failed builds: ${FAILED_BUILDERS}"
+        echo "ERROR: Minimal build failed. Scroll up past the test to see the packer error and review the build logs."
+        exit $BUILDEXIT
+    fi
+fi
 
 ANSIBLE_LOCKDOWNS=${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}
-
-ansible_lockdowns() {
-    packer build \
-        -only "${ANSIBLE_LOCKDOWNS}" \
-        -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-        -var "spel_version=${SPEL_VERSION:?}" \
-        spel/hardened-linux.pkr.hcl
-
-    LOCKEXIT=$?
-
-    FAILED_LOCKDOWNS=()
-
-    for LOCKDOWN in ${ANSIBLE_LOCKDOWNS//,/ }; do
-        LOCKDOWN_NAME="${LOCKDOWN//*./}"
-        AMI_NAME="${SPEL_IDENTIFIER}-${LOCKDOWN_NAME}-${SPEL_VERSION}.x86_64-gp3"
-        LOCKDOWN_ENV="${LOCKDOWN//[.-]/_}"
-        LOCKDOWN_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
-        if [[ "$LOCKDOWN_AMI" == "None" ]]
-        then
-            FAILED_LOCKDOWNS+=("$LOCKDOWN")
-        else
-            SUCCESS_LOCKDOWNS+=("$LOCKDOWN")
-            export "$LOCKDOWN_ENV"="$LOCKDOWN_AMI"
-        fi
-    done
-}
-
-ansible_lockdowns
-
-# Retry failed lockdowns until there are no more failed lockdowns
-while [[ ${#FAILED_LOCKDOWNS[@]} -gt 0 ]]; do
-    echo "Retrying failed builds: ${FAILED_LOCKDOWNS[*]}"
-    ANSIBLE_LOCKDOWNS=$(IFS=, ; echo "${FAILED_LOCKDOWNS[*]}")
-    ansible_lockdowns
-done
-
-SUCCESS_LOCKERS=$(IFS=, ; echo "${SUCCESS_LOCKDOWNS[*]}")
-
-export SUCCESS_BUILDS=${SUCCESS_LOCKERS[*]}
-
-if [[ $BUILDEXIT -ne 0 ]]; then
-    FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
-    echo "ERROR: Failed builds: ${FAILED_BUILDERS}"
-    echo "ERROR: Build failed. Scroll up past the test to see the packer error and review the build logs."
-    exit $BUILDEXIT
+if [[ -n "$WINDOWS_BUILDERS" ]]; then
+    if [[ -n "$ANSIBLE_LOCKDOWNS" ]]; then
+        ANSIBLE_LOCKDOWNS="${ANSIBLE_LOCKDOWNS},${WINDOWS_BUILDERS}"
+    else
+        packer init spel/hardened-linux.pkr.hcl
+        ANSIBLE_LOCKDOWNS="${WINDOWS_BUILDERS}"
+    fi
 fi
 
-if [[ $TESTEXIT -ne 0 ]]; then
-    FAILED_TEST_BUILDS+=($(grep -oP '(?<=Build ).*(?= errored)' packer_test_output.log | sed "s/'//g" | paste -sd ','))
-fi
+packer validate \
+    -only "${ANSIBLE_LOCKDOWNS}" \
+    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+    -var "spel_version=${SPEL_VERSION:?}" \
+    spel/hardened-linux.pkr.hcl
+
+packer build \
+    -only "${ANSIBLE_LOCKDOWNS}" \
+    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
+    -var "spel_version=${SPEL_VERSION:?}" \
+    spel/hardened-linux.pkr.hcl
+
+LOCKEXIT=$?
+
+export SUCCESS_BUILDS=$(IFS=, ; echo "${SUCCESS_LOCKDOWNS[*]}")
 
 if [[ $LOCKEXIT -ne 0 ]]; then
     FAILED_LOCKERS=$(IFS=, ; echo "${FAILED_LOCKDOWNS[*]}")

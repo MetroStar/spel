@@ -10,7 +10,12 @@ on:
         type: boolean
       develop:
         description: "Set AMI's to develop"
-        required: true
+        required: false
+        default: false
+        type: boolean
+      govcloud:
+        description: "Copy AMI's to GovCloud"
+        required: false
         default: false
         type: boolean
       run_centos9:
@@ -35,6 +40,16 @@ on:
         type: boolean
       run_rhel8:
         description: "Run RHEL 8 builder"
+        required: false
+        default: false
+        type: boolean
+      run_ws2016:
+        description: "Run Windows Server 2016 builder"
+        required: false
+        default: false
+        type: boolean
+      run_ws2019:
+        description: "Run Windows Server 2019 builder"
         required: false
         default: false
         type: boolean
@@ -87,6 +102,16 @@ jobs:
           fi
           builders="${builders%,}"
           echo "SPEL_BUILDERS=$builders" >> $GITHUB_ENV
+
+          windows_builders=""
+          if [[ "${{ github.event.inputs.run_ws2016 }}" == "true" ]]; then
+            windows_builders+="hardened-windows-2016-hvm,"
+          fi
+          if [[ "${{ github.event.inputs.run_ws2019 }}" == "true" ]]; then
+            windows_builders+="hardened-windows-2019-hvm,"
+          fi
+          windows_builders="${windows_builders%,}"
+          echo "WINDOWS_BUILDERS=$windows_builders" >> $GITHUB_ENV
 
           if [ "${{ github.event.inputs.develop }}" == "true" ]; then
             echo "SPEL_VERSION=$(date +%Y.%m).dev" >> $GITHUB_ENV
@@ -144,7 +169,7 @@ jobs:
           make -f Makefile.spel build
 
       - name: Copy STIGed AMI's to GovCloud
-        if: github.event.inputs.develop == 'false'
+        if: github.event.inputs.govcloud == 'true'
         run: |
           make -f Makefile.spel copy
 

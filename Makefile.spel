@@ -48,24 +48,15 @@ install:
 	$(MAKE) -f Makefile packer/install
 	bash -eo pipefail ./build/install.sh
 
-# The profile and region envs are used only by the `pre_build`, `build`, and `post_build`
-# targets. For the region targets, do not use "?=" because we *always* want to
-# override this in codebuild. We cannot set these in the buildspec because that
-# breaks codebuild when building for GovCloud.
-pre_build build copy post_build: export AWS_DEFAULT_REGION := $(BUILDER_REGION)
-pre_build build copy post_build: export AWS_REGION := $(BUILDER_REGION)
+build copy: export AWS_DEFAULT_REGION := $(BUILDER_REGION)
+build copy: export AWS_REGION := $(BUILDER_REGION)
 
 # Set the source security group cidr
-pre_build build copy post_build: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
+build copy: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
 
-pre_build:
-	bash ./build/pre_build.sh
-
-build: pre_build
+build:
 	bash ./build/build.sh
+	bash ./build/post_build.sh
 
 copy:
 	bash ./build/ami-cp.sh
-
-post_build:
-	bash ./build/post_build.sh
