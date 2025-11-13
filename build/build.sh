@@ -99,7 +99,7 @@ fi
 
 echo "==========STARTING BUILD=========="
 
-ANSIBLE_LOCKDOWNS=()
+ANSIBLE_LOCKDOWNS=""
 
 if [[ -n "$SPEL_BUILDERS" ]]; then
     FAILED_BUILDS=()
