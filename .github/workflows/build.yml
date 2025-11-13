@@ -105,10 +105,10 @@ jobs:
 
           windows_builders=""
           if [[ "${{ github.event.inputs.run_ws2016 }}" == "true" ]]; then
-            windows_builders+="hardened-windows-2016-hvm,"
+            windows_builders+="amazon-ebs.hardened-windows-2016-hvm,"
           fi
           if [[ "${{ github.event.inputs.run_ws2019 }}" == "true" ]]; then
-            windows_builders+="hardened-windows-2019-hvm,"
+            windows_builders+="amazon-ebs.hardened-windows-2019-hvm,"
           fi
           windows_builders="${windows_builders%,}"
           echo "WINDOWS_BUILDERS=$windows_builders" >> $GITHUB_ENV
