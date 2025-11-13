@@ -68,7 +68,7 @@ variable "aws_ami_users" {
 variable "aws_instance_type" {
   description = "EC2 instance type to use while building the AMIs"
   type        = string
-  default     = "m8i.96xlarge"
+  default     = "t3.2xlarge"
 }
 
 variable "aws_force_deregister" {
