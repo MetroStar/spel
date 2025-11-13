@@ -29,7 +29,7 @@ region = us-east-1
 region = us-gov-east-1
 EOL
 
-Function to check and manage AMI quotas
+# Function to check and manage AMI quotas
 check_and_manage_ami_quotas() {
     REGIONS=("us-east-1" "us-east-2" "us-west-1" "us-west-2")
 
@@ -98,6 +98,8 @@ if [ $PUBLIC = "true" ]; then
 fi
 
 echo "==========STARTING BUILD=========="
+
+ANSIBLE_LOCKDOWNS=()
 
 if [[ -n "$SPEL_BUILDERS" ]]; then
     FAILED_BUILDS=()
