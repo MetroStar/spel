@@ -148,6 +148,7 @@ if [[ -n "$SPEL_BUILDERS" ]]; then
     done
 
     SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
+    ANSIBLE_LOCKDOWNS=${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}
 
     if [[ $BUILDEXIT -ne 0 ]]; then
         FAILED_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
@@ -157,7 +158,6 @@ if [[ -n "$SPEL_BUILDERS" ]]; then
     fi
 fi
 
-ANSIBLE_LOCKDOWNS=${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}
 if [[ -n "$WINDOWS_BUILDERS" ]]; then
     if [[ -n "$ANSIBLE_LOCKDOWNS" ]]; then
         ANSIBLE_LOCKDOWNS="${ANSIBLE_LOCKDOWNS},${WINDOWS_BUILDERS}"
