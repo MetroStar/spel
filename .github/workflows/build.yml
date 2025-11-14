@@ -166,6 +166,12 @@ jobs:
           sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
           sudo apt-get update && sudo apt-get install packer
 
+      - name: Install Ansible + WinRM via apt (only when building Windows)
+        if: ${{ env.WINDOWS_BUILDERS != '' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible python3-winrm python3-requests python3-requests-ntlm
+
       - name: Build STIGed AMI's
         run: |
           make -f Makefile.spel build
