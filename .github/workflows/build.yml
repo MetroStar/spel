@@ -166,28 +166,36 @@ jobs:
           sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
           sudo apt-get update && sudo apt-get install packer
 
-      - name: Install pywinrm into Ansible's Python (no venv)
+      - name: Install role deps + pin ansible-core (no venv)
         if: env.WINDOWS_BUILDERS != ''
         run: |
           set -euo pipefail
 
-          # Find which ansible-playbook Packer will call
-          PLAYBOOK=$(command -v ansible-playbook)
-          echo "ansible-playbook -> $PLAYBOOK"
-
-          # Read the shebang to get the Python interpreter
-          SHEBANG=$(head -1 "$PLAYBOOK")
-          PY_EXEC=$(echo "$SHEBANG" | awk 'NR==1{if($0 ~ /^#!/){sub("^#!","",$0); print $0}}')
-
-          # Resolve '/usr/bin/env python3' to the concrete interpreter
-          if echo "$PY_EXEC" | grep -q "env "; then
+          # Find which ansible-playbook Packer will call (host or container)
+          PLAYBOOK=$(command -v ansible-playbook || true)
+          if [ -n "$PLAYBOOK" ]; then
+            echo "ansible-playbook -> $PLAYBOOK"
+            # Read the shebang to discover the Python interpreter
+            SHEBANG=$(head -1 "$PLAYBOOK")
+            PY_EXEC=$(echo "$SHEBANG" | awk 'NR==1{if($0 ~ /^#!/){sub("^#!","",$0); print $0}}')
+            if echo "$PY_EXEC" | grep -q "env "; then PY_EXEC=$(command -v python3); fi
+          else
             PY_EXEC=$(command -v python3)
           fi
           : "${PY_EXEC:=/usr/bin/python3}"
-          echo "Installing into Python: $PY_EXEC"
+          echo "Using Python: $PY_EXEC"
 
           sudo "$PY_EXEC" -m pip install --upgrade pip
-          sudo "$PY_EXEC" -m pip install pywinrm requests requests-ntlm
+          # Pin to pre-strictness (<2.19) and install all controller-side deps the role lists
+          sudo "$PY_EXEC" -m pip install --upgrade --force-reinstall "ansible-core<2.19"
+          sudo "$PY_EXEC" -m pip install --upgrade \
+            pywinrm requests requests-ntlm \
+            passlib lxml xmltodict jmespath
+          # (Often needed by Windows roles)
+          ansible-galaxy collection install ansible.windows community.windows || true
+
+          # Show versions
+          ansible --version || true
 
           # Sanity-check: can the same interpreter import winrm?
           "$PY_EXEC" - <<'PY'
@@ -195,26 +203,6 @@ jobs:
           print("Controller Python:", sys.executable)
           print("winrm available:", bool(pkgutil.find_loader("winrm")))
           PY
-
-      # Temporarily relax Ansible's strict boolean check for legacy roles
-      - name: (Windows only) Allow legacy conditionals (temporary)
-        if: env.WINDOWS_BUILDERS != ''
-        run: |
-          # Create a local ansible.cfg that enables the compatibility toggle
-          cat > ansible.cfg <<'CFG'
-          [defaults]
-          allow_broken_conditionals = True
-          CFG
-          # Also export the env var form for good measure
-          echo "ANSIBLE_ALLOW_BROKEN_CONDITIONALS=true" >> "$GITHUB_ENV"
-          echo "ANSIBLE_CONFIG=$GITHUB_WORKSPACE/ansible.cfg" >> "$GITHUB_ENV"
-
-      # (Optional) verify the setting is active
-      - name: Check Ansible config
-        if: env.WINDOWS_BUILDERS != ''
-        run: |
-          ansible --version || true
-          ansible-config dump | grep -i broken || true
 
       - name: Build STIGed AMI's
         run: |
