@@ -628,23 +628,36 @@ try {
         # Try ReTrim first (may not be supported on all EBS volume types)
         try {
             Write-Verbose "Attempting ReTrim optimization..."
-            Optimize-Volume -DriveLetter C -ReTrim -Verbose:$false
+            Optimize-Volume -DriveLetter C -ReTrim -Verbose:$false -ErrorAction Stop
             Write-Verbose "ReTrim optimization completed successfully"
         } catch {
-            Write-Verbose "ReTrim not supported on this volume type: $($_.Exception.Message)"
+            Write-Verbose "ReTrim not supported on this volume type, skipping"
         }
         
-        # Always try defrag (more widely supported)
+        # Try defrag only if not an SSD/NVMe (EBS volumes are typically SSD-backed)
+        # Defrag is not recommended for SSDs and may not be supported by the hardware
         try {
-            Write-Verbose "Attempting defragmentation..."
-            Optimize-Volume -DriveLetter C -Defrag -Verbose:$false
-            Write-Verbose "Defragmentation completed successfully"
+            $volume = Get-Volume -DriveLetter C
+            $partition = Get-Partition | Where-Object { $_.DriveLetter -eq 'C' }
+            $disk = Get-Disk -Number $partition.DiskNumber
+            
+            if ($disk.MediaType -eq 'HDD') {
+                Write-Verbose "Attempting defragmentation on HDD..."
+                Optimize-Volume -DriveLetter C -Defrag -Verbose:$false -ErrorAction Stop
+                Write-Verbose "Defragmentation completed successfully"
+            } else {
+                Write-Verbose "Skipping defragmentation for SSD/NVMe volume (not recommended for SSDs)"
+            }
         } catch {
-            Write-Verbose "Defragmentation failed: $($_.Exception.Message)"
+            Write-Verbose "Defragmentation skipped or not supported: $($_.Exception.Message)"
         }
     } else {
-        # Server 2016 standard defrag
-        Optimize-Volume -DriveLetter C -Defrag -Verbose:$false
+        # Server 2016 - attempt optimization but don't fail if not supported
+        try {
+            Optimize-Volume -DriveLetter C -Defrag -Verbose:$false -ErrorAction Stop
+        } catch {
+            Write-Verbose "Volume optimization not supported on this hardware: $($_.Exception.Message)"
+        }
     }
 } catch {
     Write-Verbose "Drive optimization failed: $_"
