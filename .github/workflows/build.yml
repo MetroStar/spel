@@ -196,6 +196,26 @@ jobs:
           print("winrm available:", bool(pkgutil.find_loader("winrm")))
           PY
 
+      # Temporarily relax Ansible's strict boolean check for legacy roles
+      - name: (Windows only) Allow legacy conditionals (temporary)
+        if: env.WINDOWS_BUILDERS != ''
+        run: |
+          # Create a local ansible.cfg that enables the compatibility toggle
+          cat > ansible.cfg <<'CFG'
+          [defaults]
+          allow_broken_conditionals = True
+          CFG
+          # Also export the env var form for good measure
+          echo "ANSIBLE_ALLOW_BROKEN_CONDITIONALS=true" >> "$GITHUB_ENV"
+          echo "ANSIBLE_CONFIG=$GITHUB_WORKSPACE/ansible.cfg" >> "$GITHUB_ENV"
+
+      # (Optional) verify the setting is active
+      - name: Check Ansible config
+        if: env.WINDOWS_BUILDERS != ''
+        run: |
+          ansible --version || true
+          ansible-config dump | grep -i broken || true
+
       - name: Build STIGed AMI's
         run: |
           make -f Makefile.spel build
