@@ -1,0 +1,64 @@
+---
+# Install CA Certificates on Linux and Windows
+
+- name: Install CA Certificates
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    # Linux - RHEL/CentOS/Rocky/Alma
+    - name: Create certificate directory on RHEL
+      file:
+        path: /etc/pki/ca-trust/source/anchors
+        state: directory
+        mode: '0755'
+      when: ansible_os_family == "RedHat"
+    
+    - name: Copy certificates to RHEL
+      copy:
+        src: "{{ item }}"
+        dest: /etc/pki/ca-trust/source/anchors/
+        mode: '0644'
+      with_fileglob:
+        - ca-certs/*.cer
+        - ca-certs/*.crt
+        - ca-certs/*.pem
+      when: ansible_os_family == "RedHat"
+      notify: Update CA trust RHEL
+    
+    # Windows
+    - name: Create temp directory on Windows
+      win_file:
+        path: C:\temp\ca_certs
+        state: directory
+      when: ansible_os_family == "Windows"
+    
+    - name: Copy certificates to Windows
+      win_copy:
+        src: "{{ item }}"
+        dest: C:\temp\ca_certs\
+      with_fileglob:
+        - ca-certs/*.cer
+        - ca-certs/*.crt
+        - ca-certs/*.pem
+      when: ansible_os_family == "Windows"
+    
+    - name: Import certificates to Windows trust store
+      win_shell: |
+        Get-ChildItem -Path "C:\temp\ca_certs" -Filter *.* | ForEach-Object {
+          Import-Certificate -FilePath $_.FullName -CertStoreLocation Cert:\LocalMachine\Root
+        }
+      when: ansible_os_family == "Windows"
+    
+    - name: Clean up temp directory on Windows
+      win_file:
+        path: C:\temp\ca_certs
+        state: absent
+      when: ansible_os_family == "Windows"
+  
+  handlers:
+    - name: Update CA trust RHEL
+      command: update-ca-trust
+      when: ansible_os_family == "RedHat"
+      

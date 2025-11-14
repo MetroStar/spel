@@ -722,19 +722,46 @@ build {
     }
   }
 
-    source "amazon-ebs.windows-2019-base" {
-      ami_description = format(local.windows_description, "Windows Server 2019 AMI")
-      name            = "hardened-windows-2019-hvm"
-      source_ami_filter {
-        filters = {
-          virtualization-type = "hvm"
-          name                = var.aws_source_ami_filter_windows2019_hvm.name
-          root-device-type    = "ebs"
-        }
-        owners      = var.aws_source_ami_filter_windows2019_hvm.owners
-        most_recent = true
+  source "amazon-ebs.windows-2019-base" {
+    ami_description = format(local.windows_description, "Windows Server 2019 AMI")
+    name            = "hardened-windows-2019-hvm"
+    source_ami_filter {
+      filters = {
+        virtualization-type = "hvm"
+        name                = var.aws_source_ami_filter_windows2019_hvm.name
+        root-device-type    = "ebs"
       }
+      owners      = var.aws_source_ami_filter_windows2019_hvm.owners
+      most_recent = true
     }
+  }
+
+  provisioner "windows-update" {
+    pause_before = "30s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
+  }
+
+  provisioner "ansible" {
+    pause_before  = "30s"
+    timeout       = "30m"
+    only          = [
+      "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-centos-9stream-hvm",
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
+    playbook_file = "${path.root}/ansible/ca-certs-playbook.yml"
+    use_proxy     = false
+    user          = "TempPackerUser"
+    extra_arguments = [
+      "--connection", "winrm",
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986}"
+    ]
+  }
 
   provisioner "shell" {
     pause_before        = "45s"
@@ -809,14 +836,6 @@ build {
       "rm -rf /var/lib/cloud/data",
       "rm -rf /var/lib/cloud/instance",
       "cloud-init clean --logs",
-    ]
-  }
-
-  provisioner "windows-update" {
-    pause_before = "30s"
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
     ]
   }
 
