@@ -3,12 +3,12 @@
 
 - name: Install CA Certificates
   hosts: all
-  become: yes
   gather_facts: yes
   
   tasks:
     # Linux - RHEL/CentOS/Rocky/Alma
     - name: Create certificate directory on RHEL
+      become: yes
       file:
         path: /etc/pki/ca-trust/source/anchors
         state: directory
@@ -16,6 +16,7 @@
       when: ansible_os_family == "RedHat"
     
     - name: Copy certificates to RHEL
+      become: yes
       copy:
         src: "{{ item }}"
         dest: /etc/pki/ca-trust/source/anchors/
@@ -56,9 +57,9 @@
         path: C:\temp\ca_certs
         state: absent
       when: ansible_os_family == "Windows"
-  
   handlers:
     - name: Update CA trust RHEL
+      become: yes
       command: update-ca-trust
       when: ansible_os_family == "RedHat"
       
