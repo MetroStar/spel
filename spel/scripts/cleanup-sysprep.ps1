@@ -625,8 +625,23 @@ Write-Output "Optimizing system drive..."
 try {
     if ($isServer2019OrLater) {
         # Server 2019+ supports better optimization options
-        Optimize-Volume -DriveLetter C -ReTrim -Verbose:$false
-        Optimize-Volume -DriveLetter C -Defrag -Verbose:$false
+        # Try ReTrim first (may not be supported on all EBS volume types)
+        try {
+            Write-Verbose "Attempting ReTrim optimization..."
+            Optimize-Volume -DriveLetter C -ReTrim -Verbose:$false
+            Write-Verbose "ReTrim optimization completed successfully"
+        } catch {
+            Write-Verbose "ReTrim not supported on this volume type: $($_.Exception.Message)"
+        }
+        
+        # Always try defrag (more widely supported)
+        try {
+            Write-Verbose "Attempting defragmentation..."
+            Optimize-Volume -DriveLetter C -Defrag -Verbose:$false
+            Write-Verbose "Defragmentation completed successfully"
+        } catch {
+            Write-Verbose "Defragmentation failed: $($_.Exception.Message)"
+        }
     } else {
         # Server 2016 standard defrag
         Optimize-Volume -DriveLetter C -Defrag -Verbose:$false
