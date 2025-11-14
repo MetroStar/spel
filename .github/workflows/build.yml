@@ -166,10 +166,35 @@ jobs:
           sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
           sudo apt-get update && sudo apt-get install packer
 
-      - name: Install WinRM libs
+      - name: Install pywinrm into Ansible's Python (no venv)
         if: env.WINDOWS_BUILDERS != ''
         run: |
-          sudo apt-get update && sudo apt-get install -y python3-winrm python3-requests python3-requests-ntlm
+          set -euo pipefail
+
+          # Find which ansible-playbook Packer will call
+          PLAYBOOK=$(command -v ansible-playbook)
+          echo "ansible-playbook -> $PLAYBOOK"
+
+          # Read the shebang to get the Python interpreter
+          SHEBANG=$(head -1 "$PLAYBOOK")
+          PY_EXEC=$(echo "$SHEBANG" | awk 'NR==1{if($0 ~ /^#!/){sub("^#!","",$0); print $0}}')
+
+          # Resolve '/usr/bin/env python3' to the concrete interpreter
+          if echo "$PY_EXEC" | grep -q "env "; then
+            PY_EXEC=$(command -v python3)
+          fi
+          : "${PY_EXEC:=/usr/bin/python3}"
+          echo "Installing into Python: $PY_EXEC"
+
+          sudo "$PY_EXEC" -m pip install --upgrade pip
+          sudo "$PY_EXEC" -m pip install pywinrm requests requests-ntlm
+
+          # Sanity-check: can the same interpreter import winrm?
+          "$PY_EXEC" - <<'PY'
+          import sys, pkgutil
+          print("Controller Python:", sys.executable)
+          print("winrm available:", bool(pkgutil.find_loader("winrm")))
+          PY
 
       - name: Build STIGed AMI's
         run: |
