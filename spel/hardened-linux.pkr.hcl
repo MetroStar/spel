@@ -83,6 +83,20 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "aws_source_ami_filter_al2023_hvm" {
+  description = "Object with source AMI filters for Amazon Linux 2023 HVM builds"
+  type = object({
+    name   = string
+    owners = list(string)
+  })
+  default = {
+    name = "spel-minimal-amzn-2023-hvm-*.x86_64-gp*"
+    owners = [
+      "879381286673",
+    ]
+  }
+}
+
 variable "aws_source_ami_filter_centos9stream_hvm" {
   description = "Object with source AMI filters for CentOS Stream 9 HVM builds"
   type = object({
@@ -639,6 +653,20 @@ locals {
 # amigen builds
 build {
   source "amazon-ebs.base" {
+    ami_description = format(local.description, "Amazon Linux 2023 AMI")
+    name            = "hardened-amzn-2023-hvm"
+    source_ami_filter {
+      filters = {
+        virtualization-type = "hvm"
+        name                = var.aws_source_ami_filter_al2023_hvm.name
+        root-device-type    = "ebs"
+      }
+      owners      = var.aws_source_ami_filter_al2023_hvm.owners
+      most_recent = true
+    }
+  }
+
+  source "amazon-ebs.base" {
     ami_description = format(local.description, "CentOS Stream 9 AMI")
     name            = "hardened-centos-9stream-hvm"
     source_ami_filter {
@@ -736,6 +764,19 @@ build {
     }
   }
 
+  provisioner "ansible" {
+    pause_before  = "30s"
+    timeout       = "30m"
+    only          = [
+      "amazon-ebs.hardened-amzn-2023-hvm",
+      "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-centos-9stream-hvm"
+    ]
+    playbook_file = "${path.root}/ansible/ca-certs-playbook.yml"
+    use_proxy     = false
+  }
+
   provisioner "windows-update" {
     pause_before = "30s"
     only = [
@@ -748,9 +789,6 @@ build {
     pause_before  = "30s"
     timeout       = "30m"
     only          = [
-      "amazon-ebs.hardened-rhel-9-hvm",
-      "amazon-ebs.hardened-rhel-8-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm"
     ]
@@ -760,6 +798,28 @@ build {
     extra_arguments = [
       "--connection", "winrm",
       "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986}"
+    ]
+  }
+
+  provisioner "shell" {
+    pause_before        = "45s"
+    start_retry_timeout = "5m"
+    only = [
+      "amazon-ebs.hardened-amzn-2023-hvm",
+    ]
+    execute_command = "sudo -E bash '{{.Path}}'"
+    inline = [
+      "echo 'Running Ansible Lockdown'",
+      "python3 -m pip install ansible",
+      "export PATH=/usr/local/bin:$PATH",
+      "yum install -y git aide rsyslog",
+      "ansible-galaxy install git+https://github.com/ansible-lockdown/AMAZON2023-CIS.git",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/AMAZON2023-CIS/site.yml -e '{\"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"amzn2023cis_rule_4_6_6\": false}'",
+      "rm -rf /var/lib/cloud/seed/nocloud-net",
+      "rm -rf /var/lib/cloud/sem",
+      "rm -rf /var/lib/cloud/data",
+      "rm -rf /var/lib/cloud/instance",
+      "cloud-init clean --logs",
     ]
   }
 

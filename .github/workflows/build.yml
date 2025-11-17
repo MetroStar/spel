@@ -18,6 +18,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_amzn2023:
+        description: "Run Amazon Linux 2023 builder"
+        required: false
+        default: false
+        type: boolean
       run_centos9:
         description: "Run CentOS 9 Stream builder"
         required: false
@@ -85,6 +90,9 @@ jobs:
           echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
 
           builders=""
+          if [[ "${{ github.event.inputs.run_amzn2023 }}" == "true" ]]; then
+            builders+="amazon-ebssurrogate.minimal-amazon-linux-2023-hvm,"
+          fi
           if [[ "${{ github.event.inputs.run_centos9 }}" == "true" ]]; then
             builders+="amazon-ebssurrogate.minimal-centos-9stream-hvm,"
           fi
