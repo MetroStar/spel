@@ -23,11 +23,6 @@ on:
         required: false
         default: false
         type: boolean
-      run_centos9:
-        description: "Run CentOS 9 Stream builder"
-        required: false
-        default: false
-        type: boolean
       run_ol9:
         description: "Run Oracle Linux 9 builder"
         required: false
@@ -92,9 +87,6 @@ jobs:
           builders=""
           if [[ "${{ github.event.inputs.run_amzn2023 }}" == "true" ]]; then
             builders+="amazon-ebssurrogate.minimal-amazon-linux-2023-hvm,"
-          fi
-          if [[ "${{ github.event.inputs.run_centos9 }}" == "true" ]]; then
-            builders+="amazon-ebssurrogate.minimal-centos-9stream-hvm,"
           fi
           if [[ "${{ github.event.inputs.run_ol9 }}" == "true" ]]; then
             builders+="amazon-ebssurrogate.minimal-ol-9-hvm,"
