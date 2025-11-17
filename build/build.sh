@@ -105,7 +105,7 @@ if [[ -n "$SPEL_BUILDERS" ]]; then
     FAILED_BUILDS=()
     SUCCESS_BUILDS=()
 
-    packer init spel/.
+    packer init spel/minimal-linux.pkr.hcl
 
     packer validate \
         -only "${SPEL_BUILDERS:?}" \
@@ -164,10 +164,11 @@ if [[ -n "$WINDOWS_BUILDERS" ]]; then
     if [[ -n "$ANSIBLE_LOCKDOWNS" ]]; then
         ANSIBLE_LOCKDOWNS="${ANSIBLE_LOCKDOWNS},${WINDOWS_BUILDERS}"
     else
-        packer init spel/hardened-linux.pkr.hcl
         ANSIBLE_LOCKDOWNS="${WINDOWS_BUILDERS}"
     fi
 fi
+
+packer init spel/hardened-linux.pkr.hcl
 
 packer validate \
     -only "${ANSIBLE_LOCKDOWNS}" \
