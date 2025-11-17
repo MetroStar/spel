@@ -86,7 +86,7 @@ jobs:
 
           builders=""
           if [[ "${{ github.event.inputs.run_amzn2023 }}" == "true" ]]; then
-            builders+="amazon-ebssurrogate.minimal-amazon-linux-2023-hvm,"
+            builders+="amazon-ebssurrogate.minimal-amzn-2023-hvm,"
           fi
           if [[ "${{ github.event.inputs.run_ol9 }}" == "true" ]]; then
             builders+="amazon-ebssurrogate.minimal-ol-9-hvm,"
