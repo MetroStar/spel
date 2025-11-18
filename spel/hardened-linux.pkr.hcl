@@ -890,6 +890,7 @@ build {
       "BOOT_UUID=$(findmnt --noheadings --output UUID /boot)",
       "grubby --update-kernel=ALL --remove-args=\"boot\" --args=\"boot=UUID=$BOOT_UUID\"",
       "sed -E -i.bak -e 's@(^[[:space:]]*GRUB_CMDLINE_LINUX=\"[^\"]*)[[:space:]]*boot=[^\" ]*([^\"]*\")@\\1 boot=UUID='\"$BOOT_UUID\"'\\2@' -e 't' -e 's@(^[[:space:]]*GRUB_CMDLINE_LINUX=\"[^\"]*)\"$@\\1 boot=UUID='\"$BOOT_UUID\"'\"@' /etc/default/grub",
+      "mkdir -p /boot/efi/EFI/oracle",
       "grub2-mkconfig -o /boot/efi/EFI/oracle/grub.cfg",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
