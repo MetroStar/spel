@@ -180,6 +180,7 @@ variable "aws_source_ami_filter_windows2016_hvm" {
     ]
   }
 }
+
 variable "aws_source_ami_filter_windows2019_hvm" {
   description = "Object with source AMI filters for Windows Server 2019 HVM builds"
   type = object({
@@ -188,6 +189,20 @@ variable "aws_source_ami_filter_windows2019_hvm" {
   })
   default = {
     name = "Windows_Server-2019-English-Full-Base-*"
+    owners = [
+      "amazon",
+    ]
+  }
+}
+
+variable "aws_source_ami_filter_windows2022_hvm" {
+  description = "Object with source AMI filters for Windows Server 2022 HVM builds"
+  type = object({
+    name   = string
+    owners = list(string)
+  })
+  default = {
+    name = "Windows_Server-2022-English-Full-Base-*"
     owners = [
       "amazon",
     ]
@@ -547,7 +562,7 @@ source "amazon-ebs" "base" {
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
 }
 
-source "amazon-ebs" "windows-2016-base" {
+source "amazon-ebs" "windows-base" {
   ami_groups                  = var.aws_ami_groups
   ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
   ami_regions                 = var.aws_ami_regions
@@ -564,39 +579,6 @@ source "amazon-ebs" "windows-2016-base" {
   sriov_support               = true
   subnet_id                   = var.aws_subnet_id
   tags                        = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
-  temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
-  user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
-  winrm_insecure              = true
-  winrm_timeout               = "15m"
-  winrm_use_ssl               = true
-  winrm_use_ntlm              = true
-  winrm_username              = "TempPackerUser"
-  winrm_password              = "ComplexP@ssw0rd123!"
-
-  launch_block_device_mappings {
-    device_name = "/dev/sda1"
-    volume_type = "gp3"
-    delete_on_termination = true
-  }
-}
-
-source "amazon-ebs" "windows-2019-base" {
-  ami_groups                  = var.aws_ami_groups
-  ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
-  ami_regions                 = var.aws_ami_regions
-  ami_users                   = var.aws_ami_users
-  ami_virtualization_type     = "hvm"
-  associate_public_ip_address = true
-  communicator                = "winrm"
-  deprecate_at                = local.aws_ami_deprecate_at
-  ena_support                 = true
-  force_deregister            = true
-  instance_type               = var.aws_instance_type
-  max_retries                 = 20
-  region                      = var.aws_region
-  sriov_support               = true
-  subnet_id                   = var.aws_subnet_id
-  tags                        = { Name = "" }
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
   user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
   winrm_insecure              = true
@@ -736,7 +718,7 @@ build {
     }
   }
 
-  source "amazon-ebs.windows-2016-base" {
+  source "amazon-ebs.windows-base" {
     ami_description = format(local.windows_description, "Windows Server 2016 AMI")
     name            = "hardened-windows-2016-hvm"
     source_ami_filter {
@@ -750,7 +732,7 @@ build {
     }
   }
 
-  source "amazon-ebs.windows-2019-base" {
+  source "amazon-ebs.windows-base" {
     ami_description = format(local.windows_description, "Windows Server 2019 AMI")
     name            = "hardened-windows-2019-hvm"
     source_ami_filter {
@@ -760,6 +742,20 @@ build {
         root-device-type    = "ebs"
       }
       owners      = var.aws_source_ami_filter_windows2019_hvm.owners
+      most_recent = true
+    }
+  }
+
+  source "amazon-ebs.windows-base" {
+    ami_description = format(local.windows_description, "Windows Server 2022 AMI")
+    name            = "hardened-windows-2022-hvm"
+    source_ami_filter {
+      filters = {
+        virtualization-type = "hvm"
+        name                = var.aws_source_ami_filter_windows2022_hvm.name
+        root-device-type    = "ebs"
+      }
+      owners      = var.aws_source_ami_filter_windows2022_hvm.owners
       most_recent = true
     }
   }
@@ -781,7 +777,8 @@ build {
     pause_before = "30s"
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
     ]
   }
 
@@ -790,7 +787,8 @@ build {
     timeout       = "30m"
     only          = [
       "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
     ]
     playbook_file = "${path.root}/ansible/ca-certs-playbook.yml"
     use_proxy     = false
@@ -926,14 +924,30 @@ build {
     user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19stig_newadministratorname': 'maintuser'}"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19stig_newadministratorname': 'maintuser'}"
+    ]
+  }
+
+  provisioner "ansible" {
+    pause_before = "30s"
+    timeout      = "30m"
+    only = ["amazon-ebs.hardened-windows-2022-hvm"]
+    galaxy_file = "requirements.yml"
+    galaxy_force_install = true
+    playbook_file = "${path.root}/ansible/windows-2022-stig-playbook.yml"
+    use_proxy     = false
+    user = "TempPackerUser"
+    extra_arguments = [
+      "--connection", "winrm",
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn22_cc_000470': false, 'wn22_cc_000500': false, 'wn22stig_newadministratorname': 'maintuser'}"
     ]
   }
 
   provisioner "file" {
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
     ]
     source      = "${path.root}/scripts/cleanup-sysprep.ps1"
     destination = "C:/Windows/Temp/cleanup-sysprep.ps1"
@@ -943,7 +957,8 @@ build {
     pause_before = "30s"
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
     ]
     inline = [
       "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
@@ -954,7 +969,8 @@ build {
   provisioner "file" {
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
     ]
     source      = "${path.root}/scripts/SetupComplete.cmd"
     destination = "C:/Windows/Setup/Scripts/SetupComplete.cmd"
@@ -968,6 +984,16 @@ build {
     inline = [
       "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
       "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown"
+    ]
+  }
+
+  provisioner "powershell" {
+    only = [
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' reset --block",
+      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' sysprep --shutdown --block"
     ]
   }
 }

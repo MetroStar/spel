@@ -1,0 +1,6 @@
+---
+- name: Apply Windows 2022 STIG
+  hosts: all
+  gather_facts: false
+  roles:
+    - role: Windows-2022-STIG

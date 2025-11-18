@@ -13,11 +13,11 @@ on:
         required: false
         default: false
         type: boolean
-      govcloud:
-        description: "Copy AMI's to GovCloud"
-        required: false
-        default: false
-        type: boolean
+      # govcloud:
+      #   description: "Copy AMI's to GovCloud"
+      #   required: false
+      #   default: false
+      #   type: boolean
       run_amzn2023:
         description: "Run Amazon Linux 2023 builder"
         required: false
@@ -50,6 +50,11 @@ on:
         type: boolean
       run_ws2019:
         description: "Run Windows Server 2019 builder"
+        required: false
+        default: false
+        type: boolean
+      run_ws2022:
+        description: "Run Windows Server 2022 builder"
         required: false
         default: false
         type: boolean
@@ -109,6 +114,9 @@ jobs:
           fi
           if [[ "${{ github.event.inputs.run_ws2019 }}" == "true" ]]; then
             windows_builders+="amazon-ebs.hardened-windows-2019-hvm,"
+          fi
+          if [[ "${{ github.event.inputs.run_ws2022 }}" == "true" ]]; then
+            windows_builders+="amazon-ebs.hardened-windows-2022-hvm,"
           fi
           windows_builders="${windows_builders%,}"
           echo "WINDOWS_BUILDERS=$windows_builders" >> $GITHUB_ENV
@@ -208,10 +216,10 @@ jobs:
         run: |
           make -f Makefile.spel build
 
-      - name: Copy STIGed AMI's to GovCloud
-        if: github.event.inputs.govcloud == 'true'
-        run: |
-          make -f Makefile.spel copy
+      # - name: Copy STIGed AMI's to GovCloud
+      #   if: github.event.inputs.govcloud == 'true'
+      #   run: |
+      #     make -f Makefile.spel copy
 
       # - name: Check if README.md needs update
       #   id: check_readme

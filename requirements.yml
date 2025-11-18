@@ -5,3 +5,5 @@ roles:
     name: Windows-2016-STIG
   - src: git+https://github.com/ansible-lockdown/Windows-2019-STIG.git
     name: Windows-2019-STIG
+  - src: git+https://github.com/ansible-lockdown/Windows-2022-STIG.git
+    name: Windows-2022-STIG
