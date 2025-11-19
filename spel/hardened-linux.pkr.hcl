@@ -869,6 +869,29 @@ build {
     ]
   }
 
+  provisioner "shell" {
+    pause_before        = "45s"
+    start_retry_timeout = "5m"
+    only = [
+      "amazon-ebs.hardened-ol-8-hvm",
+    ]
+    execute_command = "sudo -E bash '{{.Path}}'"
+    inline = [
+      "echo 'Running Ansible Lockdown'",
+      "python3 -m pip install ansible",
+      "export PATH=/usr/local/bin:$PATH",
+      "yum install -y git",
+      "mkdir -p $HOME/.ansible/roles",
+      "git clone https://github.com/ansible-lockdown/RHEL8-STIG.git $HOME/.ansible/roles/RHEL8-STIG",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/libexec/platform-python\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
+      "rm -rf /var/lib/cloud/seed/nocloud-net",
+      "rm -rf /var/lib/cloud/sem",
+      "rm -rf /var/lib/cloud/data",
+      "rm -rf /var/lib/cloud/instance",
+      "cloud-init clean --logs",
+    ]
+  }
+
   provisioner "ansible" {
     pause_before         = "30s"
     timeout              = "30m"
