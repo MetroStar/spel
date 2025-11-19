@@ -850,7 +850,6 @@ build {
     start_retry_timeout = "5m"
     only = [
       "amazon-ebs.hardened-rhel-8-hvm",
-      "amazon-ebs.hardened-ol-8-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
