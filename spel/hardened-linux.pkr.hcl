@@ -850,6 +850,7 @@ build {
     start_retry_timeout = "5m"
     only = [
       "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
@@ -860,56 +861,6 @@ build {
       "mkdir -p $HOME/.ansible/roles",
       "git clone https://github.com/ansible-lockdown/RHEL8-STIG.git $HOME/.ansible/roles/RHEL8-STIG",
       "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
-      "rm -rf /var/lib/cloud/seed/nocloud-net",
-      "rm -rf /var/lib/cloud/sem",
-      "rm -rf /var/lib/cloud/data",
-      "rm -rf /var/lib/cloud/instance",
-      "cloud-init clean --logs",
-    ]
-  }
-
-  provisioner "shell" {
-    pause_before        = "45s"
-    start_retry_timeout = "5m"
-    only = [
-      "amazon-ebs.hardened-ol-8-hvm",
-    ]
-    execute_command = "sudo -E bash '{{.Path}}'"
-    inline = [
-      "echo 'Running Ansible Lockdown'",
-      "python3 -m pip install ansible",
-      "export PATH=/usr/local/bin:$PATH",
-      "yum install -y git",
-      "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL8-STIG.git",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/libexec/platform-python\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
-      "echo \"Checking mount points:\"",
-      "findmnt | grep -E '(boot|efi)'",
-      "echo \"Checking all partitions:\"",
-      "lsblk -o NAME,FSTYPE,LABEL,MOUNTPOINT,UUID",
-      "echo \"Getting boot partition device:\"",
-      "BOOT_DEV=$(findmnt --noheadings --output SOURCE /boot)",
-      "if [ -z \"$BOOT_DEV\" ]; then",
-      "  echo \"/boot is not a separate mount point, finding from /boot/efi\"",
-      "  EFI_DEV=$(findmnt --noheadings --output SOURCE /boot/efi)",
-      "  echo \"EFI device is: $EFI_DEV\"",
-      "  if [ -z \"$EFI_DEV\" ]; then echo \"ERROR: Neither /boot nor /boot/efi found!\"; exit 1; fi",
-      "  BOOT_DEV=$(lsblk -nlo NAME,MOUNTPOINT | awk '$2==\"/boot/efi\" {print $1}' | sed 's/[0-9]*$//' | head -1)",
-      "  BOOT_DEV=/dev/${BOOT_DEV}1",
-      "  echo \"Assuming boot device is: $BOOT_DEV\"",
-      "fi",
-      "echo \"Boot device is: $BOOT_DEV\"",
-      "echo \"Getting boot partition UUID:\"",
-      "BOOT_UUID=$(blkid -s UUID -o value $BOOT_DEV)",
-      "echo \"Boot UUID is: $BOOT_UUID\"",
-      "if [ -z \"$BOOT_UUID\" ]; then echo \"ERROR: Boot UUID is empty!\"; exit 1; fi",
-      "grubby --update-kernel=ALL --remove-args=\"boot\" --args=\"boot=UUID=$BOOT_UUID\"",
-      "sed -E -i.bak -e 's@(^[[:space:]]*GRUB_CMDLINE_LINUX=\"[^\"]*)[[:space:]]*boot=[^\" ]*([^\"]*\")@\\1 boot=UUID='\"$BOOT_UUID\"'\\2@' -e 't' -e 's@(^[[:space:]]*GRUB_CMDLINE_LINUX=\"[^\"]*)\"$@\\1 boot=UUID='\"$BOOT_UUID\"'\"@' /etc/default/grub",
-      "echo \"Updated /etc/default/grub:\"",
-      "grep GRUB_CMDLINE_LINUX /etc/default/grub",
-      "mkdir -p /boot/efi/EFI/oracle",
-      "grub2-mkconfig -o /boot/efi/EFI/oracle/grub.cfg",
-      "echo \"Verifying grub.cfg contains boot UUID:\"",
-      "grep -E 'boot=UUID=' /boot/efi/EFI/oracle/grub.cfg | head -2",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
       "rm -rf /var/lib/cloud/data",
