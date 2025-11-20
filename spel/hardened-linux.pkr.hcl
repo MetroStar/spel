@@ -885,7 +885,7 @@ build {
       "yum install -y git",
       "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL8-STIG.git",
       "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/libexec/platform-python\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
-      "BOOT_UUID=$(lsblk -no UUID $(findmnt -n -o SOURCE /boot))",
+      "BOOT_UUID=$(lsblk -no UUID $(findmnt -n -o SOURCE /boot) | head -1)",
       "if [ -n \"$BOOT_UUID\" ]; then grubby --update-kernel=ALL --remove-args=\"boot\" --args=\"boot=UUID=$BOOT_UUID\"; fi",
       "if [ -n \"$BOOT_UUID\" ]; then sed -E -i.bak -e 's@(^[[:space:]]*GRUB_CMDLINE_LINUX=\"[^\"]*)[[:space:]]*boot=[^\" ]*([^\"]*\")@\\1 boot=UUID='\"$BOOT_UUID\"'\\2@' -e 't' -e 's@(^[[:space:]]*GRUB_CMDLINE_LINUX=\"[^\"]*)\"$@\\1 boot=UUID='\"$BOOT_UUID\"'\"@' /etc/default/grub; fi",
       "mkdir -p /boot/efi/EFI/oracle",
