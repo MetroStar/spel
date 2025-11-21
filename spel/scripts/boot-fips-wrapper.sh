@@ -1,210 +1,302 @@
 #!/usr/bin/env bash
-# boot-fips-wrapper.sh
-#
-# Usage:
-#   sudo ./boot-fips-wrapper.sh pre    # run pre-Ansible preparation (Option A)
-#   sudo ./boot-fips-wrapper.sh post   # run post-Ansible surgical fix (Option B)
-#
-# This script is idempotent and safe: it backs up /etc/default/grub and initramfs,
-# never inserts blank boot=UUID=, and will not reboot the system.
+# /tmp/boot-fips-wrapper.sh
+# Strict, verbose wrapper to handle boot=UUID and dracut-fips related tasks.
+# Usage: boot-fips-wrapper.sh pre|post
 set -euo pipefail
+shopt -s extglob
 
-if [[ $EUID -ne 0 ]]; then
-  echo "ERROR: must run as root" >&2
-  exit 2
-fi
+LOG() { printf '%s %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$*"; }
+ERR() { LOG "ERROR: $*" >&2; }
 
-TIMESTAMP="$(date +%s)"
-GRUB_DEFAULT_FILE="/etc/default/grub"
-
-# --- helper functions -------------------------------------------------------
-log() { printf '==> %s\n' "$*"; }
-err() { printf 'ERROR: %s\n' "$*" >&2; }
-
-# Resolve /boot device (non-empty if /boot is a separate mount)
-get_boot_device() {
-  findmnt -n -o SOURCE --target /boot || true
-}
-
-get_boot_uuid() {
-  local dev="$1"
-  blkid -s UUID -o value "${dev}" 2>/dev/null || true
-}
-
-# Resolve grub cfg target in a portable way
-resolve_grub_cfg_target() {
-  if [[ -L /etc/grub2.cfg ]] && [[ -e "$(readlink -f /etc/grub2.cfg)" ]]; then
-    readlink -f /etc/grub2.cfg
-  elif [[ -d /sys/firmware/efi ]]; then
-    vendor="$(ls /boot/efi/EFI 2>/dev/null | head -n1 || true)"
-    if [[ -n "${vendor}" ]]; then
-      echo "/boot/efi/EFI/${vendor}/grub.cfg"
-    else
-      echo "/boot/efi/EFI/oracle/grub.cfg"
-    fi
-  else
-    echo "/boot/grub2/grub.cfg"
-  fi
-}
-
-# --- Pre (Option A): prepare for Ansible STIG run ----------------------------
-pre() {
-  log "PRE: resolving /boot device"
-  BOOT_DEV="$(get_boot_device)"
-  if [[ -z "${BOOT_DEV}" ]]; then
-    log "/boot is not a separate mount; nothing to do for boot=UUID. Exiting PRE."
-    return 0
-  fi
-  log "/boot device: ${BOOT_DEV}"
-
-  BOOT_UUID="$(get_boot_uuid "${BOOT_DEV}")"
-  if [[ -z "${BOOT_UUID}" ]]; then
-    err "Could not determine UUID for ${BOOT_DEV}; aborting PRE to avoid inserting blank value."
-    return 1
-  fi
-  log "/boot UUID: ${BOOT_UUID}"
-
-  # Ensure dracut-fips installed
-  if rpm -q dracut-fips &>/dev/null; then
-    log "dracut-fips already installed"
-    DRACUT_INSTALLED=false
-  else
-    log "Installing dracut-fips"
-    dnf -y install dracut-fips
-    DRACUT_INSTALLED=true
-  fi
-
-  # Backup & rebuild initramfs for current kernel
-  KVER="$(uname -r)"
-  INITRD="/boot/initramfs-${KVER}.img"
-  if [[ -f "${INITRD}" ]]; then
-    cp -a "${INITRD}" "${INITRD}.bak.${TIMESTAMP}" || true
-    log "Backed up ${INITRD} -> ${INITRD}.bak.${TIMESTAMP}"
-  fi
-  log "Rebuilding initramfs for ${KVER}"
-  dracut -f "${INITRD}" "${KVER}"
-  log "Initramfs rebuilt."
-
-  # Backup /etc/default/grub safely
-  if [[ -f "${GRUB_DEFAULT_FILE}" ]]; then
-    cp -a "${GRUB_DEFAULT_FILE}" "${GRUB_DEFAULT_FILE}.bak.${TIMESTAMP}"
-    log "Backed up ${GRUB_DEFAULT_FILE} -> ${GRUB_DEFAULT_FILE}.bak.${TIMESTAMP}"
-  fi
-
-  # Update kernel args (grubby) for all kernels, idempotent:
-  log "Updating kernel args via grubby for all kernels"
-  # list kernels
-  kernels="$(grubby --info=ALL | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//')"
-  for k in ${kernels}; do
-    # defensively remove any existing boot tokens
-    grubby --update-kernel="${k}" --remove-args="boot=UUID=" || true
-    grubby --update-kernel="${k}" --remove-args="boot" || true
-    grubby --update-kernel="${k}" --args="boot=UUID=${BOOT_UUID}"
-  done
-  log "grubby updated kernel args"
-
-  # Safely update /etc/default/grub: replace or insert boot=UUID=...
-  if grep -qP '^\s*GRUB_CMDLINE_LINUX=.*\bboot=UUID=' "${GRUB_DEFAULT_FILE}"; then
-    sed -ri "s/(^\s*GRUB_CMDLINE_LINUX=.*)\bboot=UUID=[^\" ]*/\1boot=UUID=${BOOT_UUID}/" "${GRUB_DEFAULT_FILE}"
-    log "Replaced existing boot=UUID in ${GRUB_DEFAULT_FILE}"
-  else
-    sed -ri "s/^(\\s*GRUB_CMDLINE_LINUX=\")/\\1boot=UUID=${BOOT_UUID} /" "${GRUB_DEFAULT_FILE}"
-    log "Inserted boot=UUID into ${GRUB_DEFAULT_FILE}"
-  fi
-
-  # Regenerate grub config at target
-  GRUB_CFG="$(resolve_grub_cfg_target)"
-  log "Regenerating grub config at ${GRUB_CFG}"
-  grub2-mkconfig -o "${GRUB_CFG}"
-  log "PRE phase complete (no reboot performed)."
-}
-
-# --- Post (Option B): surgical repair ---------------------------------------
-post() {
-  log "POST: checking for blank or missing boot=UUID in ${GRUB_DEFAULT_FILE}"
-  # Detect if boot=UUID= is present and possibly blank or wrong
-  if ! grep -qP 'boot=UUID=' "${GRUB_DEFAULT_FILE}" 2>/dev/null; then
-    log "No boot=UUID key in ${GRUB_DEFAULT_FILE}; nothing to do in POST."
-    return 0
-  fi
-
-  # If UUID value is non-empty and looks correct, no repair necessary
-  if grep -qP 'boot=UUID=[^\" ]+' "${GRUB_DEFAULT_FILE}" 2>/dev/null; then
-    log "boot=UUID already present with a non-empty value; verifying target device matches /boot UUID."
-    # Verify that the UUID present matches the /boot device's UUID (if /boot separate)
-    BOOT_DEV="$(get_boot_device)"
-    if [[ -z "${BOOT_DEV}" ]]; then
-      log "/boot is not a separate mount; nothing to do."
-      return 0
-    fi
-    CURRENT_UUID="$(get_boot_uuid "${BOOT_DEV}")"
-    # Extract existing UUID from file (first occurrence)
-    EXISTING_UUID="$(grep -oP 'boot=UUID=\K[^\" ]+' "${GRUB_DEFAULT_FILE}" | head -n1 || true)"
-    if [[ "${EXISTING_UUID}" == "${CURRENT_UUID}" ]]; then
-      log "Existing boot=UUID matches /boot UUID (${CURRENT_UUID}). Nothing to do."
-      return 0
-    else
-      log "Existing boot=UUID (${EXISTING_UUID}) does NOT match /boot UUID (${CURRENT_UUID}). Will replace."
-      # Replace with correct one
-      cp -a "${GRUB_DEFAULT_FILE}" "${GRUB_DEFAULT_FILE}.bak.${TIMESTAMP}"
-      sed -ri "s/\bboot=UUID=[^\" ]*/boot=UUID=${CURRENT_UUID}/g" "${GRUB_DEFAULT_FILE}"
-      # Update grubby + grub.cfg too
-      for k in $(grubby --info=ALL | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//'); do
-        grubby --update-kernel="${k}" --remove-args="boot=UUID=" || true
-        grubby --update-kernel="${k}" --args="boot=UUID=${CURRENT_UUID}"
-      done
-      GRUB_CFG="$(resolve_grub_cfg_target)"
-      grub2-mkconfig -o "${GRUB_CFG}"
-      log "POST repair: replaced boot=UUID and regenerated grub.cfg"
-      return 0
-    fi
-  fi
-
-  # At this point boot=UUID exists but with empty value (boot=UUID=) — fix it
-  log "boot=UUID present but blank or malformed; attempting repair."
-
-  BOOT_DEV="$(get_boot_device)"
-  if [[ -z "${BOOT_DEV}" ]]; then
-    err "No separate /boot mount found; aborting POST to avoid guessing UUID."
-    return 1
-  fi
-  BOOT_UUID="$(get_boot_uuid "${BOOT_DEV}")"
-  if [[ -z "${BOOT_UUID}" ]]; then
-    err "Could not resolve UUID for ${BOOT_DEV}; aborting POST to avoid inserting blank value."
-    return 1
-  fi
-
-  cp -a "${GRUB_DEFAULT_FILE}" "${GRUB_DEFAULT_FILE}.bak.${TIMESTAMP}"
-  sed -ri "s/\bboot=UUID=[^\" ]*/boot=UUID=${BOOT_UUID}/g" "${GRUB_DEFAULT_FILE}"
-  # Also apply to grubby and regenerate grub.cfg
-  for k in $(grubby --info=ALL | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//'); do
-    grubby --update-kernel="${k}" --remove-args="boot=UUID=" || true
-    grubby --update-kernel="${k}" --args="boot=UUID=${BOOT_UUID}"
-  done
-  GRUB_CFG="$(resolve_grub_cfg_target)"
-  grub2-mkconfig -o "${GRUB_CFG}"
-  log "POST: repaired blank boot=UUID and updated kernel entries + grub.cfg"
-}
-
-# ---------------------------------------------------------------------------
-# Main dispatch
-if [[ $# -ne 1 ]]; then
+usage() {
   cat <<EOF
-Usage: $0 <pre|post>
+Usage: $0 pre|post
 
-  pre  - prepare system for Ansible STIG run (install dracut-fips, rebuild initramfs,
-         update /etc/default/grub and kernel args, regenerate grub.cfg)
-  post - surgical repair after Ansible run (fix blank/incorrect boot=UUID entries,
-         update grubby and regenerate grub.cfg)
+pre  - attempt to install dracut-fips (idempotent), rebuild initramfs (with fips hooks if present),
+       and insert boot=UUID into kernel args and /etc/default/grub ONLY if /boot is a separate device.
+post - verify/repair any blank/malformed boot=UUID entries (or remove them if /boot is not separate),
+       rebuild initramfs, and regenerate grub config.
 
+This script is strict: it will exit non-zero if it detects missing kernel files when they are required.
 EOF
   exit 2
+}
+
+if [[ ${#} -ne 1 ]]; then usage; fi
+MODE="$1"
+if [[ "$MODE" != "pre" && "$MODE" != "post" ]]; then usage; fi
+
+# Helpers
+backup_file() {
+  local f="$1"; local ts
+  ts=$(date +%s)
+  if [[ -f "$f" ]]; then
+    cp -a -- "$f" "${f}.bak.${ts}"
+    LOG "Backed up $f -> ${f}.bak.${ts}"
+  fi
+}
+
+is_efi() { [[ -d /sys/firmware/efi ]]; }
+
+# Resolve /boot and /
+BOOT_SRC="$(findmnt -n -o SOURCE --target /boot 2>/dev/null || true)"
+ROOT_SRC="$(findmnt -n -o SOURCE --target / 2>/dev/null || true)"
+
+LOG "Resolving /boot device and root device..."
+LOG "/boot source : ${BOOT_SRC:-<none>}"
+LOG "/ root source : ${ROOT_SRC:-<none>}"
+
+# Only treat /boot as separate if BOOT_SRC != ROOT_SRC and both non-empty
+BOOT_IS_SEPARATE="false"
+if [[ -n "$BOOT_SRC" && -n "$ROOT_SRC" && "$BOOT_SRC" != "$ROOT_SRC" ]]; then
+  BOOT_IS_SEPARATE="true"
 fi
 
-case "$1" in
-  pre)  pre ;;
-  post) post ;;
-  *) err "unknown mode: $1"; exit 2 ;;
+# Obtain actual boot UUID if separate
+BOOT_UUID=""
+if [[ "$BOOT_IS_SEPARATE" == "true" ]]; then
+  BOOT_UUID="$(blkid -s UUID -o value "$BOOT_SRC" 2>/dev/null || true)"
+  BOOT_UUID="${BOOT_UUID:-}"
+  LOG "/boot is separate; UUID=${BOOT_UUID:-<none>}"
+else
+  LOG "/boot is NOT a separate device; the script will NOT insert boot=UUID"
+fi
+
+# kernel version we operate against
+KVER="$(uname -r)"
+LOG "Working kernel version: ${KVER}"
+
+# Strict check: ensure kernel file exists where expected when needed
+kernel_file_exists_on_boot() {
+  local kver="$1"
+  [[ -f "/boot/vmlinuz-${kver}" ]]
+}
+
+initramfs_exists_on_boot() {
+  local kver="$1"
+  [[ -f "/boot/initramfs-${kver}.img" ]]
+}
+
+# Rebuild initramfs (strict). Will error out if kernel file expected is missing.
+rebuild_initramfs_for_kver() {
+  local kver="$1"
+  if [[ -z "$kver" ]]; then
+    ERR "Empty kernel version passed to rebuild_initramfs_for_kver"
+    return 1
+  fi
+
+  # If /boot is separate, ensure the kernel file exists on that /boot device before rebuilding;
+  # dracut FIPS checks can require on-disk kernel presence.
+  if [[ "$BOOT_IS_SEPARATE" == "true" ]]; then
+    if ! kernel_file_exists_on_boot "$kver"; then
+      ERR "Missing kernel file /boot/vmlinuz-${kver} on separate /boot. Aborting to avoid broken FIPS initramfs."
+      exit 3
+    fi
+  else
+    # If /boot is not separate, kernel file should still exist; but be a little lenient:
+    if ! kernel_file_exists_on_boot "$kver"; then
+      ERR "Kernel file /boot/vmlinuz-${kver} not found (root-managed /boot). Aborting."
+      exit 4
+    fi
+  fi
+
+  # backup initramfs if present
+  if [[ -f "/boot/initramfs-${kver}.img" ]]; then
+    backup_file "/boot/initramfs-${kver}.img"
+  fi
+
+  # decide whether to include fips add
+  if rpm -q --quiet dracut-fips; then
+    LOG "dracut-fips installed; rebuilding initramfs with --add fips for kernel ${kver}"
+    dracut -f -v --add fips --kver "$kver"
+  else
+    LOG "dracut-fips NOT installed; rebuilding initramfs (no fips hooks) for kernel ${kver}"
+    dracut -f -v --kver "$kver"
+  fi
+  LOG "Initramfs rebuilt for ${kver}"
+}
+
+regenerate_grub_cfg() {
+  if is_efi; then
+    mkdir -p /boot/efi/EFI/oracle
+    LOG "Regenerating grub config at /boot/efi/EFI/oracle/grub.cfg"
+    grub2-mkconfig -o /boot/efi/EFI/oracle/grub.cfg
+  else
+    LOG "Regenerating grub config at /boot/grub2/grub.cfg"
+    grub2-mkconfig -o /boot/grub2/grub.cfg
+  fi
+}
+
+# Insert boot=UUID into kernel args and /etc/default/grub (strict)
+insert_boot_uuid() {
+  local uuid="$1"
+  if [[ -z "$uuid" ]]; then
+    ERR "insert_boot_uuid called with empty UUID; aborting."
+    exit 5
+  fi
+
+  LOG "Preparing to insert boot=UUID=${uuid} into kernel args (/etc/default/grub and grubby entries)."
+
+  # Before editing, verify that the device actually contains the kernel file we need (strict)
+  local dev_by_uuid
+  dev_by_uuid="$(blkid -U "$uuid" 2>/dev/null || true)"
+  if [[ -z "$dev_by_uuid" ]]; then
+    ERR "UUID ${uuid} does not map to a device according to blkid; aborting insertion."
+    exit 6
+  fi
+
+  # mountpoint check (best effort): check that /boot is actually backed by that UUID device
+  if [[ "$BOOT_IS_SEPARATE" == "true" ]]; then
+    if ! kernel_file_exists_on_boot "$KVER"; then
+      ERR "Kernel file /boot/vmlinuz-${KVER} missing on device $dev_by_uuid; aborting insertion to prevent FIPS boot failures."
+      exit 7
+    fi
+  fi
+
+  # Update grubby kernel entries: remove any boot tokens (defensive), then add correct one
+  LOG "Updating kernel args via grubby for all kernels"
+  grubby --info=ALL | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//' | while read -r kernpath; do
+    # defensive removals
+    grubby --update-kernel="$kernpath" --remove-args="boot" || true
+    grubby --update-kernel="$kernpath" --remove-args="boot=UUID=" || true
+    # add desired token
+    grubby --update-kernel="$kernpath" --args="boot=UUID=${uuid}" || true
+  done
+
+  # Now edit /etc/default/grub
+  backup_file /etc/default/grub
+  if grep -qP '^\s*GRUB_CMDLINE_LINUX=' /etc/default/grub; then
+    # delete previous boot tokens, then append
+    sed -ri 's/\bboot=UUID=[^" ]+ ?//g; s/\bboot=[^" ]+ ?//g' /etc/default/grub
+    # append token just before closing quote (strict update)
+    sed -ri -e '/^\s*GRUB_CMDLINE_LINUX="/ {
+      s@"$@ boot=UUID='"${uuid}"'"@
+    }' /etc/default/grub
+  else
+    printf 'GRUB_CMDLINE_LINUX="boot=UUID=%s"\n' "$uuid" >> /etc/default/grub
+  fi
+
+  LOG "Inserted boot=UUID=${uuid} into /etc/default/grub and kernel entries; regenerating grub.cfg"
+  regenerate_grub_cfg
+}
+
+# Remove any boot= tokens (strict)
+remove_boot_tokens() {
+  LOG "Removing any boot= tokens from kernel args and /etc/default/grub"
+
+  # Remove from kernels
+  grubby --info=ALL | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//' | while read -r kernpath; do
+    grubby --update-kernel="$kernpath" --remove-args="boot" || true
+    grubby --update-kernel="$kernpath" --remove-args="boot=UUID=" || true
+  done
+
+  # Remove from /etc/default/grub (backup first)
+  backup_file /etc/default/grub
+  sed -ri 's/\bboot=UUID=[^" ]+ ?//g; s/\bboot=[^" ]+ ?//g' /etc/default/grub || true
+
+  LOG "Removed boot= tokens and regenerating grub.cfg"
+  regenerate_grub_cfg
+}
+
+# Main behavior
+case "$MODE" in
+  pre)
+    LOG "=== PRE mode ==="
+    # install dracut-fips idempotently if possible
+    if ! rpm -q --quiet dracut-fips; then
+      LOG "dracut-fips not installed; attempting install (if repo provides it)"
+      if command -v dnf >/dev/null 2>&1; then
+        if ! dnf -y install dracut-fips; then
+          LOG "Warning: dracut-fips install failed or not available; continuing but initramfs won't include fips hooks."
+        fi
+      else
+        if ! yum -y install dracut-fips; then
+          LOG "Warning: dracut-fips install failed or not available; continuing but initramfs won't include fips hooks."
+        fi
+      fi
+    else
+      LOG "dracut-fips already installed"
+    fi
+
+    # Rebuild initramfs now (strict)
+    LOG "Rebuilding initramfs for kernel ${KVER} (strict checks enabled)"
+    rebuild_initramfs_for_kver "$KVER"
+
+    # Insert boot=UUID only if /boot is separate and we have a UUID
+    if [[ "$BOOT_IS_SEPARATE" == "true" && -n "$BOOT_UUID" ]]; then
+      LOG "/boot is separate and UUID available; inserting boot=UUID"
+      insert_boot_uuid "$BOOT_UUID"
+    else
+      LOG "Not inserting boot=UUID: /boot is not separate or UUID missing"
+    fi
+
+    LOG "=== PRE complete ==="
+    ;;
+
+  post)
+    LOG "=== POST mode ==="
+
+    # If /boot is not separate, ensure boot tokens are removed (they're harmful in that config)
+    if [[ "$BOOT_IS_SEPARATE" != "true" ]]; then
+      LOG "/boot is NOT separate -> ensure no boot= tokens remain"
+      remove_boot_tokens
+    else
+      # /boot is separate: ensure boot token exists and refers to actual device containing kernel
+      if grep -qP '^\s*GRUB_CMDLINE_LINUX=.*\bboot=UUID=' /etc/default/grub; then
+        current="$(grep -Po '^\s*GRUB_CMDLINE_LINUX=\".*\bboot=UUID=\K[^\" ]*' /etc/default/grub || true)"
+        LOG "Found boot=UUID='${current:-<empty>}' in /etc/default/grub"
+        if [[ -z "$current" ]]; then
+          ERR "boot=UUID present but blank in /etc/default/grub; repairing with detected /boot UUID"
+          if [[ -n "$BOOT_UUID" ]]; then
+            insert_boot_uuid "$BOOT_UUID"
+          else
+            ERR "No /boot UUID available to repair; aborting to avoid FIPS boot failure."
+            exit 8
+          fi
+        else
+          # verify mapping and kernel presence
+          dev_by_uuid="$(blkid -U "$current" 2>/dev/null || true)"
+          if [[ -z "$dev_by_uuid" ]]; then
+            ERR "Configured boot=UUID=${current} does not map to a device; attempting to repair"
+            if [[ -n "$BOOT_UUID" ]]; then
+              insert_boot_uuid "$BOOT_UUID"
+            else
+              ERR "No fallback /boot UUID available; aborting to avoid broken boot."
+              exit 9
+            fi
+          else
+            # strict check: ensure kernel exists on target device
+            if ! kernel_file_exists_on_boot "$KVER"; then
+              ERR "Expected kernel /boot/vmlinuz-${KVER} missing on /boot device ${dev_by_uuid}; aborting to avoid FIPS boot failure."
+              exit 10
+            fi
+            LOG "boot=UUID ${current} validated and kernel file present; leaving as-is"
+          fi
+        fi
+      else
+        LOG "No boot=UUID token found in /etc/default/grub"
+        # If kernel entries lack boot= and /boot is separate, insert (but only if safe)
+        has_boot_token_in_kernels=$(grubby --info=ALL | grep -cE 'args=.*\bboot=' || true)
+        if [[ "$has_boot_token_in_kernels" -eq 0 && -n "$BOOT_UUID" ]]; then
+          LOG "Kernel entries missing boot= and /boot is separate; inserting boot=UUID=${BOOT_UUID}"
+          insert_boot_uuid "$BOOT_UUID"
+        else
+          LOG "No insertion required (either kernels already have boot= or no /boot UUID)"
+        fi
+      fi
+    fi
+
+    # Rebuild initramfs again (strict)
+    LOG "Rebuilding initramfs for kernel ${KVER} (post changes)"
+    rebuild_initramfs_for_kver "$KVER"
+
+    LOG "=== POST complete ==="
+    ;;
+
+  *)
+    usage
+    ;;
 esac
 
+LOG "Done."
 exit 0
