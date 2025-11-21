@@ -855,15 +855,6 @@ build {
   }
 
   provisioner "shell" {
-    only = [
-      "amazon-ebs.hardened-rhel-8-hvm",
-      "amazon-ebs.hardened-ol-8-hvm",
-    ]
-    execute_command = "sudo -E bash '{{.Path}}'"
-    inline = ["sudo bash /tmp/boot-fips-wrapper.sh pre"]
-  }
-
-  provisioner "shell" {
     pause_before        = "45s"
     start_retry_timeout = "5m"
     only = [
@@ -895,23 +886,14 @@ build {
     only = ["amazon-ebs.hardened-ol-8-hvm"]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
+      "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
       "python3 -m pip install ansible",
       "export PATH=/usr/local/bin:$PATH",
       "yum install -y git",
       "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL8-STIG.git",
-      "ansible-playbook -vvv -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/libexec/platform-python\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'"
-    ]
-  }
-
-  provisioner "shell" {
-    only = [
-      "amazon-ebs.hardened-rhel-8-hvm",
-      "amazon-ebs.hardened-ol-8-hvm",
-    ]
-    execute_command = "sudo -E bash '{{.Path}}'"
-    inline = [
-      "sudo bash /tmp/boot-fips-wrapper.sh post",
+      "ansible-playbook -vvv -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/libexec/platform-python\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
+      "bash /tmp/boot-fips-wrapper.sh post",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
       "rm -rf /var/lib/cloud/data",
