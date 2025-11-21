@@ -845,6 +845,24 @@ build {
     ]
   }
 
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
+    ]
+    source      = "scripts/boot-fips-wrapper.sh"
+    destination = "/tmp/boot-fips-wrapper.sh"
+  }
+
+  provisioner "shell" {
+    only = [
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
+    ]
+    execute_command = "sudo -E bash '{{.Path}}'"
+    inline = ["sudo bash /tmp/boot-fips-wrapper.sh pre"]
+  }
+
   provisioner "shell" {
     pause_before        = "45s"
     start_retry_timeout = "5m"
@@ -874,9 +892,7 @@ build {
   provisioner "shell" {
     pause_before        = "45s"
     start_retry_timeout = "5m"
-    only = [
-      "amazon-ebs.hardened-ol-8-hvm",
-    ]
+    only = ["amazon-ebs.hardened-ol-8-hvm"]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
       "echo 'Running Ansible Lockdown'",
@@ -884,16 +900,18 @@ build {
       "export PATH=/usr/local/bin:$PATH",
       "yum install -y git",
       "ansible-galaxy install git+https://github.com/ansible-lockdown/RHEL8-STIG.git",
-      "ansible-playbook -vvv -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/libexec/platform-python\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
-      "BOOT_UUID=$(lsblk -no UUID $(findmnt -n -o SOURCE /boot) | head -1)",
-      "if [ -n \"$BOOT_UUID\" ]; then grubby --update-kernel=ALL --remove-args=\"boot\" --args=\"boot=UUID=$BOOT_UUID\"; fi",
-      "if [ -n \"$BOOT_UUID\" ]; then sed -E -i.bak -e 's@(^[[:space:]]*GRUB_CMDLINE_LINUX=\"[^\"]*)[[:space:]]*boot=[^\" ]*([^\"]*\")@\\1 boot=UUID='\"$BOOT_UUID\"'\\2@' -e 't' -e 's@(^[[:space:]]*GRUB_CMDLINE_LINUX=\"[^\"]*)\"$@\\1 boot=UUID='\"$BOOT_UUID\"'\"@' /etc/default/grub; fi",
-      "echo 'Listing HMAC files in /boot:'",
-      "ls -la /boot/.*.hmac 2>/dev/null || echo 'No HMAC files found'",
-      "echo 'Regenerating initramfs with FIPS module...'",
-      "dracut -f --add fips --kver $(uname -r)",
-      "mkdir -p /boot/efi/EFI/oracle",
-      "grub2-mkconfig -o /boot/efi/EFI/oracle/grub.cfg",
+      "ansible-playbook -vvv -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/libexec/platform-python\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'"
+    ]
+  }
+
+  provisioner "shell" {
+    only = [
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
+    ]
+    execute_command = "sudo -E bash '{{.Path}}'"
+    inline = [
+      "sudo bash /tmp/boot-fips-wrapper.sh post",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
       "rm -rf /var/lib/cloud/data",
