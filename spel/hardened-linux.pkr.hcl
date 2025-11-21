@@ -850,7 +850,7 @@ build {
       "amazon-ebs.hardened-rhel-8-hvm",
       "amazon-ebs.hardened-ol-8-hvm",
     ]
-    source      = "scripts/boot-fips-wrapper.sh"
+    source      = "${path.root}/scripts/boot-fips-wrapper.sh"
     destination = "/tmp/boot-fips-wrapper.sh"
   }
 
