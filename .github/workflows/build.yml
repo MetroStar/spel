@@ -174,7 +174,7 @@ jobs:
           sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
           sudo apt-get update && sudo apt-get install packer
 
-      - name: Install role deps + pin ansible-core (no venv)
+      - name: Install role deps + pin ansible-core
         if: env.WINDOWS_BUILDERS != ''
         run: |
           set -euo pipefail
