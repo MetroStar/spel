@@ -766,7 +766,9 @@ build {
     only          = [
       "amazon-ebs.hardened-amzn-2023-hvm",
       "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
       "amazon-ebs.hardened-centos-9stream-hvm"
     ]
     playbook_file = "${path.root}/ansible/ca-certs-playbook.yml"
