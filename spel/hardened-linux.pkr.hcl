@@ -760,6 +760,15 @@ build {
     }
   }
 
+  provisioner "windows-update" {
+    pause_before = "30s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+  }
+
   provisioner "ansible" {
     pause_before  = "30s"
     timeout       = "30m"
@@ -773,15 +782,6 @@ build {
     ]
     playbook_file = "${path.root}/ansible/ca-certs-playbook.yml"
     use_proxy     = false
-  }
-
-  provisioner "windows-update" {
-    pause_before = "30s"
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
   }
 
   provisioner "ansible" {
