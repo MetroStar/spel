@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # /tmp/boot-fips-wrapper.sh
-# Strict, verbose wrapper to handle boot=UUID and dracut-fips related tasks.
-# Usage: boot-fips-wrapper.sh pre|post
+# Robust + strict wrapper: ensures boot=UUID points to the partition that actually
+# contains /boot/vmlinuz-$KVER and enforces presence of the kernel HMAC needed
+# by dracut-fips. Exits non-zero with clear logs on any fatal mismatch.
 set -euo pipefail
 shopt -s extglob
 
@@ -12,12 +13,12 @@ usage() {
   cat <<EOF
 Usage: $0 pre|post
 
-pre  - attempt to install dracut-fips (idempotent), rebuild initramfs (with fips hooks if present),
-       and insert boot=UUID into kernel args and /etc/default/grub ONLY if /boot is a separate device.
-post - verify/repair any blank/malformed boot=UUID entries (or remove them if /boot is not separate),
-       rebuild initramfs, and regenerate grub config.
+pre  - prepare: install dracut-fips if possible, rebuild initramfs (strict),
+       and insert boot=UUID that points to the device actually holding /boot/vmlinuz-$KVER.
+post - verify & repair boot=UUID if it doesn't point at the kernel-containing device,
+       ensure HMACs are present, rebuild initramfs (strict) and regen grub.cfg.
 
-This script is strict: it will exit non-zero if it detects missing kernel files when they are required.
+This script is strict: it will exit non-zero if required kernel files or HMACs are missing.
 EOF
   exit 2
 }
@@ -38,7 +39,7 @@ backup_file() {
 
 is_efi() { [[ -d /sys/firmware/efi ]]; }
 
-# Resolve /boot and /
+# Find mount sources
 BOOT_SRC="$(findmnt -n -o SOURCE --target /boot 2>/dev/null || true)"
 ROOT_SRC="$(findmnt -n -o SOURCE --target / 2>/dev/null || true)"
 
@@ -46,38 +47,74 @@ LOG "Resolving /boot device and root device..."
 LOG "/boot source : ${BOOT_SRC:-<none>}"
 LOG "/ root source : ${ROOT_SRC:-<none>}"
 
-# Only treat /boot as separate if BOOT_SRC != ROOT_SRC and both non-empty
+# Determine if /boot is a separate device
 BOOT_IS_SEPARATE="false"
 if [[ -n "$BOOT_SRC" && -n "$ROOT_SRC" && "$BOOT_SRC" != "$ROOT_SRC" ]]; then
   BOOT_IS_SEPARATE="true"
 fi
 
-# Obtain actual boot UUID if separate
-BOOT_UUID=""
-if [[ "$BOOT_IS_SEPARATE" == "true" ]]; then
-  BOOT_UUID="$(blkid -s UUID -o value "$BOOT_SRC" 2>/dev/null || true)"
-  BOOT_UUID="${BOOT_UUID:-}"
-  LOG "/boot is separate; UUID=${BOOT_UUID:-<none>}"
-else
-  LOG "/boot is NOT a separate device; the script will NOT insert boot=UUID"
-fi
-
-# kernel version we operate against
+# Kernel version to operate on
 KVER="$(uname -r)"
 LOG "Working kernel version: ${KVER}"
 
-# Strict check: ensure kernel file exists where expected when needed
-kernel_file_exists_on_boot() {
-  local kver="$1"
-  [[ -f "/boot/vmlinuz-${kver}" ]]
+# convenience tests
+kernel_file_exists_on_path() {
+  local kpath="$1"
+  [[ -f "$kpath" ]]
 }
 
-initramfs_exists_on_boot() {
+# Determine the device that actually contains the kernel files:
+# prefer the mounted /boot that contains vmlinuz-$KVER; fallback to search.
+detect_device_holding_kernel() {
   local kver="$1"
-  [[ -f "/boot/initramfs-${kver}.img" ]]
+
+  # first, prefer the currently mounted /boot (if it contains vmlinuz-$kver)
+  if [[ -n "$BOOT_SRC" ]]; then
+    if kernel_file_exists_on_path "/boot/vmlinuz-${kver}"; then
+      echo "$BOOT_SRC"
+      return 0
+    fi
+  fi
+
+  # fallback: search all mounted filesystems for the kernel path
+  while read -r mp src; do
+    if [[ -f "${mp}/vmlinuz-${kver}" ]]; then
+      echo "$src"
+      return 0
+    fi
+  done < <(findmnt -rn -o TARGET,SOURCE)
+
+  # final fallback: try scanning blkid devices for a vmlinuz file (rare)
+  # (search common device mounts under /run/media, /mnt, etc.)
+  for d in /mnt /run/media /media; do
+    if [[ -d "$d" ]]; then
+      while read -r mp src; do
+        if [[ -f "${mp}/vmlinuz-${kver}" ]]; then
+          echo "$src"
+          return 0
+        fi
+      done < <(findmnt -rn -o TARGET,SOURCE "$d" 2>/dev/null || true)
+    fi
+  done
+
+  return 1
 }
 
-# Rebuild initramfs (strict). Will error out if kernel file expected is missing.
+# Get UUID for a block device path (source from findmnt e.g. /dev/nvme0n1p3 or /dev/mapper/...)
+device_uuid() {
+  local src="$1"
+  # If source is a mapper name (/dev/mapper/...), blkid works; handle LVM devices too.
+  blkid -s UUID -o value "$src" 2>/dev/null || true
+}
+
+# Strict: check hmac presence for kernel (dracut-fips expects /boot/.vmlinuz-<kver>.hmac)
+hmac_path_for_kver() {
+  local kver="$1"
+  # many distros create a hidden .vmlinuz-<kver>.hmac in /boot
+  echo "/boot/.vmlinuz-${kver}.hmac"
+}
+
+# Rebuild initramfs (strict); exit if expected files missing
 rebuild_initramfs_for_kver() {
   local kver="$1"
   if [[ -z "$kver" ]]; then
@@ -85,19 +122,10 @@ rebuild_initramfs_for_kver() {
     return 1
   fi
 
-  # If /boot is separate, ensure the kernel file exists on that /boot device before rebuilding;
-  # dracut FIPS checks can require on-disk kernel presence.
-  if [[ "$BOOT_IS_SEPARATE" == "true" ]]; then
-    if ! kernel_file_exists_on_boot "$kver"; then
-      ERR "Missing kernel file /boot/vmlinuz-${kver} on separate /boot. Aborting to avoid broken FIPS initramfs."
-      exit 3
-    fi
-  else
-    # If /boot is not separate, kernel file should still exist; but be a little lenient:
-    if ! kernel_file_exists_on_boot "$kver"; then
-      ERR "Kernel file /boot/vmlinuz-${kver} not found (root-managed /boot). Aborting."
-      exit 4
-    fi
+  # Ensure kernel file is present on the device that will be used by boot=UUID
+  if ! kernel_file_exists_on_path "/boot/vmlinuz-${kver}"; then
+    ERR "Missing kernel file /boot/vmlinuz-${kver} on the mounted /boot. Aborting to avoid broken initramfs."
+    exit 3
   fi
 
   # backup initramfs if present
@@ -105,7 +133,7 @@ rebuild_initramfs_for_kver() {
     backup_file "/boot/initramfs-${kver}.img"
   fi
 
-  # decide whether to include fips add
+  # choose dracut invocation: try to include fips if available
   if rpm -q --quiet dracut-fips; then
     LOG "dracut-fips installed; rebuilding initramfs with --add fips for kernel ${kver}"
     dracut -f -v --add fips --kver "$kver"
@@ -113,70 +141,67 @@ rebuild_initramfs_for_kver() {
     LOG "dracut-fips NOT installed; rebuilding initramfs (no fips hooks) for kernel ${kver}"
     dracut -f -v --kver "$kver"
   fi
+
   LOG "Initramfs rebuilt for ${kver}"
 }
 
 regenerate_grub_cfg() {
   if is_efi; then
-    mkdir -p /boot/efi/EFI/oracle
-    LOG "Regenerating grub config at /boot/efi/EFI/oracle/grub.cfg"
-    grub2-mkconfig -o /boot/efi/EFI/oracle/grub.cfg
+    LOG "Regenerating grub config at /boot/efi/EFI/redhat/grub.cfg (or distro-specific path)"
+    # prefer redhat path on RHEL; if missing create directory fallback to oracle to avoid mkconfig failure
+    if [[ -d /boot/efi/EFI/redhat || ! -d /boot/efi/EFI/oracle ]]; then
+      grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg
+    else
+      mkdir -p /boot/efi/EFI/oracle
+      grub2-mkconfig -o /boot/efi/EFI/oracle/grub.cfg
+    fi
   else
     LOG "Regenerating grub config at /boot/grub2/grub.cfg"
     grub2-mkconfig -o /boot/grub2/grub.cfg
   fi
 }
 
-# Insert boot=UUID into kernel args and /etc/default/grub (strict)
-insert_boot_uuid() {
-  local uuid="$1"
-  if [[ -z "$uuid" ]]; then
-    ERR "insert_boot_uuid called with empty UUID; aborting."
-    exit 5
-  fi
-
-  LOG "Preparing to insert boot=UUID=${uuid} into kernel args (/etc/default/grub and grubby entries)."
-
-  # Before editing, verify that the device actually contains the kernel file we need (strict)
-  local dev_by_uuid
-  dev_by_uuid="$(blkid -U "$uuid" 2>/dev/null || true)"
-  if [[ -z "$dev_by_uuid" ]]; then
-    ERR "UUID ${uuid} does not map to a device according to blkid; aborting insertion."
+# Insert or replace boot=UUID ensuring it points at the device that contains vmlinuz/$KVER
+insert_or_replace_boot_uuid_with_kernel_device() {
+  local want_dev="$1"   # device path, e.g. /dev/nvme0n1p3
+  local want_uuid
+  want_uuid="$(device_uuid "$want_dev" || true)"
+  if [[ -z "$want_uuid" ]]; then
+    ERR "Could not determine UUID for device $want_dev; aborting insertion."
     exit 6
   fi
 
-  # mountpoint check (best effort): check that /boot is actually backed by that UUID device
-  if [[ "$BOOT_IS_SEPARATE" == "true" ]]; then
-    if ! kernel_file_exists_on_boot "$KVER"; then
-      ERR "Kernel file /boot/vmlinuz-${KVER} missing on device $dev_by_uuid; aborting insertion to prevent FIPS boot failures."
-      exit 7
-    fi
+  LOG "Will ensure boot=UUID=${want_uuid} (device ${want_dev}) is set in kernel args and /etc/default/grub"
+
+  # Update grubby kernel entries defensively: remove any boot= tokens and add correct one
+  LOG "Updating kernel args via grubby for all kernels (defensively removing prior boot tokens)"
+  # iterate kernels known to grubby
+  mapfile -t KERNEL_PATHS < <(grubby --info=ALL 2>/dev/null | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//' || true)
+  if [[ ${#KERNEL_PATHS[@]} -eq 0 ]]; then
+    LOG "No kernel paths returned by grubby --info=ALL; skipping grubby updates"
+  else
+    for kernpath in "${KERNEL_PATHS[@]}"; do
+      LOG "Updating kernel entry ${kernpath}"
+      grubby --update-kernel="$kernpath" --remove-args="boot" || true
+      grubby --update-kernel="$kernpath" --remove-args="boot=UUID=" || true
+      grubby --update-kernel="$kernpath" --args="boot=UUID=${want_uuid}" || true
+    done
   fi
 
-  # Update grubby kernel entries: remove any boot tokens (defensive), then add correct one
-  LOG "Updating kernel args via grubby for all kernels"
-  grubby --info=ALL | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//' | while read -r kernpath; do
-    # defensive removals
-    grubby --update-kernel="$kernpath" --remove-args="boot" || true
-    grubby --update-kernel="$kernpath" --remove-args="boot=UUID=" || true
-    # add desired token
-    grubby --update-kernel="$kernpath" --args="boot=UUID=${uuid}" || true
-  done
-
-  # Now edit /etc/default/grub
+  # Edit /etc/default/grub: remove previous boot tokens and set to the correct UUID
   backup_file /etc/default/grub
   if grep -qP '^\s*GRUB_CMDLINE_LINUX=' /etc/default/grub; then
-    # delete previous boot tokens, then append
+    # remove any existing boot= tokens (basic, conservative regex)
     sed -ri 's/\bboot=UUID=[^" ]+ ?//g; s/\bboot=[^" ]+ ?//g' /etc/default/grub
-    # append token just before closing quote (strict update)
+    # append the desired token inside the quoted cmdline
     sed -ri -e '/^\s*GRUB_CMDLINE_LINUX="/ {
-      s@"$@ boot=UUID='"${uuid}"'"@
+      s@"$@ boot=UUID='"${want_uuid}"'"@
     }' /etc/default/grub
   else
-    printf 'GRUB_CMDLINE_LINUX="boot=UUID=%s"\n' "$uuid" >> /etc/default/grub
+    printf 'GRUB_CMDLINE_LINUX="boot=UUID=%s"\n' "$want_uuid" >> /etc/default/grub
   fi
 
-  LOG "Inserted boot=UUID=${uuid} into /etc/default/grub and kernel entries; regenerating grub.cfg"
+  LOG "Inserted/updated boot=UUID=${want_uuid} into /etc/default/grub; regenerating grub.cfg"
   regenerate_grub_cfg
 }
 
@@ -185,7 +210,8 @@ remove_boot_tokens() {
   LOG "Removing any boot= tokens from kernel args and /etc/default/grub"
 
   # Remove from kernels
-  grubby --info=ALL | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//' | while read -r kernpath; do
+  mapfile -t KERNEL_PATHS < <(grubby --info=ALL 2>/dev/null | awk -F: '/kernel/ {print $2}' | sed 's/^[ \t]*//' || true)
+  for kernpath in "${KERNEL_PATHS[@]:-}"; do
     grubby --update-kernel="$kernpath" --remove-args="boot" || true
     grubby --update-kernel="$kernpath" --remove-args="boot=UUID=" || true
   done
@@ -198,20 +224,21 @@ remove_boot_tokens() {
   regenerate_grub_cfg
 }
 
-# Main behavior
+# MAIN
 case "$MODE" in
   pre)
     LOG "=== PRE mode ==="
-    # install dracut-fips idempotently if possible
+
+    # Ensure dracut-fips if desired (best-effort)
     if ! rpm -q --quiet dracut-fips; then
       LOG "dracut-fips not installed; attempting install (if repo provides it)"
       if command -v dnf >/dev/null 2>&1; then
         if ! dnf -y install dracut-fips; then
-          LOG "Warning: dracut-fips install failed or not available; continuing but initramfs won't include fips hooks."
+          LOG "Warning: dracut-fips install failed or not available; continuing but initramfs may not include fips hooks."
         fi
       else
         if ! yum -y install dracut-fips; then
-          LOG "Warning: dracut-fips install failed or not available; continuing but initramfs won't include fips hooks."
+          LOG "Warning: dracut-fips install failed or not available; continuing but initramfs may not include fips hooks."
         fi
       fi
     else
@@ -222,12 +249,25 @@ case "$MODE" in
     LOG "Rebuilding initramfs for kernel ${KVER} (strict checks enabled)"
     rebuild_initramfs_for_kver "$KVER"
 
-    # Insert boot=UUID only if /boot is separate and we have a UUID
-    if [[ "$BOOT_IS_SEPARATE" == "true" && -n "$BOOT_UUID" ]]; then
-      LOG "/boot is separate and UUID available; inserting boot=UUID"
-      insert_boot_uuid "$BOOT_UUID"
+    # Determine which device actually contains the kernel files, prefer the mounted /boot
+    if ! kernel_device=$(detect_device_holding_kernel "$KVER"); then
+      ERR "Could not detect any device that contains /boot/vmlinuz-${KVER}. Aborting."
+      exit 11
+    fi
+    LOG "Detected kernel-containing device: ${kernel_device}"
+
+    # If /boot is separate, insert boot=UUID for the device that actually holds the kernel
+    if [[ "$BOOT_IS_SEPARATE" == "true" ]]; then
+      device_uuid_val="$(device_uuid "$kernel_device" || true)"
+      if [[ -z "$device_uuid_val" ]]; then
+        ERR "Kernel device ${kernel_device} has no UUID according to blkid; aborting to avoid creating broken boot entry."
+        exit 12
+      fi
+      LOG "/boot is separate; ensuring boot=UUID=${device_uuid_val} (device ${kernel_device})"
+      insert_or_replace_boot_uuid_with_kernel_device "$kernel_device"
     else
-      LOG "Not inserting boot=UUID: /boot is not separate or UUID missing"
+      LOG "/boot is NOT a separate device; not inserting boot=UUID (removing any existing ones for safety)"
+      remove_boot_tokens
     fi
 
     LOG "=== PRE complete ==="
@@ -236,57 +276,71 @@ case "$MODE" in
   post)
     LOG "=== POST mode ==="
 
-    # If /boot is not separate, ensure boot tokens are removed (they're harmful in that config)
+    # figure out device that actually contains kernel files
+    if ! kernel_device=$(detect_device_holding_kernel "$KVER"); then
+      ERR "Could not detect device containing /boot/vmlinuz-${KVER}; aborting."
+      exit 13
+    fi
+    kernel_uuid="$(device_uuid "$kernel_device" || true)"
+    LOG "Kernel files detected on device ${kernel_device} (UUID=${kernel_uuid:-<none>})"
+
+    # If /boot is not separate ensure tokens are removed
     if [[ "$BOOT_IS_SEPARATE" != "true" ]]; then
-      LOG "/boot is NOT separate -> ensure no boot= tokens remain"
+      LOG "/boot is not separate; ensure no boot= tokens remain"
       remove_boot_tokens
     else
-      # /boot is separate: ensure boot token exists and refers to actual device containing kernel
+      # Check GRUB_CMDLINE_LINUX for boot=UUID
       if grep -qP '^\s*GRUB_CMDLINE_LINUX=.*\bboot=UUID=' /etc/default/grub; then
         current="$(grep -Po '^\s*GRUB_CMDLINE_LINUX=\".*\bboot=UUID=\K[^\" ]*' /etc/default/grub || true)"
         LOG "Found boot=UUID='${current:-<empty>}' in /etc/default/grub"
+
         if [[ -z "$current" ]]; then
-          ERR "boot=UUID present but blank in /etc/default/grub; repairing with detected /boot UUID"
-          if [[ -n "$BOOT_UUID" ]]; then
-            insert_boot_uuid "$BOOT_UUID"
-          else
-            ERR "No /boot UUID available to repair; aborting to avoid FIPS boot failure."
-            exit 8
-          fi
+          ERR "boot=UUID present but blank in /etc/default/grub; repairing to kernel's device"
+          insert_or_replace_boot_uuid_with_kernel_device "$kernel_device"
         else
-          # verify mapping and kernel presence
-          dev_by_uuid="$(blkid -U "$current" 2>/dev/null || true)"
-          if [[ -z "$dev_by_uuid" ]]; then
-            ERR "Configured boot=UUID=${current} does not map to a device; attempting to repair"
-            if [[ -n "$BOOT_UUID" ]]; then
-              insert_boot_uuid "$BOOT_UUID"
-            else
-              ERR "No fallback /boot UUID available; aborting to avoid broken boot."
-              exit 9
-            fi
+          # Map the configured UUID to a device and ensure it actually contains the kernel
+          configured_dev="$(blkid -U "$current" 2>/dev/null || true)"
+          if [[ -z "$configured_dev" ]]; then
+            ERR "Configured boot=UUID=${current} does not map to a device via blkid; replacing with kernel device UUID ${kernel_uuid}"
+            insert_or_replace_boot_uuid_with_kernel_device "$kernel_device"
           else
-            # strict check: ensure kernel exists on target device
-            if ! kernel_file_exists_on_boot "$KVER"; then
-              ERR "Expected kernel /boot/vmlinuz-${KVER} missing on /boot device ${dev_by_uuid}; aborting to avoid FIPS boot failure."
-              exit 10
+            LOG "Configured boot=UUID ${current} maps to device ${configured_dev}"
+            # verify that the configured device is the same as the kernel device
+            if [[ "$configured_dev" != "$kernel_device" ]]; then
+              ERR "Configured boot=UUID ${current} does not point at the device that contains vmlinuz-${KVER} (${kernel_device}). Replacing it."
+              insert_or_replace_boot_uuid_with_kernel_device "$kernel_device"
+            else
+              LOG "boot=UUID matches the actual kernel device; leaving as-is"
             fi
-            LOG "boot=UUID ${current} validated and kernel file present; leaving as-is"
           fi
         fi
       else
-        LOG "No boot=UUID token found in /etc/default/grub"
-        # If kernel entries lack boot= and /boot is separate, insert (but only if safe)
-        has_boot_token_in_kernels=$(grubby --info=ALL | grep -cE 'args=.*\bboot=' || true)
-        if [[ "$has_boot_token_in_kernels" -eq 0 && -n "$BOOT_UUID" ]]; then
-          LOG "Kernel entries missing boot= and /boot is separate; inserting boot=UUID=${BOOT_UUID}"
-          insert_boot_uuid "$BOOT_UUID"
+        # No boot token found; if /boot is separate, set it to the kernel device UUID
+        if [[ -n "$kernel_uuid" ]]; then
+          LOG "No boot= token found in /etc/default/grub but /boot is separate -> inserting boot=UUID=${kernel_uuid}"
+          insert_or_replace_boot_uuid_with_kernel_device "$kernel_device"
         else
-          LOG "No insertion required (either kernels already have boot= or no /boot UUID)"
+          LOG "No boot= token and could not determine kernel device UUID; leaving unchanged"
         fi
       fi
     fi
 
-    # Rebuild initramfs again (strict)
+    # Now check presence of the kernel HMAC expected by dracut-fips
+    HMAC_PATH="$(hmac_path_for_kver "$KVER")"
+    if [[ -f "$HMAC_PATH" ]]; then
+      LOG "Found kernel HMAC at ${HMAC_PATH}"
+    else
+      ERR "Missing kernel HMAC file ${HMAC_PATH}. dracut-FIPS will refuse to boot without that HMAC present."
+      LOG "Suggested remediation (pick one):"
+      LOG "  * Ensure dracut-fips (or the distro mechanism that generates HMACs) is installed and that kernel packaging hooks created the HMAC."
+      LOG "  * Rebuild initramfs and ensure any distro kernel-install hooks run. Example:"
+      LOG "      # dnf install dracut-fips   # (if available)"
+      LOG "      # dracut -f -v --add fips --kver ${KVER}"
+      LOG "  After creating the HMAC (usually created by the kernel packaging hooks), rerun this script."
+      exit 14
+    fi
+
+    # Rebuild initramfs again (post changes)
     LOG "Rebuilding initramfs for kernel ${KVER} (post changes)"
     rebuild_initramfs_for_kver "$KVER"
 
