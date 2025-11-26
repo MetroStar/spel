@@ -3,16 +3,16 @@ name: Build STIGed AMI's
 on:
   workflow_dispatch:
     inputs:
-      public:
-        description: "Set AMI's to public"
-        required: true
-        default: true
-        type: boolean
-      develop:
-        description: "Set AMI's to develop"
+      offline_mode:
+        description: "Use offline mode with NIPR artifacts"
         required: false
         default: false
         type: boolean
+      nipr_artifact_name:
+        description: "NIPR artifact name (e.g., spel-nipr-transfer-20251126)"
+        required: false
+        default: ""
+        type: string
       # govcloud:
       #   description: "Copy AMI's to GovCloud"
       #   required: false
@@ -59,9 +59,6 @@ on:
         default: false
         type: boolean
 
-  schedule:
-    - cron: '0 9 1 * *'
-
 permissions:
   id-token: write
   contents: write
@@ -75,6 +72,91 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Download NIPR artifacts for offline mode
+        if: github.event.inputs.offline_mode == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.inputs.nipr_artifact_name }}
+          path: ./nipr-artifacts/
+        continue-on-error: true
+
+      - name: Setup offline environment
+        if: github.event.inputs.offline_mode == 'true'
+        run: |
+          echo "=== Setting up offline mode with NIPR artifacts ==="
+          
+          # Check if artifacts were downloaded
+          if [ -d "nipr-artifacts" ] && [ -n "$(ls -A nipr-artifacts 2>/dev/null)" ]; then
+            echo "✓ NIPR artifacts downloaded from GitHub"
+            cd nipr-artifacts
+            
+            # Verify checksums if available
+            CHECKSUM_FILE=$(ls spel-nipr-*-checksums.txt 2>/dev/null | head -1)
+            if [ -n "$CHECKSUM_FILE" ]; then
+              echo "Verifying checksums..."
+              if sha256sum -c "$CHECKSUM_FILE"; then
+                echo "✓ Checksum verification passed"
+              else
+                echo "⚠ Checksum verification failed, but continuing..."
+              fi
+            fi
+            
+            # Move archives to repository root
+            mv spel-*.tar.gz ../ 2>/dev/null || true
+            mv spel-nipr-*-checksums.txt ../ 2>/dev/null || true
+            mv spel-nipr-*-manifest.txt ../ 2>/dev/null || true
+            cd ..
+          else
+            echo "⚠ No artifacts downloaded - checking for archives in repository..."
+          fi
+          
+          # Check if archives exist (either downloaded or committed to repo)
+          if ls spel-*.tar.gz 1> /dev/null 2>&1; then
+            echo "✓ Found NIPR transfer archives"
+            ls -lh spel-*.tar.gz
+            
+            # Extract archives
+            echo ""
+            echo "Extracting NIPR archives..."
+            bash ./scripts/extract-nipr-archives.sh
+            
+            # Verify offline mode files exist
+            echo ""
+            echo "Verifying offline mode setup..."
+            if [ -f "mirrors/el9/repodata/repomd.xml" ]; then
+              echo "✓ Mirrors extracted successfully"
+              du -sh mirrors/
+            else
+              echo "✗ Mirror metadata not found"
+              exit 1
+            fi
+            
+            if [ -d "spel/ansible/roles" ] && [ -n "$(ls -A spel/ansible/roles 2>/dev/null)" ]; then
+              echo "✓ Ansible roles extracted successfully"
+              du -sh spel/ansible/roles/
+            else
+              echo "⚠ Ansible roles directory empty or missing"
+            fi
+            
+            if [ -d "offline-packages" ] && [ -n "$(ls -A offline-packages 2>/dev/null)" ]; then
+              echo "✓ Offline packages extracted successfully"
+              du -sh offline-packages/
+            else
+              echo "⚠ Offline packages directory empty or missing"
+            fi
+            
+            echo ""
+            echo "=== Offline mode setup complete ==="
+          else
+            echo "✗ No NIPR archives found!"
+            echo ""
+            echo "To use offline mode, either:"
+            echo "  1. Provide a valid nipr_artifact_name from a previous nipr-prepare workflow run"
+            echo "  2. Commit the NIPR archives to a test branch"
+            echo "  3. Manually upload archives to the repository"
+            exit 1
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -86,8 +168,25 @@ jobs:
         run: |
           echo "Setting up environment variables"
 
-          echo "PUBLIC=${{ github.event.inputs.public }}" >> $GITHUB_ENV
           echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
+          
+          # Detect offline mode (for local testing with network isolation)
+          if [ -f "mirrors/el9/repodata/repomd.xml" ] || [ -f "offline-packages/awscli-exe-linux-x86_64.zip" ]; then
+            echo "SPEL_OFFLINE_MODE=true" >> $GITHUB_ENV
+            echo "✓ Detected offline mode - using vendored packages"
+            
+            # Display offline mode info
+            echo ""
+            echo "=== Offline Mode Active ==="
+            echo "Mirrors: $(du -sh mirrors 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+            echo "Roles: $(du -sh spel/ansible/roles 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+            echo "Packages: $(du -sh offline-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+            echo "==========================="
+            echo ""
+          else
+            echo "SPEL_OFFLINE_MODE=false" >> $GITHUB_ENV
+            echo "Online mode - will download packages from internet"
+          fi
 
           builders=""
           if [[ "${{ github.event.inputs.run_amzn2023 }}" == "true" ]]; then
@@ -121,20 +220,11 @@ jobs:
           windows_builders="${windows_builders%,}"
           echo "WINDOWS_BUILDERS=$windows_builders" >> $GITHUB_ENV
 
-          if [ "${{ github.event.inputs.develop }}" == "true" ]; then
-            echo "SPEL_VERSION=$(date +%Y.%m).dev" >> $GITHUB_ENV
-            echo "PKR_VAR_aws_force_deregister=true" >> $GITHUB_ENV
-            echo "PKR_VAR_aws_ami_regions=[\"us-east-1\"]" >> $GITHUB_ENV
-          else
-            echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
-            echo "PKR_VAR_aws_ami_regions=[\"us-east-1\",\"us-east-2\",\"us-west-1\",\"us-west-2\"]" >> $GITHUB_ENV
-          fi
+          echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+          echo "PKR_VAR_aws_force_deregister=true" >> $GITHUB_ENV
+          echo "PKR_VAR_aws_ami_regions=[\"us-east-1\"]" >> $GITHUB_ENV
 
-          if [ "${{ github.event.inputs.public }}" == "true" ]; then
-            echo "PKR_VAR_aws_ami_groups=[\"all\"]" >> $GITHUB_ENV
-          else
-            echo "PKR_VAR_aws_ami_groups=[]" >> $GITHUB_ENV
-          fi
+          echo "PKR_VAR_aws_ami_groups=[\"all\"]" >> $GITHUB_ENV
 
           echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
           echo "PACKER_GITHUB_API_TOKEN=${{ secrets.PACKER_GITHUB_API_TOKEN }}" >> $GITHUB_ENV
@@ -144,73 +234,13 @@ jobs:
           echo "AWS_GOVCLOUD_ACCESS_KEY_ID=${{ secrets.AWS_GOVCLOUD_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "AWS_GOVCLOUD_SECRET_ACCESS_KEY=${{ secrets.AWS_GOVCLOUD_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
 
-      - name: Install necessary packages
+      - name: Initialize Git Submodules
         run: |
-          sudo apt-get update -y && sudo apt-get install -y \
-            xz-utils \
-            curl \
-            jq \
-            unzip \
-            make \
-            vim \
-            build-essential \
-            libssl-dev \
-            zlib1g-dev \
-            libbz2-dev \
-            libreadline-dev \
-            libsqlite3-dev \
-            llvm \
-            libncursesw5-dev \
-            tk-dev \
-            libxml2-dev \
-            libxmlsec1-dev \
-            libffi-dev \
-            liblzma-dev \
-            && sudo rm -rf /var/lib/apt/lists/*
+          git submodule update --init --recursive
 
-      - name: Install Packer
+      - name: Setup Build Environment
         run: |
-          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-          sudo apt-get update && sudo apt-get install packer
-
-      - name: Install role deps + pin ansible-core
-        if: env.WINDOWS_BUILDERS != ''
-        run: |
-          set -euo pipefail
-
-          # Find which ansible-playbook Packer will call (host or container)
-          PLAYBOOK=$(command -v ansible-playbook || true)
-          if [ -n "$PLAYBOOK" ]; then
-            echo "ansible-playbook -> $PLAYBOOK"
-            # Read the shebang to discover the Python interpreter
-            SHEBANG=$(head -1 "$PLAYBOOK")
-            PY_EXEC=$(echo "$SHEBANG" | awk 'NR==1{if($0 ~ /^#!/){sub("^#!","",$0); print $0}}')
-            if echo "$PY_EXEC" | grep -q "env "; then PY_EXEC=$(command -v python3); fi
-          else
-            PY_EXEC=$(command -v python3)
-          fi
-          : "${PY_EXEC:=/usr/bin/python3}"
-          echo "Using Python: $PY_EXEC"
-
-          sudo "$PY_EXEC" -m pip install --upgrade pip
-          # Pin to pre-strictness (<2.19) and install all controller-side deps the role lists
-          sudo "$PY_EXEC" -m pip install --upgrade --force-reinstall "ansible-core<2.19"
-          sudo "$PY_EXEC" -m pip install --upgrade \
-            pywinrm requests requests-ntlm \
-            passlib lxml xmltodict jmespath
-          # (Often needed by Windows roles)
-          ansible-galaxy collection install ansible.windows community.windows || true
-
-          # Show versions
-          ansible --version || true
-
-          # Sanity-check: can the same interpreter import winrm?
-          "$PY_EXEC" - <<'PY'
-          import sys, pkgutil
-          print("Controller Python:", sys.executable)
-          print("winrm available:", bool(pkgutil.find_loader("winrm")))
-          PY
+          bash build/ci-setup.sh
 
       - name: Build STIGed AMI's
         run: |

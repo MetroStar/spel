@@ -1,0 +1,11 @@
+# Ignore all downloaded tools and dependencies
+packer/packer
+packer/packer_*
+packer/plugins/
+python-deps/*.whl
+python-deps/*.tar.gz
+
+# Keep structure and documentation
+!.gitkeep
+!README.md
+!.gitignore

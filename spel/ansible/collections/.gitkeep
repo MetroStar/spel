@@ -1,0 +1,8 @@
+# Vendored Ansible collections for NIPR offline builds
+#
+# This directory should contain:
+# - ansible_collections/ansible/windows/
+# - ansible_collections/community/windows/
+#
+# To populate this directory, run from a system with internet access:
+#   ansible-galaxy collection install ansible.windows community.windows -p .

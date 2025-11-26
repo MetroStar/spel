@@ -18,7 +18,7 @@ AMIGENPKGGRP="${SPEL_AMIGENPKGGRP:-core}"
 AMIGENREPOS="${SPEL_AMIGENREPOS}"
 AMIGENREPOSRC="${SPEL_AMIGENREPOSRC}"
 AMIGENROOTNM="${SPEL_AMIGENROOTNM}"
-AMIGENSOURCE="${SPEL_AMIGEN9SOURCE:-https://github.com/MetroStar/amigen9.git}"
+AMIGENSOURCE="${SPEL_AMIGEN9SOURCE:-file://$(dirname $(dirname $(dirname $(readlink -f "$0"))))/vendor/amigen9}"
 AMIGENSSMAGENT="${SPEL_AMIGENSSMAGENT}"
 AMIGENSTORLAY="${SPEL_AMIGENSTORLAY}"
 AMIGENTIMEZONE="${SPEL_TIMEZONE:-UTC}"
@@ -656,8 +656,15 @@ then
         err_exit "Failed creating build-tools directory"
 fi
 
-# Pull build-tools from git clone-source
-git clone --branch "${AMIGENBRANCH}" "${AMIGENSOURCE}" "${ELBUILD}"
+# Pull build-tools from git clone-source or copy from local vendor
+if [[ "${AMIGENSOURCE}" == file://* ]]; then
+    AMIGEN_LOCAL_PATH="${AMIGENSOURCE#file://}"
+    err_exit "Copying build-tools from local source [${AMIGEN_LOCAL_PATH}]..." NONE
+    cp -r "${AMIGEN_LOCAL_PATH}" "${ELBUILD}" || \
+        err_exit "Failed copying build-tools from local source"
+else
+    git clone --branch "${AMIGENBRANCH}" "${AMIGENSOURCE}" "${ELBUILD}"
+fi
 
 # Execute build-tools
 BuildChroot

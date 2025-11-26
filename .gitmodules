@@ -1,0 +1,6 @@
+[submodule "vendor/amigen8"]
+	path = vendor/amigen8
+	url = ../amigen8
+[submodule "vendor/amigen9"]
+	path = vendor/amigen9
+	url = ../amigen9

@@ -236,6 +236,42 @@ variable "aws_subnet_id" {
   default     = null
 }
 
+variable "aws_vpc_id" {
+  description = "ID of the VPC where Packer will launch the EC2 instance. Required for NIPR deployments"
+  type        = string
+  default     = null
+}
+
+variable "aws_vpc_endpoint_ec2" {
+  description = "VPC endpoint DNS name for EC2 service (NIPR environments)"
+  type        = string
+  default     = null
+}
+
+variable "aws_vpc_endpoint_s3" {
+  description = "VPC endpoint DNS name for S3 service (NIPR environments)"
+  type        = string
+  default     = null
+}
+
+variable "aws_vpc_endpoint_ssm" {
+  description = "VPC endpoint DNS name for SSM service (NIPR environments)"
+  type        = string
+  default     = null
+}
+
+variable "aws_nipr_ami_regions" {
+  description = "List of regions to copy AMIs to in NIPR environment. Overrides aws_ami_regions for NIPR builds"
+  type        = list(string)
+  default     = null
+}
+
+variable "aws_nipr_account_id" {
+  description = "AWS account ID for NIPR marketplace AMIs. When set, overrides default commercial account IDs in source AMI filters"
+  type        = string
+  default     = ""
+}
+
 variable "aws_temporary_security_group_source_cidrs" {
   description = "List of IPv4 CIDR blocks to be authorized access to the instance"
   type        = list(string)
@@ -407,9 +443,9 @@ variable "amigen_amiutils_source_url" {
 }
 
 variable "amigen_aws_cfnbootstrap" {
-  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities"
+  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Defaults to spel_cfnbootstrap_source for NIPR support"
   type        = string
-  default     = "https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz"
+  default     = ""
 }
 
 variable "amigen_aws_cliv1_source" {
@@ -711,6 +747,24 @@ variable "spel_version" {
   type        = string
 }
 
+variable "spel_cfnbootstrap_source" {
+  description = "Source URL or file path for AWS CloudFormation Bootstrap package. Use file:// for offline/NIPR builds"
+  type        = string
+  default     = "https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz"
+}
+
+variable "spel_awscli_source" {
+  description = "Source URL or file path for AWS CLI v2 package. Use file:// for offline/NIPR builds"
+  type        = string
+  default     = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+}
+
+variable "spel_ssm_agent_source" {
+  description = "Source URL or file path for AWS SSM Agent RPM. Use file:// for offline/NIPR builds"
+  type        = string
+  default     = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
+}
+
 ###
 # End of variables blocks
 ###
@@ -727,7 +781,7 @@ source "amazon-ebssurrogate" "base" {
   }
   ami_groups                  = var.aws_ami_groups
   ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
-  ami_regions                 = var.aws_ami_regions
+  ami_regions                 = local.effective_ami_regions
   ami_users                   = var.aws_ami_users
   ami_virtualization_type     = "hvm"
   associate_public_ip_address = true
@@ -765,6 +819,7 @@ source "amazon-ebssurrogate" "base" {
     "diffie-hellman-group1-sha1"
   ]
   subnet_id                             = var.aws_subnet_id
+  vpc_id                                = var.aws_vpc_id
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
   use_create_image                      = true
   user_data_file                        = "${path.root}/userdata/userdata.cloud"
@@ -853,6 +908,23 @@ locals {
   amigen9_repo_sources   = join(",", var.amigen9_repo_sources)
   amigen9_storage_layout = join(",", var.amigen9_storage_layout)
 
+  # NIPR-specific overrides
+  # Use NIPR AMI regions if specified, otherwise use commercial regions
+  effective_ami_regions = var.aws_nipr_ami_regions != null ? var.aws_nipr_ami_regions : var.aws_ami_regions
+  
+  # Use NIPR account ID for source AMI owners if specified
+  # This allows using NIPR marketplace AMIs instead of commercial marketplace AMIs
+  use_nipr_ami_owners = var.aws_nipr_account_id != ""
+  
+  # Effective source AMI filter owners - use NIPR account if specified, otherwise use commercial
+  effective_al2023_owners        = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_al2023_hvm.owners
+  effective_alma9_owners         = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_alma9_hvm.owners
+  effective_centos9stream_owners = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_centos9stream_hvm.owners
+  effective_ol8_owners           = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_ol8_hvm.owners
+  effective_ol9_owners           = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_ol9_hvm.owners
+  effective_rhel8_owners         = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_rhel8_hvm.owners
+  effective_rhel9_owners         = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_rhel9_hvm.owners
+
   # Template the description string
   description = "STIG-partitioned [*NOT HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.spel_description_url}."
 
@@ -879,7 +951,7 @@ build {
         name                = var.aws_source_ami_filter_alma9_hvm.name
         root-device-type    = "ebs"
       }
-      owners      = var.aws_source_ami_filter_alma9_hvm.owners
+      owners      = local.effective_alma9_owners
       most_recent = true
     }
   }
@@ -893,7 +965,7 @@ build {
         name                = var.aws_source_ami_filter_al2023_hvm.name
         root-device-type    = "ebs"
       }
-      owners      = var.aws_source_ami_filter_al2023_hvm.owners
+      owners      = local.effective_al2023_owners
       most_recent = true
     }
   }
@@ -907,7 +979,7 @@ build {
         name                = var.aws_source_ami_filter_centos9stream_hvm.name
         root-device-type    = "ebs"
       }
-      owners      = var.aws_source_ami_filter_centos9stream_hvm.owners
+      owners      = local.effective_centos9stream_owners
       most_recent = true
     }
   }
@@ -921,7 +993,7 @@ build {
         name                = var.aws_source_ami_filter_ol8_hvm.name
         root-device-type    = "ebs"
       }
-      owners      = var.aws_source_ami_filter_ol8_hvm.owners
+      owners      = local.effective_ol8_owners
       most_recent = true
     }
   }
@@ -935,7 +1007,7 @@ build {
         name                = var.aws_source_ami_filter_ol9_hvm.name
         root-device-type    = "ebs"
       }
-      owners      = var.aws_source_ami_filter_ol9_hvm.owners
+      owners      = local.effective_ol9_owners
       most_recent = true
     }
   }
@@ -1117,9 +1189,9 @@ build {
       "SPEL_AMIGENROOTNM=${var.amigen8_filesystem_label}",
       "SPEL_AMIGENSTORLAY=${local.amigen8_storage_layout}",
       "SPEL_AMIGENVGNAME=RootVG",
-      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap}",
-      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source}",
+      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.spel_cfnbootstrap_source}",
+      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source != "" ? var.amigen_aws_cliv1_source : var.spel_awscli_source}",
+      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.spel_awscli_source}",
       "SPEL_CLOUDPROVIDER=aws",
       "SPEL_EXTRARPMS=${local.amigen8_extra_rpms}",
       "SPEL_FIPSDISABLE=${var.amigen_fips_disable}",
@@ -1158,9 +1230,9 @@ build {
       "SPEL_AMIGENUEFIDEVLBL=${var.amigen9_uefi_dev_label}",
       "SPEL_AMIGENUEFIDEVSZ=${var.amigen9_uefi_dev_size}",
       "SPEL_AMIGENVGNAME=RootVG",
-      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap}",
-      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source}",
+      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.spel_cfnbootstrap_source}",
+      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source != "" ? var.amigen_aws_cliv1_source : var.spel_awscli_source}",
+      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.spel_awscli_source}",
       "SPEL_CLOUDPROVIDER=aws",
       "SPEL_EXTRARPMS=${local.amigen9_extra_rpms}",
       "SPEL_FIPSDISABLE=${var.amigen_fips_disable}",
@@ -1195,9 +1267,9 @@ build {
       "SPEL_AMIGENSTORLAY=${local.amigen8_storage_layout}",
       "SPEL_AMIGENVGNAME=VolGroup00",
       "SPEL_AMIUTILSSOURCE=${var.amigen_amiutils_source_url}",
-      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap}",
-      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source}",
+      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.spel_cfnbootstrap_source}",
+      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source != "" ? var.amigen_aws_cliv1_source : var.spel_awscli_source}",
+      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.spel_awscli_source}",
       "SPEL_BOOTLABEL=/boot",
       "SPEL_BUILDDEPS=lvm2 parted yum-utils unzip git",
       "SPEL_BUILDNAME=${source.name}",

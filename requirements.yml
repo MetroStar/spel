@@ -1,9 +1,16 @@
 # requirements.yml for ansible-galaxy
-# This file allows ansible-galaxy to install the Ansible Lockdown roles from GitHub
+# This file installs the Ansible Lockdown roles from vendored local copies
+# For NIPR air-gapped environments, roles are cloned from GitHub and committed to this repo
 roles:
-  - src: git+https://github.com/ansible-lockdown/Windows-2016-STIG.git
+  - src: ./spel/ansible/roles/Windows-2016-STIG
     name: Windows-2016-STIG
-  - src: git+https://github.com/ansible-lockdown/Windows-2019-STIG.git
+  - src: ./spel/ansible/roles/Windows-2019-STIG
     name: Windows-2019-STIG
-  - src: git+https://github.com/ansible-lockdown/Windows-2022-STIG.git
+  - src: ./spel/ansible/roles/Windows-2022-STIG
     name: Windows-2022-STIG
+  - src: ./spel/ansible/roles/AMAZON2023-CIS
+    name: AMAZON2023-CIS
+  - src: ./spel/ansible/roles/RHEL8-STIG
+    name: RHEL8-STIG
+  - src: ./spel/ansible/roles/RHEL9-STIG
+    name: RHEL9-STIG

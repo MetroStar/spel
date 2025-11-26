@@ -1,0 +1,181 @@
+#!/bin/bash
+#
+# Download AWS utilities for offline NIPR builds with storage optimization
+# Run this on a system with internet access before transferring to NIPR
+#
+# STORAGE OPTIMIZATION:
+# - Single SSM Agent file (compatible with both EL8/EL9)
+# - Optional compression of packages
+# - Version tracking for updates
+#
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OFFLINE_DIR="${SCRIPT_DIR}/../offline-packages"
+
+# Configuration
+COMPRESS="${SPEL_OFFLINE_COMPRESS:-true}"
+VERIFY_DOWNLOADS="${SPEL_OFFLINE_VERIFY:-true}"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_debug() {
+    echo -e "${BLUE}[DEBUG]${NC} $1"
+}
+
+# Check for wget
+if ! command -v wget &> /dev/null; then
+    log_error "wget is required but not installed"
+    exit 1
+fi
+
+log_info "Offline packages download configuration:"
+log_debug "  Packages directory: $OFFLINE_DIR"
+log_debug "  Create compressed archive: $COMPRESS"
+log_debug "  Verify downloads: $VERIFY_DOWNLOADS"
+
+mkdir -p "$OFFLINE_DIR"
+
+# Track download sizes
+TOTAL_SIZE=0
+
+# 1. AWS CLI v2
+log_info "[1/3] Downloading AWS CLI v2..."
+AWS_CLI_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+AWS_CLI_FILE="${OFFLINE_DIR}/awscli-exe-linux-x86_64.zip"
+
+if wget -N "$AWS_CLI_URL" -O "$AWS_CLI_FILE"; then
+    SIZE=$(du -h "$AWS_CLI_FILE" | awk '{print $1}')
+    log_info "  Downloaded: awscli-exe-linux-x86_64.zip ($SIZE)"
+    TOTAL_SIZE=$((TOTAL_SIZE + $(stat -c%s "$AWS_CLI_FILE")))
+else
+    log_error "  Failed to download AWS CLI v2"
+fi
+
+# 2. CloudFormation Bootstrap
+log_info "[2/3] Downloading AWS CloudFormation Bootstrap..."
+CFN_URL="https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz"
+CFN_FILE="${OFFLINE_DIR}/aws-cfn-bootstrap-py3-latest.tar.gz"
+
+if wget -N "$CFN_URL" -O "$CFN_FILE"; then
+    SIZE=$(du -h "$CFN_FILE" | awk '{print $1}')
+    log_info "  Downloaded: aws-cfn-bootstrap-py3-latest.tar.gz ($SIZE)"
+    TOTAL_SIZE=$((TOTAL_SIZE + $(stat -c%s "$CFN_FILE")))
+else
+    log_error "  Failed to download CloudFormation Bootstrap"
+fi
+
+# 3. SSM Agent (single version for both EL8/EL9)
+log_info "[3/3] Downloading AWS SSM Agent..."
+SSM_URL="https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
+SSM_FILE="${OFFLINE_DIR}/amazon-ssm-agent.rpm"
+
+if wget -N "$SSM_URL" -O "$SSM_FILE"; then
+    SIZE=$(du -h "$SSM_FILE" | awk '{print $1}')
+    log_info "  Downloaded: amazon-ssm-agent.rpm ($SIZE)"
+    log_debug "  Note: Single SSM Agent RPM is compatible with both EL8 and EL9"
+    TOTAL_SIZE=$((TOTAL_SIZE + $(stat -c%s "$SSM_FILE")))
+else
+    log_error "  Failed to download SSM Agent"
+fi
+
+# Verify downloads
+if [ "$VERIFY_DOWNLOADS" = "true" ]; then
+    log_info "Verifying downloads..."
+    
+    # Check file sizes (basic verification)
+    if [ -f "$AWS_CLI_FILE" ] && [ $(stat -c%s "$AWS_CLI_FILE") -gt 1000000 ]; then
+        log_debug "  ✓ AWS CLI appears valid (>1MB)"
+    else
+        log_warn "  ⚠ AWS CLI may be incomplete"
+    fi
+    
+    if [ -f "$CFN_FILE" ] && [ $(stat -c%s "$CFN_FILE") -gt 100000 ]; then
+        log_debug "  ✓ CFN Bootstrap appears valid (>100KB)"
+    else
+        log_warn "  ⚠ CFN Bootstrap may be incomplete"
+    fi
+    
+    if [ -f "$SSM_FILE" ] && [ $(stat -c%s "$SSM_FILE") -gt 10000000 ]; then
+        log_debug "  ✓ SSM Agent appears valid (>10MB)"
+    else
+        log_warn "  ⚠ SSM Agent may be incomplete"
+    fi
+fi
+
+# Create version tracking file
+VERSION_FILE="${OFFLINE_DIR}/VERSIONS.txt"
+log_info "Creating version tracking file..."
+
+cat > "$VERSION_FILE" <<EOF
+# Offline Packages Version Information
+# Downloaded on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+AWS CLI v2:
+  URL: $AWS_CLI_URL
+  File: awscli-exe-linux-x86_64.zip
+  Size: $(du -h "$AWS_CLI_FILE" 2>/dev/null | awk '{print $1}' || echo "N/A")
+  SHA256: $(sha256sum "$AWS_CLI_FILE" 2>/dev/null | awk '{print $1}' || echo "N/A")
+
+CloudFormation Bootstrap:
+  URL: $CFN_URL
+  File: aws-cfn-bootstrap-py3-latest.tar.gz
+  Size: $(du -h "$CFN_FILE" 2>/dev/null | awk '{print $1}' || echo "N/A")
+  SHA256: $(sha256sum "$CFN_FILE" 2>/dev/null | awk '{print $1}' || echo "N/A")
+
+SSM Agent:
+  URL: $SSM_URL
+  File: amazon-ssm-agent.rpm
+  Size: $(du -h "$SSM_FILE" 2>/dev/null | awk '{print $1}' || echo "N/A")
+  SHA256: $(sha256sum "$SSM_FILE" 2>/dev/null | awk '{print $1}' || echo "N/A")
+  Compatible: EL8, EL9
+
+Total Size: $(du -sh "$OFFLINE_DIR" | awk '{print $1}')
+EOF
+
+log_info "Version information saved to VERSIONS.txt"
+
+# Create compressed archive
+if [ "$COMPRESS" = "true" ]; then
+    ARCHIVE_PATH="${SCRIPT_DIR}/../offline-packages.tar.gz"
+    log_info "Creating compressed archive..."
+    
+    tar czf "$ARCHIVE_PATH" \
+        -C "$(dirname "$OFFLINE_DIR")" \
+        "$(basename "$OFFLINE_DIR")"
+    
+    ARCHIVE_SIZE=$(du -sh "$ARCHIVE_PATH" | awk '{print $1}')
+    UNCOMPRESSED_SIZE=$(du -sh "$OFFLINE_DIR" | awk '{print $1}')
+    
+    log_info "Created: offline-packages.tar.gz"
+    log_info "  Uncompressed: $UNCOMPRESSED_SIZE"
+    log_info "  Compressed: $ARCHIVE_SIZE"
+    log_info "  Archive location: $ARCHIVE_PATH"
+fi
+
+# Summary
+log_info ""
+log_info "Offline packages download complete!"
+log_info "Downloaded files:"
+ls -lh "$OFFLINE_DIR" | grep -E '\.(zip|tar\.gz|rpm)$' | awk '{print "  " $9 " (" $5 ")"}'
+
+log_info ""
+log_info "Total package size: $(du -sh "$OFFLINE_DIR" | awk '{print $1}')"
+log_info "SHA256 checksums saved in VERSIONS.txt"

@@ -1,30 +1,261 @@
-before_script:
-  - touch .variables
-  - apt-get update
-  - apt-get -y install python-pip python-dev build-essential
-  - pip install awscli --upgrade
-  - test $SPEL_CI == "true" && echo "export SPEL_VERSION=$(date +%Y.%m.dev%s)" >> .variables || true
+# GitLab CI/CD Configuration for SPEL NIPR Builds
+# This pipeline builds STIGed AMIs in an air-gapped NIPR environment
 
-commercial_build_job:
-  variables:
-    AWS_REGION: "us-east-1"
-    SOURCE_AMI_CENTOS7_HVM: "ami-090b9dabe1c9f40b3"
-    SOURCE_AMI_RHEL7_HVM: "ami-0394fe9914b475c53"
+variables:
+  SPEL_OFFLINE_MODE: "true"
+  SPEL_IDENTIFIER: "spel"
+  PKR_VAR_aws_region: "us-east-1"
+  PACKER_LOG: "1"
+  CHECKPOINT_DISABLE: "1"
+
+stages:
+  - extract      # Extract transferred archives
+  - configure    # Configure local repositories
+  - setup
+  - validate
+  - build
+
+# Default settings for all jobs
+default:
+  before_script:
+    - echo "Starting job on $(hostname)"
+    - echo "Git commit - ${CI_COMMIT_SHA}"
+
+# Extract NIPR transfer archives
+extract:archives:
+  stage: extract
   script:
-    - source .variables
-    - make
+    - echo "Extracting NIPR transfer archives..."
+    - |
+      # Find the most recent checksum file
+      CHECKSUM_FILE=$(ls -t spel-nipr-*-checksums.txt 2>/dev/null | head -1)
+      
+      if [ -n "$CHECKSUM_FILE" ]; then
+        echo "Found checksum file - $CHECKSUM_FILE"
+        
+        # Verify checksums
+        if sha256sum -c "$CHECKSUM_FILE"; then
+          echo "✓ Checksum verification passed"
+        else
+          echo "✗ Checksum verification failed!"
+          exit 1
+        fi
+      else
+        echo "⚠ No checksum file found, skipping verification"
+      fi
+    
+    - echo "Extracting archives..."
+    - ./scripts/extract-nipr-archives.sh
+    
+    - echo "Extraction complete!"
+    - echo "Directory structure:"
+    - du -sh mirrors/ offline-packages/ spel/ansible/roles/ tools/ 2>/dev/null || true
+  artifacts:
+    paths:
+      - mirrors/
+      - offline-packages/
+      - spel/ansible/roles/
+      - tools/
+      - vendor/
+    expire_in: 7 days
+  tags:
+    - spel-nipr-runner
+  only:
+    variables:
+      - $EXTRACT_ARCHIVES == "true"
+  when: manual
 
-govcloud_build_job:
-  variables:
-    AWS_REGION: "us-gov-west-1"
-    SOURCE_AMI_CENTOS7_HVM: "ami-faae349b"
-    SOURCE_AMI_RHEL7_HVM: "ami-91d649f0"
-    SPEL_SSM_ACCESS_KEY: "/spel/govcloud/access-key"
-    SPEL_SSM_SECRET_KEY: "/spel/govcloud/secret-key"
+# Configure local repositories
+configure:repos:
+  stage: configure
+  needs: ["extract:archives"]
   script:
-    - source .variables
-    - make
+    - echo "Configuring local YUM/DNF repositories..."
+    - sudo ./scripts/setup-local-repos.sh
+    
+    - echo "Verifying repository configuration..."
+    - sudo dnf repolist --all
+    
+    - echo "Testing repository access..."
+    - sudo dnf makecache
+    
+    - echo "Repository configuration complete!"
+  artifacts:
+    paths:
+      - /etc/yum.repos.d/*.repo
+    expire_in: 7 days
+  tags:
+    - spel-nipr-runner
+  only:
+    variables:
+      - $EXTRACT_ARCHIVES == "true"
+  when: on_success
 
-after_script:
-  - source .variables
-  - make post_build
+# Setup job - prepare environment
+setup:
+  stage: setup
+  script:
+    - echo "Setting up build environment..."
+    - git submodule update --init --recursive
+    - bash build/ci-setup.sh
+    - packer version
+    - ansible --version
+  artifacts:
+    paths:
+      - .env
+    expire_in: 1 hour
+  tags:
+    - spel-nipr-runner
+
+# Validate Packer templates
+validate:minimal:
+  stage: validate
+  needs: ["setup"]
+  script:
+    - source .env || true
+    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).dev}"
+    - |
+      packer validate \
+        -var "spel_identifier=${SPEL_IDENTIFIER}" \
+        -var "spel_version=${SPEL_VERSION}" \
+        spel/minimal-linux.pkr.hcl
+  tags:
+    - spel-nipr-runner
+
+validate:hardened:
+  stage: validate
+  needs: ["setup"]
+  script:
+    - source .env || true
+    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).dev}"
+    - |
+      packer validate \
+        -var "spel_identifier=${SPEL_IDENTIFIER}" \
+        -var "spel_version=${SPEL_VERSION}" \
+        spel/hardened-linux.pkr.hcl
+  tags:
+    - spel-nipr-runner
+
+# Build jobs - triggered manually or on tag
+.build_template: &build_definition
+  stage: build
+  needs: ["setup", "validate:minimal", "validate:hardened"]
+  timeout: 6 hours
+  script:
+    - source .env || true
+    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).dev}"
+    - export PUBLIC="${PUBLIC:-false}"
+    
+    # Set AWS credentials from GitLab CI/CD variables
+    - export AWS_COMMERCIAL_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}"
+    - export AWS_COMMERCIAL_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}"
+    
+    # Configure AWS profile
+    - mkdir -p ~/.aws
+    - |
+      cat <<EOF > ~/.aws/credentials
+      [commercial]
+      aws_access_key_id = ${AWS_COMMERCIAL_ACCESS_KEY_ID}
+      aws_secret_access_key = ${AWS_COMMERCIAL_SECRET_ACCESS_KEY}
+      EOF
+    - |
+      cat <<EOF > ~/.aws/config
+      [profile commercial]
+      region = ${PKR_VAR_aws_region}
+      EOF
+    
+    # Set Packer variables for NIPR
+    - export PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister:-false}"
+    - export PKR_VAR_aws_ami_regions="${PKR_VAR_aws_nipr_ami_regions:-[\"us-east-1\"]}"
+    - export PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups:-[]}"
+    - export PKR_VAR_aws_vpc_id="${PKR_VAR_aws_vpc_id}"
+    - export PKR_VAR_aws_subnet_id="${PKR_VAR_aws_subnet_id}"
+    - export PKR_VAR_aws_nipr_account_id="${PKR_VAR_aws_nipr_account_id}"
+    
+    # Run build
+    - make -f Makefile.spel build
+  artifacts:
+    paths:
+      - .spel/
+    reports:
+      dotenv: .env
+    expire_in: 30 days
+  tags:
+    - spel-nipr-runner
+  when: manual
+
+# Individual build jobs
+build:amzn2023:
+  <<: *build_definition
+  variables:
+    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm"
+  only:
+    variables:
+      - $RUN_AMZN2023 == "true"
+
+build:ol9:
+  <<: *build_definition
+  variables:
+    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-ol-9-hvm"
+  only:
+    variables:
+      - $RUN_OL9 == "true"
+
+build:rhel9:
+  <<: *build_definition
+  variables:
+    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-rhel-9-hvm"
+  only:
+    variables:
+      - $RUN_RHEL9 == "true"
+
+build:ol8:
+  <<: *build_definition
+  variables:
+    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-ol-8-hvm"
+  only:
+    variables:
+      - $RUN_OL8 == "true"
+
+build:rhel8:
+  <<: *build_definition
+  variables:
+    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-rhel-8-hvm"
+  only:
+    variables:
+      - $RUN_RHEL8 == "true"
+
+build:windows2016:
+  <<: *build_definition
+  variables:
+    WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2016-hvm"
+  only:
+    variables:
+      - $RUN_WS2016 == "true"
+
+build:windows2019:
+  <<: *build_definition
+  variables:
+    WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2019-hvm"
+  only:
+    variables:
+      - $RUN_WS2019 == "true"
+
+build:windows2022:
+  <<: *build_definition
+  variables:
+    WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2022-hvm"
+  only:
+    variables:
+      - $RUN_WS2022 == "true"
+
+# Full build job (all builders) - runs on tagged releases
+build:all:
+  <<: *build_definition
+  variables:
+    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm,amazon-ebssurrogate.minimal-ol-9-hvm,amazon-ebssurrogate.minimal-rhel-9-hvm,amazon-ebssurrogate.minimal-ol-8-hvm,amazon-ebssurrogate.minimal-rhel-8-hvm"
+    WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2016-hvm,amazon-ebs.hardened-windows-2019-hvm,amazon-ebs.hardened-windows-2022-hvm"
+  only:
+    - tags
+  when: on_success
+
