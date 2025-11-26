@@ -41,6 +41,10 @@ jobs:
     timeout-minutes: 480  # 8 hours for large mirror sync
     
     steps:
+      - name: Install Git for checkout
+        run: |
+          dnf install -y git
+      
       - name: Checkout repository with submodules
         uses: actions/checkout@v4
         with:
