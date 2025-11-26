@@ -55,12 +55,24 @@ log_debug "  Compress repositories: $COMPRESS_REPOS"
 log_debug "  Use hardlinks: $USE_HARDLINKS"
 
 # Check for required commands
-for cmd in reposync createrepo_c dnf; do
+# Note: reposync may be a dnf subcommand (dnf reposync) in newer systems
+if command -v reposync &> /dev/null; then
+    REPOSYNC_CMD="reposync"
+elif dnf reposync --help &> /dev/null; then
+    REPOSYNC_CMD="dnf reposync"
+else
+    log_error "reposync is required but not found (tried 'reposync' and 'dnf reposync')"
+    exit 1
+fi
+
+for cmd in createrepo_c dnf; do
     if ! command -v "$cmd" &> /dev/null; then
         log_error "$cmd is required but not installed"
         exit 1
     fi
 done
+
+log_debug "  Using reposync command: $REPOSYNC_CMD"
 
 sync_repo() {
     local repo_name=$1
@@ -87,7 +99,7 @@ sync_repo() {
     fi
     
     # Sync only the newest packages with metadata
-    if ! dnf reposync \
+    if ! $REPOSYNC_CMD \
         --repoid="$repo_name" \
         --download-metadata \
         --newest-only \
