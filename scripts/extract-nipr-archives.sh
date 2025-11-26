@@ -91,37 +91,6 @@ else
     log_warn "No base archive found (spel-base-*.tar.gz)"
 fi
 
-# Extract mirrors archive
-MIRRORS_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-mirrors-*.tar.gz 2>/dev/null | head -1)
-if [ -n "$MIRRORS_ARCHIVE" ]; then
-    log_info "Extracting mirrors archive..."
-    tar xzf "$MIRRORS_ARCHIVE" -C "$REPO_ROOT"
-    
-    # Check if mirrors are compressed and need decompression
-    if ls "${REPO_ROOT}"/mirrors/*/*.tar.gz &>/dev/null; then
-        log_info "Decompressing individual repository mirrors..."
-        
-        for repo_archive in "${REPO_ROOT}"/mirrors/*/*.tar.gz; do
-            repo_dir=$(dirname "$repo_archive")
-            repo_name=$(basename "$repo_archive" .tar.gz)
-            
-            log_debug "  Extracting $(basename "$repo_archive")..."
-            tar xzf "$repo_archive" -C "$repo_dir"
-            
-            if [ "$CLEANUP_ARCHIVES" = "true" ]; then
-                rm "$repo_archive"
-                log_debug "  Removed $repo_archive"
-            fi
-        done
-        
-        log_info "  ✓ Repository mirrors decompressed"
-    fi
-    
-    log_info "  ✓ Mirrors archive extracted"
-else
-    log_warn "No mirrors archive found (spel-mirrors-*.tar.gz)"
-fi
-
 # Extract tools archive
 TOOLS_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-tools-*.tar.gz 2>/dev/null | head -1)
 if [ -n "$TOOLS_ARCHIVE" ]; then
@@ -145,6 +114,30 @@ if [ -n "$TOOLS_ARCHIVE" ]; then
         
         if [ "$CLEANUP_ARCHIVES" = "true" ]; then
             rm "${REPO_ROOT}/offline-packages.tar.gz"
+        fi
+    fi
+    
+    # Extract Ansible collection tarballs if they exist
+    if [ -d "${REPO_ROOT}/spel/ansible/collections" ]; then
+        COLLECTION_TARBALLS=$(find "${REPO_ROOT}/spel/ansible/collections" -name "*.tar.gz" -type f 2>/dev/null || true)
+        
+        if [ -n "$COLLECTION_TARBALLS" ]; then
+            log_info "Extracting Ansible collections..."
+            mkdir -p "${REPO_ROOT}/spel/ansible/collections/ansible_collections"
+            
+            echo "$COLLECTION_TARBALLS" | while read -r tarball; do
+                if [ -f "$tarball" ]; then
+                    collection_name=$(basename "$tarball" .tar.gz)
+                    log_debug "  Extracting ${collection_name}..."
+                    tar xzf "$tarball" -C "${REPO_ROOT}/spel/ansible/collections/ansible_collections/"
+                    
+                    if [ "$CLEANUP_ARCHIVES" = "true" ]; then
+                        rm "$tarball"
+                    fi
+                fi
+            done
+            
+            log_info "  ✓ Ansible collections extracted"
         fi
     fi
     
@@ -178,13 +171,40 @@ log_info "Validating extraction..."
 ERRORS=0
 
 # Check key directories
-for dir in spel mirrors offline-packages tools; do
+for dir in spel offline-packages tools; do
     if [ -d "${REPO_ROOT}/${dir}" ]; then
         log_debug "  ✓ ${dir}/ exists"
     else
         log_warn "  ⚠ ${dir}/ not found (may not be required)"
     fi
 done
+
+# Check new component directories
+if [ -d "${REPO_ROOT}/tools/python-deps" ]; then
+    log_debug "  ✓ Python dependencies found"
+    wheel_count=$(find "${REPO_ROOT}/tools/python-deps" -name "*.whl" 2>/dev/null | wc -l)
+    log_debug "    Wheel files: ${wheel_count}"
+fi
+
+if [ -d "${REPO_ROOT}/spel/ansible/collections/ansible_collections" ]; then
+    log_debug "  ✓ Ansible collections extracted"
+    collection_count=$(find "${REPO_ROOT}/spel/ansible/collections/ansible_collections" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | wc -l)
+    log_debug "    Collections: ${collection_count}"
+fi
+
+if [ -d "${REPO_ROOT}/tools/packer/linux_amd64" ]; then
+    log_debug "  ✓ Packer Linux binary found"
+fi
+
+if [ -d "${REPO_ROOT}/tools/packer/windows_amd64" ]; then
+    log_debug "  ✓ Packer Windows binary found"
+fi
+
+if [ -d "${REPO_ROOT}/tools/packer/plugins" ]; then
+    log_debug "  ✓ Packer plugins found"
+    plugin_count=$(find "${REPO_ROOT}/tools/packer/plugins" -name "packer-plugin-*" -type f 2>/dev/null | wc -l)
+    log_debug "    Plugin files: ${plugin_count}"
+fi
 
 # Check for Packer templates
 if [ -f "${REPO_ROOT}/spel/minimal-linux.pkr.hcl" ]; then
@@ -214,15 +234,21 @@ fi
 
 log_info ""
 log_info "Directory structure:"
-du -sh "${REPO_ROOT}"/{spel,mirrors,offline-packages,tools,vendor} 2>/dev/null | \
+du -sh "${REPO_ROOT}"/{spel,offline-packages,tools,vendor} 2>/dev/null | \
     awk '{printf "  %-20s %8s\n", $2, $1}' || true
 
 log_info ""
 log_info "Next steps:"
-log_info "  1. Configure local repositories: sudo ./scripts/setup-local-repos.sh"
-log_info "  2. Set GitLab CI variables (see docs/NIPR-Setup.md)"
-log_info "  3. Test environment: ./build/ci-setup.sh"
-log_info "  4. Validate Packer: ./tools/packer/packer validate spel/minimal-linux.pkr.hcl"
+log_info "  1. Install Ansible Core (if extracted):"
+log_info "     pip install --no-index --find-links tools/python-deps/ 'ansible-core>=2.16.0,<2.19.0'"
+log_info "  2. Install Packer (Linux):"
+log_info "     sudo install -m 755 tools/packer/linux_amd64/packer /usr/local/bin/packer"
+log_info "  3. Set Packer plugin path:"
+log_info "     export PACKER_PLUGIN_PATH=\"\${PWD}/tools/packer/plugins\""
+log_info "  4. Configure to use NIPR RPM repositories (no local mirrors needed)"
+log_info "  5. Set GitLab CI variables (see docs/CI-CD-Setup.md)"
+log_info "  6. Test environment: ./build/ci-setup.sh"
+log_info "  7. Validate Packer: packer validate spel/minimal-linux.pkr.hcl"
 
 if [ "$CLEANUP_ARCHIVES" = "true" ]; then
     log_info ""

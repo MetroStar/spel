@@ -1,6 +1,7 @@
 # Offline AWS Utilities Packages for NIPR Builds
 
-This directory contains pre-downloaded AWS utilities packages required for building SPEL AMIs in air-gapped NIPR environments.
+> **Note**: This directory contains ONLY AWS-specific utilities (AWS CLI, SSM Agent, CFN Bootstrap).  
+> YUM/DNF repository mirrors are NOT synced for NIPR - the NIPR environment has its own RPM repositories available.
 
 ## Quick Download (Optimized)
 

@@ -20,7 +20,7 @@ OUTPUT_DIR="${SPEL_ARCHIVE_OUTPUT:-${REPO_ROOT}}"
 # Configuration
 CREATE_SEPARATE="${SPEL_ARCHIVE_SEPARATE:-true}"
 CREATE_COMBINED="${SPEL_ARCHIVE_COMBINED:-true}"
-INCLUDE_MIRRORS="${SPEL_ARCHIVE_MIRRORS:-true}"
+# Note: Mirrors are not synced for NIPR - NIPR has its own RPM repositories
 
 # Colors for output
 RED='\033[0;31m'
@@ -60,7 +60,7 @@ log_debug "  Repository root: $REPO_ROOT"
 log_debug "  Output directory: $OUTPUT_DIR"
 log_debug "  Create separate archives: $CREATE_SEPARATE"
 log_debug "  Create combined archive: $CREATE_COMBINED"
-log_debug "  Include mirrors: $INCLUDE_MIRRORS"
+log_debug "  Include mirrors: false (NIPR has its own RPM repositories)"
 
 # Common exclusions
 COMMON_EXCLUDES=(
@@ -106,54 +106,46 @@ if [ "$CREATE_SEPARATE" = "true" ]; then
     
     # 1. Base archive (code, scripts, configs)
     create_archive "spel-base-${DATE}.tar.gz" "base archive" \
-        --exclude='mirrors' \
         --exclude='offline-packages/*.zip' \
         --exclude='offline-packages/*.tar.gz' \
         --exclude='offline-packages/*.rpm' \
-        --exclude='tools/packer/packer' \
-        --exclude='tools/packer/plugins' \
-        --exclude='tools/python-deps/*.whl' \
         --exclude='spel/ansible/roles/*/.git' \
         --exclude='vendor/*/.git' \
         .
     
-    # 2. Mirrors archive (if mirrors exist and include is enabled)
-    if [ "$INCLUDE_MIRRORS" = "true" ] && [ -d "mirrors" ]; then
-        # Check if compressed mirrors exist
-        if ls mirrors/*/*.tar.gz &>/dev/null; then
-            log_info "Using compressed mirror archives..."
-            create_archive "spel-mirrors-compressed-${DATE}.tar.gz" "compressed mirrors" \
-                --exclude='mirrors/*/baseos' \
-                --exclude='mirrors/*/appstream' \
-                --exclude='mirrors/*/extras' \
-                --exclude='mirrors/*/epel' \
-                --exclude='mirrors/spel-packages/*.rpm' \
-                mirrors
-        else
-            log_warn "No compressed mirrors found, creating from raw directories..."
-            create_archive "spel-mirrors-${DATE}.tar.gz" "mirrors archive" \
-                mirrors
-        fi
-    else
-        log_warn "Skipping mirrors (not found or disabled)"
-    fi
-    
-    # 3. Tools archive (if tools exist)
-    if [ -d "tools" ] || [ -d "offline-packages" ]; then
-        log_info "Creating tools and offline packages archive..."
+    # 2. Tools archive (if tools exist)
+    if [ -d "tools" ] || [ -d "offline-packages" ] || [ -d "mirrors/spel-packages" ] || [ -d "spel/ansible/collections" ]; then
+        log_info "Creating tools, SPEL packages, offline packages, and collections archive..."
         
         # Create temporary staging for tools
         TEMP_TOOLS=$(mktemp -d)
         trap "rm -rf $TEMP_TOOLS" EXIT
         
-        # Copy tools if they exist
+        # Copy tools if they exist (includes Python deps, Packer binaries, and plugins)
         if [ -d "tools" ]; then
-            cp -r tools "$TEMP_TOOLS/"
+            log_debug "  Copying tools directory (Python deps, Packer binaries, plugins)..."
+            # Use --dereference to follow symlinks in Packer plugins
+            cp -rL tools "$TEMP_TOOLS/"
         fi
         
         # Copy offline packages if they exist
         if [ -d "offline-packages" ]; then
+            log_debug "  Copying offline packages..."
             cp -r offline-packages "$TEMP_TOOLS/"
+        fi
+        
+        # Copy SPEL packages if they exist
+        if [ -d "mirrors/spel-packages" ]; then
+            log_debug "  Copying SPEL packages..."
+            mkdir -p "$TEMP_TOOLS/mirrors"
+            cp -r mirrors/spel-packages "$TEMP_TOOLS/mirrors/"
+        fi
+        
+        # Copy Ansible collections if they exist (tarballs)
+        if [ -d "spel/ansible/collections" ]; then
+            log_debug "  Copying Ansible collections..."
+            mkdir -p "$TEMP_TOOLS/spel/ansible"
+            cp -r spel/ansible/collections "$TEMP_TOOLS/spel/ansible/"
         fi
         
         # Copy compressed archives if they exist
@@ -161,7 +153,7 @@ if [ "$CREATE_SEPARATE" = "true" ]; then
         [ -f "offline-packages.tar.gz" ] && cp offline-packages.tar.gz "$TEMP_TOOLS/"
         
         create_archive "spel-tools-${DATE}.tar.gz" "tools archive" \
-            -C "$TEMP_TOOLS" .
+            -p -C "$TEMP_TOOLS" .
     fi
 fi
 
@@ -171,18 +163,7 @@ if [ "$CREATE_COMBINED" = "true" ]; then
     
     COMBINED_EXCLUDES=("${COMMON_EXCLUDES[@]}")
     
-    # Exclude uncompressed mirrors if compressed versions exist
-    if ls mirrors/*/*.tar.gz &>/dev/null 2>&1; then
-        COMBINED_EXCLUDES+=(
-            --exclude='mirrors/*/baseos'
-            --exclude='mirrors/*/appstream'
-            --exclude='mirrors/*/extras'
-            --exclude='mirrors/*/epel'
-        )
-        log_debug "  Using compressed mirrors in combined archive"
-    fi
-    
-    # Exclude large binary files if not needed
+    # Exclude unnecessary files
     COMBINED_EXCLUDES+=(
         --exclude='spel/ansible/roles/*/.git'
         --exclude='vendor/*/.git'
@@ -235,6 +216,6 @@ log_info "Total size: $TOTAL_SIZE"
 log_info ""
 log_info "Next steps:"
 log_info "  1. Verify checksums: sha256sum -c spel-nipr-${DATE}-checksums.txt"
-log_info "  2. Transfer archives to NIPR using approved method"
+log_info "  2. Transfer to NIPR (Note: Mirrors NOT included - use NIPR RPM repos)"
 log_info "  3. Verify checksums on NIPR side"
 log_info "  4. Extract using scripts/extract-nipr-archives.sh"

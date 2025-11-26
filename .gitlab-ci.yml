@@ -10,7 +10,6 @@ variables:
 
 stages:
   - extract      # Extract transferred archives
-  - configure    # Configure local repositories
   - setup
   - validate
   - build
@@ -49,12 +48,23 @@ extract:archives:
     
     - echo "Extraction complete!"
     - echo "Directory structure:"
-    - du -sh mirrors/ offline-packages/ spel/ansible/roles/ tools/ 2>/dev/null || true
+    - |
+      echo "=== Offline Components ==="
+      echo "Python deps: $(du -sh tools/python-deps 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+      echo "Packer Linux: $(du -sh tools/packer/linux_amd64 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+      echo "Packer Windows: $(du -sh tools/packer/windows_amd64 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+      echo "Packer plugins: $(du -sh tools/packer/plugins 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+      echo "Collections: $(du -sh spel/ansible/collections 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+      echo "Roles: $(du -sh spel/ansible/roles 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+      echo "Packages: $(du -sh offline-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+      echo "SPEL packages: $(du -sh spel-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+      echo "========================="
   artifacts:
     paths:
-      - mirrors/
       - offline-packages/
       - spel/ansible/roles/
+      - spel/ansible/collections/
+      - spel-packages/
       - tools/
       - vendor/
     expire_in: 7 days
@@ -64,32 +74,6 @@ extract:archives:
     variables:
       - $EXTRACT_ARCHIVES == "true"
   when: manual
-
-# Configure local repositories
-configure:repos:
-  stage: configure
-  needs: ["extract:archives"]
-  script:
-    - echo "Configuring local YUM/DNF repositories..."
-    - sudo ./scripts/setup-local-repos.sh
-    
-    - echo "Verifying repository configuration..."
-    - sudo dnf repolist --all
-    
-    - echo "Testing repository access..."
-    - sudo dnf makecache
-    
-    - echo "Repository configuration complete!"
-  artifacts:
-    paths:
-      - /etc/yum.repos.d/*.repo
-    expire_in: 7 days
-  tags:
-    - spel-nipr-runner
-  only:
-    variables:
-      - $EXTRACT_ARCHIVES == "true"
-  when: on_success
 
 # Setup job - prepare environment
 setup:

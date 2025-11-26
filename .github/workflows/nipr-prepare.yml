@@ -3,8 +3,28 @@ name: Prepare NIPR Transfer Archives
 on:
   workflow_dispatch:
     inputs:
-      sync_mirrors:
-        description: "Sync YUM/DNF repository mirrors"
+      sync_spel:
+        description: "Sync SPEL custom packages"
+        required: false
+        default: true
+        type: boolean
+      download_packer:
+        description: "Download Packer binaries (Linux + Windows)"
+        required: false
+        default: true
+        type: boolean
+      download_packer_plugins:
+        description: "Download Packer plugins"
+        required: false
+        default: true
+        type: boolean
+      download_ansible:
+        description: "Download Ansible Core and dependencies"
+        required: false
+        default: true
+        type: boolean
+      download_collections:
+        description: "Download Ansible collections"
         required: false
         default: true
         type: boolean
@@ -38,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: fedora:latest
-    timeout-minutes: 480  # 8 hours for large mirror sync
+    timeout-minutes: 90  # 1.5 hours for all downloads including Ansible and Packer plugins
     
     steps:
       - name: Install Git for checkout
@@ -62,19 +82,17 @@ jobs:
             tar \
             gzip \
             findutils \
-            which
+            which \
+            python3.9 \
+            python3-pip \
+            unzip
       
       - name: Set up environment variables
         run: |
           echo "DATE=$(date +%Y%m%d)" >> $GITHUB_ENV
           echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
           
-          # Storage optimization settings
-          echo "SPEL_MIRROR_EXCLUDE_DEBUG=true" >> $GITHUB_ENV
-          echo "SPEL_MIRROR_EXCLUDE_SOURCE=true" >> $GITHUB_ENV
-          echo "SPEL_MIRROR_COMPRESS=true" >> $GITHUB_ENV
-          echo "SPEL_MIRROR_HARDLINK=true" >> $GITHUB_ENV
-          
+          # Storage optimization settings for roles and packages
           echo "SPEL_ROLES_REMOVE_GIT=true" >> $GITHUB_ENV
           echo "SPEL_ROLES_COMPRESS=true" >> $GITHUB_ENV
           
@@ -83,7 +101,14 @@ jobs:
           
           echo "SPEL_ARCHIVE_SEPARATE=true" >> $GITHUB_ENV
           echo "SPEL_ARCHIVE_COMBINED=true" >> $GITHUB_ENV
-          echo "SPEL_ARCHIVE_MIRRORS=true" >> $GITHUB_ENV
+          
+          # Packer configuration
+          echo "SPEL_PACKER_VERSION=1.11.2" >> $GITHUB_ENV
+          echo "SPEL_PACKER_PLATFORMS=linux_amd64 windows_amd64" >> $GITHUB_ENV
+          
+          # Python configuration
+          echo "SPEL_PYTHON_VERSION=3.9" >> $GITHUB_ENV
+          echo "SPEL_ANSIBLE_VERSION=>=2.16.0,<2.19.0" >> $GITHUB_ENV
       
       - name: Display configuration
         run: |
@@ -92,31 +117,105 @@ jobs:
           echo "SPEL Version: $SPEL_VERSION"
           echo ""
           echo "Tasks:"
-          echo "  Sync Mirrors: ${{ github.event.inputs.sync_mirrors }}"
+          echo "  Sync SPEL Packages: ${{ github.event.inputs.sync_spel }}"
+          echo "  Download Packer: ${{ github.event.inputs.download_packer }}"
+          echo "  Download Packer Plugins: ${{ github.event.inputs.download_packer_plugins }}"
+          echo "  Download Ansible Core: ${{ github.event.inputs.download_ansible }}"
+          echo "  Download Ansible Collections: ${{ github.event.inputs.download_collections }}"
           echo "  Vendor Roles: ${{ github.event.inputs.sync_roles }}"
           echo "  Download Packages: ${{ github.event.inputs.sync_packages }}"
           echo "  Create Archives: ${{ github.event.inputs.create_archives }}"
           echo "  Upload Artifacts: ${{ github.event.inputs.upload_artifacts }}"
           echo ""
           echo "Storage Optimization:"
-          echo "  Exclude debug packages: $SPEL_MIRROR_EXCLUDE_DEBUG"
-          echo "  Exclude source packages: $SPEL_MIRROR_EXCLUDE_SOURCE"
-          echo "  Compress repositories: $SPEL_MIRROR_COMPRESS"
           echo "  Remove .git from roles: $SPEL_ROLES_REMOVE_GIT"
-          echo "================================================"
+          echo "  Packer version: $SPEL_PACKER_VERSION"
+          echo "  Packer platforms: $SPEL_PACKER_PLATFORMS"
+          echo "  Python version: $SPEL_PYTHON_VERSION"
+          echo "  Ansible version: $SPEL_ANSIBLE_VERSION"
+          echo ""
+          echo "Note: YUM/DNF mirrors are NOT synced - NIPR has its own RPM repositories"
+          echo "================================================="
       
-      - name: Sync YUM/DNF repository mirrors
-        if: github.event.inputs.sync_mirrors != 'false'
+      - name: Sync SPEL custom packages
+        if: github.event.inputs.sync_spel != 'false'
         run: |
-          echo "=== Syncing YUM/DNF Mirrors with Optimizations ==="
-          ./scripts/sync-mirrors.sh
+          echo "=== Syncing SPEL Custom Packages ==="
+          ./scripts/sync-spel-packages.sh
           
           echo ""
-          echo "Mirror sizes:"
-          du -sh mirrors/*/
+          echo "SPEL packages:"
+          ls -lh mirrors/spel-packages/*.rpm 2>/dev/null || echo "No RPMs found"
           echo ""
-          echo "Total mirror size:"
-          du -sh mirrors/
+          echo "Total SPEL packages size:"
+          du -sh mirrors/spel-packages/
+      
+      - name: Download Packer binaries
+        if: github.event.inputs.download_packer != 'false'
+        run: |
+          echo "=== Downloading Packer Binaries (Multi-Platform) ==="
+          ./scripts/download-packer.sh
+          
+          echo ""
+          echo "Packer binaries:"
+          ls -lh tools/packer/*/packer* 2>/dev/null || echo "No binaries found"
+          echo ""
+          echo "Linux Packer version:"
+          ./tools/packer/linux_amd64/packer version
+      
+      - name: Download Packer plugins
+        if: github.event.inputs.download_packer_plugins != 'false'
+        run: |
+          echo "=== Downloading Packer Plugins ==="
+          ./scripts/download-packer-plugins.sh
+          
+          echo ""
+          echo "Plugin files:"
+          find tools/packer/plugins -name "packer-plugin-*" -type f 2>/dev/null | head -10
+          echo ""
+          echo "Total plugins size:"
+          du -sh tools/packer/plugins/
+      
+      - name: Verify Packer plugins
+        if: github.event.inputs.download_packer_plugins != 'false'
+        run: |
+          echo "=== Verifying Packer Plugins ==="
+          export PACKER_PLUGIN_PATH="${PWD}/tools/packer/plugins"
+          
+          if ./tools/packer/linux_amd64/packer plugins installed; then
+            echo ""
+            echo "✓ Packer plugins verification successful"
+          else
+            echo ""
+            echo "⚠ Warning: Packer plugin verification failed, but continuing..."
+            echo "Plugins are already downloaded and checksummed."
+          fi
+      
+      - name: Download Ansible Core and dependencies
+        if: github.event.inputs.download_ansible != 'false'
+        run: |
+          echo "=== Downloading Ansible Core and Dependencies ==="
+          ./scripts/download-ansible-core.sh
+          
+          echo ""
+          echo "Python wheels:"
+          ls -1 tools/python-deps/*.whl 2>/dev/null | wc -l | xargs echo "  Total wheels:"
+          echo ""
+          echo "Total Python deps size:"
+          du -sh tools/python-deps/
+      
+      - name: Download Ansible collections
+        if: github.event.inputs.download_collections != 'false'
+        run: |
+          echo "=== Downloading Ansible Collections ==="
+          ./scripts/vendor-ansible-collections.sh
+          
+          echo ""
+          echo "Collection tarballs:"
+          ls -lh spel/ansible/collections/*.tar.gz 2>/dev/null || echo "No collections found"
+          echo ""
+          echo "Total collections size:"
+          du -sh spel/ansible/collections/
       
       - name: Vendor Ansible roles
         if: github.event.inputs.sync_roles != 'false'
@@ -206,20 +305,29 @@ jobs:
           3. Transfer spel-nipr-${DATE}-checksums.txt for verification
           4. On NIPR: verify checksums again after transfer
           5. On NIPR: run ./scripts/extract-nipr-archives.sh
-          6. On NIPR: run sudo ./scripts/setup-local-repos.sh
+          6. On NIPR: configure to use NIPR RPM repositories (no local mirrors needed)
           
           Storage Optimization Applied
           ----------------------------
-          - Excluded debug/source packages from mirrors (saves ~70%)
           - Removed .git directories from Ansible roles (saves ~80%)
           - Used single SSM agent for EL8/EL9 (saves ~25%)
-          - Created compressed archives (saves ~60% transfer size)
+          - Created compressed archives
           
           Expected Sizes
           --------------
-          - Mirrors (optimized): 30-50 GB
-          - Compressed transfer: 12-20 GB
-          - Total reduction: ~70% vs unoptimized
+          - Ansible Roles: ~60 MB
+          - Ansible Collections: ~30 MB
+          - Ansible Core (Python wheels): ~100 MB
+          - Offline Packages: ~75 MB
+          - SPEL Packages: ~20 MB
+          - Packer Binaries (Linux + Windows): ~500 MB
+          - Packer Plugins: ~80 MB
+          - Build Scripts: ~100 MB
+          - Total uncompressed: ~2-3 GB
+          - Compressed transfer: ~2-2.5 GB
+          
+          Note: YUM/DNF mirrors are NOT included - NIPR environment
+                uses its own RPM repositories
           MANIFEST_EOF
           
           echo "=== Transfer Manifest ==="
@@ -237,6 +345,18 @@ jobs:
           echo ""
           echo "Total archive size:"
           du -ch spel-*.tar.gz 2>/dev/null | tail -1 | awk '{print "  " $1}' || echo "  N/A"
+          echo ""
+          echo "Contents:"
+          echo "  - Ansible roles (vendored)"
+          echo "  - Ansible collections (ansible.windows, community.windows)"
+          echo "  - Ansible Core with Python dependencies"
+          echo "  - Offline packages (AWS CLI, SSM Agent, CFN Bootstrap)"
+          echo "  - SPEL custom packages"
+          echo "  - Packer binaries (Linux + Windows v$SPEL_PACKER_VERSION)"
+          echo "  - Packer plugins (all required for SPEL builds)"
+          echo "  - Build scripts and configurations"
+          echo ""
+          echo "Note: YUM/DNF mirrors NOT included - use NIPR RPM repositories"
           echo ""
           echo "Files ready for transfer:"
           echo "  - spel-nipr-${DATE}-checksums.txt (verification)"
@@ -297,10 +417,10 @@ jobs:
           
           echo "### Storage Optimization" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Excluded debug/source packages (saves ~70%)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Removed git history from roles (saves ~80%)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Single SSM agent for EL8/EL9 (saves ~25%)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Compressed archives (saves ~60% transfer)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Compressed archives" >> $GITHUB_STEP_SUMMARY
+          echo "- ℹ️  YUM/DNF mirrors NOT included - NIPR uses its own RPM repositories" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY

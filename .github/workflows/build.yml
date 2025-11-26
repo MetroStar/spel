@@ -123,19 +123,33 @@ jobs:
             # Verify offline mode files exist
             echo ""
             echo "Verifying offline mode setup..."
-            if [ -f "mirrors/el9/repodata/repomd.xml" ]; then
-              echo "✓ Mirrors extracted successfully"
-              du -sh mirrors/
-            else
-              echo "✗ Mirror metadata not found"
-              exit 1
-            fi
             
             if [ -d "spel/ansible/roles" ] && [ -n "$(ls -A spel/ansible/roles 2>/dev/null)" ]; then
               echo "✓ Ansible roles extracted successfully"
               du -sh spel/ansible/roles/
             else
               echo "⚠ Ansible roles directory empty or missing"
+            fi
+            
+            if [ -d "tools/python-deps" ] && [ -n "$(ls -A tools/python-deps 2>/dev/null)" ]; then
+              echo "✓ Python dependencies extracted successfully"
+              du -sh tools/python-deps/
+            else
+              echo "⚠ Python dependencies directory empty or missing"
+            fi
+            
+            if [ -d "tools/packer/linux_amd64" ] && [ -f "tools/packer/linux_amd64/packer" ]; then
+              echo "✓ Packer binary extracted successfully"
+              tools/packer/linux_amd64/packer version
+            else
+              echo "⚠ Packer binary missing"
+            fi
+            
+            if [ -d "spel/ansible/collections/ansible_collections" ]; then
+              echo "✓ Ansible collections extracted successfully"
+              du -sh spel/ansible/collections/
+            else
+              echo "⚠ Ansible collections directory empty or missing"
             fi
             
             if [ -d "offline-packages" ] && [ -n "$(ls -A offline-packages 2>/dev/null)" ]; then
@@ -171,16 +185,19 @@ jobs:
           echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
           
           # Detect offline mode (for local testing with network isolation)
-          if [ -f "mirrors/el9/repodata/repomd.xml" ] || [ -f "offline-packages/awscli-exe-linux-x86_64.zip" ]; then
+          if [ -f "offline-packages/awscli-exe-linux-x86_64.zip" ] || [ -d "tools/python-deps" ] || [ -d "spel/ansible/collections/ansible_collections" ]; then
             echo "SPEL_OFFLINE_MODE=true" >> $GITHUB_ENV
             echo "✓ Detected offline mode - using vendored packages"
             
             # Display offline mode info
             echo ""
             echo "=== Offline Mode Active ==="
-            echo "Mirrors: $(du -sh mirrors 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+            echo "Python deps: $(du -sh tools/python-deps 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+            echo "Packer: $(tools/packer/linux_amd64/packer version 2>/dev/null | head -1 || echo 'N/A')"
+            echo "Collections: $(du -sh spel/ansible/collections 2>/dev/null | awk '{print $1}' || echo 'N/A')"
             echo "Roles: $(du -sh spel/ansible/roles 2>/dev/null | awk '{print $1}' || echo 'N/A')"
             echo "Packages: $(du -sh offline-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
+            echo "SPEL packages: $(du -sh spel-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
             echo "==========================="
             echo ""
           else
