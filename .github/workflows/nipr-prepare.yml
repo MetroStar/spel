@@ -50,6 +50,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             dnf \
+            dnf-plugins-core \
             createrepo-c \
             hardlink \
             wget \
