@@ -208,6 +208,10 @@ jobs:
         if: github.event.inputs.download_collections != 'false'
         run: |
           echo "=== Downloading Ansible Collections ==="
+          
+          # Install ansible-core temporarily for ansible-galaxy command
+          pip3.9 install --user "ansible-core>=2.14.0,<2.16.0"
+          
           ./scripts/vendor-ansible-collections.sh
           
           echo ""
