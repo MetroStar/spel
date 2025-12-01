@@ -67,7 +67,15 @@ mkdir -p "$ROLES_DIR" || {
 }
 log_debug "✓ Roles directory created successfully"
 
+# Check bash version (associative arrays require bash 4.0+)
+log_debug "Bash version: ${BASH_VERSION}"
+if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+    log_error "This script requires bash 4.0 or higher (found ${BASH_VERSION})"
+    exit 1
+fi
+
 # Define roles to vendor
+log_debug "Defining roles to vendor..."
 declare -A ROLES=(
     ["RHEL8-STIG"]="https://github.com/ansible-lockdown/RHEL8-STIG.git"
     ["RHEL9-STIG"]="https://github.com/ansible-lockdown/RHEL9-STIG.git"
