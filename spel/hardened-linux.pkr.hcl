@@ -1009,8 +1009,7 @@ build {
     pause_before         = "30s"
     timeout              = "30m"
     only                 = ["amazon-ebs.hardened-windows-2016-hvm"]
-    galaxy_file          = "${path.root}/../requirements.yml"
-    galaxy_force_install = true
+    roles_path           = "${path.root}/ansible/roles"
     playbook_file        = "${path.root}/ansible/windows-2016-stig-playbook.yml"
     use_proxy            = false
     user = "TempPackerUser"
@@ -1024,8 +1023,7 @@ build {
     pause_before = "30s"
     timeout      = "30m"
     only = ["amazon-ebs.hardened-windows-2019-hvm"]
-    galaxy_file = "${path.root}/../requirements.yml"
-    galaxy_force_install = true
+    roles_path = "${path.root}/ansible/roles"
     playbook_file = "${path.root}/ansible/windows-2019-stig-playbook.yml"
     use_proxy     = false
     user = "TempPackerUser"
@@ -1039,8 +1037,7 @@ build {
     pause_before = "30s"
     timeout      = "30m"
     only = ["amazon-ebs.hardened-windows-2022-hvm"]
-    galaxy_file = "${path.root}/../requirements.yml"
-    galaxy_force_install = true
+    roles_path = "${path.root}/ansible/roles"
     playbook_file = "${path.root}/ansible/windows-2022-stig-playbook.yml"
     use_proxy     = false
     user = "TempPackerUser"
