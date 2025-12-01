@@ -18,7 +18,7 @@ TOOLS_DIR="${SCRIPT_DIR}/../tools/python-deps"
 
 # Configuration
 PYTHON_VERSION="${SPEL_PYTHON_VERSION:-3.9}"
-ANSIBLE_VERSION="${SPEL_ANSIBLE_VERSION:->=2.16.0,<2.19.0}"
+ANSIBLE_VERSION="${SPEL_ANSIBLE_VERSION:->=2.14.0,<2.16.0}"  # 2.14.x and 2.15.x support Python 3.9
 
 # Colors for output
 RED='\033[0;31m'

@@ -108,7 +108,7 @@ jobs:
           
           # Python configuration
           echo "SPEL_PYTHON_VERSION=3.9" >> $GITHUB_ENV
-          echo "SPEL_ANSIBLE_VERSION=>=2.16.0,<2.19.0" >> $GITHUB_ENV
+          echo "SPEL_ANSIBLE_VERSION=>=2.14.0,<2.16.0" >> $GITHUB_ENV
       
       - name: Display configuration
         run: |
