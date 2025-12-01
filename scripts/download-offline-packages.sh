@@ -11,7 +11,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OFFLINE_DIR="${SCRIPT_DIR}/../offline-packages"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+OFFLINE_DIR="${REPO_ROOT}/offline-packages"
 
 # Configuration
 COMPRESS="${SPEL_OFFLINE_COMPRESS:-true}"
