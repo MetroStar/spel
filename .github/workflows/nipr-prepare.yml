@@ -145,7 +145,7 @@ jobs:
           
           echo ""
           echo "SPEL packages:"
-          ls -lh mirrors/spel-packages/*.rpm 2>/dev/null || echo "No RPMs found"
+          find mirrors/spel-packages -name "*.rpm" -exec ls -lh {} \; 2>/dev/null || echo "No RPMs found"
           echo ""
           echo "Total SPEL packages size:"
           du -sh mirrors/spel-packages/

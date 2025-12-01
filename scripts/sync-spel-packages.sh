@@ -41,41 +41,29 @@ mkdir -p "$MIRROR_BASE"
 log_info "Downloading SPEL release packages..."
 
 # Download spel-release packages
-wget -N -P "$MIRROR_BASE" \
-    "${SPEL_REPO_BASE}/spel-release-latest-8.noarch.rpm" \
-    "${SPEL_REPO_BASE}/spel-release-latest-9.noarch.rpm" \
-    || log_warn "Failed to download some spel-release packages"
+DOWNLOAD_SUCCESS=0
+for rpm in "spel-release-latest-8.noarch.rpm" "spel-release-latest-9.noarch.rpm"; do
+    if wget -nv -N -P "$MIRROR_BASE" "${SPEL_REPO_BASE}/${rpm}"; then
+        log_info "Downloaded: $rpm"
+        DOWNLOAD_SUCCESS=1
+    else
+        log_warn "Failed to download: $rpm"
+    fi
+done
 
-# Get list of packages from the repository
-log_info "Fetching package list from SPEL repository..."
-
-# Download repodata to discover available packages
-mkdir -p "${MIRROR_BASE}/repodata"
-wget -N -P "${MIRROR_BASE}/repodata" \
-    "${SPEL_REPO_BASE}/repodata/repomd.xml" \
-    || log_error "Failed to download repomd.xml"
-
-# Extract primary.xml location from repomd.xml
-PRIMARY_XML=$(grep -A2 'type="primary"' "${MIRROR_BASE}/repodata/repomd.xml" | \
-    grep 'location href' | sed 's/.*href="//;s/".*//')
-
-if [ -n "$PRIMARY_XML" ]; then
-    log_info "Downloading primary package metadata..."
-    wget -N -P "${MIRROR_BASE}" \
-        "${SPEL_REPO_BASE}/${PRIMARY_XML}" \
-        || log_warn "Failed to download primary.xml"
-    
-    # Extract package URLs from primary XML (simplified - adjust based on actual format)
-    # This downloads all current packages - uncomment if you want full mirror
-    # gunzip -c "${MIRROR_BASE}/${PRIMARY_XML}" | \
-    #     grep -oP 'location href="\K[^"]+' | \
-    #     while read -r pkg; do
-    #         wget -N -P "$MIRROR_BASE" "${SPEL_REPO_BASE}/${pkg}"
-    #     done
+if [ $DOWNLOAD_SUCCESS -eq 0 ]; then
+    log_error "Failed to download any SPEL release packages"
+    log_error "This may indicate the repository is unavailable or the URL has changed"
+    log_error "Repository: $SPEL_REPO_BASE"
+    exit 1
 fi
 
+# Create local repository metadata from downloaded packages
 log_info "Creating repository metadata..."
-createrepo_c --update "$MIRROR_BASE" || log_error "Failed to create repository metadata"
+if ! createrepo_c "$MIRROR_BASE"; then
+    log_error "Failed to create repository metadata"
+    exit 1
+fi
 
 # Calculate total size
 TOTAL_SIZE=$(du -sh "$MIRROR_BASE" | awk '{print $1}')
