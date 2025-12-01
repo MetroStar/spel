@@ -74,10 +74,13 @@ jobs:
 
       - name: Download NIPR artifacts for offline mode
         if: github.event.inputs.offline_mode == 'true'
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v6
         with:
           name: ${{ github.event.inputs.nipr_artifact_name }}
           path: ./nipr-artifacts/
+          workflow: nipr-prepare.yml
+          workflow_conclusion: success
+          search_artifacts: true
         continue-on-error: true
 
       - name: Setup offline environment
