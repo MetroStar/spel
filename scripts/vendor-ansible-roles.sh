@@ -60,7 +60,12 @@ log_debug "  Remove .git directories: $REMOVE_GIT"
 log_debug "  Create compressed archive: $COMPRESS"
 log_debug "  Specific tag: ${SPECIFIC_TAG:-latest}"
 
-mkdir -p "$ROLES_DIR"
+log_debug "Creating roles directory: $ROLES_DIR"
+mkdir -p "$ROLES_DIR" || {
+    log_error "Failed to create roles directory: $ROLES_DIR"
+    exit 1
+}
+log_debug "✓ Roles directory created successfully"
 
 # Define roles to vendor
 declare -A ROLES=(
