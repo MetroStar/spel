@@ -82,9 +82,18 @@ create_archive() {
     
     log_info "Creating $description..."
     
-    if tar czf "${OUTPUT_DIR}/${archive_name}" \
+    # Create temporary directory for archive creation
+    local temp_archive_dir=$(mktemp -d)
+    local temp_archive="${temp_archive_dir}/${archive_name}"
+    
+    # Create archive in temp location to avoid "file changed as we read it" error
+    if tar czf "${temp_archive}" \
         "${COMMON_EXCLUDES[@]}" \
         "${include_patterns[@]}"; then
+        
+        # Move archive to final destination
+        mv "${temp_archive}" "${OUTPUT_DIR}/${archive_name}"
+        rm -rf "$temp_archive_dir"
         
         local size=$(du -h "${OUTPUT_DIR}/${archive_name}" | awk '{print $1}')
         log_info "  Created: ${archive_name} ($size)"
@@ -96,6 +105,7 @@ create_archive() {
         return 0
     else
         log_error "  Failed to create ${archive_name}"
+        rm -rf "$temp_archive_dir"
         return 1
     fi
 }
