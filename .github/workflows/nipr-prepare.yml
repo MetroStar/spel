@@ -227,6 +227,7 @@ jobs:
       
       - name: Vendor Ansible roles
         if: github.event.inputs.sync_roles != 'false'
+        shell: bash
         run: |
           echo "=== Vendoring Ansible Roles ==="
           
