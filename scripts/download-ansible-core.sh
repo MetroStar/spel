@@ -18,8 +18,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_DIR="${SCRIPT_DIR}/../tools/python-deps"
 
 # Configuration
-PYTHON_VERSION="${SPEL_PYTHON_VERSION:-3.9}"
-ANSIBLE_VERSION="${SPEL_ANSIBLE_VERSION:->=2.14.0,<2.16.0}"  # 2.14.x and 2.15.x support Python 3.9
+PYTHON_VERSION="${SPEL_PYTHON_VERSION:-3.12}"
+ANSIBLE_VERSION="${SPEL_ANSIBLE_VERSION:->=2.14.0,<2.16.0}"  # 2.14.x and 2.15.x support Python 3.9+
 
 # Colors for output
 RED='\033[0;31m'
@@ -88,12 +88,13 @@ done
 # This will get pure-Python wheels where available and platform-specific where needed
 log_info "Downloading Python wheels..."
 
+# Download for the specified Python version (defaults to 3.12 for GitHub Actions compatibility)
+# This will download all dependencies including lxml with proper binary wheels
 if pip download \
     --dest "$TOOLS_DIR" \
     --python-version "$PYTHON_VERSION" \
     --platform manylinux2014_x86_64 \
     --implementation cp \
-    --abi cp39 \
     --only-binary=:all: \
     "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download.log; then
     
