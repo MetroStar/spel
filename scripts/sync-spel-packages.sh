@@ -7,7 +7,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MIRROR_BASE="${SCRIPT_DIR}/../mirrors/spel-packages"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+MIRROR_BASE="${REPO_ROOT}/mirrors/spel-packages"
 SPEL_REPO_BASE="https://spel-packages.cloudarmor.io/spel-packages/repo"
 
 # Colors for output
