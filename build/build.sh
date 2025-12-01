@@ -2,6 +2,9 @@
 # Do not use `set -e`, as we handle the errexit in the script
 set -u -o pipefail
 
+# Default PUBLIC to true if not set (used for AMI quota management)
+PUBLIC="${PUBLIC:-true}"
+
 # Ensure required environment variables are set
 : "${AWS_COMMERCIAL_ACCESS_KEY_ID:?}"
 : "${AWS_COMMERCIAL_SECRET_ACCESS_KEY:?}"

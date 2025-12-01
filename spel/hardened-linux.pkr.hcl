@@ -50,7 +50,7 @@ packer {
 variable "aws_ami_groups" {
   description = "List of groups that have access to launch the resulting AMIs. Keyword `all` will make the AMIs publicly accessible"
   type        = list(string)
-  default     = []
+  default     = ["all"]
 }
 
 variable "aws_ami_regions" {
