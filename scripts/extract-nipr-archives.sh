@@ -214,8 +214,8 @@ else
     ((ERRORS++))
 fi
 
-# Check for scripts
-if [ -f "${REPO_ROOT}/scripts/sync-mirrors.sh" ]; then
+# Check for scripts (sync-mirrors.sh was removed - NIPR has its own repos)
+if [ -f "${REPO_ROOT}/scripts/extract-nipr-archives.sh" ]; then
     log_debug "  ✓ Scripts found"
 else
     log_error "  ✗ Scripts missing!"
