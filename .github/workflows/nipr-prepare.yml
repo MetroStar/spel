@@ -85,7 +85,8 @@ jobs:
             which \
             python3.9 \
             python3-pip \
-            unzip
+            unzip \
+            bash
       
       - name: Set up environment variables
         run: |
@@ -236,6 +237,9 @@ jobs:
           
           # Ensure ansible-galaxy is in PATH (needed for potential dependencies)
           export PATH="$HOME/.local/bin:$PATH"
+          
+          # Enable debug mode to see where it fails
+          set -x
           
           ./scripts/vendor-ansible-roles.sh
           
