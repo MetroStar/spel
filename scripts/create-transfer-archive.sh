@@ -105,12 +105,17 @@ if [ "$CREATE_SEPARATE" = "true" ]; then
     log_info "Creating separate component archives..."
     
     # 1. Base archive (code, scripts, configs)
+    log_info "Creating base archive..."
     create_archive "spel-base-${DATE}.tar.gz" "base archive" \
         --exclude='offline-packages/*.zip' \
         --exclude='offline-packages/*.tar.gz' \
         --exclude='offline-packages/*.rpm' \
         --exclude='spel/ansible/roles/*/.git' \
         --exclude='vendor/*/.git' \
+        --exclude='spel-*.tar.gz' \
+        --exclude='spel-*.tar.gz.sha256' \
+        --exclude='*.tar.gz' \
+        --exclude='*.tar.gz.sha256' \
         .
     
     # 2. Tools archive (if tools exist)
