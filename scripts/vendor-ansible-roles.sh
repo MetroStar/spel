@@ -88,8 +88,10 @@ log_debug "✓ Defined ${#ROLES[@]} roles"
 TOTAL_ROLES=${#ROLES[@]}
 CURRENT=0
 
+log_info "Starting to clone ${TOTAL_ROLES} roles..."
+
 for role_name in "${!ROLES[@]}"; do
-    ((CURRENT++))
+    CURRENT=$((CURRENT + 1))
     role_url="${ROLES[$role_name]}"
     role_path="${ROLES_DIR}/${role_name}"
     
