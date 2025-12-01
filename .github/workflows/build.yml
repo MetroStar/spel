@@ -254,6 +254,9 @@ jobs:
           echo "AWS_GOVCLOUD_ACCESS_KEY_ID=${{ secrets.AWS_GOVCLOUD_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "AWS_GOVCLOUD_SECRET_ACCESS_KEY=${{ secrets.AWS_GOVCLOUD_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
 
+          # Set PUBLIC=true to enable AMI quota management for public AMIs
+          echo "PUBLIC=true" >> $GITHUB_ENV
+
       - name: Initialize Git Submodules
         if: github.event.inputs.offline_mode != 'true'
         run: |
