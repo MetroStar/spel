@@ -20,6 +20,11 @@ REMOVE_GIT="${SPEL_ROLES_REMOVE_GIT:-true}"
 COMPRESS="${SPEL_ROLES_COMPRESS:-true}"
 SPECIFIC_TAG="${SPEL_ROLES_TAG:-}"  # Set to specific tag/version if needed
 
+# Handle "latest" keyword - empty string means latest default branch
+if [ "$SPECIFIC_TAG" = "latest" ]; then
+    SPECIFIC_TAG=""
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

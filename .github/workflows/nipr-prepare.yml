@@ -229,6 +229,10 @@ jobs:
         if: github.event.inputs.sync_roles != 'false'
         run: |
           echo "=== Vendoring Ansible Roles ==="
+          
+          # Ensure ansible-galaxy is in PATH (needed for potential dependencies)
+          export PATH="$HOME/.local/bin:$PATH"
+          
           ./scripts/vendor-ansible-roles.sh
           
           echo ""
