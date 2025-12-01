@@ -211,8 +211,8 @@ jobs:
           echo "=== Downloading Ansible Collections ==="
           
           # Install ansible-core temporarily for ansible-galaxy command
-          # Use Python 3.12 to match the wheels we're downloading
-          python3.12 -m pip install --user "ansible-core>=2.14.0,<2.16.0"
+          # Use pip3 (installed via python3-pip package) which works with Python 3.12
+          pip3 install --user "ansible-core>=2.14.0,<2.16.0"
           
           # Ensure ansible-galaxy is in PATH
           export PATH="$HOME/.local/bin:$PATH"
