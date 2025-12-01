@@ -5,7 +5,8 @@
 #
 # This script downloads:
 # - ansible-core (>=2.16.0, <2.19.0)
-# - Python dependencies: pywinrm, requests, passlib, lxml, xmltodict, jmespath
+# - Python dependencies: pywinrm, requests, requests-ntlm, passlib, lxml, xmltodict, jmespath
+# - Test dependencies: distro, pytest, pytest-logger, pytest-testinfra
 #
 # Uses combined approach:
 # - Pure-Python wheels where available (--only-binary=:none:)
@@ -67,10 +68,15 @@ PACKAGES=(
     "ansible-core${ANSIBLE_VERSION}"
     "pywinrm>=0.4.3"
     "requests>=2.31.0"
+    "requests-ntlm>=1.2.0"
     "passlib>=1.7.4"
     "lxml>=4.9.0"
     "xmltodict>=0.13.0"
     "jmespath>=1.0.1"
+    "distro>=1.8.0"
+    "pytest>=7.4.0"
+    "pytest-logger>=0.5.1"
+    "pytest-testinfra>=9.0.0"
 )
 
 log_info "Packages to download:"
@@ -187,6 +193,10 @@ requests:
   Purpose: HTTP library for Python
   Required for: Ansible modules, AWS API calls
 
+requests-ntlm:
+  Purpose: NTLM authentication handler for requests
+  Required for: Windows WinRM authentication
+
 passlib:
   Purpose: Password hashing library
   Required for: Ansible user management modules
@@ -202,6 +212,22 @@ xmltodict:
 jmespath:
   Purpose: JSON query language
   Required for: Ansible filters and AWS API response processing
+
+distro:
+  Purpose: Linux distribution detection
+  Required for: Build scripts and system detection
+
+pytest:
+  Purpose: Python testing framework
+  Required for: Running test suites
+
+pytest-logger:
+  Purpose: Pytest logging plugin
+  Required for: Test logging
+
+pytest-testinfra:
+  Purpose: Infrastructure testing framework
+  Required for: AMI validation tests
 EOF
 
 log_info "Version manifest created: ${VERSION_FILE}"
