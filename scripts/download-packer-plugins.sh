@@ -16,6 +16,19 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PLUGINS_DIR="${REPO_ROOT}/tools/packer/plugins"
 PACKER_CONFIG_DIR="${HOME}/.config/packer/plugins"
 
+# Detect Packer binary (prefer local install, fall back to system)
+if [ -x "${REPO_ROOT}/tools/packer/linux_amd64/packer" ]; then
+    PACKER_BIN="${REPO_ROOT}/tools/packer/linux_amd64/packer"
+    log_info() { echo -e "\033[0;32m[INFO]\033[0m $1"; }
+    log_info "Using local Packer binary: ${PACKER_BIN}"
+elif command -v packer &> /dev/null; then
+    PACKER_BIN="packer"
+else
+    echo -e "\033[0;31m[ERROR]\033[0m packer is required but not installed"
+    echo -e "\033[0;31m[ERROR]\033[0m Run ./scripts/download-packer.sh first"
+    exit 1
+fi
+
 # Configuration
 PACKER_TEMPLATES=(
     "${REPO_ROOT}/spel/minimal-linux.pkr.hcl"
@@ -45,17 +58,8 @@ log_debug() {
     echo -e "${BLUE}[DEBUG]${NC} $1"
 }
 
-# Check for required commands
-for cmd in packer; do
-    if ! command -v "$cmd" &> /dev/null; then
-        log_error "$cmd is required but not installed"
-        log_error "Run ./scripts/download-packer.sh first"
-        exit 1
-    fi
-done
-
 log_info "Packer plugins download configuration:"
-log_debug "  Packer version: $(packer version | head -1)"
+log_debug "  Packer version: $(${PACKER_BIN} version | head -1)"
 log_debug "  Templates to process: ${#PACKER_TEMPLATES[@]}"
 log_debug "  Source: ${PACKER_CONFIG_DIR}"
 log_debug "  Target: ${PLUGINS_DIR}"
@@ -72,7 +76,7 @@ for template in "${PACKER_TEMPLATES[@]}"; do
     template_name=$(basename "$template")
     log_info "Processing ${template_name}..."
     
-    if packer init "$template" 2>&1 | tee "/tmp/packer-init-${template_name}.log"; then
+    if ${PACKER_BIN} init "$template" 2>&1 | tee "/tmp/packer-init-${template_name}.log"; then
         log_info "  ✓ Plugins initialized for ${template_name}"
     else
         log_error "  ✗ Failed to initialize plugins for ${template_name}"
