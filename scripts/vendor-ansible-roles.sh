@@ -93,18 +93,20 @@ for role_name in "${!ROLES[@]}"; do
     
     if [ -n "$SPECIFIC_TAG" ]; then
         # Clone specific tag/branch
+        log_debug "  Using specific tag/branch: $SPECIFIC_TAG"
         if ! git clone --depth 1 --branch "$SPECIFIC_TAG" --single-branch \
-            "$role_url" "$role_path"; then
+            "$role_url" "$role_path" 2>&1; then
             log_warn "  Failed to clone tag $SPECIFIC_TAG, trying latest..."
-            git clone --depth 1 "$role_url" "$role_path" || {
-                log_error "  Failed to clone $role_name"
+            if ! git clone --depth 1 "$role_url" "$role_path" 2>&1; then
+                log_error "  Failed to clone $role_name from $role_url"
                 continue
-            }
+            fi
         fi
     else
         # Clone latest
-        if ! git clone --depth 1 "$role_url" "$role_path"; then
-            log_error "  Failed to clone $role_name"
+        log_debug "  Cloning latest default branch"
+        if ! git clone --depth 1 "$role_url" "$role_path" 2>&1; then
+            log_error "  Failed to clone $role_name from $role_url"
             continue
         fi
     fi

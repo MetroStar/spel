@@ -230,6 +230,9 @@ jobs:
         run: |
           echo "=== Vendoring Ansible Roles ==="
           
+          # Configure git for safe directory (needed in GitHub Actions containers)
+          git config --global --add safe.directory '*'
+          
           # Ensure ansible-galaxy is in PATH (needed for potential dependencies)
           export PATH="$HOME/.local/bin:$PATH"
           
