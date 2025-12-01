@@ -210,7 +210,11 @@ jobs:
           echo "=== Downloading Ansible Collections ==="
           
           # Install ansible-core temporarily for ansible-galaxy command
-          python3.9 -m pip install --user "ansible-core>=2.14.0,<2.16.0"
+          # Use python3-pip package's pip3 instead of python3.9 -m pip
+          pip3 install --user "ansible-core>=2.14.0,<2.16.0"
+          
+          # Ensure ansible-galaxy is in PATH
+          export PATH="$HOME/.local/bin:$PATH"
           
           ./scripts/vendor-ansible-collections.sh
           
