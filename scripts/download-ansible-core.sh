@@ -88,6 +88,7 @@ if pip download \
     --platform manylinux2014_x86_64 \
     --implementation cp \
     --abi cp39 \
+    --only-binary=:all: \
     "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download.log; then
     
     log_info "  ✓ Wheels downloaded successfully"
