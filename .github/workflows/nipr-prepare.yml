@@ -166,6 +166,8 @@ jobs:
       
       - name: Download Packer plugins
         if: github.event.inputs.download_packer_plugins != 'false'
+        env:
+          PACKER_GITHUB_API_TOKEN: ${{ secrets.PACKER_GITHUB_API_TOKEN }}
         run: |
           echo "=== Downloading Packer Plugins ==="
           ./scripts/download-packer-plugins.sh
