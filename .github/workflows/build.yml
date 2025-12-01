@@ -255,6 +255,7 @@ jobs:
           echo "AWS_GOVCLOUD_SECRET_ACCESS_KEY=${{ secrets.AWS_GOVCLOUD_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
 
       - name: Initialize Git Submodules
+        if: github.event.inputs.offline_mode != 'true'
         run: |
           git submodule update --init --recursive
 
