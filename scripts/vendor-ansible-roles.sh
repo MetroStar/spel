@@ -76,14 +76,14 @@ fi
 
 # Define roles to vendor
 log_debug "Defining roles to vendor..."
-declare -A ROLES=(
-    ["RHEL8-STIG"]="https://github.com/ansible-lockdown/RHEL8-STIG.git"
-    ["RHEL9-STIG"]="https://github.com/ansible-lockdown/RHEL9-STIG.git"
-    ["AMAZON2023-CIS"]="https://github.com/ansible-lockdown/AMAZON2023-CIS.git"
-    ["Windows-2016-STIG"]="https://github.com/ansible-lockdown/Windows-2016-STIG.git"
-    ["Windows-2019-STIG"]="https://github.com/ansible-lockdown/Windows-2019-STIG.git"
-    ["Windows-2022-STIG"]="https://github.com/ansible-lockdown/Windows-2022-STIG.git"
-)
+declare -A ROLES
+ROLES["RHEL8-STIG"]="https://github.com/ansible-lockdown/RHEL8-STIG.git"
+ROLES["RHEL9-STIG"]="https://github.com/ansible-lockdown/RHEL9-STIG.git"
+ROLES["AMAZON2023-CIS"]="https://github.com/ansible-lockdown/AMAZON2023-CIS.git"
+ROLES["Windows-2016-STIG"]="https://github.com/ansible-lockdown/Windows-2016-STIG.git"
+ROLES["Windows-2019-STIG"]="https://github.com/ansible-lockdown/Windows-2019-STIG.git"
+ROLES["Windows-2022-STIG"]="https://github.com/ansible-lockdown/Windows-2022-STIG.git"
+log_debug "✓ Defined ${#ROLES[@]} roles"
 
 TOTAL_ROLES=${#ROLES[@]}
 CURRENT=0
