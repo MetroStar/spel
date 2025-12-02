@@ -135,8 +135,8 @@ install_ansible_collections() {
         if [ -d "${REPO_ROOT}/spel/ansible/collections" ] && ls "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz 1> /dev/null 2>&1; then
             for tarball in "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz; do
                 log_info "Installing $(basename "$tarball")..."
-                ansible-galaxy collection install "$tarball" --force || \
-                    log_warn "Failed to install $(basename "$tarball")"
+                # Filter out dependency version warnings - we only need the collections we're explicitly installing
+                ansible-galaxy collection install "$tarball" --force 2>&1 | grep -v "does not support Ansible version" || true
             done
             log_info "Ansible collections installed from vendored tarballs"
         else
@@ -146,12 +146,9 @@ install_ansible_collections() {
     else
         # Online mode - download specific versions from Galaxy
         log_info "Installing Ansible collections from Galaxy..."
-        ansible-galaxy collection install ansible.windows:1.14.0 --force || \
-            log_warn "Failed to install ansible.windows"
-        ansible-galaxy collection install community.windows:1.13.0 --force || \
-            log_warn "Failed to install community.windows"
-        ansible-galaxy collection install community.general:7.5.0 --force || \
-            log_warn "Failed to install community.general"
+        ansible-galaxy collection install ansible.windows:1.14.0 --force 2>&1 | grep -v "does not support Ansible version" || true
+        ansible-galaxy collection install community.windows:1.13.0 --force 2>&1 | grep -v "does not support Ansible version" || true
+        ansible-galaxy collection install community.general:7.5.0 --force 2>&1 | grep -v "does not support Ansible version" || true
         log_info "Ansible collections installed from Galaxy"
     fi
 }
