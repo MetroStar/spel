@@ -12,11 +12,11 @@ The NIPR transfer workflow is split across two CI/CD systems:
 ```
 Internet System (GitHub)          NIPR System (GitLab)
 ┌─────────────────────┐          ┌──────────────────────┐
-│ 1. Sync Mirrors     │          │ 7. Extract Archives  │
-│ 2. Vendor Roles     │          │ 8. Configure Repos   │
-│ 3. Download Pkgs    │   -->    │ 9. Setup Environment │
-│ 4. Create Archives  │ Transfer │ 10. Validate         │
-│ 5. Verify Checksums │          │ 11. Build AMIs       │
+│ 1. Vendor Roles     │          │ 7. Extract Archives  │
+│ 2. Vendor Colls     │          │ 8. Setup Environment │
+│ 3. Download Pkgs    │   -->    │ 9. Validate          │
+│ 4. Create Archives  │ Transfer │ 10. Build AMIs       │
+│ 5. Verify Checksums │          │                      │
 │ 6. Upload Artifacts │          │                      │
 └─────────────────────┘          └──────────────────────┘
 ```
@@ -46,8 +46,8 @@ The workflow runs automatically on the 15th of each month to prepare archives fo
 1. Go to **Actions** → **Prepare NIPR Transfer Archives**
 2. Click **Run workflow**
 3. Select options:
-   - **Sync mirrors**: Download YUM/DNF repositories (default: true)
    - **Vendor roles**: Clone Ansible roles (default: true)
+   - **Vendor collections**: Download Ansible collections (default: true)
    - **Download packages**: Get offline AWS utilities (default: true)
    - **Create archives**: Build transfer archives (default: true)
    - **Upload artifacts**: Upload to GitHub (default: true)
@@ -68,10 +68,6 @@ After workflow completes:
 All optimization settings are pre-configured:
 
 ```bash
-SPEL_MIRROR_EXCLUDE_DEBUG=true    # Exclude debug packages (saves 40%)
-SPEL_MIRROR_EXCLUDE_SOURCE=true   # Exclude source RPMs (saves 20%)
-SPEL_MIRROR_COMPRESS=true         # Compress repos (saves 60% transfer)
-SPEL_MIRROR_HARDLINK=true         # Deduplicate files (saves 10%)
 SPEL_ROLES_REMOVE_GIT=true        # Remove .git dirs (saves 50%)
 SPEL_ROLES_COMPRESS=true          # Compress roles archive
 SPEL_OFFLINE_COMPRESS=true        # Compress offline packages
@@ -82,12 +78,12 @@ SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
 ### Workflow Steps
 
 1. **Checkout** - Clone repository with submodules
-2. **Install dependencies** - dnf, createrepo-c, hardlink, wget
+2. **Install dependencies** - Python, pip, ansible-galaxy
 3. **Set environment** - Configure optimization variables
-4. **Sync mirrors** - Download YUM/DNF repositories (30-50 GB)
-5. **Vendor roles** - Clone Ansible roles without git history (60 MB)
-6. **Download packages** - Get AWS utilities (75 MB)
-7. **Create archives** - Build compressed transfer archives (12-20 GB)
+4. **Vendor roles** - Clone Ansible roles without git history (60 MB)
+5. **Vendor collections** - Download Ansible collections as tarballs (5 MB)
+6. **Download packages** - Get AWS utilities and Packer (400 MB)
+7. **Create archives** - Build compressed transfer archives (500 MB)
 8. **Verify checksums** - Validate all archives with SHA256
 9. **Generate manifest** - Create transfer documentation
 10. **Upload artifacts** - Store in GitHub for download
@@ -96,12 +92,11 @@ SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
 
 ```
 Archives created:
-  spel-base-20251126.tar.gz                  500 MB
-  spel-mirrors-compressed-20251126.tar.gz    15 GB
+  spel-base-20251126.tar.gz                  100 MB
   spel-tools-20251126.tar.gz                 400 MB
-  spel-nipr-complete-20251126.tar.gz         18 GB
+  spel-nipr-complete-20251126.tar.gz         500 MB
 
-Total archive size: 18 GB
+Total archive size: 500 MB
 
 Files ready for transfer:
   - spel-nipr-20251126-checksums.txt
@@ -118,10 +113,9 @@ Location: `.gitlab-ci.yml`
 ### Pipeline Stages
 
 1. **extract** - Extract transferred archives
-2. **configure** - Set up local repositories
-3. **setup** - Prepare build environment
-4. **validate** - Validate Packer templates
-5. **build** - Build AMI images
+2. **setup** - Prepare build environment and configure repositories
+3. **validate** - Validate Packer templates
+4. **build** - Build AMI images
 
 ### Prerequisites
 
@@ -154,12 +148,12 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `EXTRACT_ARCHIVES` | Enable archive extraction | `true` |
-| `AWS_COMMERCIAL_ACCESS_KEY_ID` | NIPR AWS access key | `AKIA...` |
-| `AWS_COMMERCIAL_SECRET_ACCESS_KEY` | NIPR AWS secret key | `secret` |
-| `PKR_VAR_aws_nipr_account_id` | NIPR AWS account ID | `123456789012` |
+| `AWS_GOVCLOUD_ACCESS_KEY_ID` | NIPR GovCloud access key | `AKIA...` |
+| `AWS_GOVCLOUD_SECRET_ACCESS_KEY` | NIPR GovCloud secret key | `secret` |
+| `PKR_VAR_aws_nipr_account_id` | NIPR AWS account ID for source AMI filters | `123456789012` |
 | `PKR_VAR_aws_vpc_id` | VPC ID in NIPR | `vpc-abc123` |
 | `PKR_VAR_aws_subnet_id` | Subnet ID in NIPR | `subnet-xyz789` |
-| `PKR_VAR_aws_nipr_ami_regions` | Target regions | `["us-east-1"]` |
+| `PKR_VAR_aws_nipr_ami_regions` | Target regions (optional) | `["us-gov-east-1"]` |
 | `RUN_AMZN2023` | Build Amazon Linux 2023 | `true` (optional) |
 | `RUN_RHEL9` | Build RHEL 9 | `true` (optional) |
 | `RUN_RHEL8` | Build RHEL 8 | `true` (optional) |
@@ -197,14 +191,15 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 3. **Run extraction pipeline**:
    - Go to **CI/CD** → **Pipelines**
    - Click **Run pipeline**
-   - Pipeline will run `extract:archives` (manual job)
-   - Click **▶** button on `extract:archives` job
+   - Set variable: `EXTRACT_ARCHIVES=true`
+   - Click **Run pipeline**
+   - Manually click **▶** on `extract:archives` job
    - Wait for extraction to complete
-   - `configure:repos` job runs automatically after extraction
 
 4. **Verify setup**:
    - Check job logs for successful extraction
-   - Verify repositories configured: `sudo dnf repolist`
+   - `setup` job runs automatically and configures environment
+   - All offline components (Packer, Python, Ansible collections) are configured automatically
 
 #### Monthly AMI Builds
 
@@ -241,17 +236,6 @@ only:
 
 **Run when**: Initial setup or archive updates
 
-#### configure:repos (Automatic)
-
-Configures local YUM/DNF repositories.
-
-```yaml
-needs: ["extract:archives"]
-when: on_success
-```
-
-**Run when**: After successful extraction
-
 #### setup (Automatic)
 
 Initializes git submodules and sets up build environment.
@@ -275,6 +259,25 @@ Builds specific AMI types. Run manually to control which AMIs to build.
 - `build:windows2022` - Windows Server 2022
 - `build:all` - All builders (on tagged releases)
 
+### Offline Mode
+
+The GitLab CI pipeline runs in **offline mode** (`SPEL_OFFLINE_MODE=true`), which means:
+
+- **No internet access** during builds - completely air-gapped operation
+- **Pre-vendored dependencies** - all components included in transfer archives:
+  - Packer v1.11.2 (Linux and Windows binaries)
+  - Packer plugins (Amazon, Ansible, PowerShell)
+  - Python packages as wheels
+  - Ansible collections as tarballs (ansible.windows:1.14.0, community.windows:1.13.0, community.general:7.5.0)
+  - Ansible roles cloned locally
+  - AWS CLI utilities and tools
+- **RHUI Repositories**: Uses AWS GovCloud RHUI repos (no local mirrors needed)
+- **Local installation** - collections installed to `~/.ansible/collections/` during `setup` job
+- **Version compatibility** - Ansible Core 2.15.13 with collection versions tested for compatibility
+- **Reproducible builds** - same vendored components ensure consistent results
+
+This ensures builds are completely independent of external networks and reproducible across different NIPR environments.
+
 ## Complete Workflow Example
 
 ### Month 1: Initial Setup
@@ -282,8 +285,8 @@ Builds specific AMI types. Run manually to control which AMIs to build.
 **Internet System (GitHub Actions)**:
 ```bash
 # Automatic on 15th of month, or manually trigger
-# Downloads: mirrors, roles, packages
-# Creates: spel-*.tar.gz archives
+# Downloads: roles, collections, packages, tools
+# Creates: spel-*.tar.gz archives (~500 MB)
 # Uploads to GitHub artifacts
 ```
 
@@ -315,13 +318,13 @@ git push
 **Internet System (GitHub Actions)**:
 ```bash
 # Automatic monthly run creates new archives
-# Only changed components need transfer (usually just mirrors)
+# Only changed components need transfer (usually just roles/collections)
 ```
 
 **Transfer**:
 ```bash
-# Transfer only updated archives (e.g., mirrors only)
-# Much smaller transfer size for incremental updates
+# Transfer only updated archives (e.g., roles or tools only)
+# Smaller transfer size for incremental updates (~100-400 MB)
 ```
 
 **NIPR System (GitLab CI)**:
@@ -334,11 +337,6 @@ git push
 ## Troubleshooting
 
 ### GitHub Actions Issues
-
-**Problem**: Mirror sync fails
-```bash
-Solution: Check network connectivity, retry workflow
-```
 
 **Problem**: Archive too large for GitHub artifacts
 ```bash
@@ -390,18 +388,24 @@ sudo gitlab-runner restart
 
 ### GitHub Actions Runner
 
-- **Mirrors**: 30-50 GB
 - **Roles**: 100 MB
+- **Collections**: 10 MB
 - **Packages**: 100 MB
-- **Archives**: 12-20 GB
-- **Total**: ~50-70 GB free space needed
+- **Packer/Python**: 400 MB
+- **Archives**: 500 MB
+- **Total**: ~1-2 GB free space needed
 
 ### GitLab Runner (NIPR)
 
-- **Extracted archives**: 31-51 GB
+- **Extracted archives**: ~600 MB
+  - Offline packages: 75 MB
+  - Ansible roles: 60 MB
+  - Ansible collections (tarballs): 5 MB
+  - Packer binaries: 400 MB
+  - Python packages: 100 MB
 - **Build artifacts**: 10-20 GB
 - **Packer cache**: 5-10 GB
-- **Total**: ~60-80 GB free space needed
+- **Total**: ~20-35 GB free space needed
 
 ## Security Considerations
 

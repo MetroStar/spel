@@ -18,7 +18,8 @@ Notes on Lifecycle:
     repositories offered by the distribution-owner. If running EC2s inside of a
     VPC with no access to the internet at large, it will not be possible to
     install additional RPMs or patch systems without the use of either a proxy
-    or standing up a private yum mirror
+    or standing up a private yum mirror. Note: RHEL images in AWS GovCloud (including
+    NIPR) have access to RHUI repositories within the isolated network
 1.  Red Hat images are configured to use a given cloud service provider's (CSP) 
     [Red Hat Update Infrastructure](https://access.redhat.com/products/red-hat-update-infrastructure)
     (a.k.a., "RHUI") repositories. These repositories are managed by Red 
@@ -331,6 +332,42 @@ privilege-transition rules defined.
 
 [`Packer`][2] by [Hashicorp][1] is used to manage the process of building
 images.
+
+### CI/CD Deployment Modes
+
+The SPEL build system supports three deployment modes to accommodate different AWS environments and network configurations:
+
+#### 1. GitHub Actions (Dual-Environment)
+**Use case**: Building for both AWS Commercial and GovCloud from internet-connected systems
+
+- **Credentials**: Requires both `AWS_COMMERCIAL_*` and `AWS_GOVCLOUD_*` environment variables
+- **Regions**: Builds AMIs in commercial (us-east-1, us-east-2, us-west-1, us-west-2) and GovCloud (us-gov-east-1, us-gov-west-1) regions
+- **AMI Quota Management**: Automatically manages public AMI quotas across all regions
+- **Network**: Full internet access for downloading dependencies
+- **Configuration**: See `.github/workflows/build.yml`
+
+#### 2. GitLab CI (NIPR Single-Environment)
+**Use case**: Building in air-gapped NIPR environment with only GovCloud access
+
+- **Credentials**: Uses only `AWS_GOVCLOUD_*` environment variables  
+- **Regions**: Builds only in us-gov-east-1 (or configured NIPR region)
+- **Offline Mode**: All dependencies pre-vendored in transfer archives (Packer, Python packages, Ansible collections, YUM/DNF repos)
+- **Network**: Completely air-gapped, no internet access
+- **Configuration**: See `.gitlab-ci.yml` and `docs/CI-CD-Setup.md`
+
+#### 3. Local Development (Flexible)
+**Use case**: Testing and development on local workstations
+
+- **Credentials**: Automatically detects available credentials (commercial, GovCloud, or both)
+- **Regions**: Configurable via Packer variables
+- **Network**: Can work online or offline (when `SPEL_OFFLINE_MODE=true`)
+- **Script**: `build/build.sh` automatically configures AWS CLI profiles based on detected credentials
+
+**Key Feature**: The `build/build.sh` script intelligently detects which AWS credentials are available and configures only the necessary profiles, making it compatible with single-environment (NIPR) or dual-environment (GitHub Actions) deployments without code changes.
+
+For detailed NIPR/GitLab CI setup instructions, see [`docs/CI-CD-Setup.md`](docs/CI-CD-Setup.md).
+
+### Local Build Prerequisites
 
 1.  [Download][3] and extract `packer` for your platform. Add it to your PATH,
     if you like. On Linux, watch out for other `packer` executables with the
