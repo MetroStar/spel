@@ -174,37 +174,6 @@ jobs:
             exit 1
           fi
 
-      - name: Install Ansible collections for offline mode
-        if: github.event.inputs.offline_mode == 'true'
-        run: |
-          echo "Installing Ansible collections to user directory..."
-          
-          # Install from tarballs if they exist
-          if [ -d "spel/ansible/collections" ] && ls spel/ansible/collections/*.tar.gz 1> /dev/null 2>&1; then
-            for tarball in spel/ansible/collections/*.tar.gz; do
-              echo "Installing $(basename "$tarball")..."
-              ansible-galaxy collection install "$tarball" --force
-            done
-          # Otherwise use the already-extracted collections
-          elif [ -d "spel/ansible/collections/ansible_collections" ]; then
-            echo "Collections already extracted, installing from directory..."
-            # Find all collections in the extracted structure
-            find spel/ansible/collections/ansible_collections -mindepth 2 -maxdepth 2 -type d | while read -r collection_dir; do
-              namespace=$(basename "$(dirname "$collection_dir")")
-              collection=$(basename "$collection_dir")
-              echo "Installing ${namespace}.${collection}..."
-              # Create a temporary tarball and install it
-              temp_tar=$(mktemp --suffix=.tar.gz)
-              tar -czf "$temp_tar" -C "$(dirname "$(dirname "$collection_dir")")" "${namespace}/${collection}"
-              ansible-galaxy collection install "$temp_tar" --force
-              rm "$temp_tar"
-            done
-          fi
-          
-          echo ""
-          echo "Installed Ansible collections:"
-          ansible-galaxy collection list
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:

@@ -130,23 +130,28 @@ install_python_deps() {
 # Install Ansible collections
 install_ansible_collections() {
     if detect_offline_mode; then
-        # Offline mode - use vendored collections
-        log_info "Installing Ansible collections from vendored path..."
-        if [ -d "${REPO_ROOT}/spel/ansible/collections/ansible_collections" ]; then
-            ansible-galaxy collection install \
-                --force-with-deps \
-                --collections-path "${REPO_ROOT}/spel/ansible/collections" \
-                "${REPO_ROOT}/spel/ansible/collections/ansible_collections/"* \
-                2>/dev/null || log_warn "Failed to install some collections"
-            log_info "Ansible collections installed from vendored path"
+        # Offline mode - install from vendored tarballs
+        log_info "Installing Ansible collections from vendored tarballs..."
+        if [ -d "${REPO_ROOT}/spel/ansible/collections" ] && ls "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz 1> /dev/null 2>&1; then
+            for tarball in "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz; do
+                log_info "Installing $(basename "$tarball")..."
+                ansible-galaxy collection install "$tarball" --force || \
+                    log_warn "Failed to install $(basename "$tarball")"
+            done
+            log_info "Ansible collections installed from vendored tarballs"
         else
-            log_warn "Vendored Ansible collections not found - builds may fail for Windows"
+            log_warn "Vendored Ansible collection tarballs not found - builds may fail for Windows"
+            log_warn "Expected location: ${REPO_ROOT}/spel/ansible/collections/*.tar.gz"
         fi
     else
-        # Online mode - download from Galaxy
+        # Online mode - download specific versions from Galaxy
         log_info "Installing Ansible collections from Galaxy..."
-        ansible-galaxy collection install ansible.windows community.windows || \
-            log_warn "Failed to install Ansible collections"
+        ansible-galaxy collection install ansible.windows:1.14.0 --force || \
+            log_warn "Failed to install ansible.windows"
+        ansible-galaxy collection install community.windows:1.13.0 --force || \
+            log_warn "Failed to install community.windows"
+        ansible-galaxy collection install community.general:7.5.0 --force || \
+            log_warn "Failed to install community.general"
         log_info "Ansible collections installed from Galaxy"
     fi
 }
