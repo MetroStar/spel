@@ -351,8 +351,8 @@ The SPEL build system supports three deployment modes to accommodate different A
 
 - **Credentials**: Uses only `AWS_GOVCLOUD_*` environment variables  
 - **Regions**: Builds only in us-gov-east-1 (or configured NIPR region)
-- **Offline Mode**: All dependencies pre-vendored in transfer archives (Packer, Python packages, Ansible collections, YUM/DNF repos)
-- **Network**: Completely air-gapped, no internet access
+- **Offline Mode**: All dependencies pre-vendored in transfer archives (~1 GB: Packer, Python packages, Ansible collections, AWS utilities)
+- **Network**: Air-gapped with AWS GovCloud RHUI repository access
 - **Configuration**: See `.gitlab-ci.yml` and `docs/CI-CD-Setup.md`
 
 #### 3. Local Development (Flexible)

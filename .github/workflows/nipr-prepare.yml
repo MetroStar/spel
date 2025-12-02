@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: fedora:latest
-    timeout-minutes: 90  # 1.5 hours for all downloads including Ansible and Packer plugins
+    timeout-minutes: 30  # Typically completes in 5-10 minutes
     
     steps:
       - name: Install Git for checkout
@@ -345,8 +345,8 @@ jobs:
           - Packer Binaries (Linux + Windows): ~500 MB
           - Packer Plugins: ~80 MB
           - Build Scripts: ~100 MB
-          - Total uncompressed: ~2-3 GB
-          - Compressed transfer: ~2-2.5 GB
+          - Total uncompressed: ~1 GB
+          - Compressed transfer: ~1 GB
           
           Note: YUM/DNF mirrors are NOT included - NIPR environment
                 uses its own RPM repositories

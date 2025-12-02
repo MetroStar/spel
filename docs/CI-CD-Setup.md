@@ -81,9 +81,9 @@ SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
 2. **Install dependencies** - Python, pip, ansible-galaxy
 3. **Set environment** - Configure optimization variables
 4. **Vendor roles** - Clone Ansible roles without git history (60 MB)
-5. **Vendor collections** - Download Ansible collections as tarballs (5 MB)
-6. **Download packages** - Get AWS utilities and Packer (400 MB)
-7. **Create archives** - Build compressed transfer archives (500 MB)
+5. **Vendor collections** - Download Ansible collections as tarballs (30 MB)
+6. **Download packages** - Get AWS utilities and Packer (500 MB)
+7. **Create archives** - Build compressed transfer archives (~1 GB)
 8. **Verify checksums** - Validate all archives with SHA256
 9. **Generate manifest** - Create transfer documentation
 10. **Upload artifacts** - Store in GitHub for download
@@ -92,11 +92,11 @@ SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
 
 ```
 Archives created:
-  spel-base-20251126.tar.gz                  100 MB
-  spel-tools-20251126.tar.gz                 400 MB
-  spel-nipr-complete-20251126.tar.gz         500 MB
+  spel-base-20251126.tar.gz                  ~200 MB
+  spel-tools-20251126.tar.gz                 ~600 MB
+  spel-nipr-complete-20251126.tar.gz         ~1 GB
 
-Total archive size: 500 MB
+Total archive size: ~1 GB
 
 Files ready for transfer:
   - spel-nipr-20251126-checksums.txt
@@ -282,8 +282,9 @@ This ensures builds are completely independent of external networks and reproduc
 ```bash
 # Automatic on 15th of month, or manually trigger
 # Downloads: roles, collections, packages, tools
-# Creates: spel-*.tar.gz archives (~500 MB)
+# Creates: spel-*.tar.gz archives (~1 GB)
 # Uploads to GitHub artifacts
+# Typically completes in 5-10 minutes
 ```
 
 **Transfer**:
@@ -320,7 +321,7 @@ git push
 **Transfer**:
 ```bash
 # Transfer only updated archives (e.g., roles or tools only)
-# Smaller transfer size for incremental updates (~100-400 MB)
+# Smaller transfer size for incremental updates (~200-600 MB)
 ```
 
 **NIPR System (GitLab CI)**:
@@ -379,20 +380,22 @@ sudo gitlab-runner restart
 ### GitHub Actions Runner
 
 - **Roles**: 100 MB
-- **Collections**: 10 MB
-- **Packages**: 100 MB
-- **Packer/Python**: 400 MB
-- **Archives**: 500 MB
-- **Total**: ~1-2 GB free space needed
+- **Collections**: 50 MB
+- **Packages**: 200 MB
+- **Packer/Python**: 600 MB
+- **Archives**: 1 GB
+- **Total**: ~2-3 GB free space needed
 
 ### GitLab Runner (NIPR)
 
-- **Extracted archives**: ~600 MB
+- **Extracted archives**: ~1 GB
   - Offline packages: 75 MB
   - Ansible roles: 60 MB
-  - Ansible collections (tarballs): 5 MB
-  - Packer binaries: 400 MB
+  - Ansible collections (tarballs): 30 MB
+  - Packer binaries: 500 MB
   - Python packages: 100 MB
+  - SPEL packages: 20 MB
+  - Build scripts: 100 MB
 - **Build artifacts**: 10-20 GB
 - **Packer cache**: 5-10 GB
 - **Total**: ~20-35 GB free space needed

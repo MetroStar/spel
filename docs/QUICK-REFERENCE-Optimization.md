@@ -11,7 +11,7 @@ git clone --recurse-submodules https://github.com/MetroStar/spel.git && cd spel/
 ./scripts/vendor-ansible-roles.sh              # 60 MB (vs 300 MB)
 ./scripts/vendor-ansible-collections.sh         # 5 MB (vs 20 MB)
 ./scripts/download-offline-packages.sh          # 75 MB (vs 100 MB)
-./scripts/create-transfer-archive.sh            # Creates ~500 MB archives
+./scripts/create-transfer-archive.sh            # Creates ~1 GB archives
 
 # Verify and transfer
 sha256sum -c spel-nipr-*-checksums.txt
@@ -38,7 +38,7 @@ export SPEL_OFFLINE_MODE=true
 | Packages | 100 MB | 75 MB | 25% |
 | Tools | 400 MB | 400 MB | - |
 | **Total** | **820 MB** | **600 MB** | **27%** |
-| **Compressed** | - | **500 MB** | **39%** |
+| **Compressed** | - | **~1 GB** | **~0%** |
 
 Note: NIPR builds now use RHUI repositories available in AWS GovCloud, eliminating the need for 30-50 GB of YUM/DNF mirrors.
 
@@ -49,7 +49,7 @@ Note: NIPR builds now use RHUI repositories available in AWS GovCloud, eliminati
 | `vendor-ansible-roles.sh` | Ansible roles | 60 MB roles + archive |
 | `vendor-ansible-collections.sh` | Ansible collections | 5 MB tarballs |
 | `download-offline-packages.sh` | AWS utilities | 75 MB packages + archive |
-| `create-transfer-archive.sh` | Transfer archives | ~500 MB compressed |
+| `create-transfer-archive.sh` | Transfer archives | ~1 GB compressed |
 | `extract-nipr-archives.sh` | NIPR extraction | Deployed workspace |
 
 ## Environment Variables Cheat Sheet
@@ -80,7 +80,7 @@ export SPEL_ARCHIVE_COMBINED=true          # Single archive
 - `spel-nipr-YYYYMMDD-checksums.txt` - SHA256 verification
 
 ### Combined Archive
-- `spel-nipr-complete-YYYYMMDD.tar.gz` (~500 MB) - Everything
+- `spel-nipr-complete-YYYYMMDD.tar.gz` (~1 GB) - Everything
 
 ## Common Tasks
 
@@ -137,7 +137,7 @@ sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
 ## Success Criteria
 
 ✅ Ansible roles total ~60 MB (not 300 MB)  
-✅ Transfer archives total ~500 MB (not 12-20 GB)  
+✅ Transfer archives total ~1 GB  
 ✅ All checksums verify successfully  
 ✅ Extract script completes without errors  
 ✅ Packer validates templates  

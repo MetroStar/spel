@@ -14,7 +14,7 @@ This guide provides strategies to minimize storage requirements and transfer siz
 | Build Tools | 400 MB | 400 MB | **0%** |
 | **TOTAL** | **820 MB** | **600 MB** | **27%** |
 
-**Compressed Transfer**: 600 MB → **500 MB** (17% additional compression)
+**Compressed Transfer**: 600 MB → **~1 GB** (depends on Packer binary compression)
 
 ## Automated Optimization Workflow
 
@@ -165,7 +165,7 @@ SPEL_ARCHIVE_COMBINED=true \
 SPEL_ARCHIVE_SEPARATE=false \
 ./scripts/create-transfer-archive.sh
 
-# Result: spel-nipr-complete-YYYYMMDD.tar.gz (~500 MB)
+# Result: spel-nipr-complete-YYYYMMDD.tar.gz (~1 GB)
 ```
 
 ### Option 2: Separate Component Archives (Recommended)
@@ -199,7 +199,7 @@ Workspace:
   ├── Offline packages     ~75 MB
   ├── Build tools          ~400 MB
   ├── Packer plugins       ~100 MB
-  └── Transfer archives    ~500 MB
+  └── Transfer archives    ~1 GB
 Total working space: ~1-2 GB
 ```
 
@@ -207,10 +207,10 @@ Total working space: ~1-2 GB
 
 ```
 Minimum (compressed archives only):
-  └── spel-nipr-*.tar.gz   ~500 MB
+  └── spel-nipr-*.tar.gz   ~1 GB
 
 Recommended (archives + checksums):
-  └── All archives         ~500 MB
+  └── All archives         ~1 GB
 ```
 
 ### NIPR System (Deployed)
