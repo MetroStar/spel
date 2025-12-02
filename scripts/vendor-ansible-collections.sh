@@ -16,14 +16,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COLLECTIONS_DIR="${SCRIPT_DIR}/../spel/ansible/collections"
 
 # Configuration
-# Pin collections to versions compatible with Ansible Core 2.15
-# - ansible.windows 1.x supports Ansible Core 2.14-2.15 (v2.x requires 2.16+)
-# - community.windows 1.x supports Ansible Core 2.14-2.15 (v2.x requires 2.16+)
-# - community.general 7.x supports Ansible Core 2.14-2.15 (v8.x requires 2.15+, v9.x requires 2.16+)
+# Pin collections to specific versions compatible with Ansible Core 2.15
+# Using exact version numbers to ensure ansible-galaxy downloads the correct versions
+# - ansible.windows 1.14.0 is the last 1.x release (supports Ansible Core 2.14-2.15)
+# - community.windows 1.13.0 is the last 1.x release (supports Ansible Core 2.14-2.15)
+# - community.general 7.5.0 is a stable 7.x release (supports Ansible Core 2.14-2.15)
 COLLECTIONS=(
-    "ansible.windows:>=1.0.0,<2.0.0"
-    "community.windows:>=1.0.0,<2.0.0"
-    "community.general:>=7.0.0,<8.0.0"
+    "ansible.windows:==1.14.0"
+    "community.windows:==1.13.0"
+    "community.general:==7.5.0"
 )
 
 # Colors for output
