@@ -870,6 +870,9 @@ build {
     playbook_file = "${path.root}/ansible/ca-certs-playbook.yml"
     use_proxy     = false
     user          = "TempPackerUser"
+    ansible_env_vars = [
+      "ANSIBLE_COLLECTIONS_PATH=${path.root}/ansible/collections"
+    ]
     extra_arguments = [
       "--connection", "winrm",
       "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986}"
