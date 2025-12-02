@@ -117,63 +117,16 @@ if [ -n "$TOOLS_ARCHIVE" ]; then
         fi
     fi
     
-    # Install Ansible collection tarballs if they exist
+    # Extract Ansible collection tarballs if they exist
+    # Note: Collections will be installed by ci-setup.sh, we just need to keep the tarballs
     if [ -d "${REPO_ROOT}/spel/ansible/collections" ]; then
         COLLECTION_TARBALLS=$(find "${REPO_ROOT}/spel/ansible/collections" -name "*.tar.gz" -type f 2>/dev/null || true)
         
         if [ -n "$COLLECTION_TARBALLS" ]; then
-            log_info "Installing Ansible collections..."
-            mkdir -p "${REPO_ROOT}/spel/ansible/collections/ansible_collections"
-            
-            # Check if ansible-galaxy is available
-            if command -v ansible-galaxy &> /dev/null; then
-                log_debug "  Using ansible-galaxy to install collections"
-                echo "$COLLECTION_TARBALLS" | while read -r tarball; do
-                    if [ -f "$tarball" ]; then
-                        collection_name=$(basename "$tarball" .tar.gz)
-                        log_debug "  Installing ${collection_name}..."
-                        ansible-galaxy collection install "$tarball" \
-                            -p "${REPO_ROOT}/spel/ansible/collections" \
-                            --force
-                        
-                        if [ "$CLEANUP_ARCHIVES" = "true" ]; then
-                            rm "$tarball"
-                        fi
-                    fi
-                done
-            else
-                log_warn "  ansible-galaxy not found, using manual extraction"
-                log_warn "  Collections may not work correctly without proper installation"
-                echo "$COLLECTION_TARBALLS" | while read -r tarball; do
-                    if [ -f "$tarball" ]; then
-                        collection_name=$(basename "$tarball" .tar.gz)
-                        log_debug "  Extracting ${collection_name}..."
-                        
-                        # Extract to temporary directory to get the collection structure
-                        TEMP_DIR=$(mktemp -d)
-                        tar xzf "$tarball" -C "$TEMP_DIR"
-                        
-                        # Determine namespace and collection name from MANIFEST.json
-                        if [ -f "$TEMP_DIR/MANIFEST.json" ]; then
-                            NAMESPACE=$(grep -o '"namespace"[[:space:]]*:[[:space:]]*"[^"]*"' "$TEMP_DIR/MANIFEST.json" | sed 's/.*"\([^"]*\)".*/\1/')
-                            COLLECTION=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$TEMP_DIR/MANIFEST.json" | sed 's/.*"\([^"]*\)".*/\1/')
-                            
-                            if [ -n "$NAMESPACE" ] && [ -n "$COLLECTION" ]; then
-                                mkdir -p "${REPO_ROOT}/spel/ansible/collections/ansible_collections/${NAMESPACE}"
-                                mv "$TEMP_DIR" "${REPO_ROOT}/spel/ansible/collections/ansible_collections/${NAMESPACE}/${COLLECTION}"
-                            else
-                                log_error "  Could not determine namespace/collection from MANIFEST.json"
-                            fi
-                        fi
-                        
-                        if [ "$CLEANUP_ARCHIVES" = "true" ]; then
-                            rm "$tarball"
-                        fi
-                    fi
-                done
-            fi
-            
-            log_info "  ✓ Ansible collections installed"
+            log_info "Found Ansible collection tarballs"
+            TARBALL_COUNT=$(echo "$COLLECTION_TARBALLS" | wc -l)
+            log_debug "  Collection tarballs: ${TARBALL_COUNT}"
+            log_info "  ✓ Collections will be installed by ci-setup.sh"
         fi
     fi
     
