@@ -1013,6 +1013,9 @@ build {
     playbook_file        = "${path.root}/ansible/windows-2016-stig-playbook.yml"
     use_proxy            = false
     user = "TempPackerUser"
+    ansible_env_vars = [
+      "ANSIBLE_COLLECTIONS_PATH=${path.root}/ansible/collections"
+    ]
     extra_arguments = [
       "--connection", "winrm",
       "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16stig_newadministratorname': 'maintuser'}"
@@ -1027,6 +1030,9 @@ build {
     playbook_file = "${path.root}/ansible/windows-2019-stig-playbook.yml"
     use_proxy     = false
     user = "TempPackerUser"
+    ansible_env_vars = [
+      "ANSIBLE_COLLECTIONS_PATH=${path.root}/ansible/collections"
+    ]
     extra_arguments = [
       "--connection", "winrm",
       "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19stig_newadministratorname': 'maintuser'}"
@@ -1041,6 +1047,9 @@ build {
     playbook_file = "${path.root}/ansible/windows-2022-stig-playbook.yml"
     use_proxy     = false
     user = "TempPackerUser"
+    ansible_env_vars = [
+      "ANSIBLE_COLLECTIONS_PATH=${path.root}/ansible/collections"
+    ]
     extra_arguments = [
       "--connection", "winrm",
       "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn22_ac_000010': false, 'wn22_cc_000470': false, 'wn22_cc_000500': false, 'wn22stig_newadministratorname': 'maintuser'}"
