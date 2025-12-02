@@ -4,7 +4,7 @@
 variables:
   SPEL_OFFLINE_MODE: "true"
   SPEL_IDENTIFIER: "spel"
-  PKR_VAR_aws_region: "us-east-1"
+  PKR_VAR_aws_region: "us-gov-east-1"
   PACKER_LOG: "1"
   CHECKPOINT_DISABLE: "1"
 
@@ -97,7 +97,7 @@ validate:minimal:
   needs: ["setup"]
   script:
     - source .env || true
-    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).dev}"
+    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
     - |
       packer validate \
         -var "spel_identifier=${SPEL_IDENTIFIER}" \
@@ -111,7 +111,7 @@ validate:hardened:
   needs: ["setup"]
   script:
     - source .env || true
-    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).dev}"
+    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
     - |
       packer validate \
         -var "spel_identifier=${SPEL_IDENTIFIER}" \
@@ -127,31 +127,18 @@ validate:hardened:
   timeout: 6 hours
   script:
     - source .env || true
-    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).dev}"
-    - export PUBLIC="${PUBLIC:-false}"
+    - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
+    - export PUBLIC="${PUBLIC:-true}"
     
-    # Set AWS credentials from GitLab CI/CD variables
-    - export AWS_COMMERCIAL_ACCESS_KEY_ID="${AWS_COMMERCIAL_ACCESS_KEY_ID}"
-    - export AWS_COMMERCIAL_SECRET_ACCESS_KEY="${AWS_COMMERCIAL_SECRET_ACCESS_KEY}"
-    
-    # Configure AWS profile
-    - mkdir -p ~/.aws
-    - |
-      cat <<EOF > ~/.aws/credentials
-      [commercial]
-      aws_access_key_id = ${AWS_COMMERCIAL_ACCESS_KEY_ID}
-      aws_secret_access_key = ${AWS_COMMERCIAL_SECRET_ACCESS_KEY}
-      EOF
-    - |
-      cat <<EOF > ~/.aws/config
-      [profile commercial]
-      region = ${PKR_VAR_aws_region}
-      EOF
+    # Set AWS GovCloud credentials for NIPR environment
+    # NIPR uses GovCloud, so we provide only GovCloud credentials
+    - export AWS_GOVCLOUD_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
+    - export AWS_GOVCLOUD_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
     
     # Set Packer variables for NIPR
-    - export PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister:-false}"
-    - export PKR_VAR_aws_ami_regions="${PKR_VAR_aws_nipr_ami_regions:-[\"us-east-1\"]}"
-    - export PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups:-[]}"
+    - export PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister:-true}"
+    - export PKR_VAR_aws_ami_regions="${PKR_VAR_aws_nipr_ami_regions:-[\"us-gov-east-1\"]}"
+    - export PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups:-[\"all\"]}"
     - export PKR_VAR_aws_vpc_id="${PKR_VAR_aws_vpc_id}"
     - export PKR_VAR_aws_subnet_id="${PKR_VAR_aws_subnet_id}"
     - export PKR_VAR_aws_nipr_account_id="${PKR_VAR_aws_nipr_account_id}"

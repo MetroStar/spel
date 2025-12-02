@@ -5,38 +5,76 @@ set -u -o pipefail
 # Default PUBLIC to true if not set (used for AMI quota management)
 PUBLIC="${PUBLIC:-true}"
 
-# Ensure required environment variables are set
-: "${AWS_COMMERCIAL_ACCESS_KEY_ID:?}"
-: "${AWS_COMMERCIAL_SECRET_ACCESS_KEY:?}"
-: "${AWS_GOVCLOUD_ACCESS_KEY_ID:?}"
-: "${AWS_GOVCLOUD_SECRET_ACCESS_KEY:?}"
+# Detect which AWS environments are configured
+HAS_COMMERCIAL=false
+HAS_GOVCLOUD=false
+
+if [[ -n "${AWS_COMMERCIAL_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_COMMERCIAL_SECRET_ACCESS_KEY:-}" ]]; then
+    HAS_COMMERCIAL=true
+fi
+
+if [[ -n "${AWS_GOVCLOUD_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_GOVCLOUD_SECRET_ACCESS_KEY:-}" ]]; then
+    HAS_GOVCLOUD=true
+fi
+
+# Require at least one environment
+if [[ "$HAS_COMMERCIAL" == "false" ]] && [[ "$HAS_GOVCLOUD" == "false" ]]; then
+    echo "ERROR: At least one set of AWS credentials must be provided"
+    echo "  Required: AWS_COMMERCIAL_* OR AWS_GOVCLOUD_*"
+    exit 1
+fi
 
 # Create AWS CLI configuration files
 mkdir -p ~/.aws
 
-cat <<EOL > ~/.aws/credentials
+# Build credentials file dynamically
+cat > ~/.aws/credentials <<EOL
+EOL
+
+if [[ "$HAS_COMMERCIAL" == "true" ]]; then
+    cat >> ~/.aws/credentials <<EOL
 [commercial]
 aws_access_key_id = ${AWS_COMMERCIAL_ACCESS_KEY_ID}
 aws_secret_access_key = ${AWS_COMMERCIAL_SECRET_ACCESS_KEY}
 
+EOL
+fi
+
+if [[ "$HAS_GOVCLOUD" == "true" ]]; then
+    cat >> ~/.aws/credentials <<EOL
 [govcloud]
 aws_access_key_id = ${AWS_GOVCLOUD_ACCESS_KEY_ID}
 aws_secret_access_key = ${AWS_GOVCLOUD_SECRET_ACCESS_KEY}
+
+EOL
+fi
+
+# Build config file dynamically
+cat > ~/.aws/config <<EOL
 EOL
 
-cat <<EOL > ~/.aws/config
+if [[ "$HAS_COMMERCIAL" == "true" ]]; then
+    cat >> ~/.aws/config <<EOL
 [profile commercial]
 region = us-east-1
 
+EOL
+fi
+
+if [[ "$HAS_GOVCLOUD" == "true" ]]; then
+    cat >> ~/.aws/config <<EOL
 [profile govcloud]
 region = us-gov-east-1
+
 EOL
+fi
 
 # Function to check and manage AMI quotas
 check_and_manage_ami_quotas() {
-    REGIONS=("us-east-1" "us-east-2" "us-west-1" "us-west-2")
+    if [[ "$HAS_COMMERCIAL" == "true" ]]; then
+        REGIONS=("us-east-1" "us-east-2" "us-west-1" "us-west-2")
 
-    for REGION in "${REGIONS[@]}"; do
+        for REGION in "${REGIONS[@]}"; do
         echo "Checking AMI quotas in region $REGION"
 
         # Get the service quota limit for public AMIs
@@ -62,11 +100,13 @@ check_and_manage_ami_quotas() {
                 aws ec2 modify-image-attribute --image-id "$AMI_ID" --launch-permission "{\"Remove\": [{\"Group\":\"all\"}]}" --region "$REGION" --profile commercial
             done
         fi
-    done
+        done
+    fi
 
-    REGIONS=("us-gov-east-1" "us-gov-west-1")
+    if [[ "$HAS_GOVCLOUD" == "true" ]]; then
+        REGIONS=("us-gov-east-1" "us-gov-west-1")
 
-    for REGION in "${REGIONS[@]}"; do
+        for REGION in "${REGIONS[@]}"; do
         echo "Checking AMI quotas in region $REGION"
 
         # Get the service quota limit for public AMIs
@@ -92,12 +132,21 @@ check_and_manage_ami_quotas() {
                 aws ec2 modify-image-attribute --image-id "$AMI_ID" --launch-permission "{\"Remove\": [{\"Group\":\"all\"}]}" --region "$REGION" --profile govcloud
             done
         fi
-    done
+        done
+    fi
 }
 
 if [ $PUBLIC = "true" ]; then
   # Check and manage AMI quotas before starting the build
   check_and_manage_ami_quotas
+fi
+
+# Determine which profile to use for AMI lookups
+# Prefer commercial if available, otherwise use govcloud
+if [[ "$HAS_COMMERCIAL" == "true" ]]; then
+    AWS_PROFILE="commercial"
+else
+    AWS_PROFILE="govcloud"
 fi
 
 echo "==========STARTING BUILD=========="
@@ -132,7 +181,7 @@ if [[ -n "$SPEL_BUILDERS" ]]; then
             BUILD_NAME="${BUILDER//*./}"
             AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
             BUILDER_ENV="${BUILDER//[.-]/_}"
-            BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
+            BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile $AWS_PROFILE)
             if [[ "$BUILDER_AMI" == "None" ]]
             then
                 FAILED_BUILDS+=("$BUILDER")
