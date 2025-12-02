@@ -80,27 +80,30 @@ SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
 1. **Checkout** - Clone repository with submodules
 2. **Install dependencies** - Python, pip, ansible-galaxy
 3. **Set environment** - Configure optimization variables
-4. **Vendor roles** - Clone Ansible roles without git history (60 MB)
-5. **Vendor collections** - Download Ansible collections as tarballs (30 MB)
-6. **Download packages** - Get AWS utilities and Packer (500 MB)
-7. **Create archives** - Build compressed transfer archives (~1 GB)
-8. **Verify checksums** - Validate all archives with SHA256
-9. **Generate manifest** - Create transfer documentation
-10. **Upload artifacts** - Store in GitHub for download
+4. **Vendor roles** - Clone Ansible roles without git history (4 MB)
+5. **Vendor collections** - Download Ansible collections as tarballs (3.5 MB)
+6. **Download packages** - Get AWS utilities and Packer (183 MB: 86 MB offline + 97 MB Packer)
+7. **Download Packer plugins** - Get required Packer plugins (241 MB)
+8. **Create archives** - Build compressed transfer archives (1.1 GB total)
+9. **Verify checksums** - Validate all archives with SHA256
+10. **Generate manifest** - Create transfer documentation
+11. **Upload artifacts** - Store in GitHub for download (90 day retention)
 
 ### Expected Output
 
 ```
 Archives created:
-  spel-base-20251126.tar.gz                  ~200 MB
-  spel-tools-20251126.tar.gz                 ~600 MB
-  spel-nipr-complete-20251126.tar.gz         ~1 GB
+  spel-base-20251202.tar.gz                  118 MB
+  spel-tools-20251202.tar.gz                 289 MB
+  spel-nipr-complete-20251202.tar.gz         694 MB
 
-Total archive size: ~1 GB
+Total archive size: 1.1 GB
+
+Workflow duration: 2-3 minutes (typical: 2:25)
 
 Files ready for transfer:
-  - spel-nipr-20251126-checksums.txt
-  - spel-nipr-20251126-manifest.txt
+  - spel-nipr-20251202-checksums.txt
+  - spel-nipr-20251202-manifest.txt
   - spel-*.tar.gz
 ```
 

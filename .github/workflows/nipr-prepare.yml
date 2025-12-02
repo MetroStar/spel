@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: fedora:latest
-    timeout-minutes: 30  # Typically completes in 5-10 minutes
+    timeout-minutes: 10  # Typically completes in 2-3 minutes (actual: 2:25)
     
     steps:
       - name: Install Git for checkout
@@ -335,18 +335,20 @@ jobs:
           - Used single SSM agent for EL8/EL9 (saves ~25%)
           - Created compressed archives
           
-          Expected Sizes
-          --------------
-          - Ansible Roles: ~60 MB
-          - Ansible Collections: ~30 MB
-          - Ansible Core (Python wheels): ~100 MB
-          - Offline Packages: ~75 MB
-          - SPEL Packages: ~20 MB
-          - Packer Binaries (Linux + Windows): ~500 MB
-          - Packer Plugins: ~80 MB
+          Expected Sizes (Actual Measured)
+          --------------------------------
+          - Ansible Roles: 4 MB
+          - Ansible Collections: 3.5 MB
+          - Ansible Core (Python wheels): 16 MB
+          - Offline Packages: 86 MB
+          - SPEL Packages: 56 KB
+          - Packer Binaries (Linux + Windows): 97 MB
+          - Packer Plugins: 241 MB
           - Build Scripts: ~100 MB
-          - Total uncompressed: ~1 GB
-          - Compressed transfer: ~1 GB
+          - Total compressed archives: 1.1 GB
+            - spel-base: 118 MB
+            - spel-tools: 289 MB
+            - spel-nipr-complete: 694 MB
           
           Note: YUM/DNF mirrors are NOT included - NIPR environment
                 uses its own RPM repositories

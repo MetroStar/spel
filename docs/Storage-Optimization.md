@@ -7,14 +7,17 @@ This guide provides strategies to minimize storage requirements and transfer siz
 ## Quick Reference
 
 | Component | Default | Optimized | Savings |
-|-----------|---------|-----------|---------|
-| Ansible Roles | 300 MB | 60 MB | **80%** |
-| Ansible Collections | 20 MB | 5 MB | **75%** |
-| Offline Packages | 100 MB | 75 MB | **25%** |
-| Build Tools | 400 MB | 400 MB | **0%** |
-| **TOTAL** | **820 MB** | **600 MB** | **27%** |
+|-----------|---------|-----------|---------||
+| Ansible Roles | 300 MB | 4 MB | **99%** |
+| Ansible Collections | 20 MB | 3.5 MB | **83%** |
+| Offline Packages | 100 MB | 86 MB | **14%** |
+| Python Deps | 100 MB | 16 MB | **84%** |
+| Packer Binaries | 500 MB | 97 MB | **81%** |
+| Packer Plugins | 80 MB | 241 MB | **-201%** |
+| SPEL Packages | 20 MB | 56 KB | **99.7%** |
+| **TOTAL** | **1120 MB** | **447 MB** | **60%** |
 
-**Compressed Transfer**: 600 MB → **~1 GB** (depends on Packer binary compression)
+**Compressed Transfer**: 447 MB → **1.1 GB** (118 MB base + 289 MB tools + 694 MB complete)
 
 ## Automated Optimization Workflow
 
@@ -60,7 +63,7 @@ sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
 
 ## Optimization Strategies by Component
 
-### 1. Ansible Roles (300 MB → 60 MB)
+### 1. Ansible Roles (300 MB → 4 MB)
 
 #### Strategy A: Shallow Clone (Saves 50%)
 
@@ -116,7 +119,7 @@ ansible-galaxy collection download ansible.windows:1.14.0
 
 **Total**: ~5.3 MB (vs 20 MB if extracted)
 
-### 3. Offline AWS Packages (100 MB → 75 MB)
+### 3. Offline AWS Packages (100 MB → 86 MB)
 
 #### Strategy: Single SSM Agent for Both EL8/EL9
 
@@ -165,7 +168,7 @@ SPEL_ARCHIVE_COMBINED=true \
 SPEL_ARCHIVE_SEPARATE=false \
 ./scripts/create-transfer-archive.sh
 
-# Result: spel-nipr-complete-YYYYMMDD.tar.gz (~1 GB)
+# Result: spel-nipr-complete-YYYYMMDD.tar.gz (1.1 GB)
 ```
 
 ### Option 2: Separate Component Archives (Recommended)
@@ -177,7 +180,7 @@ SPEL_ARCHIVE_SEPARATE=false \
 ./scripts/create-transfer-archive.sh
 
 # Results:
-# - spel-base-YYYYMMDD.tar.gz (~100 MB)
+# - spel-base-YYYYMMDD.tar.gz (118 MB)
 # - spel-tools-YYYYMMDD.tar.gz (~400 MB)
 ```
 
@@ -194,23 +197,29 @@ SPEL_ARCHIVE_SEPARATE=false \
 ```
 Workspace:
   ├── Code/Scripts         ~100 MB
-  ├── Ansible roles        ~60 MB (optimized)
-  ├── Ansible collections  ~5 MB (tarballs)
-  ├── Offline packages     ~75 MB
-  ├── Build tools          ~400 MB
-  ├── Packer plugins       ~100 MB
-  └── Transfer archives    ~1 GB
-Total working space: ~1-2 GB
+  ├── Ansible roles        4 MB (optimized)
+  ├── Ansible collections  3.5 MB (tarballs)
+  ├── Python dependencies  16 MB
+  ├── Offline packages     86 MB
+  ├── Packer binaries      97 MB
+  ├── Packer plugins       241 MB
+  ├── SPEL packages        56 KB
+  └── Transfer archives    1.1 GB
+Total working space: 2-3 GB
 ```
 
 ### Transfer Media
 
 ```
 Minimum (compressed archives only):
-  └── spel-nipr-*.tar.gz   ~1 GB
+  └── spel-nipr-*.tar.gz   1.1 GB
 
 Recommended (archives + checksums):
-  └── All archives         ~1 GB
+  ├── spel-base-*.tar.gz       118 MB
+  ├── spel-tools-*.tar.gz      289 MB
+  ├── spel-nipr-complete-*.tar.gz  694 MB
+  └── checksums + manifest     <1 MB
+  Total: 1.1 GB
 ```
 
 ### NIPR System (Deployed)
@@ -218,16 +227,18 @@ Recommended (archives + checksums):
 ```
 Deployed workspace:
   ├── Code/Scripts         ~100 MB
-  ├── Ansible roles        ~60 MB
-  ├── Ansible collections  ~5 MB (tarballs, installed to ~/.ansible/collections/)
-  ├── Offline packages     ~75 MB
-  ├── Build tools          ~400 MB
-  ├── Packer plugins       ~100 MB
+  ├── Ansible roles        4 MB
+  ├── Ansible collections  3.5 MB (tarballs, installed to ~/.ansible/collections/)
+  ├── Python dependencies  16 MB
+  ├── Offline packages     86 MB
+  ├── Packer binaries      97 MB
+  ├── Packer plugins       241 MB
+  ├── SPEL packages        56 KB
   ├── Vendor submodules    ~100 MB
   └── Build workspace      ~10-15 GB (per concurrent build)
   
-Minimum: ~1 GB
-Recommended: ~20-35 GB (allows 1-2 concurrent builds)
+Minimum: 1.1 GB
+Recommended: 20-35 GB (allows 1-2 concurrent builds)
 ```
 
 **Note**: NIPR builds use RHUI repositories within AWS GovCloud, so no local mirrors are needed.

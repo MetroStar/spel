@@ -8,10 +8,10 @@
 git clone --recurse-submodules https://github.com/MetroStar/spel.git && cd spel/
 
 # Run all optimization scripts
-./scripts/vendor-ansible-roles.sh              # 60 MB (vs 300 MB)
-./scripts/vendor-ansible-collections.sh         # 5 MB (vs 20 MB)
-./scripts/download-offline-packages.sh          # 75 MB (vs 100 MB)
-./scripts/create-transfer-archive.sh            # Creates ~1 GB archives
+./scripts/vendor-ansible-roles.sh              # 4 MB (vs 300 MB)
+./scripts/vendor-ansible-collections.sh         # 3.5 MB (vs 20 MB)
+./scripts/download-offline-packages.sh          # 86 MB (vs 100 MB)
+./scripts/create-transfer-archive.sh            # Creates 1.1 GB archives
 
 # Verify and transfer
 sha256sum -c spel-nipr-*-checksums.txt
@@ -33,12 +33,15 @@ export SPEL_OFFLINE_MODE=true
 
 | Component | Before | After | Savings |
 |-----------|--------|-------|---------|  
-| Roles | 300 MB | 60 MB | 80% |
-| Collections | 20 MB | 5 MB | 75% |
-| Packages | 100 MB | 75 MB | 25% |
-| Tools | 400 MB | 400 MB | - |
-| **Total** | **820 MB** | **600 MB** | **27%** |
-| **Compressed** | - | **~1 GB** | **~0%** |
+| Roles | 300 MB | 4 MB | 99% |
+| Collections | 20 MB | 3.5 MB | 83% |
+| Offline Packages | 100 MB | 86 MB | 14% |
+| Python Deps | 100 MB | 16 MB | 84% |
+| Packer Binaries | 500 MB | 97 MB | 81% |
+| Packer Plugins | 80 MB | 241 MB | -201% |
+| SPEL Packages | 20 MB | 56 KB | 99.7% |
+| **Total** | **1120 MB** | **447 MB** | **60%** |
+| **Compressed** | **447 MB** | **1.1 GB** | **-146%** |
 
 Note: NIPR builds now use RHUI repositories available in AWS GovCloud, eliminating the need for 30-50 GB of YUM/DNF mirrors.
 
@@ -46,10 +49,10 @@ Note: NIPR builds now use RHUI repositories available in AWS GovCloud, eliminati
 
 | Script | Purpose | Output |
 |--------|---------|--------|
-| `vendor-ansible-roles.sh` | Ansible roles | 60 MB roles + archive |
-| `vendor-ansible-collections.sh` | Ansible collections | 5 MB tarballs |
-| `download-offline-packages.sh` | AWS utilities | 75 MB packages + archive |
-| `create-transfer-archive.sh` | Transfer archives | ~1 GB compressed |
+| `vendor-ansible-roles.sh` | Ansible roles | 4 MB roles + archive |
+| `vendor-ansible-collections.sh` | Ansible collections | 3.5 MB tarballs |
+| `download-offline-packages.sh` | AWS utilities | 86 MB packages + archive |
+| `create-transfer-archive.sh` | Transfer archives | 1.1 GB compressed |
 | `extract-nipr-archives.sh` | NIPR extraction | Deployed workspace |
 
 ## Environment Variables Cheat Sheet
@@ -75,8 +78,9 @@ export SPEL_ARCHIVE_COMBINED=true          # Single archive
 ## Archive Contents
 
 ### Separate Archives (Default)
-- `spel-base-YYYYMMDD.tar.gz` (~100 MB) - Code, scripts, configs, roles
-- `spel-tools-YYYYMMDD.tar.gz` (~400 MB) - Packer, Python, AWS packages
+- `spel-base-YYYYMMDD.tar.gz` (118 MB) - Code, scripts, configs, roles
+- `spel-tools-YYYYMMDD.tar.gz` (289 MB) - Packer, Python, AWS packages, plugins
+- `spel-nipr-complete-YYYYMMDD.tar.gz` (694 MB) - Complete workspace
 - `spel-nipr-YYYYMMDD-checksums.txt` - SHA256 verification
 
 ### Combined Archive
