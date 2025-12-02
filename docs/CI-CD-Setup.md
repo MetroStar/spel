@@ -135,10 +135,6 @@ sudo gitlab-runner register \
   --executor shell \
   --description "SPEL NIPR Builder" \
   --tag-list "spel-nipr-runner"
-
-# Grant sudo privileges
-sudo visudo
-# Add: gitlab-runner ALL=(ALL) NOPASSWD: /path/to/spel/scripts/setup-local-repos.sh
 ```
 
 #### Required GitLab CI/CD Variables
@@ -364,15 +360,9 @@ Solution: Re-transfer archives, verify file integrity
 sha256sum spel-*.tar.gz > manual-checksums.txt
 ```
 
-**Problem**: Configure repos fails - permission denied
-```bash
-Solution: Add gitlab-runner to sudoers for setup-local-repos.sh
-sudo visudo
-```
-
 **Problem**: Build fails - cannot access repositories
 ```bash
-Solution: Verify local repos configured
+Solution: Verify AWS GovCloud RHUI repositories are accessible
 sudo dnf repolist
 sudo dnf makecache
 ```

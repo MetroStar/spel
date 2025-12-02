@@ -451,4 +451,4 @@ jobs:
           echo "2. Verify checksums: \`sha256sum -c spel-nipr-${DATE}-checksums.txt\`" >> $GITHUB_STEP_SUMMARY
           echo "3. Transfer archives to NIPR environment" >> $GITHUB_STEP_SUMMARY
           echo "4. Extract on NIPR: \`./scripts/extract-nipr-archives.sh\`" >> $GITHUB_STEP_SUMMARY
-          echo "5. Configure repos: \`sudo ./scripts/setup-local-repos.sh\`" >> $GITHUB_STEP_SUMMARY
+          echo "5. Run GitLab CI pipeline to build AMIs (uses RHUI repositories)" >> $GITHUB_STEP_SUMMARY
