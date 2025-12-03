@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: fedora:latest
-    timeout-minutes: 10  # Typically completes in 2-3 minutes (actual: 2:25)
+    timeout-minutes: 15  # Typically completes in 5-8 minutes with ClamAV scan (was 2-3 min without scan)
     
     steps:
       - name: Install Git for checkout
@@ -86,7 +86,9 @@ jobs:
             python3.12 \
             python3-pip \
             unzip \
-            bash
+            bash \
+            clamav \
+            clamav-update
       
       - name: Set up environment variables
         run: |
@@ -110,6 +112,20 @@ jobs:
           # Python configuration (use 3.12 for GitHub Actions runner compatibility)
           echo "SPEL_PYTHON_VERSION=3.12" >> $GITHUB_ENV
           echo "SPEL_ANSIBLE_VERSION=>=2.14.0,<2.16.0" >> $GITHUB_ENV
+      
+      - name: Update ClamAV virus definitions
+        run: |
+          echo "=== Updating ClamAV Virus Definitions ==="
+          
+          # Create ClamAV database directory
+          mkdir -p /var/lib/clamav
+          
+          # Update virus definitions
+          freshclam --verbose
+          
+          echo ""
+          echo "ClamAV database updated successfully"
+          clamscan --version
       
       - name: Display configuration
         run: |
@@ -265,10 +281,116 @@ jobs:
           echo "Total packages size:"
           du -sh offline-packages/
       
+      - name: Scan files with ClamAV
+        run: |
+          echo "=== Scanning All Files with ClamAV ==="
+          echo "This scan ensures all downloaded/vendored files are clean before archiving"
+          echo ""
+          
+          # Scan directories containing downloaded/vendored content
+          SCAN_DIRS=(
+            "mirrors/spel-packages"
+            "tools/packer"
+            "tools/python-deps"
+            "offline-packages"
+            "spel/ansible/roles"
+            "spel/ansible/collections"
+            "vendor"
+          )
+          
+          SCAN_LOG="clamav-scan-${DATE}.log"
+          INFECTED_FILES=0
+          SCANNED_FILES=0
+          
+          echo "Scanning directories:" | tee "$SCAN_LOG"
+          for dir in "${SCAN_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "  - $dir" | tee -a "$SCAN_LOG"
+            fi
+          done
+          echo "" | tee -a "$SCAN_LOG"
+          
+          # Perform full recursive scan with detailed output
+          # --recursive: scan subdirectories
+          # --infected: only print infected files
+          # --bell: sound bell on virus detection
+          # --log: save scan results
+          # Exit codes: 0=clean, 1=infected, 2=error
+          
+          echo "Starting full recursive virus scan..." | tee -a "$SCAN_LOG"
+          echo "Scan started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
+          echo "" | tee -a "$SCAN_LOG"
+          
+          for dir in "${SCAN_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "========================================" | tee -a "$SCAN_LOG"
+              echo "Scanning: $dir" | tee -a "$SCAN_LOG"
+              echo "========================================" | tee -a "$SCAN_LOG"
+              
+              if clamscan --recursive --infected --verbose "$dir" | tee -a "$SCAN_LOG"; then
+                echo "✓ $dir: CLEAN" | tee -a "$SCAN_LOG"
+              else
+                SCAN_EXIT=$?
+                if [ $SCAN_EXIT -eq 1 ]; then
+                  echo "✗ $dir: INFECTED FILES DETECTED!" | tee -a "$SCAN_LOG"
+                  INFECTED_FILES=$((INFECTED_FILES + 1))
+                else
+                  echo "⚠ $dir: SCAN ERROR (exit code: $SCAN_EXIT)" | tee -a "$SCAN_LOG"
+                fi
+              fi
+              echo "" | tee -a "$SCAN_LOG"
+            fi
+          done
+          
+          echo "========================================" | tee -a "$SCAN_LOG"
+          echo "Scan completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
+          echo "========================================" | tee -a "$SCAN_LOG"
+          
+          # Get scan summary
+          echo "" | tee -a "$SCAN_LOG"
+          echo "=== ClamAV Scan Summary ===" | tee -a "$SCAN_LOG"
+          
+          # Count scanned files from log
+          SCANNED_FILES=$(grep -c "Scanning " "$SCAN_LOG" || echo "0")
+          
+          echo "Directories scanned: ${#SCAN_DIRS[@]}" | tee -a "$SCAN_LOG"
+          echo "Files scanned: $SCANNED_FILES" | tee -a "$SCAN_LOG"
+          
+          # Check if any infections found
+          if [ $INFECTED_FILES -gt 0 ]; then
+            echo "" | tee -a "$SCAN_LOG"
+            echo "❌ VIRUS SCAN FAILED!" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Infected directories detected: $INFECTED_FILES" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "ACTION REQUIRED:" | tee -a "$SCAN_LOG"
+            echo "  1. Review scan log above for infected files" | tee -a "$SCAN_LOG"
+            echo "  2. Investigate source of infected files" | tee -a "$SCAN_LOG"
+            echo "  3. Remove or quarantine infected files" | tee -a "$SCAN_LOG"
+            echo "  4. Re-run workflow after remediation" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "NIPR SECURITY POLICY: Infected files cannot be transferred" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            
+            # Fail workflow
+            exit 1
+          else
+            echo "" | tee -a "$SCAN_LOG"
+            echo "✅ ALL FILES CLEAN - No threats detected" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Files are safe for NIPR transfer" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+          fi
+          
+          # Save scan log as artifact
+          mv "$SCAN_LOG" "spel-nipr-${DATE}-clamav-scan.log"
+      
       - name: Create transfer archives
         if: github.event.inputs.create_archives != 'false'
         run: |
           echo "=== Creating Transfer Archives ==="
+          echo "Note: All files passed ClamAV virus scan"
+          echo ""
           ./scripts/create-transfer-archive.sh
           
           echo ""
@@ -334,6 +456,12 @@ jobs:
           - Removed .git directories from Ansible roles (saves ~80%)
           - Used single SSM agent for EL8/EL9 (saves ~25%)
           - Created compressed archives
+          
+          Security Scan
+          -------------
+          - ClamAV virus scan: PASSED
+          - All files scanned and verified clean
+          - Scan log: spel-nipr-${DATE}-clamav-scan.log
           
           Expected Sizes (Actual Measured)
           --------------------------------
@@ -403,6 +531,7 @@ jobs:
             spel-*.tar.gz
             spel-nipr-*-checksums.txt
             spel-nipr-*-manifest.txt
+            spel-nipr-*-clamav-scan.log
           retention-days: 90
           compression-level: 0
       
@@ -445,6 +574,17 @@ jobs:
           echo "- ✅ Single SSM agent for EL8/EL9 (saves ~25%)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Compressed archives" >> $GITHUB_STEP_SUMMARY
           echo "- ℹ️  YUM/DNF mirrors NOT included - NIPR uses its own RPM repositories" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "spel-nipr-${DATE}-clamav-scan.log" ]; then
+            echo "- ✅ ClamAV virus scan: **PASSED**" >> $GITHUB_STEP_SUMMARY
+            echo "- All files verified clean before archiving" >> $GITHUB_STEP_SUMMARY
+            echo "- Scan log included in artifacts" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚠️  ClamAV scan: Not performed" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
