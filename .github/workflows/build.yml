@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       offline_mode:
-        description: "Use offline mode with NIPR artifacts"
+        description: "Use offline mode with NIPR artifacts (includes ClamAV-scanned files)"
         required: false
         default: false
         type: boolean
@@ -104,10 +104,41 @@ jobs:
               fi
             fi
             
+            # Check for ClamAV scan log
+            SCAN_LOG=$(ls spel-nipr-*-clamav-scan.log 2>/dev/null | head -1)
+            if [ -n "$SCAN_LOG" ]; then
+              echo ""
+              echo "=== Security Scan Verification ==="
+              echo "ClamAV scan log found: $SCAN_LOG"
+              
+              # Check if scan passed
+              if grep -q "Infected files: 0" "$SCAN_LOG"; then
+                echo "✅ ClamAV scan: PASSED"
+                echo "   All files verified clean before archiving"
+                
+                # Display scan summary
+                echo ""
+                echo "Scan summary:"
+                grep -A 10 "SCAN SUMMARY" "$SCAN_LOG" | head -12 || true
+              else
+                echo "⚠️  ClamAV scan status unclear - review log"
+                echo "   Infected files may have been detected"
+              fi
+              echo "======================="
+              echo ""
+            else
+              echo ""
+              echo "⚠️  WARNING: No ClamAV scan log found in artifacts"
+              echo "   This may indicate archives were prepared without security scanning"
+              echo "   NIPR security policy requires all files to be virus-scanned"
+              echo ""
+            fi
+            
             # Move archives to repository root
             mv spel-*.tar.gz ../ 2>/dev/null || true
             mv spel-nipr-*-checksums.txt ../ 2>/dev/null || true
             mv spel-nipr-*-manifest.txt ../ 2>/dev/null || true
+            mv spel-nipr-*-clamav-scan.log ../ 2>/dev/null || true
             cd ..
           else
             echo "⚠ No artifacts downloaded - checking for archives in repository..."
@@ -269,6 +300,85 @@ jobs:
       - name: Build STIGed AMI's
         run: |
           make -f Makefile.spel build
+
+      - name: Create build summary
+        if: always()
+        run: |
+          echo "## SPEL Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add security scan info if in offline mode
+          if [ "${{ github.event.inputs.offline_mode }}" = "true" ]; then
+            echo "### Security Verification" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ -f spel-nipr-*-clamav-scan.log ]; then
+              SCAN_LOG=$(ls spel-nipr-*-clamav-scan.log | head -1)
+              
+              # Check if scan passed
+              if grep -q "Infected files: 0" "$SCAN_LOG" 2>/dev/null; then
+                echo "- ✅ ClamAV virus scan: **PASSED**" >> $GITHUB_STEP_SUMMARY
+                echo "- All components scanned and verified clean" >> $GITHUB_STEP_SUMMARY
+                
+                # Get scan statistics
+                SCANNED_FILES=$(grep "Scanned files:" "$SCAN_LOG" | awk '{print $3}' || echo "unknown")
+                SCAN_TIME=$(grep "Time:" "$SCAN_LOG" | awk '{print $2, $3, $4}' || echo "unknown")
+                
+                echo "- Files scanned: $SCANNED_FILES" >> $GITHUB_STEP_SUMMARY
+                echo "- Scan duration: $SCAN_TIME" >> $GITHUB_STEP_SUMMARY
+                echo "- Compliant with NIPR security requirements" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ⚠️ ClamAV scan status: **UNCLEAR**" >> $GITHUB_STEP_SUMMARY
+                echo "- Review scan log for details" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "- ⚠️ No ClamAV scan log found" >> $GITHUB_STEP_SUMMARY
+              echo "- Archives may not meet NIPR security requirements" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Add build mode info
+          echo "### Build Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.offline_mode }}" = "true" ]; then
+            echo "- **Mode**: Offline (NIPR artifacts)" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ github.event.inputs.nipr_artifact_name }}" ]; then
+              echo "- **Artifact**: \`${{ github.event.inputs.nipr_artifact_name }}\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Mode**: Online (Internet-connected)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # List selected builders
+          echo "### Selected Builders" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event.inputs.run_amzn2023 }}" = "true" ]; then
+            echo "- Amazon Linux 2023" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.run_ol9 }}" = "true" ]; then
+            echo "- Oracle Linux 9" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.run_rhel9 }}" = "true" ]; then
+            echo "- RHEL 9" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.run_ol8 }}" = "true" ]; then
+            echo "- Oracle Linux 8" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.run_rhel8 }}" = "true" ]; then
+            echo "- RHEL 8" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.run_ws2016 }}" = "true" ]; then
+            echo "- Windows Server 2016" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.run_ws2019 }}" = "true" ]; then
+            echo "- Windows Server 2019" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ github.event.inputs.run_ws2022 }}" = "true" ]; then
+            echo "- Windows Server 2022" >> $GITHUB_STEP_SUMMARY
+          fi
 
       # - name: Copy STIGed AMI's to GovCloud
       #   if: github.event.inputs.govcloud == 'true'

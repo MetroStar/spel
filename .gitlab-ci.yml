@@ -46,6 +46,67 @@ extract:archives:
         echo "⚠ No checksum file found, skipping verification"
       fi
     
+    # Verify ClamAV scan results
+    - |
+      echo ""
+      echo "=== Verifying Security Scan ==="
+      
+      SCAN_LOG=$(ls -t spel-nipr-*-clamav-scan.log 2>/dev/null | head -1)
+      
+      if [ -n "$SCAN_LOG" ]; then
+        echo "ClamAV scan log found: $SCAN_LOG"
+        
+        # Check if scan passed (no infected files)
+        if grep -q "Infected files: 0" "$SCAN_LOG"; then
+          echo "✅ ClamAV scan: PASSED"
+          echo "   All files verified clean before transfer"
+          
+          # Display scan summary
+          echo ""
+          echo "Security scan summary:"
+          grep -B 2 -A 10 "SCAN SUMMARY" "$SCAN_LOG" | head -15 || true
+          echo ""
+        else
+          echo "❌ ClamAV scan: FAILED or UNCLEAR"
+          echo ""
+          echo "SECURITY POLICY VIOLATION:"
+          echo "  Files must pass virus scan before use in NIPR"
+          echo "  Review scan log: $SCAN_LOG"
+          echo ""
+          
+          # Show any infected files
+          if grep -q "FOUND" "$SCAN_LOG"; then
+            echo "Infected files detected:"
+            grep "FOUND" "$SCAN_LOG"
+            echo ""
+          fi
+          
+          exit 1
+        fi
+      else
+        echo "⚠️  WARNING: No ClamAV scan log found!"
+        echo ""
+        echo "NIPR SECURITY REQUIREMENT:"
+        echo "  All transferred files must be scanned for viruses"
+        echo "  Missing scan log indicates archives may not comply with security policy"
+        echo ""
+        echo "ACTION REQUIRED:"
+        echo "  1. Verify archives were prepared with nipr-prepare workflow"
+        echo "  2. Ensure ClamAV scanning was enabled during preparation"
+        echo "  3. Re-prepare archives using the official workflow"
+        echo ""
+        
+        # Make this a hard failure for NIPR compliance
+        # Set REQUIRE_SCAN_LOG=false in CI/CD variables to override (not recommended)
+        if [ "${REQUIRE_SCAN_LOG:-true}" = "true" ]; then
+          echo "❌ Failing build due to missing security scan log (NIPR compliance)"
+          exit 1
+        else
+          echo "⚠️  Continuing despite missing scan log (REQUIRE_SCAN_LOG=false)"
+        fi
+      fi
+      echo "============================"
+    
     - echo "Extracting archives..."
     - ./scripts/extract-nipr-archives.sh
     
@@ -70,6 +131,8 @@ extract:archives:
       - spel-packages/
       - tools/
       - vendor/
+      - spel-nipr-*-clamav-scan.log  # Preserve scan log for audit trail
+      - spel-nipr-*-manifest.txt     # Preserve manifest
     expire_in: 7 days
   tags:
     - spel-nipr-runner
@@ -377,6 +440,110 @@ infra:iam:
 #############################################################################
 # Setup Stage - Verify Resources and Initialize Tools
 #############################################################################
+
+# Verify security compliance (NIPR requirement)
+verify:security:
+  stage: setup
+  needs: ["extract:archives"]
+  script:
+    - echo "=== NIPR Security Compliance Verification ==="
+    - echo ""
+    
+    # Check for scan log
+    - |
+      SCAN_LOG=$(ls -t spel-nipr-*-clamav-scan.log 2>/dev/null | head -1)
+      
+      if [ -z "$SCAN_LOG" ]; then
+        echo "❌ COMPLIANCE FAILURE: ClamAV scan log not found"
+        echo ""
+        echo "NIPR security policy requires virus scanning of all transferred files."
+        echo "Archives must be prepared using the nipr-prepare workflow with ClamAV scanning enabled."
+        echo ""
+        exit 1
+      fi
+      
+      echo "✓ ClamAV scan log found: $SCAN_LOG"
+    
+    # Verify scan passed (no infected files)
+    - |
+      if ! grep -q "Infected files: 0" "$SCAN_LOG"; then
+        echo ""
+        echo "❌ COMPLIANCE FAILURE: Files did not pass virus scan"
+        echo ""
+        echo "Scan results indicate infected files or scan errors."
+        echo "Review the scan log for details:"
+        grep "Infected files:" "$SCAN_LOG" || echo "Unable to determine infection count"
+        echo ""
+        
+        if grep -q "FOUND" "$SCAN_LOG"; then
+          echo "Infected files detected:"
+          grep "FOUND" "$SCAN_LOG" | head -10
+          echo ""
+        fi
+        
+        exit 1
+      fi
+      
+      echo "✓ Virus scan passed: 0 infected files"
+    
+    # Verify scan completeness
+    - |
+      SCANNED_FILES=$(grep "Scanned files:" "$SCAN_LOG" | awk '{print $3}')
+      
+      if [ -z "$SCANNED_FILES" ] || [ "$SCANNED_FILES" -lt 100 ]; then
+        echo ""
+        echo "⚠️  WARNING: Scan may be incomplete"
+        echo "   Scanned files: ${SCANNED_FILES:-unknown}"
+        echo "   Expected: 1000+ files typically"
+        echo ""
+      else
+        echo "✓ Scan completeness: $SCANNED_FILES files scanned"
+      fi
+    
+    # Display scan summary
+    - |
+      echo ""
+      echo "=== ClamAV Scan Summary ==="
+      grep -B 2 -A 10 "SCAN SUMMARY" "$SCAN_LOG" | head -15 || {
+        echo "Unable to extract scan summary"
+        echo "Scan log content:"
+        tail -20 "$SCAN_LOG"
+      }
+      echo "=========================="
+    
+    # Check for manifest
+    - |
+      MANIFEST=$(ls -t spel-nipr-*-manifest.txt 2>/dev/null | head -1)
+      
+      if [ -n "$MANIFEST" ]; then
+        echo ""
+        echo "✓ Transfer manifest found: $MANIFEST"
+        echo ""
+        echo "Manifest contents:"
+        cat "$MANIFEST" | head -30
+        echo ""
+      else
+        echo ""
+        echo "⚠️  Transfer manifest not found (optional)"
+        echo ""
+      fi
+    
+    # Final compliance check
+    - |
+      echo ""
+      echo "=== Security Compliance Summary ==="
+      echo "✅ ClamAV scan log: PRESENT"
+      echo "✅ Virus scan result: PASSED (0 infected files)"
+      echo "✅ Files verified: $SCANNED_FILES files scanned"
+      echo "✅ NIPR security requirements: MET"
+      echo ""
+      echo "Archives are compliant and ready for NIPR deployment."
+      echo "===================================="
+  tags:
+    - spel-nipr-runner
+  only:
+    variables:
+      - $EXTRACT_ARCHIVES == "true"
 
 # Verify system resources
 verify:resources:
