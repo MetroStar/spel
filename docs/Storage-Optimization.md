@@ -276,6 +276,173 @@ Recommended: 20-35 GB (allows 1-2 concurrent builds)
 | `SPEL_VERIFY_CHECKSUMS` | `true` | Verify SHA256 checksums |
 | `SPEL_CLEANUP_ARCHIVES` | `false` | Remove archives after extraction |
 
+## Pipeline Integration
+
+### GitLab CI Storage Analysis by Stage
+
+The GitLab CI pipeline manages storage efficiently across multiple stages:
+
+#### Stage 1: Extract (2-3 minutes)
+
+**Storage Impact**: +1 GB (one-time)
+
+```
+Input: Archives in repository (1.1 GB compressed)
+Process: Extract to working directories
+Output: ~1 GB extracted files
+```
+
+**Storage breakdown**:
+- SPEL packages: 56 KB → `spel/`
+- Ansible roles: 4 MB → `vendor/ansible-roles/`
+- Ansible collections: 3.5 MB → `vendor/ansible-collections/`
+- Offline packages: 86 MB → `offline-packages/`
+- Packer binaries: 97 MB → `tools/packer-linux/`, `tools/packer-windows/`
+- Packer plugins: 241 MB → `tools/packer-plugins/`
+- Python packages: 16 MB → `tools/python-deps/`
+
+**Artifacts**: Retained for 90 days, used by all subsequent stages
+
+#### Stage 2: Infrastructure (2-3 minutes, one-time)
+
+**Storage Impact**: Minimal (~10 KB artifacts)
+
+```
+Process: Creates AWS resources via API calls
+Output: infra.env, iam.env configuration files
+```
+
+**Resources created**:
+- VPC, Internet Gateway, Subnet, Route Table (no local storage)
+- Security Group (no local storage)
+- IAM Role, Policy, Instance Profile (no local storage)
+
+**Artifacts**: Configuration files retained for 90 days
+
+#### Stage 3: Setup (4-5 minutes)
+
+**Storage Impact**: +500 MB (temporary)
+
+**Job: verify:resources**
+- No storage impact (checks only)
+- Verifies 50+ GB free disk space
+- Verifies 2+ GB free memory
+
+**Job: aws:verify**
+- No storage impact (API calls only)
+- Tests AWS credentials
+- Verifies VPC/subnet configuration
+
+**Job: setup**
+- Initializes git submodules: vendor/amigen8 (~2 MB), vendor/amigen9 (~2 MB)
+- Detects offline Packer installation
+- No additional storage (uses extracted files)
+
+**Job: python:setup**
+- Creates virtual environment: `.venv/` (~200 MB)
+- Installs from offline wheels in `tools/python-deps/`
+- Temporary: Cleaned between builds or retained for reuse
+
+**Job: packer:init**
+- Initializes Packer plugin cache: `~/.packer.d/` (~300 MB)
+- Uses plugins from `tools/packer-plugins/` (offline mode)
+- Persistent cache: Reused across builds
+
+**Job: verify:dependencies**
+- No storage impact (verification only)
+- Checks submodule content
+
+**Total setup stage storage**: ~500 MB (venv + plugin cache)
+
+#### Stage 4: Validate (1 minute)
+
+**Storage Impact**: Minimal
+
+```
+Process: Runs packer validate on all templates
+Output: Validation results (text logs only)
+```
+
+No additional storage required (uses setup artifacts)
+
+#### Stage 5: Build (2-5 hours per OS)
+
+**Storage Impact**: +15-30 GB per concurrent build
+
+**Per build job storage breakdown**:
+- Packer working directory: 2-5 GB
+  - Source AMI snapshot downloads
+  - Ansible playbook execution
+  - STIG content and scripts
+- Packer cache (`~/.packer.d/tmp/`): 5-10 GB
+  - AMI creation temporary files
+  - Instance volume snapshots
+- Build logs: 10-50 MB
+  - Ansible output
+  - Packer progress logs
+  - Error debugging information
+
+**Concurrent builds**:
+- 1 OS build: ~17 GB total workspace
+- 2 concurrent builds: ~32 GB total workspace
+- 3 concurrent builds: ~47 GB total workspace
+- Full parallel (8 OS): ~120+ GB total workspace
+
+**Cleanup**: Packer automatically cleans working directory after successful build, but cache persists
+
+### Total System Requirements
+
+**Minimum for single OS build**:
+- Extracted archives: 1 GB
+- Python venv: 200 MB
+- Packer plugin cache: 300 MB
+- Build workspace: 15-20 GB
+- **Total**: 17-22 GB free space
+
+**Recommended for monthly builds** (2-3 OS concurrently):
+- Base: 1.5 GB (archives + setup)
+- Build workspaces: 45-60 GB (3 × 15-20 GB)
+- **Total**: 50+ GB free space (verified by `verify:resources` job)
+
+**Required for full release** (8 OS builds in parallel):
+- Base: 1.5 GB
+- Build workspaces: 120-160 GB (8 × 15-20 GB)
+- **Total**: 130+ GB free space
+
+### Storage Optimization Tips for Pipeline
+
+1. **Clean Packer cache periodically**:
+   ```bash
+   rm -rf ~/.packer.d/tmp/*
+   # Saves 5-10 GB per previous build
+   ```
+
+2. **Reuse Python venv**:
+   - Keep `.venv/` between builds (saves 4-5 min setup time)
+   - Recreate monthly when archives update
+
+3. **Run builds serially for limited disk**:
+   - Set only one `RUN_<OS>=true` at a time
+   - Reduces peak storage to ~20 GB vs 120+ GB
+
+4. **Archive rotation**:
+   - Keep only current month's archives in repository
+   - Delete previous month after successful extraction
+   - Saves 1 GB per old archive set
+
+5. **Artifact cleanup**:
+   - GitLab automatically deletes artifacts after 90 days
+   - Manually delete old pipeline artifacts if storage constrained
+   - infra.env/iam.env are tiny (<10 KB), keep for infrastructure reuse
+
+### Pipeline Storage Best Practices
+
+1. **Initial setup**: Run extract and infrastructure stages once, artifacts last 90 days
+2. **Monthly builds**: Only re-extract if archives updated, reuse infrastructure
+3. **Concurrent limits**: Don't exceed (available_space - 2GB) / 20GB concurrent builds
+4. **Monitor usage**: Check `df -h` before starting builds (verified automatically)
+5. **Clean between releases**: Remove Packer cache and old venv before major releases
+
 ## Troubleshooting
 
 ### Issue: Transfer archive too large for media
