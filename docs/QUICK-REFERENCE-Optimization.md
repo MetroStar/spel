@@ -25,22 +25,34 @@
 # Or manually trigger workflow at:
 # https://github.com/MetroStar/spel/actions/workflows/nipr-prepare.yml
 
+# Workflow duration: 5-8 minutes (includes ClamAV virus scan)
+
 # Download artifacts after workflow completes:
 # - spel-nipr-YYYYMMDD-base.tar.gz (118 MB)
 # - spel-nipr-YYYYMMDD-tools.tar.gz (289 MB)  
 # - spel-nipr-YYYYMMDD-complete.tar.gz (694 MB)
 # - spel-nipr-YYYYMMDD-checksums.txt
+# - spel-nipr-YYYYMMDD-manifest.txt
+# - spel-nipr-YYYYMMDD-clamav-scan.log (security audit trail)
 
-# Verify before transfer
+# Verify security scan passed (check GitHub Actions summary)
+# ClamAV scans ~1.6 GB across 7 directories (3-5 min)
+# Scan log shows: Infected files: 0
+
+# Verify checksums before transfer
 sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
 ```
 
 ### Step 2: Transfer to NIPR
 ```bash
 # Transfer via approved method (DVD, secure transfer, etc.)
-# Total transfer size: ~1.1 GB
+# Total transfer size: ~1.1 GB (includes virus scan log)
 # Verify checksums after transfer
 sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
+
+# Review security scan log for compliance
+less spel-nipr-YYYYMMDD-clamav-scan.log
+# Verify: "Infected files: 0" in scan summary
 ```
 
 ### Step 3: Upload to GitLab NIPR
@@ -49,10 +61,13 @@ sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
 git clone https://your-gitlab-nipr-instance.mil/your-group/spel.git
 cd spel/
 
-# Add archives
+# Add archives and security artifacts
 git lfs track "*.tar.gz"
-git add .gitattributes spel-*.tar.gz spel-nipr-*-checksums.txt
-git commit -m "Add NIPR transfer archives for December 2025"
+git add .gitattributes spel-*.tar.gz \
+  spel-nipr-*-checksums.txt \
+  spel-nipr-*-manifest.txt \
+  spel-nipr-*-clamav-scan.log
+git commit -m "Add NIPR transfer archives for December 2025 (virus scan: clean)"
 git push
 ```
 
@@ -210,8 +225,9 @@ git push
 ### Internet System (GitHub Actions Runner)
 - Workspace: 500 MB
 - Dependencies download: 1.5 GB
+- ClamAV virus definitions: ~300 MB
 - Archives created: 1.1 GB
-- **Total needed**: ~3 GB free space
+- **Total needed**: ~3.4 GB free space
 
 ### Transfer Media
 - **Total transfer**: 1.1 GB
@@ -219,6 +235,8 @@ git push
   - Tools archive: 289 MB
   - Complete archive: 694 MB (optional)
   - Checksums: minimal
+  - Manifest: minimal
+  - ClamAV scan log: ~50 KB (security audit trail)
 
 ### NIPR System (GitLab Runner)
 - Extracted archives: ~1 GB
@@ -277,6 +295,29 @@ ls -lh tools/packer-plugins/
 # Submodules empty
 git submodule update --init --recursive
 ls -lh vendor/amigen8/ vendor/amigen9/
+```
+
+### Security Scanning
+```bash
+# Verify scan passed (on Internet system, GitHub Actions summary)
+# Look for: "Security Scan: ✅ PASSED (0 infected files)"
+
+# Review scan log details
+less spel-nipr-YYYYMMDD-clamav-scan.log
+
+# Check scan summary
+grep "SCAN SUMMARY" -A 10 spel-nipr-YYYYMMDD-clamav-scan.log
+# Verify: "Infected files: 0"
+# Typical: 5000+ files scanned, 3-5 min duration
+
+# If virus detected (workflow fails)
+grep "FOUND" spel-nipr-YYYYMMDD-clamav-scan.log
+# Investigate detected files, verify false positives
+
+# ClamAV version check (on Internet system)
+freshclam --version
+clamscan --version
+# Database should have 8M+ signatures
 ```
 
 ### Build Stage

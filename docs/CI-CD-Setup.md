@@ -12,12 +12,13 @@ The NIPR transfer workflow is split across two CI/CD systems:
 ```
 Internet System (GitHub)          NIPR System (GitLab)
 ┌─────────────────────┐          ┌──────────────────────┐
-│ 1. Vendor Roles     │          │ 7. Extract Archives  │
-│ 2. Vendor Colls     │          │ 8. Setup Environment │
-│ 3. Download Pkgs    │   -->    │ 9. Validate          │
-│ 4. Create Archives  │ Transfer │ 10. Build AMIs       │
-│ 5. Verify Checksums │          │                      │
-│ 6. Upload Artifacts │          │                      │
+│ 1. Vendor Roles     │          │ 8. Extract Archives  │
+│ 2. Vendor Colls     │          │ 9. Setup Environment │
+│ 3. Download Pkgs    │   -->    │ 10. Validate         │
+│ 4. ClamAV Scan 🔒   │ Transfer │ 11. Build AMIs       │
+│ 5. Create Archives  │          │                      │
+│ 6. Verify Checksums │          │                      │
+│ 7. Upload Artifacts │          │                      │
 └─────────────────────┘          └──────────────────────┘
 ```
 
@@ -32,6 +33,7 @@ Location: `.github/workflows/nipr-prepare.yml`
 - **Automated Scheduling**: Runs monthly on the 15th at 6:00 AM UTC
 - **Manual Triggers**: Run on-demand with customizable options
 - **Storage Optimization**: Reduces transfer size by 70%
+- **Security Scanning**: ClamAV virus scan before archiving 🔒
 - **Artifact Upload**: Stores archives in GitHub for 90 days
 - **Checksum Verification**: Generates SHA256 checksums for all archives
 
@@ -78,20 +80,26 @@ SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
 ### Workflow Steps
 
 1. **Checkout** - Clone repository with submodules
-2. **Install dependencies** - Python, pip, ansible-galaxy
-3. **Set environment** - Configure optimization variables
-4. **Vendor roles** - Clone Ansible roles without git history (4 MB)
-5. **Vendor collections** - Download Ansible collections as tarballs (3.5 MB)
-6. **Download packages** - Get AWS utilities and Packer (183 MB: 86 MB offline + 97 MB Packer)
-7. **Download Packer plugins** - Get required Packer plugins (241 MB)
-8. **Create archives** - Build compressed transfer archives (1.1 GB total)
-9. **Verify checksums** - Validate all archives with SHA256
-10. **Generate manifest** - Create transfer documentation
-11. **Upload artifacts** - Store in GitHub for download (90 day retention)
+2. **Install dependencies** - Python, pip, ansible-galaxy, ClamAV
+3. **Update virus definitions** - Download latest ClamAV signatures via freshclam
+4. **Set environment** - Configure optimization variables
+5. **Vendor roles** - Clone Ansible roles without git history (4 MB)
+6. **Vendor collections** - Download Ansible collections as tarballs (3.5 MB)
+7. **Download packages** - Get AWS utilities and Packer (183 MB: 86 MB offline + 97 MB Packer)
+8. **Download Packer plugins** - Get required Packer plugins (241 MB)
+9. **Scan files with ClamAV** - Full recursive virus scan of all components (3-5 min) 🔒
+10. **Create archives** - Build compressed transfer archives (1.1 GB total)
+11. **Verify checksums** - Validate all archives with SHA256
+12. **Generate manifest** - Create transfer documentation with scan results
+13. **Upload artifacts** - Store in GitHub for download (90 day retention)
 
 ### Expected Output
 
 ```
+Security Scan:
+  ✅ ClamAV scan: PASSED
+  All files verified clean before archiving
+
 Archives created:
   spel-base-20251202.tar.gz                  118 MB
   spel-tools-20251202.tar.gz                 289 MB
@@ -99,13 +107,90 @@ Archives created:
 
 Total archive size: 1.1 GB
 
-Workflow duration: 2-3 minutes (typical: 2:25)
+Workflow duration: 5-8 minutes (typical: includes 3-5 min ClamAV scan)
 
 Files ready for transfer:
   - spel-nipr-20251202-checksums.txt
   - spel-nipr-20251202-manifest.txt
+  - spel-nipr-20251202-clamav-scan.log
   - spel-*.tar.gz
 ```
+
+### Security Scanning
+
+Before creating transfer archives, all files are scanned with **ClamAV** antivirus software to ensure NIPR security compliance.
+
+**Scan Coverage**:
+
+The workflow performs a comprehensive recursive scan of all directories that will be archived:
+
+1. **mirrors/spel-packages/** - SPEL repository RPMs (~800 MB)
+2. **tools/packer/** - Packer binaries and plugins (~500 MB)
+3. **tools/python-deps/** - Python wheels and dependencies (~150 MB)
+4. **offline-packages/** - AWS utilities and tools (~5 MB)
+5. **spel/ansible/roles/** - Vendored Ansible roles (~10 MB)
+6. **spel/ansible/collections/** - Ansible collection tarballs (~50 MB)
+7. **vendor/** - Submodule dependencies (~100 MB)
+
+**Scan Process**:
+
+1. **Install ClamAV**: Installs `clamav` and `clamav-update` packages
+2. **Update Virus Definitions**: Downloads latest signatures (~200-300 MB) via `freshclam`
+3. **Scan Files**: Executes `clamscan -r` on all 7 directories (3-5 minutes)
+4. **Verify Results**: Checks exit code and scanned file count
+5. **Log Results**: Saves detailed scan log as `spel-nipr-YYYYMMDD-clamav-scan.log`
+
+**Scan Output Example** (Success):
+
+```
+----------- SCAN SUMMARY -----------
+Known viruses: 8730764
+Engine version: 1.0.7
+Scanned directories: 1234
+Scanned files: 5678
+Infected files: 0
+Data scanned: 1234.56 MB
+Data read: 2345.67 MB
+Time: 180.456 sec (3 m 0 s)
+Start Date: 2025:01:15 10:30:00
+End Date:   2025:01:15 10:33:00
+```
+
+**Failure Handling**:
+
+The workflow uses **fail-fast** behavior for NIPR security requirements:
+
+- **Exit Code 0**: Clean scan - workflow continues ✅
+- **Exit Code 1**: Virus detected - **workflow fails immediately** ❌
+- **Exit Code 2**: Scan error - **workflow fails immediately** ❌
+
+When a virus is detected or scan error occurs:
+1. Detailed scan log is saved showing infected files
+2. Workflow terminates before creating archives
+3. No artifacts are uploaded (prevents contamination)
+4. Security team reviews scan log to identify issues
+
+**Scan Log Details**:
+
+The scan log (`spel-nipr-YYYYMMDD-clamav-scan.log`) includes:
+- Complete list of scanned files
+- Virus signatures database version
+- Scan timing and performance metrics
+- Infected file paths (if any detected)
+- File size: ~50 KB
+
+The scan log is:
+- Included in transfer archives for audit trail
+- Added to GitHub Actions artifacts (90-day retention)
+- Referenced in the transfer manifest
+- Available for security review on NIPR side
+
+**Security Compliance**:
+
+- **NIPR Requirement**: All files must be virus-scanned before air-gap transfer
+- **Audit Trail**: Scan log provides verifiable security compliance
+- **Database Updates**: Latest virus definitions ensure current threat detection
+- **Fail-Fast**: Prevents any infected files from reaching NIPR environment
 
 ## GitLab CI Setup (NIPR)
 
@@ -763,6 +848,85 @@ Solution: Check Packer template for errors
 packer validate spel/minimal-linux.pkr.hcl
 
 # Fix syntax errors in template files
+```
+
+### Security Scanning Issues
+
+**Problem**: ClamAV scan fails - virus definitions update failed
+```bash
+Solution: Check network connectivity and freshclam logs
+sudo freshclam --verbose
+
+# Common causes:
+# - Network connectivity issues (check firewall rules)
+# - Insufficient disk space for virus definitions (~200-300 MB)
+# - ClamAV mirrors temporarily unavailable
+
+# Retry workflow after verifying network and disk space
+```
+
+**Problem**: ClamAV scan fails - infected file detected
+```bash
+Solution: Review scan log to identify infected files
+cat spel-nipr-YYYYMMDD-clamav-scan.log | grep FOUND
+
+# Output example:
+# /path/to/infected/file.exe: Win.Trojan.Generic FOUND
+
+# Actions:
+# 1. Verify false positive (some security tools trigger AV)
+# 2. If legitimate file, report false positive to ClamAV
+# 3. If truly infected, remove file from repository
+# 4. Re-run nipr-prepare workflow after cleanup
+```
+
+**Problem**: ClamAV scan timeout - exceeds 15 minutes
+```bash
+Solution: Large file sets may require more time
+
+# Workflow timeout: 15 minutes (includes scan + archive creation)
+# Typical scan: 3-5 minutes for ~1.6 GB of files
+
+# If timeout occurs:
+# 1. Check for extremely large files in scanned directories
+# 2. Verify system has sufficient CPU/memory resources
+# 3. Consider increasing timeout in .github/workflows/nipr-prepare.yml
+```
+
+**Problem**: Scan completes but no log file created
+```bash
+Solution: Check scan step logs for errors
+
+# Scan log should be created at:
+# spel-nipr-YYYYMMDD-clamav-scan.log
+
+# If missing:
+# 1. Review workflow logs for scan step errors
+# 2. Verify write permissions in repository root
+# 3. Check disk space (log file ~50 KB)
+```
+
+**Problem**: Scan log not included in transfer archives
+```bash
+Solution: Verify scan passed before archiving
+
+# Archive creation requires successful scan (exit code 0)
+# If workflow fails during scan, archives are not created
+
+# To verify:
+# 1. Check GitHub Actions summary for security scan status
+# 2. Review manifest file for scan log reference
+# 3. Verify scan log in artifacts (if workflow completed)
+```
+
+### Validate Stage Issues (continued)
+
+**Problem**: Template validation fails - syntax error
+```bash
+Solution: Check Packer template for errors
+packer validate spel/minimal-linux.pkr.hcl
+
+# Fix syntax errors in template files
 # Common issues:
 # - Missing required variables
 # - Invalid HCL syntax
@@ -944,6 +1108,22 @@ Solution: Increase timeout-minutes in workflow file
 3. **Verify checksums always**: Never skip checksum verification
 4. **Audit infrastructure access**: Review security group rules periodically
 5. **Keep GitLab variables protected**: Mark all credentials as "Protected" and "Masked"
+6. **Review ClamAV scan logs**: Always check scan results before transferring archives
+7. **Update virus definitions regularly**: Run nipr-prepare workflow frequently to get latest definitions
+8. **Investigate scan failures immediately**: Any virus detection requires immediate investigation
+9. **Maintain scan log audit trail**: Keep scan logs for compliance and security review
+10. **Verify scan completion**: Confirm ClamAV scanned expected file count before accepting results
+
+### ClamAV Security Scanning
+
+1. **Run nipr-prepare before monthly transfers**: Ensures latest virus definitions are used
+2. **Review scan summary in GitHub Actions**: Check "Infected files: 0" in workflow output
+3. **Include scan log in NIPR transfer**: Provides security team with verification evidence
+4. **Archive scan logs long-term**: Keep scan logs beyond 90-day artifact retention for compliance
+5. **Report false positives**: If legitimate files trigger detection, report to ClamAV upstream
+6. **Monitor scan duration**: Typical scan is 3-5 minutes; longer times may indicate issues
+7. **Verify database version**: Scan summary shows virus definition count (8M+ is typical)
+8. **Use fail-fast for NIPR**: Never disable exit-on-error for security scans
 
 ## Infrastructure Setup Details (Manual Alternative)
 

@@ -15,9 +15,11 @@ This guide provides strategies to minimize storage requirements and transfer siz
 | Packer Binaries | 500 MB | 97 MB | **81%** |
 | Packer Plugins | 80 MB | 241 MB | **-201%** |
 | SPEL Packages | 20 MB | 56 KB | **99.7%** |
+| ClamAV DB (temporary) | 0 MB | 300 MB | **N/A** |
 | **TOTAL** | **1120 MB** | **447 MB** | **60%** |
 
 **Compressed Transfer**: 447 MB → **1.1 GB** (118 MB base + 289 MB tools + 694 MB complete)
+**Security Artifacts**: Checksums + manifest + ClamAV scan log (~50 KB total)
 
 ## Automated Optimization Workflow
 
@@ -204,8 +206,10 @@ Workspace:
   ├── Packer binaries      97 MB
   ├── Packer plugins       241 MB
   ├── SPEL packages        56 KB
+  ├── ClamAV virus DB      ~300 MB (temporary, for scanning)
   └── Transfer archives    1.1 GB
-Total working space: 2-3 GB
+Total working space: 2-3.4 GB
+Note: ClamAV DB downloaded during scan, not included in transfer
 ```
 
 ### Transfer Media
@@ -214,11 +218,13 @@ Total working space: 2-3 GB
 Minimum (compressed archives only):
   └── spel-nipr-*.tar.gz   1.1 GB
 
-Recommended (archives + checksums):
+Recommended (archives + security artifacts):
   ├── spel-base-*.tar.gz       118 MB
   ├── spel-tools-*.tar.gz      289 MB
   ├── spel-nipr-complete-*.tar.gz  694 MB
-  └── checksums + manifest     <1 MB
+  ├── checksums.txt            ~2 KB
+  ├── manifest.txt             ~5 KB
+  └── clamav-scan.log          ~50 KB (security audit trail)
   Total: 1.1 GB
 ```
 
@@ -289,7 +295,7 @@ The GitLab CI pipeline manages storage efficiently across multiple stages:
 ```
 Input: Archives in repository (1.1 GB compressed)
 Process: Extract to working directories
-Output: ~1 GB extracted files
+Output: ~1 GB extracted files + scan log
 ```
 
 **Storage breakdown**:
@@ -300,6 +306,12 @@ Output: ~1 GB extracted files
 - Packer binaries: 97 MB → `tools/packer-linux/`, `tools/packer-windows/`
 - Packer plugins: 241 MB → `tools/packer-plugins/`
 - Python packages: 16 MB → `tools/python-deps/`
+- ClamAV scan log: ~50 KB → `spel-nipr-YYYYMMDD-clamav-scan.log`
+
+**Security Artifacts**:
+- Checksums file: ~2 KB
+- Manifest file: ~5 KB
+- ClamAV scan log: ~50 KB (includes complete scan results, virus DB version, scan metrics)
 
 **Artifacts**: Retained for 90 days, used by all subsequent stages
 
