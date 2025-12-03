@@ -77,7 +77,9 @@ git push
 # Set variable: EXTRACT_ARCHIVES=true
 # Click "Run pipeline"
 # Manually click ▶ on "extract:archives" job
-# Wait 2-3 minutes for extraction
+# Wait 2-3 minutes for extraction + security verification
+# Job verifies ClamAV scan log and checks for infected files
+# Note: Job fails if scan log missing or infected files found (NIPR compliance)
 ```
 
 ### Step 5: Create Infrastructure (One-Time)
@@ -99,6 +101,7 @@ git push
 #   RUN_RHEL9=true
 #   RUN_OL9=true
 # Click "Run pipeline"
+# Setup stage includes verify:security job (validates scan compliance)
 # Setup + validate run automatically (5-6 min)
 # Manually click ▶ on build:rhel9 or build:ol9
 # Wait 2-5 hours per build

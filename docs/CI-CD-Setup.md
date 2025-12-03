@@ -4,22 +4,33 @@ This guide explains how to set up and use the automated CI/CD pipelines for NIPR
 
 ## Overview
 
-The NIPR transfer workflow is split across two CI/CD systems:
+The NIPR transfer and build workflow spans multiple CI/CD systems:
 
-1. **GitHub Actions** (Internet-connected) - Prepares optimized transfer archives
-2. **GitLab CI** (NIPR air-gapped) - Extracts archives and builds AMIs
+1. **GitHub Actions** (Internet-connected) - Prepares optimized transfer archives (nipr-prepare.yml)
+2. **GitHub Actions** (Optional testing) - Tests offline builds with NIPR artifacts (build.yml)  
+3. **GitLab CI** (NIPR air-gapped) - Extracts archives and builds AMIs (.gitlab-ci.yml)
 
 ```
 Internet System (GitHub)          NIPR System (GitLab)
 ┌─────────────────────┐          ┌──────────────────────┐
 │ 1. Vendor Roles     │          │ 8. Extract Archives  │
-│ 2. Vendor Colls     │          │ 9. Setup Environment │
-│ 3. Download Pkgs    │   -->    │ 10. Validate         │
-│ 4. ClamAV Scan 🔒   │ Transfer │ 11. Build AMIs       │
-│ 5. Create Archives  │          │                      │
+│ 2. Vendor Colls     │          │ 9. Verify Security ✓ │
+│ 3. Download Pkgs    │   -->    │ 10. Setup Env        │
+│ 4. ClamAV Scan 🔒   │ Transfer │ 11. Validate         │
+│ 5. Create Archives  │          │ 12. Build AMIs       │
 │ 6. Verify Checksums │          │                      │
 │ 7. Upload Artifacts │          │                      │
 └─────────────────────┘          └──────────────────────┘
+        │                                  ▲
+        │ Optional Testing                 │
+        ▼                                  │
+┌─────────────────────┐                   │
+│ Test Offline Build  │                   │
+│ - Verify Security ✓ │  (If successful,  │
+│ - Test Extraction   │   transfer to NIPR)
+│ - Validate Build    │                   │
+└─────────────────────┘───────────────────┘
+   GitHub Actions (build.yml)
 ```
 
 ## GitHub Actions Setup (Internet-Connected)
@@ -192,6 +203,51 @@ The scan log is:
 - **Database Updates**: Latest virus definitions ensure current threat detection
 - **Fail-Fast**: Prevents any infected files from reaching NIPR environment
 
+### Build Workflow (Optional - Testing)
+
+Location: `.github/workflows/build.yml`
+
+**Purpose**: Test NIPR offline builds in GitHub Actions using transferred artifacts
+
+This workflow allows testing the complete NIPR offline build process in GitHub Actions before deploying to actual NIPR environments. It's useful for:
+- Validating NIPR transfer archives before physical transfer
+- Testing builds in a controlled environment
+- Verifying security scanning compliance
+- Debugging offline mode issues
+
+**Key Features**:
+- **Offline Mode Support**: Can use NIPR artifacts from nipr-prepare.yml workflow
+- **Security Verification**: Validates ClamAV scan logs in offline mode
+- **Flexible Builders**: Select specific OS builds to test
+- **AWS Integration**: Tests against Commercial AWS (can be adapted for GovCloud)
+- **Build Summary**: Displays security scan status and build configuration
+
+**Usage**:
+
+1. Run nipr-prepare.yml workflow first to create artifacts
+2. Go to **Actions** → **Build STIGed AMI's**
+3. Click **Run workflow**
+4. Configure options:
+   - **offline_mode**: true (to test NIPR archives)
+   - **nipr_artifact_name**: Name of artifact from nipr-prepare workflow (e.g., spel-nipr-transfer-20251203)
+   - Select OS builders to test (e.g., run_rhel9, run_ol9)
+5. Click **Run workflow**
+
+**Security Features in Offline Mode**:
+- Verifies ClamAV scan log presence in NIPR artifacts
+- Checks for "Infected files: 0" in scan results
+- Displays scan summary (files scanned, duration, status)
+- Warns if scan log is missing (indicates non-compliant archives)
+- Shows security compliance status in build summary
+- Preserves scan logs for audit trail
+
+**Output**:
+- Build summary with security verification section
+- Scan statistics (if offline mode used)
+- NIPR compliance indication
+- Build configuration details
+- Selected builders list
+
 ## GitLab CI Setup (NIPR)
 
 ### Configuration File
@@ -345,6 +401,7 @@ git push
 
 **Step 4: Verify setup**:
 - Setup stage runs automatically after infrastructure stage:
+  - `verify:security` - Verifies ClamAV scan compliance (NIPR requirement)
   - `verify:resources` - Checks disk (50+ GB), memory (2+ GB), commands
   - `aws:verify` - Tests AWS credentials, verifies VPC/subnet connectivity
   - `setup` - Initializes git submodules, detects offline Packer
@@ -426,16 +483,25 @@ Extracts transferred archives and verifies checksums.
 
 **Trigger**: Manual (only when `EXTRACT_ARCHIVES=true`)
 **Duration**: 2-3 minutes
-**Artifacts**: Extracted tools, packages, roles, collections (90-day retention)
+**Artifacts**: Extracted tools, packages, roles, collections, scan logs (7-day retention)
 
 **What it does**:
-- Runs `scripts/extract-nipr-archives.sh`
 - Verifies SHA256 checksums before extraction
+- **Verifies ClamAV security scan compliance**:
+  - Checks for `spel-nipr-*-clamav-scan.log` presence
+  - Verifies scan passed ("Infected files: 0")
+  - Displays scan summary for audit trail
+  - **Fails build if scan log missing** (controlled by `REQUIRE_SCAN_LOG` variable, default: true)
+  - Shows infected files if detected
+- Runs `scripts/extract-nipr-archives.sh`
 - Extracts to proper directory structure:
   - `tools/` - Packer binaries (Linux + Windows), Python packages
   - `offline-packages/` - SPEL offline installation packages
   - `vendor/ansible-roles/` - Ansible roles for amigen
   - `vendor/ansible-collections/` - Ansible collection tarballs
+- Preserves security artifacts:
+  - `spel-nipr-*-clamav-scan.log` - ClamAV scan results
+  - `spel-nipr-*-manifest.txt` - Archive contents manifest
 - Creates artifact for use by subsequent stages
 
 **Run when**:
@@ -493,7 +559,7 @@ Creates AWS infrastructure resources needed for Packer builds.
 
 #### Stage 3: Setup
 
-**Jobs**: `verify:resources`, `aws:verify`, `setup`, `python:setup`, `packer:init`, `verify:dependencies`
+**Jobs**: `verify:security`, `verify:resources`, `aws:verify`, `setup`, `python:setup`, `packer:init`, `verify:dependencies`
 
 Prepares build environment and verifies all dependencies.
 
@@ -502,6 +568,17 @@ Prepares build environment and verifies all dependencies.
 **Artifacts**: None (configuration stored in pipeline variables)
 
 **What it does**:
+
+**`verify:security`** (runs first, after `extract:archives`):
+- **NIPR Security Compliance Verification** (required for all NIPR builds)
+- Verifies ClamAV scan log presence in extracted artifacts
+- Checks scan results: "Infected files: 0" (fails if not found)
+- Validates scan completeness (warns if <100 files scanned)
+- Displays full scan summary for audit trail
+- Shows manifest contents if available
+- Provides compliance summary report
+- **Fails build if scan log missing or scan failed** (NIPR security requirement)
+- Only runs when `EXTRACT_ARCHIVES=true`
 
 **`verify:resources`** (runs first, parallel with `aws:verify`):
 - Checks available disk space (requires 50+ GB free)
@@ -919,6 +996,49 @@ Solution: Verify scan passed before archiving
 # 3. Verify scan log in artifacts (if workflow completed)
 ```
 
+**Problem**: GitLab CI extract:archives job fails - missing scan log
+```bash
+Solution: Ensure NIPR archives include ClamAV scan log
+
+# GitLab CI verifies scan log presence (NIPR compliance requirement)
+# Job will fail if spel-nipr-*-clamav-scan.log is missing
+
+# Actions:
+# 1. Verify archives were created with nipr-prepare.yml workflow
+# 2. Check that ClamAV scanning step completed successfully
+# 3. Re-run nipr-prepare.yml if scan log missing
+# 4. Set REQUIRE_SCAN_LOG=false to bypass (NOT recommended for NIPR)
+```
+
+**Problem**: GitLab CI verify:security job fails - infected files detected
+```bash
+Solution: Review scan log and clean infected files
+
+# verify:security job checks scan log for "Infected files: 0"
+# Job fails if infected files found or scan incomplete
+
+# Actions:
+# 1. Review scan log: cat spel-nipr-*-clamav-scan.log
+# 2. Identify infected files (look for "FOUND" entries)
+# 3. Investigate false positives vs. actual infections
+# 4. Re-prepare archives after cleanup
+# 5. Do not bypass this check in NIPR environments
+```
+
+**Problem**: GitHub Actions build.yml - warning about missing scan log
+```bash
+Solution: Verify offline mode artifacts include scan log
+
+# build.yml displays warning if scan log missing in offline mode
+# This is informational only (does not fail build)
+
+# To resolve:
+# 1. Ensure nipr_artifact_name references valid nipr-prepare.yml artifact
+# 2. Verify artifact includes spel-nipr-*-clamav-scan.log
+# 3. Check that ClamAV scanning was enabled during archive preparation
+# 4. For testing only, you can ignore warning (not for NIPR use)
+```
+
 ### Validate Stage Issues (continued)
 
 **Problem**: Template validation fails - syntax error
@@ -1118,6 +1238,12 @@ Solution: Increase timeout-minutes in workflow file
 
 1. **Run nipr-prepare before monthly transfers**: Ensures latest virus definitions are used
 2. **Review scan summary in GitHub Actions**: Check "Infected files: 0" in workflow output
+3. **Verify scan logs in NIPR**: GitLab CI now validates scan log presence and results
+4. **Test with build.yml before NIPR**: Optional - validate archives work in offline mode
+5. **Never bypass REQUIRE_SCAN_LOG**: Keep default (true) for NIPR compliance enforcement
+6. **Monitor verify:security job**: New GitLab CI job provides comprehensive compliance check
+7. **Preserve scan logs**: Kept in artifacts for audit trail (7-day retention in GitLab)
+8. **Check build summaries**: Both workflows display security scan status for transparency
 3. **Include scan log in NIPR transfer**: Provides security team with verification evidence
 4. **Archive scan logs long-term**: Keep scan logs beyond 90-day artifact retention for compliance
 5. **Report false positives**: If legitimate files trigger detection, report to ClamAV upstream
