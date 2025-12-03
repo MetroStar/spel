@@ -1,0 +1,29 @@
+# TruffleHog exclusions for SPEL NIPR preparation
+# These paths contain expected patterns that trigger false positives
+
+# Documentation files (may contain example credentials)
+docs/**/*.md
+README.md
+CONTRIBUTING.md
+
+# Test fixtures and examples
+tests/**/fixtures/**
+tests/**/examples/**
+**/test_*.py
+
+# Binary files (already scanned by ClamAV)
+**/*.rpm
+**/*.whl
+**/*.tar.gz
+**/*.zip
+**/*.exe
+
+# Packer plugins (checksummed binaries)
+tools/packer/plugins/**
+
+# Downloaded vendor packages
+offline-packages/**
+tools/python-deps/**
+
+# Known false positives in configuration
+# Add specific files as discovered during testing

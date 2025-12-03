@@ -90,6 +90,25 @@ jobs:
             clamav \
             clamav-update
       
+      - name: Install TruffleHog for secrets scanning
+        run: |
+          echo "=== Installing TruffleHog ==="
+          
+          # Download TruffleHog binary
+          TRUFFLEHOG_VERSION="3.82.13"
+          wget -O /tmp/trufflehog.tar.gz \
+            "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz"
+          
+          # Extract and install
+          tar -xzf /tmp/trufflehog.tar.gz -C /tmp
+          mv /tmp/trufflehog /usr/local/bin/
+          chmod +x /usr/local/bin/trufflehog
+          
+          # Verify installation
+          trufflehog --version
+          
+          echo "TruffleHog installed successfully"
+      
       - name: Set up environment variables
         run: |
           echo "DATE=$(date +%Y%m%d)" >> $GITHUB_ENV
@@ -385,11 +404,137 @@ jobs:
           # Save scan log as artifact
           mv "$SCAN_LOG" "spel-nipr-${DATE}-clamav-scan.log"
       
+      - name: Scan for secrets with TruffleHog
+        run: |
+          echo "=== Scanning for Secrets with TruffleHog ==="
+          echo "This scan ensures no credentials or sensitive data are included before archiving"
+          echo ""
+          
+          SCAN_LOG="trufflehog-scan-${DATE}.log"
+          SECRETS_FOUND=0
+          
+          # Directories to scan (same as ClamAV for consistency)
+          SCAN_DIRS=(
+            "mirrors/spel-packages"
+            "tools/packer"
+            "tools/python-deps"
+            "offline-packages"
+            "spel/ansible/roles"
+            "spel/ansible/collections"
+            "vendor"
+          )
+          
+          # Also scan key configuration files in repo root
+          SCAN_FILES=(
+            "spel/*.pkr.hcl"
+            "spel/*.auto.pkrvars.hcl"
+            "build/*.sh"
+            "scripts/*.sh"
+          )
+          
+          echo "Scanning for secrets..." | tee "$SCAN_LOG"
+          echo "Scan started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
+          echo "" | tee -a "$SCAN_LOG"
+          
+          # Scan directories
+          for dir in "${SCAN_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "========================================" | tee -a "$SCAN_LOG"
+              echo "Scanning directory: $dir" | tee -a "$SCAN_LOG"
+              echo "========================================" | tee -a "$SCAN_LOG"
+              
+              # Run TruffleHog filesystem scan
+              # --no-update: don't check for updates (faster)
+              # --fail: exit with non-zero if secrets found
+              if trufflehog filesystem "$dir" \
+                --no-update \
+                --exclude-paths .trufflehog-exclude.txt \
+                >> "$SCAN_LOG" 2>&1; then
+                echo "✓ $dir: No secrets detected" | tee -a "$SCAN_LOG"
+              else
+                SCAN_EXIT=$?
+                if [ $SCAN_EXIT -eq 183 ]; then
+                  # Exit code 183 = secrets found
+                  echo "✗ $dir: SECRETS DETECTED!" | tee -a "$SCAN_LOG"
+                  SECRETS_FOUND=$((SECRETS_FOUND + 1))
+                else
+                  echo "⚠ $dir: Scan error (exit code: $SCAN_EXIT)" | tee -a "$SCAN_LOG"
+                fi
+              fi
+              echo "" | tee -a "$SCAN_LOG"
+            fi
+          done
+          
+          # Scan specific files
+          echo "========================================" | tee -a "$SCAN_LOG"
+          echo "Scanning configuration files" | tee -a "$SCAN_LOG"
+          echo "========================================" | tee -a "$SCAN_LOG"
+          
+          for pattern in "${SCAN_FILES[@]}"; do
+            for file in $pattern; do
+              if [ -f "$file" ]; then
+                echo "Scanning: $file" | tee -a "$SCAN_LOG"
+                if trufflehog filesystem "$file" \
+                  --no-update \
+                  >> "$SCAN_LOG" 2>&1; then
+                  echo "✓ $file: No secrets detected" | tee -a "$SCAN_LOG"
+                else
+                  SCAN_EXIT=$?
+                  if [ $SCAN_EXIT -eq 183 ]; then
+                    echo "✗ $file: SECRETS DETECTED!" | tee -a "$SCAN_LOG"
+                    SECRETS_FOUND=$((SECRETS_FOUND + 1))
+                  fi
+                fi
+              fi
+            done
+          done
+          echo "" | tee -a "$SCAN_LOG"
+          
+          echo "========================================" | tee -a "$SCAN_LOG"
+          echo "Scan completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
+          echo "========================================" | tee -a "$SCAN_LOG"
+          
+          # Summary
+          echo "" | tee -a "$SCAN_LOG"
+          echo "=== TruffleHog Secrets Scan Summary ===" | tee -a "$SCAN_LOG"
+          echo "Directories scanned: ${#SCAN_DIRS[@]}" | tee -a "$SCAN_LOG"
+          echo "Locations with secrets: $SECRETS_FOUND" | tee -a "$SCAN_LOG"
+          
+          # Check if any secrets found
+          if [ $SECRETS_FOUND -gt 0 ]; then
+            echo "" | tee -a "$SCAN_LOG"
+            echo "❌ SECRETS SCAN FAILED!" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Secrets detected in: $SECRETS_FOUND location(s)" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "ACTION REQUIRED:" | tee -a "$SCAN_LOG"
+            echo "  1. Review scan log above for detected secrets" | tee -a "$SCAN_LOG"
+            echo "  2. Remove or redact sensitive data" | tee -a "$SCAN_LOG"
+            echo "  3. Add false positives to .trufflehog-exclude.txt" | tee -a "$SCAN_LOG"
+            echo "  4. Rotate any exposed credentials immediately" | tee -a "$SCAN_LOG"
+            echo "  5. Re-run workflow after remediation" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "NIPR SECURITY POLICY: No secrets allowed in transfer" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            
+            # Fail workflow
+            exit 1
+          else
+            echo "" | tee -a "$SCAN_LOG"
+            echo "✅ NO SECRETS DETECTED - All files clean" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Files are safe for NIPR transfer" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+          fi
+          
+          # Save scan log as artifact
+          mv "$SCAN_LOG" "spel-nipr-${DATE}-trufflehog-scan.log"
+      
       - name: Create transfer archives
         if: github.event.inputs.create_archives != 'false'
         run: |
           echo "=== Creating Transfer Archives ==="
-          echo "Note: All files passed ClamAV virus scan"
+          echo "Note: All files passed security scans (ClamAV + TruffleHog)"
           echo ""
           ./scripts/create-transfer-archive.sh
           
@@ -457,11 +602,14 @@ jobs:
           - Used single SSM agent for EL8/EL9 (saves ~25%)
           - Created compressed archives
           
-          Security Scan
-          -------------
+          Security Scans
+          --------------
           - ClamAV virus scan: PASSED
+          - TruffleHog secrets scan: PASSED
           - All files scanned and verified clean
-          - Scan log: spel-nipr-${DATE}-clamav-scan.log
+          - Scan logs: 
+              spel-nipr-${DATE}-clamav-scan.log
+              spel-nipr-${DATE}-trufflehog-scan.log
           
           Expected Sizes (Actual Measured)
           --------------------------------
@@ -532,6 +680,7 @@ jobs:
             spel-nipr-*-checksums.txt
             spel-nipr-*-manifest.txt
             spel-nipr-*-clamav-scan.log
+            spel-nipr-*-trufflehog-scan.log
           retention-days: 90
           compression-level: 0
       
@@ -576,15 +725,26 @@ jobs:
           echo "- ℹ️  YUM/DNF mirrors NOT included - NIPR uses its own RPM repositories" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          echo "### Security Scan" >> $GITHUB_STEP_SUMMARY
+          echo "### Security Scans" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # ClamAV results
           if [ -f "spel-nipr-${DATE}-clamav-scan.log" ]; then
-            echo "- ✅ ClamAV virus scan: **PASSED**" >> $GITHUB_STEP_SUMMARY
-            echo "- All files verified clean before archiving" >> $GITHUB_STEP_SUMMARY
-            echo "- Scan log included in artifacts" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ **ClamAV virus scan: PASSED**" >> $GITHUB_STEP_SUMMARY
+            echo "  - All files verified clean before archiving" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ⚠️  ClamAV scan: Not performed" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          # TruffleHog results
+          if [ -f "spel-nipr-${DATE}-trufflehog-scan.log" ]; then
+            echo "- ✅ **TruffleHog secrets scan: PASSED**" >> $GITHUB_STEP_SUMMARY
+            echo "  - No credentials or secrets detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚠️  TruffleHog scan: Not performed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "- 📋 Scan logs included in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY

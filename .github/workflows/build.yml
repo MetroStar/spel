@@ -134,11 +134,37 @@ jobs:
               echo ""
             fi
             
+            # Check for TruffleHog scan log
+            SECRETS_LOG=$(ls spel-nipr-*-trufflehog-scan.log 2>/dev/null | head -1)
+            if [ -n "$SECRETS_LOG" ]; then
+              echo ""
+              echo "=== Secrets Scan Verification ==="
+              echo "TruffleHog scan log found: $SECRETS_LOG"
+              
+              # Check if scan passed
+              if grep -q "NO SECRETS DETECTED" "$SECRETS_LOG"; then
+                echo "✅ TruffleHog scan: PASSED"
+                echo "   No credentials or secrets detected"
+              else
+                echo "⚠️  TruffleHog scan status unclear - review log"
+                echo "   Secrets may have been detected"
+              fi
+              echo "======================="
+              echo ""
+            else
+              echo ""
+              echo "⚠️  WARNING: No TruffleHog scan log found in artifacts"
+              echo "   This may indicate archives were prepared without secrets scanning"
+              echo "   NIPR security policy requires secrets verification"
+              echo ""
+            fi
+            
             # Move archives to repository root
             mv spel-*.tar.gz ../ 2>/dev/null || true
             mv spel-nipr-*-checksums.txt ../ 2>/dev/null || true
             mv spel-nipr-*-manifest.txt ../ 2>/dev/null || true
             mv spel-nipr-*-clamav-scan.log ../ 2>/dev/null || true
+            mv spel-nipr-*-trufflehog-scan.log ../ 2>/dev/null || true
             cd ..
           else
             echo "⚠ No artifacts downloaded - checking for archives in repository..."
@@ -335,6 +361,22 @@ jobs:
               echo "- ⚠️ No ClamAV scan log found" >> $GITHUB_STEP_SUMMARY
               echo "- Archives may not meet NIPR security requirements" >> $GITHUB_STEP_SUMMARY
             fi
+            
+            # TruffleHog results
+            SECRETS_LOG=$(ls spel-nipr-*-trufflehog-scan.log 2>/dev/null | head -1)
+            if [ -n "$SECRETS_LOG" ]; then
+              if grep -q "NO SECRETS DETECTED" "$SECRETS_LOG" 2>/dev/null; then
+                echo "- ✅ TruffleHog secrets scan: **PASSED**" >> $GITHUB_STEP_SUMMARY
+                echo "- No credentials or sensitive data detected" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ⚠️ TruffleHog scan status: **UNCLEAR**" >> $GITHUB_STEP_SUMMARY
+                echo "- Review scan log for details" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "- ⚠️ No TruffleHog scan log found" >> $GITHUB_STEP_SUMMARY
+              echo "- Archives may not have secrets verification" >> $GITHUB_STEP_SUMMARY
+            fi
+            
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           

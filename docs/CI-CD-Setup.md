@@ -13,13 +13,14 @@ The NIPR transfer and build workflow spans multiple CI/CD systems:
 ```
 Internet System (GitHub)          NIPR System (GitLab)
 ┌─────────────────────┐          ┌──────────────────────┐
-│ 1. Vendor Roles     │          │ 8. Extract Archives  │
-│ 2. Vendor Colls     │          │ 9. Verify Security ✓ │
-│ 3. Download Pkgs    │   -->    │ 10. Setup Env        │
-│ 4. ClamAV Scan 🔒   │ Transfer │ 11. Validate         │
-│ 5. Create Archives  │          │ 12. Build AMIs       │
-│ 6. Verify Checksums │          │                      │
-│ 7. Upload Artifacts │          │                      │
+│ 1. Vendor Roles     │          │ 9. Extract Archives  │
+│ 2. Vendor Colls     │          │ 10. Verify Security ✓│
+│ 3. Download Pkgs    │   -->    │    - ClamAV          │
+│ 4. ClamAV Scan 🔒   │ Transfer │    - TruffleHog      │
+│ 5. TruffleHog 🔑    │          │ 11. Setup Env        │
+│ 6. Create Archives  │          │ 12. Validate         │
+│ 7. Verify Checksums │          │ 13. Build AMIs       │
+│ 8. Upload Artifacts │          │                      │
 └─────────────────────┘          └──────────────────────┘
         │                                  ▲
         │ Optional Testing                 │
@@ -27,7 +28,9 @@ Internet System (GitHub)          NIPR System (GitLab)
 ┌─────────────────────┐                   │
 │ Test Offline Build  │                   │
 │ - Verify Security ✓ │  (If successful,  │
-│ - Test Extraction   │   transfer to NIPR)
+│   • ClamAV          │   transfer to NIPR)
+│   • TruffleHog      │                   │
+│ - Test Extraction   │                   │
 │ - Validate Build    │                   │
 └─────────────────────┘───────────────────┘
    GitHub Actions (build.yml)
@@ -44,7 +47,7 @@ Location: `.github/workflows/nipr-prepare.yml`
 - **Automated Scheduling**: Runs monthly on the 15th at 6:00 AM UTC
 - **Manual Triggers**: Run on-demand with customizable options
 - **Storage Optimization**: Reduces transfer size by 70%
-- **Security Scanning**: ClamAV virus scan before archiving 🔒
+- **Security Scanning**: ClamAV virus scan + TruffleHog secrets scan before archiving 🔒🔑
 - **Artifact Upload**: Stores archives in GitHub for 90 days
 - **Checksum Verification**: Generates SHA256 checksums for all archives
 
@@ -91,7 +94,7 @@ SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
 ### Workflow Steps
 
 1. **Checkout** - Clone repository with submodules
-2. **Install dependencies** - Python, pip, ansible-galaxy, ClamAV
+2. **Install dependencies** - Python, pip, ansible-galaxy, ClamAV, TruffleHog
 3. **Update virus definitions** - Download latest ClamAV signatures via freshclam
 4. **Set environment** - Configure optimization variables
 5. **Vendor roles** - Clone Ansible roles without git history (4 MB)
@@ -99,17 +102,19 @@ SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
 7. **Download packages** - Get AWS utilities and Packer (183 MB: 86 MB offline + 97 MB Packer)
 8. **Download Packer plugins** - Get required Packer plugins (241 MB)
 9. **Scan files with ClamAV** - Full recursive virus scan of all components (3-5 min) 🔒
-10. **Create archives** - Build compressed transfer archives (1.1 GB total)
-11. **Verify checksums** - Validate all archives with SHA256
-12. **Generate manifest** - Create transfer documentation with scan results
-13. **Upload artifacts** - Store in GitHub for download (90 day retention)
+10. **Scan for secrets with TruffleHog** - Comprehensive credential/secrets detection (2-3 min) 🔑
+11. **Create archives** - Build compressed transfer archives (1.1 GB total)
+12. **Verify checksums** - Validate all archives with SHA256
+13. **Generate manifest** - Create transfer documentation with scan results
+14. **Upload artifacts** - Store in GitHub for download (90 day retention)
 
 ### Expected Output
 
 ```
-Security Scan:
+Security Scans:
   ✅ ClamAV scan: PASSED
-  All files verified clean before archiving
+  ✅ TruffleHog scan: PASSED
+  All files verified clean and free of secrets before archiving
 
 Archives created:
   spel-base-20251202.tar.gz                  118 MB
@@ -118,18 +123,25 @@ Archives created:
 
 Total archive size: 1.1 GB
 
-Workflow duration: 5-8 minutes (typical: includes 3-5 min ClamAV scan)
+Workflow duration: 7-11 minutes (includes 3-5 min ClamAV + 2-3 min TruffleHog)
 
 Files ready for transfer:
   - spel-nipr-20251202-checksums.txt
   - spel-nipr-20251202-manifest.txt
   - spel-nipr-20251202-clamav-scan.log
+  - spel-nipr-20251202-trufflehog-scan.log
   - spel-*.tar.gz
 ```
 
 ### Security Scanning
 
-Before creating transfer archives, all files are scanned with **ClamAV** antivirus software to ensure NIPR security compliance.
+Before creating transfer archives, all files are scanned with **dual security verification**:
+- **ClamAV** - Antivirus scanning for malware/viruses
+- **TruffleHog** - Secrets detection for credentials/sensitive data
+
+This ensures NIPR security compliance by preventing both malware and credential leakage.
+
+#### ClamAV Virus Scanning
 
 **Scan Coverage**:
 
@@ -203,6 +215,92 @@ The scan log is:
 - **Database Updates**: Latest virus definitions ensure current threat detection
 - **Fail-Fast**: Prevents any infected files from reaching NIPR environment
 
+#### TruffleHog Secrets Scanning
+
+**Scan Coverage**:
+
+The workflow performs comprehensive secrets detection across the same directories scanned by ClamAV, plus configuration files:
+
+1. **mirrors/spel-packages/** - SPEL repository RPMs
+2. **tools/packer/** - Packer binaries and plugins
+3. **tools/python-deps/** - Python wheels and dependencies
+4. **offline-packages/** - AWS utilities and tools
+5. **spel/ansible/roles/** - Vendored Ansible roles
+6. **spel/ansible/collections/** - Ansible collection tarballs
+7. **vendor/** - Submodule dependencies
+8. **Configuration files** - `*.pkr.hcl`, `*.sh` scripts
+
+**Scan Process**:
+
+1. **Install TruffleHog**: Downloads v3.82.13 binary from GitHub releases
+2. **Scan Files**: Executes `trufflehog filesystem` on all directories and config files (2-3 minutes)
+3. **Verify Results**: Checks exit code (0 = clean, 183 = secrets found)
+4. **Log Results**: Saves detailed scan log as `spel-nipr-YYYYMMDD-trufflehog-scan.log`
+
+**Scan Output Example** (Success):
+
+```
+=== TruffleHog Secrets Scan Summary ===
+Scanning: mirrors/spel-packages
+Scanning: tools/packer
+Scanning: tools/python-deps
+Scanning: offline-packages
+Scanning: spel/ansible/roles
+Scanning: spel/ansible/collections
+Scanning: vendor
+Scanning: *.pkr.hcl
+Scanning: *.sh
+
+NO SECRETS DETECTED ✅
+All files verified free of credentials
+Scan completed in 2m 15s
+```
+
+**Failure Handling**:
+
+The workflow uses **fail-fast** behavior for secrets detection:
+
+- **Exit Code 0**: Clean scan - workflow continues ✅
+- **Exit Code 183**: Secrets detected - **workflow fails immediately** ❌
+- **Other Exit Codes**: Scan error - **workflow fails immediately** ❌
+
+When secrets are detected:
+1. Detailed scan log shows file paths and secret types
+2. Workflow terminates before creating archives
+3. No artifacts are uploaded (prevents credential leakage)
+4. Security team reviews findings to remediate
+
+**Exclusions**:
+
+The file `.trufflehog-exclude.txt` contains patterns to exclude false positives:
+- Documentation files (may contain example credentials)
+- Test fixtures and test data
+- Binary files (already scanned by ClamAV)
+- Downloaded vendor packages (pre-vetted)
+- Packer plugins (binary executables)
+
+**Scan Log Details**:
+
+The scan log (`spel-nipr-YYYYMMDD-trufflehog-scan.log`) includes:
+- List of scanned files/directories
+- Detected secrets with file paths and line numbers (if any)
+- Secret types detected (API keys, passwords, tokens, etc.)
+- Scan timing and performance metrics
+- File size: ~10-50 KB
+
+The scan log is:
+- Included in transfer archives for audit trail
+- Added to GitHub Actions artifacts (90-day retention)
+- Referenced in the transfer manifest
+- Available for security review on NIPR side
+
+**Security Compliance**:
+
+- **NIPR Requirement**: All files must be free of credentials/secrets before air-gap transfer
+- **Audit Trail**: Scan log provides verifiable secrets detection compliance
+- **Fail-Fast**: Prevents any secrets from reaching NIPR environment
+- **Comprehensive Detection**: Scans for 700+ secret types (AWS keys, GitHub tokens, private keys, etc.)
+
 ### Build Workflow (Optional - Testing)
 
 Location: `.github/workflows/build.yml`
@@ -217,7 +315,7 @@ This workflow allows testing the complete NIPR offline build process in GitHub A
 
 **Key Features**:
 - **Offline Mode Support**: Can use NIPR artifacts from nipr-prepare.yml workflow
-- **Security Verification**: Validates ClamAV scan logs in offline mode
+- **Security Verification**: Validates ClamAV and TruffleHog scan logs in offline mode
 - **Flexible Builders**: Select specific OS builds to test
 - **AWS Integration**: Tests against Commercial AWS (can be adapted for GovCloud)
 - **Build Summary**: Displays security scan status and build configuration
@@ -234,10 +332,12 @@ This workflow allows testing the complete NIPR offline build process in GitHub A
 5. Click **Run workflow**
 
 **Security Features in Offline Mode**:
-- Verifies ClamAV scan log presence in NIPR artifacts
-- Checks for "Infected files: 0" in scan results
-- Displays scan summary (files scanned, duration, status)
-- Warns if scan log is missing (indicates non-compliant archives)
+- Verifies ClamAV scan log presence and results in NIPR artifacts
+- Verifies TruffleHog scan log presence and results in NIPR artifacts
+- Checks for "Infected files: 0" in ClamAV results
+- Checks for "NO SECRETS DETECTED" in TruffleHog results
+- Displays scan summaries (files scanned, duration, status)
+- Warns if scan logs are missing (indicates non-compliant archives)
 - Shows security compliance status in build summary
 - Preserves scan logs for audit trail
 
@@ -487,12 +587,21 @@ Extracts transferred archives and verifies checksums.
 
 **What it does**:
 - Verifies SHA256 checksums before extraction
-- **Verifies ClamAV security scan compliance**:
+- **Verifies dual security scan compliance**:
+  
+  **ClamAV Verification**:
   - Checks for `spel-nipr-*-clamav-scan.log` presence
   - Verifies scan passed ("Infected files: 0")
   - Displays scan summary for audit trail
-  - **Fails build if scan log missing** (controlled by `REQUIRE_SCAN_LOG` variable, default: true)
+  - **Fails build if scan log missing** (controlled by `REQUIRE_VIRUS_SCAN` variable, default: true)
   - Shows infected files if detected
+  
+  **TruffleHog Verification**:
+  - Checks for `spel-nipr-*-trufflehog-scan.log` presence
+  - Verifies scan passed ("NO SECRETS DETECTED")
+  - **Fails build if secrets detected or log missing** (controlled by `REQUIRE_SECRETS_SCAN` variable, default: true)
+  - Shows detected secret types if found
+  
 - Runs `scripts/extract-nipr-archives.sh`
 - Extracts to proper directory structure:
   - `tools/` - Packer binaries (Linux + Windows), Python packages
@@ -500,7 +609,8 @@ Extracts transferred archives and verifies checksums.
   - `vendor/ansible-roles/` - Ansible roles for amigen
   - `vendor/ansible-collections/` - Ansible collection tarballs
 - Preserves security artifacts:
-  - `spel-nipr-*-clamav-scan.log` - ClamAV scan results
+  - `spel-nipr-*-clamav-scan.log` - ClamAV virus scan results
+  - `spel-nipr-*-trufflehog-scan.log` - TruffleHog secrets scan results
   - `spel-nipr-*-manifest.txt` - Archive contents manifest
 - Creates artifact for use by subsequent stages
 
@@ -571,14 +681,24 @@ Prepares build environment and verifies all dependencies.
 
 **`verify:security`** (runs first, after `extract:archives`):
 - **NIPR Security Compliance Verification** (required for all NIPR builds)
-- Verifies ClamAV scan log presence in extracted artifacts
-- Checks scan results: "Infected files: 0" (fails if not found)
-- Validates scan completeness (warns if <100 files scanned)
-- Displays full scan summary for audit trail
-- Shows manifest contents if available
-- Provides compliance summary report
-- **Fails build if scan log missing or scan failed** (NIPR security requirement)
-- Only runs when `EXTRACT_ARCHIVES=true`
+- **ClamAV Verification**:
+  - Verifies ClamAV scan log presence in extracted artifacts
+  - Checks scan results: "Infected files: 0" (fails if not found)
+  - Validates scan completeness (warns if <100 files scanned)
+  - Displays full ClamAV scan summary for audit trail
+- **TruffleHog Verification**:
+  - Verifies TruffleHog scan log presence in extracted artifacts
+  - Checks scan results: "NO SECRETS DETECTED" (fails if not found)
+  - Displays TruffleHog scan summary for audit trail
+  - Shows detected secret types if any found
+- **Compliance Reporting**:
+  - Shows manifest contents if available
+  - Provides comprehensive dual-scan compliance summary
+  - Displays both ClamAV and TruffleHog results
+- **Failure Handling**:
+  - **Fails build if ClamAV scan log missing or scan failed** (NIPR security requirement)
+  - **Fails build if TruffleHog scan log missing or secrets detected** (NIPR security requirement)
+  - Only runs when `EXTRACT_ARCHIVES=true`
 
 **`verify:resources`** (runs first, parallel with `aws:verify`):
 - Checks available disk space (requires 50+ GB free)
@@ -1036,6 +1156,116 @@ Solution: Verify offline mode artifacts include scan log
 # 1. Ensure nipr_artifact_name references valid nipr-prepare.yml artifact
 # 2. Verify artifact includes spel-nipr-*-clamav-scan.log
 # 3. Check that ClamAV scanning was enabled during archive preparation
+# 4. For testing only, you can ignore warning (not for NIPR use)
+```
+
+**Problem**: TruffleHog scan fails - secrets detected
+```bash
+Solution: Review scan log to identify detected secrets
+
+cat spel-nipr-YYYYMMDD-trufflehog-scan.log | grep "Detector Type:"
+
+# Output example:
+# File: /path/to/file.sh
+# Line: 42
+# Detector Type: AWS
+# Finding: AKIAIOSFODNN7EXAMPLE
+
+# Actions:
+# 1. Review detected secrets - verify if legitimate or false positive
+# 2. For test/example credentials, add to .trufflehog-exclude.txt
+# 3. For real credentials, remove from code immediately
+# 4. Use environment variables or AWS Secrets Manager instead
+# 5. Re-run nipr-prepare workflow after remediation
+```
+
+**Problem**: TruffleHog scan false positives in documentation
+```bash
+Solution: Add exclusion patterns to .trufflehog-exclude.txt
+
+# Documentation often contains example credentials
+# Exclude docs by adding to .trufflehog-exclude.txt:
+docs/**/*.md
+README.md
+CONTRIBUTING.md
+
+# Test fixtures may contain test data:
+tests/**/fixtures/**
+**/test_*.py
+
+# Commit exclusions and re-run workflow
+```
+
+**Problem**: TruffleHog installation fails - download error
+```bash
+Solution: Check network connectivity and GitHub releases access
+
+# TruffleHog downloads v3.82.13 binary from GitHub releases
+# Verify connectivity to:
+wget -O /dev/null https://github.com/trufflesecurity/trufflehog/releases/
+
+# If blocked:
+# 1. Check firewall/proxy configuration
+# 2. Verify GitHub API rate limits not exceeded
+# 3. Try alternative mirror if available
+# 4. Contact network admin for GitHub access
+```
+
+**Problem**: TruffleHog scan timeout - exceeds expected duration
+```bash
+Solution: Large codebases may require more scan time
+
+# Typical scan: 2-3 minutes for ~1.6 GB of files
+# Scan includes 7 directories plus config files
+
+# If timeout occurs:
+# 1. Check for very large files in scanned directories
+# 2. Verify sufficient CPU/memory resources available
+# 3. Consider excluding binary files (already in .trufflehog-exclude.txt)
+# 4. Monitor scan progress in workflow logs
+```
+
+**Problem**: GitLab CI extract:archives job fails - missing TruffleHog log
+```bash
+Solution: Ensure NIPR archives include TruffleHog scan log
+
+# GitLab CI verifies scan log presence (NIPR compliance requirement)
+# Job will fail if spel-nipr-*-trufflehog-scan.log is missing
+
+# Actions:
+# 1. Verify archives were created with nipr-prepare.yml workflow
+# 2. Check that TruffleHog scanning step completed successfully
+# 3. Re-run nipr-prepare.yml if scan log missing
+# 4. Set REQUIRE_SECRETS_SCAN=false to bypass (NOT recommended for NIPR)
+```
+
+**Problem**: GitLab CI verify:security job fails - secrets detected
+```bash
+Solution: Review scan log and remediate secrets
+
+# verify:security job checks scan log for "NO SECRETS DETECTED"
+# Job fails if secrets found or scan incomplete
+
+# Actions:
+# 1. Review scan log: cat spel-nipr-*-trufflehog-scan.log
+# 2. Identify detected secrets (look for "Detector Type:" entries)
+# 3. Remove or rotate any real credentials found
+# 4. Add legitimate false positives to .trufflehog-exclude.txt
+# 5. Re-prepare archives after remediation
+# 6. Do not bypass this check in NIPR environments
+```
+
+**Problem**: GitHub Actions build.yml - warning about missing TruffleHog log
+```bash
+Solution: Verify offline mode artifacts include TruffleHog scan log
+
+# build.yml displays warning if TruffleHog log missing in offline mode
+# This is informational only (does not fail build)
+
+# To resolve:
+# 1. Ensure nipr_artifact_name references valid nipr-prepare.yml artifact
+# 2. Verify artifact includes spel-nipr-*-trufflehog-scan.log
+# 3. Check that TruffleHog scanning was enabled during archive preparation
 # 4. For testing only, you can ignore warning (not for NIPR use)
 ```
 

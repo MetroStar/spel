@@ -25,7 +25,7 @@
 # Or manually trigger workflow at:
 # https://github.com/MetroStar/spel/actions/workflows/nipr-prepare.yml
 
-# Workflow duration: 5-8 minutes (includes ClamAV virus scan)
+# Workflow duration: 7-11 minutes (includes ClamAV + TruffleHog scans)
 
 # Download artifacts after workflow completes:
 # - spel-nipr-YYYYMMDD-base.tar.gz (118 MB)
@@ -33,11 +33,14 @@
 # - spel-nipr-YYYYMMDD-complete.tar.gz (694 MB)
 # - spel-nipr-YYYYMMDD-checksums.txt
 # - spel-nipr-YYYYMMDD-manifest.txt
-# - spel-nipr-YYYYMMDD-clamav-scan.log (security audit trail)
+# - spel-nipr-YYYYMMDD-clamav-scan.log (virus scan audit trail)
+# - spel-nipr-YYYYMMDD-trufflehog-scan.log (secrets scan audit trail)
 
-# Verify security scan passed (check GitHub Actions summary)
+# Verify security scans passed (check GitHub Actions summary)
 # ClamAV scans ~1.6 GB across 7 directories (3-5 min)
-# Scan log shows: Infected files: 0
+#   → Scan log shows: Infected files: 0
+# TruffleHog scans same directories + config files (2-3 min)
+#   → Scan log shows: NO SECRETS DETECTED
 
 # Verify checksums before transfer
 sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
@@ -46,13 +49,16 @@ sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
 ### Step 2: Transfer to NIPR
 ```bash
 # Transfer via approved method (DVD, secure transfer, etc.)
-# Total transfer size: ~1.1 GB (includes virus scan log)
+# Total transfer size: ~1.1 GB (includes both security scan logs)
 # Verify checksums after transfer
 sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
 
-# Review security scan log for compliance
+# Review security scan logs for compliance
 less spel-nipr-YYYYMMDD-clamav-scan.log
 # Verify: "Infected files: 0" in scan summary
+
+less spel-nipr-YYYYMMDD-trufflehog-scan.log
+# Verify: "NO SECRETS DETECTED" in scan summary
 ```
 
 ### Step 3: Upload to GitLab NIPR
@@ -66,8 +72,9 @@ git lfs track "*.tar.gz"
 git add .gitattributes spel-*.tar.gz \
   spel-nipr-*-checksums.txt \
   spel-nipr-*-manifest.txt \
-  spel-nipr-*-clamav-scan.log
-git commit -m "Add NIPR transfer archives for December 2025 (virus scan: clean)"
+  spel-nipr-*-clamav-scan.log \
+  spel-nipr-*-trufflehog-scan.log
+git commit -m "Add NIPR transfer archives for December 2025 (security: clean)"
 git push
 ```
 
@@ -77,9 +84,11 @@ git push
 # Set variable: EXTRACT_ARCHIVES=true
 # Click "Run pipeline"
 # Manually click ▶ on "extract:archives" job
-# Wait 2-3 minutes for extraction + security verification
-# Job verifies ClamAV scan log and checks for infected files
-# Note: Job fails if scan log missing or infected files found (NIPR compliance)
+# Wait 2-3 minutes for extraction + dual security verification
+# Job verifies both ClamAV and TruffleHog scan logs
+# Note: Job fails if scan logs missing or issues found (NIPR compliance)
+#   - ClamAV: Checks for "Infected files: 0"
+#   - TruffleHog: Checks for "NO SECRETS DETECTED"
 ```
 
 ### Step 5: Create Infrastructure (One-Time)
@@ -436,6 +445,43 @@ rm -rf .venv/
 ## Success Criteria
 
 ✅ Archives total ~1.1 GB compressed  
+✅ Both ClamAV and TruffleHog security scans pass  
+✅ Checksums verify successfully before and after transfer  
+✅ GitLab CI extract and verify:security jobs complete without errors  
+✅ All required artifacts present (archives + scan logs + manifest)  
+✅ Packer templates validate successfully in offline mode  
+✅ AMI builds complete in 2-5 hours per OS  
+✅ AMIs register with correct tags and metadata  
+✅ Test instances launch successfully from AMIs  
+
+## Quick Troubleshooting
+
+### Security Scan Issues
+
+**ClamAV scan fails**:
+```bash
+# Check workflow logs for virus definition update errors
+# Verify network connectivity during freshclam
+# Review infected files: grep FOUND spel-nipr-*-clamav-scan.log
+```
+
+**TruffleHog scan fails - secrets detected**:
+```bash
+# Review detected secrets: grep "Detector Type:" spel-nipr-*-trufflehog-scan.log
+# Add false positives to .trufflehog-exclude.txt
+# Remove real credentials and use environment variables
+# Re-run nipr-prepare workflow after remediation
+```
+
+**Security logs missing in GitLab CI**:
+```bash
+# Verify archives include both scan logs
+# Set REQUIRE_VIRUS_SCAN=false / REQUIRE_SECRETS_SCAN=false only for testing
+# NOT recommended for NIPR compliance
+# Re-prepare archives with security scanning enabled
+```
+
+### Extract/Build Issues
 ✅ All checksums verify successfully  
 ✅ Extract completes without errors  
 ✅ Infrastructure created (one-time) or variables configured  

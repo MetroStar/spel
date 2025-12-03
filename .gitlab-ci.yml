@@ -49,8 +49,9 @@ extract:archives:
     # Verify ClamAV scan results
     - |
       echo ""
-      echo "=== Verifying Security Scan ==="
+      echo "=== Verifying Security Scans ==="
       
+      # Check ClamAV scan log
       SCAN_LOG=$(ls -t spel-nipr-*-clamav-scan.log 2>/dev/null | head -1)
       
       if [ -n "$SCAN_LOG" ]; then
@@ -63,7 +64,7 @@ extract:archives:
           
           # Display scan summary
           echo ""
-          echo "Security scan summary:"
+          echo "ClamAV scan summary:"
           grep -B 2 -A 10 "SCAN SUMMARY" "$SCAN_LOG" | head -15 || true
           echo ""
         else
@@ -97,14 +98,69 @@ extract:archives:
         echo ""
         
         # Make this a hard failure for NIPR compliance
-        # Set REQUIRE_SCAN_LOG=false in CI/CD variables to override (not recommended)
-        if [ "${REQUIRE_SCAN_LOG:-true}" = "true" ]; then
-          echo "❌ Failing build due to missing security scan log (NIPR compliance)"
+        # Set REQUIRE_VIRUS_SCAN=false in CI/CD variables to override (not recommended)
+        if [ "${REQUIRE_VIRUS_SCAN:-true}" = "true" ]; then
+          echo "❌ Failing build due to missing virus scan log (NIPR compliance)"
           exit 1
         else
-          echo "⚠️  Continuing despite missing scan log (REQUIRE_SCAN_LOG=false)"
+          echo "⚠️  Continuing despite missing scan log (REQUIRE_VIRUS_SCAN=false)"
         fi
       fi
+      
+      # Check TruffleHog secrets scan log
+      SECRETS_LOG=$(ls -t spel-nipr-*-trufflehog-scan.log 2>/dev/null | head -1)
+      
+      if [ -n "$SECRETS_LOG" ]; then
+        echo ""
+        echo "TruffleHog scan log found: $SECRETS_LOG"
+        
+        # Check if scan passed (no secrets detected)
+        if grep -q "NO SECRETS DETECTED" "$SECRETS_LOG"; then
+          echo "✅ TruffleHog scan: PASSED"
+          echo "   No credentials or sensitive data detected"
+          echo ""
+        else
+          echo "❌ TruffleHog scan: FAILED or UNCLEAR"
+          echo ""
+          echo "SECURITY POLICY VIOLATION:"
+          echo "  Files must not contain credentials or secrets"
+          echo "  Review scan log: $SECRETS_LOG"
+          echo ""
+          
+          # Show any secrets found
+          if grep -q "Detector Type:" "$SECRETS_LOG"; then
+            echo "Secrets detected in scan log - review immediately!"
+            echo ""
+          fi
+          
+          exit 1
+        fi
+      else
+        echo ""
+        echo "⚠️  WARNING: No TruffleHog scan log found!"
+        echo ""
+        echo "NIPR SECURITY REQUIREMENT:"
+          echo "  All transferred files must be scanned for secrets/credentials"
+        echo "  Missing scan log indicates archives may not comply with security policy"
+        echo ""
+        echo "ACTION REQUIRED:"
+        echo "  1. Verify archives were prepared with nipr-prepare workflow"
+        echo "  2. Ensure TruffleHog scanning was enabled during preparation"
+        echo "  3. Re-prepare archives using the official workflow"
+        echo ""
+        
+        # Make this a hard failure for NIPR compliance
+        # Set REQUIRE_SECRETS_SCAN=false in CI/CD variables to override (not recommended)
+        if [ "${REQUIRE_SECRETS_SCAN:-true}" = "true" ]; then
+          echo "❌ Failing build due to missing secrets scan log (NIPR compliance)"
+          exit 1
+        else
+          echo "⚠️  Continuing despite missing scan log (REQUIRE_SECRETS_SCAN=false)"
+        fi
+      fi
+      
+      echo "============================"
+      echo "✅ All security scans verified"
       echo "============================"
     
     - echo "Extracting archives..."
@@ -131,8 +187,9 @@ extract:archives:
       - spel-packages/
       - tools/
       - vendor/
-      - spel-nipr-*-clamav-scan.log  # Preserve scan log for audit trail
-      - spel-nipr-*-manifest.txt     # Preserve manifest
+      - spel-nipr-*-clamav-scan.log    # Preserve ClamAV scan log for audit trail
+      - spel-nipr-*-trufflehog-scan.log # Preserve TruffleHog scan log for audit trail
+      - spel-nipr-*-manifest.txt       # Preserve manifest
     expire_in: 7 days
   tags:
     - spel-nipr-runner
@@ -449,7 +506,7 @@ verify:security:
     - echo "=== NIPR Security Compliance Verification ==="
     - echo ""
     
-    # Check for scan log
+    # Check for ClamAV scan log
     - |
       SCAN_LOG=$(ls -t spel-nipr-*-clamav-scan.log 2>/dev/null | head -1)
       
@@ -464,7 +521,7 @@ verify:security:
       
       echo "✓ ClamAV scan log found: $SCAN_LOG"
     
-    # Verify scan passed (no infected files)
+    # Verify ClamAV scan passed (no infected files)
     - |
       if ! grep -q "Infected files: 0" "$SCAN_LOG"; then
         echo ""
@@ -484,23 +541,23 @@ verify:security:
         exit 1
       fi
       
-      echo "✓ Virus scan passed: 0 infected files"
+      echo "✓ ClamAV virus scan passed: 0 infected files"
     
-    # Verify scan completeness
+    # Verify ClamAV scan completeness
     - |
       SCANNED_FILES=$(grep "Scanned files:" "$SCAN_LOG" | awk '{print $3}')
       
       if [ -z "$SCANNED_FILES" ] || [ "$SCANNED_FILES" -lt 100 ]; then
         echo ""
-        echo "⚠️  WARNING: Scan may be incomplete"
+        echo "⚠️  WARNING: ClamAV scan may be incomplete"
         echo "   Scanned files: ${SCANNED_FILES:-unknown}"
         echo "   Expected: 1000+ files typically"
         echo ""
       else
-        echo "✓ Scan completeness: $SCANNED_FILES files scanned"
+        echo "✓ ClamAV scan completeness: $SCANNED_FILES files scanned"
       fi
     
-    # Display scan summary
+    # Display ClamAV scan summary
     - |
       echo ""
       echo "=== ClamAV Scan Summary ==="
@@ -510,6 +567,61 @@ verify:security:
         tail -20 "$SCAN_LOG"
       }
       echo "=========================="
+    
+    # Check for TruffleHog scan log
+    - |
+      echo ""
+      SECRETS_LOG=$(ls -t spel-nipr-*-trufflehog-scan.log 2>/dev/null | head -1)
+      
+      if [ -z "$SECRETS_LOG" ]; then
+        echo "❌ COMPLIANCE FAILURE: TruffleHog scan log not found"
+        echo ""
+        echo "NIPR security policy requires secrets scanning of all transferred files."
+        echo "Archives must be prepared using the nipr-prepare workflow with TruffleHog scanning enabled."
+        echo ""
+        exit 1
+      fi
+      
+      echo "✓ TruffleHog scan log found: $SECRETS_LOG"
+    
+    # Verify TruffleHog scan passed (no secrets detected)
+    - |
+      if ! grep -q "NO SECRETS DETECTED" "$SECRETS_LOG"; then
+        echo ""
+        echo "❌ COMPLIANCE FAILURE: Files did not pass secrets scan"
+        echo ""
+        echo "Scan results indicate secrets/credentials detected or scan errors."
+        echo "Review the scan log for details: $SECRETS_LOG"
+        echo ""
+        
+        if grep -q "Detector Type:" "$SECRETS_LOG"; then
+          echo "Secrets detected - IMMEDIATE REVIEW REQUIRED"
+          echo "Potential credential types found in scan log"
+          echo ""
+        fi
+        
+        exit 1
+      fi
+      
+      echo "✓ TruffleHog secrets scan passed: No credentials detected"
+    
+    # Display TruffleHog scan summary
+    - |
+      echo ""
+      echo "=== TruffleHog Scan Summary ==="
+      if grep -q "NO SECRETS DETECTED" "$SECRETS_LOG"; then
+        echo "✅ Scan Result: CLEAN"
+        echo "✅ No credentials or sensitive data found"
+        
+        # Count files scanned
+        SCANNED_COUNT=$(grep -c "Scanning:" "$SECRETS_LOG" 2>/dev/null || echo "unknown")
+        if [ "$SCANNED_COUNT" != "unknown" ] && [ "$SCANNED_COUNT" -gt 0 ]; then
+          echo "   Files/directories scanned: $SCANNED_COUNT"
+        fi
+      else
+        echo "⚠️  Scan result unclear - review log"
+      fi
+      echo "============================"
     
     # Check for manifest
     - |
@@ -533,11 +645,14 @@ verify:security:
       echo ""
       echo "=== Security Compliance Summary ==="
       echo "✅ ClamAV scan log: PRESENT"
-      echo "✅ Virus scan result: PASSED (0 infected files)"
-      echo "✅ Files verified: $SCANNED_FILES files scanned"
+      echo "✅ ClamAV virus scan: PASSED (0 infected files)"
+      echo "✅ ClamAV files verified: $SCANNED_FILES files scanned"
+      echo "✅ TruffleHog scan log: PRESENT"
+      echo "✅ TruffleHog secrets scan: PASSED (no credentials)"
       echo "✅ NIPR security requirements: MET"
       echo ""
       echo "Archives are compliant and ready for NIPR deployment."
+      echo "All security scans passed - virus and secrets verification complete."
       echo "===================================="
   tags:
     - spel-nipr-runner
