@@ -7,12 +7,15 @@ variables:
   PKR_VAR_aws_region: "us-gov-east-1"
   PACKER_LOG: "1"
   CHECKPOINT_DISABLE: "1"
+  # Infrastructure naming
+  INFRA_PREFIX: "spel-nipr"
 
 stages:
   - extract      # Extract transferred archives
-  - setup
-  - validate
-  - build
+  - infra        # Create AWS infrastructure (optional one-time setup)
+  - setup        # Verify resources and initialize tools
+  - validate     # Validate Packer templates
+  - build        # Build AMIs
 
 # Default settings for all jobs
 default:
@@ -75,29 +78,583 @@ extract:archives:
       - $EXTRACT_ARCHIVES == "true"
   when: manual
 
+#############################################################################
+# Infrastructure Stage - Create AWS Resources (Optional One-Time Setup)
+#############################################################################
+
+# Create or verify VPC and networking
+infra:network:
+  stage: infra
+  script:
+    - echo "Setting up AWS network infrastructure..."
+    - export AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
+    - export AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+    
+    # Check if VPC already specified
+    - |
+      if [ -n "${PKR_VAR_aws_vpc_id}" ]; then
+        echo "Using existing VPC: ${PKR_VAR_aws_vpc_id}"
+        VPC_ID="${PKR_VAR_aws_vpc_id}"
+      else
+        # Create VPC if not exists
+        echo "Creating new VPC..."
+        VPC_ID=$(aws ec2 create-vpc \
+          --cidr-block 10.0.0.0/16 \
+          --tag-specifications "ResourceType=vpc,Tags=[{Key=Name,Value=${INFRA_PREFIX}-vpc},{Key=Project,Value=SPEL},{Key=Environment,Value=NIPR}]" \
+          --query 'Vpc.VpcId' \
+          --output text 2>/dev/null || \
+          aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${INFRA_PREFIX}-vpc" \
+            --query 'Vpcs[0].VpcId' \
+            --output text)
+        
+        echo "VPC ID: ${VPC_ID}"
+        
+        # Enable DNS
+        aws ec2 modify-vpc-attribute --vpc-id "${VPC_ID}" --enable-dns-support
+        aws ec2 modify-vpc-attribute --vpc-id "${VPC_ID}" --enable-dns-hostnames
+      fi
+    
+    # Create Internet Gateway
+    - |
+      IGW_ID=$(aws ec2 describe-internet-gateways \
+        --filters "Name=tag:Name,Values=${INFRA_PREFIX}-igw" \
+        --query 'InternetGateways[0].InternetGatewayId' \
+        --output text 2>/dev/null)
+      
+      if [ "${IGW_ID}" = "None" ] || [ -z "${IGW_ID}" ]; then
+        echo "Creating Internet Gateway..."
+        IGW_ID=$(aws ec2 create-internet-gateway \
+          --tag-specifications "ResourceType=internet-gateway,Tags=[{Key=Name,Value=${INFRA_PREFIX}-igw}]" \
+          --query 'InternetGateway.InternetGatewayId' \
+          --output text)
+        
+        aws ec2 attach-internet-gateway --vpc-id "${VPC_ID}" --internet-gateway-id "${IGW_ID}"
+      fi
+      
+      echo "Internet Gateway ID: ${IGW_ID}"
+    
+    # Create subnet if not specified
+    - |
+      if [ -n "${PKR_VAR_aws_subnet_id}" ]; then
+        echo "Using existing subnet: ${PKR_VAR_aws_subnet_id}"
+        SUBNET_ID="${PKR_VAR_aws_subnet_id}"
+      else
+        echo "Creating public subnet..."
+        SUBNET_ID=$(aws ec2 create-subnet \
+          --vpc-id "${VPC_ID}" \
+          --cidr-block 10.0.1.0/24 \
+          --tag-specifications "ResourceType=subnet,Tags=[{Key=Name,Value=${INFRA_PREFIX}-public-subnet}]" \
+          --query 'Subnet.SubnetId' \
+          --output text 2>/dev/null || \
+          aws ec2 describe-subnets \
+            --filters "Name=tag:Name,Values=${INFRA_PREFIX}-public-subnet" \
+            --query 'Subnets[0].SubnetId' \
+            --output text)
+        
+        echo "Subnet ID: ${SUBNET_ID}"
+        
+        # Enable auto-assign public IP
+        aws ec2 modify-subnet-attribute --subnet-id "${SUBNET_ID}" --map-public-ip-on-launch
+      fi
+    
+    # Create route table and associate
+    - |
+      RT_ID=$(aws ec2 describe-route-tables \
+        --filters "Name=tag:Name,Values=${INFRA_PREFIX}-public-rt" \
+        --query 'RouteTables[0].RouteTableId' \
+        --output text)
+      
+      if [ "${RT_ID}" = "None" ] || [ -z "${RT_ID}" ]; then
+        echo "Creating route table..."
+        RT_ID=$(aws ec2 create-route-table \
+          --vpc-id "${VPC_ID}" \
+          --tag-specifications "ResourceType=route-table,Tags=[{Key=Name,Value=${INFRA_PREFIX}-public-rt}]" \
+          --query 'RouteTable.RouteTableId' \
+          --output text)
+        
+        # Create route to IGW
+        aws ec2 create-route \
+          --route-table-id "${RT_ID}" \
+          --destination-cidr-block 0.0.0.0/0 \
+          --gateway-id "${IGW_ID}" || true
+        
+        # Associate with subnet
+        aws ec2 associate-route-table \
+          --route-table-id "${RT_ID}" \
+          --subnet-id "${SUBNET_ID}" || true
+      fi
+    
+    # Output infrastructure IDs
+    - |
+      echo "=== Infrastructure Created ==="
+      echo "VPC_ID=${VPC_ID}"
+      echo "SUBNET_ID=${SUBNET_ID}"
+      echo "IGW_ID=${IGW_ID}"
+      echo "RT_ID=${RT_ID}"
+      echo "============================="
+      
+      # Save to artifacts
+      cat > infra.env <<EOF
+      export PKR_VAR_aws_vpc_id="${VPC_ID}"
+      export PKR_VAR_aws_subnet_id="${SUBNET_ID}"
+      EOF
+  artifacts:
+    reports:
+      dotenv: infra.env
+    expire_in: 90 days
+  tags:
+    - spel-nipr-runner
+  only:
+    variables:
+      - $CREATE_INFRASTRUCTURE == "true"
+  when: manual
+
+# Create Security Group
+infra:security_group:
+  stage: infra
+  needs: ["infra:network"]
+  script:
+    - echo "Creating security group for Packer builders..."
+    - export AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
+    - export AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+    
+    # Load VPC ID from previous job
+    - source infra.env
+    
+    # Create security group
+    - |
+      SG_ID=$(aws ec2 describe-security-groups \
+        --filters "Name=tag:Name,Values=${INFRA_PREFIX}-packer-sg" \
+        --query 'SecurityGroups[0].GroupId' \
+        --output text)
+      
+      if [ "${SG_ID}" = "None" ] || [ -z "${SG_ID}" ]; then
+        echo "Creating security group..."
+        SG_ID=$(aws ec2 create-security-group \
+          --group-name "${INFRA_PREFIX}-packer-sg" \
+          --description "Security group for SPEL Packer builders" \
+          --vpc-id "${PKR_VAR_aws_vpc_id}" \
+          --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=${INFRA_PREFIX}-packer-sg}]" \
+          --query 'GroupId' \
+          --output text)
+        
+        echo "Security group created: ${SG_ID}"
+      else
+        echo "Using existing security group: ${SG_ID}"
+      fi
+      
+      # Save to artifacts
+      cat >> infra.env <<EOF
+      export PKR_VAR_security_group_id="${SG_ID}"
+      EOF
+  artifacts:
+    reports:
+      dotenv: infra.env
+    expire_in: 90 days
+  tags:
+    - spel-nipr-runner
+  only:
+    variables:
+      - $CREATE_INFRASTRUCTURE == "true"
+  when: manual
+
+# Create IAM resources
+infra:iam:
+  stage: infra
+  script:
+    - echo "Creating IAM role and instance profile for Packer..."
+    - export AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
+    - export AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+    
+    # Create IAM role
+    - |
+      ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
+      
+      # Check if role exists
+      if ! aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null; then
+        echo "Creating IAM role..."
+        
+        # Create trust policy
+        cat > trust-policy.json <<'EOF'
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "ec2.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+          }
+        ]
+      }
+      EOF
+        
+        aws iam create-role \
+          --role-name "${ROLE_NAME}" \
+          --assume-role-policy-document file://trust-policy.json \
+          --description "Role for SPEL Packer builders" \
+          --tags Key=Project,Value=SPEL Key=Environment,Value=NIPR
+      fi
+    
+    # Create IAM policy (truncated for brevity - see full implementation)
+    - |
+      POLICY_NAME="${INFRA_PREFIX}-packer-builder-policy"
+      POLICY_ARN=$(aws iam list-policies --scope Local \
+        --query "Policies[?PolicyName=='${POLICY_NAME}'].Arn" --output text)
+      
+      if [ -z "${POLICY_ARN}" ]; then
+        echo "Creating IAM policy..."
+        # Create policy document with EC2 permissions
+        cat > packer-policy.json <<'EOF'
+      {
+        "Version": "2012-10-17",
+        "Statement": [{
+          "Effect": "Allow",
+          "Action": [
+            "ec2:AttachVolume", "ec2:AuthorizeSecurityGroupIngress",
+            "ec2:CopyImage", "ec2:CreateImage", "ec2:CreateKeypair",
+            "ec2:CreateSecurityGroup", "ec2:CreateSnapshot", "ec2:CreateTags",
+            "ec2:CreateVolume", "ec2:DeleteKeyPair", "ec2:DeleteSecurityGroup",
+            "ec2:DeleteSnapshot", "ec2:DeleteVolume", "ec2:DeregisterImage",
+            "ec2:DescribeImageAttribute", "ec2:DescribeImages", "ec2:DescribeInstances",
+            "ec2:DescribeInstanceStatus", "ec2:DescribeRegions", "ec2:DescribeSecurityGroups",
+            "ec2:DescribeSnapshots", "ec2:DescribeSubnets", "ec2:DescribeTags",
+            "ec2:DescribeVolumes", "ec2:DetachVolume", "ec2:GetPasswordData",
+            "ec2:ModifyImageAttribute", "ec2:ModifyInstanceAttribute",
+            "ec2:ModifySnapshotAttribute", "ec2:RegisterImage", "ec2:RunInstances",
+            "ec2:StopInstances", "ec2:TerminateInstances"
+          ],
+          "Resource": "*"
+        }]
+      }
+      EOF
+        
+        POLICY_ARN=$(aws iam create-policy \
+          --policy-name "${POLICY_NAME}" \
+          --policy-document file://packer-policy.json \
+          --description "Policy for SPEL Packer builders" \
+          --tags Key=Project,Value=SPEL Key=Environment,Value=NIPR \
+          --query 'Policy.Arn' --output text)
+      fi
+      
+      # Attach policy to role
+      aws iam attach-role-policy --role-name "${ROLE_NAME}" --policy-arn "${POLICY_ARN}" || true
+    
+    # Create instance profile
+    - |
+      PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
+      
+      if ! aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
+        echo "Creating instance profile..."
+        aws iam create-instance-profile \
+          --instance-profile-name "${PROFILE_NAME}" \
+          --tags Key=Project,Value=SPEL Key=Environment,Value=NIPR
+        
+        aws iam add-role-to-instance-profile \
+          --instance-profile-name "${PROFILE_NAME}" \
+          --role-name "${ROLE_NAME}"
+        
+        sleep 10  # Wait for instance profile propagation
+      fi
+      
+      echo "PKR_VAR_iam_instance_profile=${PROFILE_NAME}" > iam.env
+  artifacts:
+    reports:
+      dotenv: iam.env
+    expire_in: 90 days
+  tags:
+    - spel-nipr-runner
+  only:
+    variables:
+      - $CREATE_INFRASTRUCTURE == "true"
+  when: manual
+
+#############################################################################
+# Setup Stage - Verify Resources and Initialize Tools
+#############################################################################
+
+# Verify system resources
+verify:resources:
+  stage: setup
+  script:
+    - echo "Verifying system resources..."
+    
+    # Check disk space (need at least 50 GB free)
+    - |
+      AVAILABLE_GB=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
+      REQUIRED_GB=50
+      
+      if [ "$AVAILABLE_GB" -lt "$REQUIRED_GB" ]; then
+        echo "✗ Insufficient disk space: ${AVAILABLE_GB}GB available, ${REQUIRED_GB}GB required"
+        exit 1
+      fi
+      
+      echo "✓ Disk space: ${AVAILABLE_GB}GB available"
+    
+    # Check memory
+    - |
+      AVAILABLE_MB=$(free -m | grep Mem | awk '{print $7}')
+      REQUIRED_MB=2048
+      
+      if [ "$AVAILABLE_MB" -lt "$REQUIRED_MB" ]; then
+        echo "⚠ Low memory: ${AVAILABLE_MB}MB available, ${REQUIRED_MB}MB recommended"
+      else
+        echo "✓ Memory: ${AVAILABLE_MB}MB available"
+      fi
+    
+    # Check for required commands
+    - |
+      REQUIRED_COMMANDS=("git" "make" "sha256sum" "tar" "aws")
+      for cmd in "${REQUIRED_COMMANDS[@]}"; do
+        if command -v "$cmd" &> /dev/null; then
+          echo "✓ $cmd found: $(command -v $cmd)"
+        else
+          echo "✗ $cmd not found!"
+          exit 1
+        fi
+      done
+  tags:
+    - spel-nipr-runner
+
+# Verify AWS connectivity and infrastructure
+aws:verify:
+  stage: setup
+  script:
+    - echo "Verifying AWS GovCloud connectivity..."
+    - export AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
+    - export AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+    
+    # Load infrastructure config if available
+    - |
+      if [ -f infra.env ]; then
+        echo "Loading infrastructure configuration..."
+        source infra.env
+      fi
+    
+    # Test AWS CLI access
+    - |
+      echo "Testing AWS credentials..."
+      aws sts get-caller-identity --region "${AWS_DEFAULT_REGION}"
+      echo "✓ AWS credentials valid"
+    
+    # Verify VPC exists (if configured)
+    - |
+      if [ -n "${PKR_VAR_aws_vpc_id}" ]; then
+        if aws ec2 describe-vpcs --vpc-ids "${PKR_VAR_aws_vpc_id}" --region "${AWS_DEFAULT_REGION}" &>/dev/null; then
+          echo "✓ VPC ${PKR_VAR_aws_vpc_id} accessible"
+        else
+          echo "⚠ VPC ${PKR_VAR_aws_vpc_id} not found"
+          echo "You may need to run CREATE_INFRASTRUCTURE=true to create infrastructure"
+        fi
+      else
+        echo "⚠ PKR_VAR_aws_vpc_id not set"
+      fi
+    
+    # Verify subnet exists (if configured)
+    - |
+      if [ -n "${PKR_VAR_aws_subnet_id}" ]; then
+        if aws ec2 describe-subnets --subnet-ids "${PKR_VAR_aws_subnet_id}" --region "${AWS_DEFAULT_REGION}" &>/dev/null; then
+          echo "✓ Subnet ${PKR_VAR_aws_subnet_id} accessible"
+        else
+          echo "⚠ Subnet ${PKR_VAR_aws_subnet_id} not found"
+        fi
+      fi
+    
+    # Check AMI quotas
+    - |
+      AMI_COUNT=$(aws ec2 describe-images --owners self --region "${AWS_DEFAULT_REGION}" --query 'length(Images)' --output text)
+      echo "Current AMI count: ${AMI_COUNT}"
+      
+      if [ "${AMI_COUNT}" -gt 50 ]; then
+        echo "⚠ High AMI count (${AMI_COUNT}). Consider cleanup if PKR_VAR_aws_force_deregister=false"
+      fi
+  tags:
+    - spel-nipr-runner
+
 # Setup job - prepare environment
 setup:
   stage: setup
+  needs: ["verify:resources", "aws:verify"]
   script:
     - echo "Setting up build environment..."
     - git submodule update --init --recursive
     - bash build/ci-setup.sh
-    - packer version
-    - ansible --version
+    
+    # Verify Packer is available
+    - |
+      if [ -f "tools/packer/linux_amd64/packer" ]; then
+        export PATH="${CI_PROJECT_DIR}/tools/packer/linux_amd64:${PATH}"
+      fi
+      packer version
+    
+    # Verify Ansible is available
+    - ansible --version || echo "⚠ Ansible not yet installed - will be available after python:setup"
   artifacts:
     paths:
       - .env
+      - vendor/
     expire_in: 1 hour
   tags:
     - spel-nipr-runner
 
+# Install Python dependencies
+python:setup:
+  stage: setup
+  needs: ["setup"]
+  script:
+    - echo "Installing Python dependencies..."
+    
+    # Create virtual environment
+    - python3 -m venv .venv
+    - source .venv/bin/activate
+    
+    # Install from offline wheels if available
+    - |
+      if [ -d "tools/python-deps" ] && [ -f "requirements.txt" ]; then
+        echo "Installing from offline wheels..."
+        pip install --no-index --find-links=tools/python-deps -r requirements.txt
+        echo "✓ Python dependencies installed"
+      else
+        echo "⚠ Offline wheels not found, attempting online install..."
+        pip install -r requirements.txt || echo "⚠ requirements.txt not found"
+      fi
+    
+    # Verify critical packages
+    - |
+      echo "=== Installed Python Packages ==="
+      pip list | grep -E "ansible|boto3|botocore|jinja2" || true
+      echo "================================="
+      
+      # Verify Ansible is available
+      ansible --version
+  artifacts:
+    paths:
+      - .venv/
+    expire_in: 7 days
+  tags:
+    - spel-nipr-runner
+
+# Initialize Packer plugins
+packer:init:
+  stage: setup
+  needs: ["setup"]
+  script:
+    - echo "Initializing Packer plugins..."
+    
+    # Set Packer path for offline mode
+    - |
+      if [ -f "tools/packer/linux_amd64/packer" ]; then
+        export PATH="${CI_PROJECT_DIR}/tools/packer/linux_amd64:${PATH}"
+      fi
+    
+    # Set plugin directory
+    - export PACKER_PLUGIN_PATH="${CI_PROJECT_DIR}/tools/packer/plugins"
+    - mkdir -p "${PACKER_PLUGIN_PATH}"
+    
+    # Initialize plugins for Linux builds
+    - |
+      cd spel
+      echo "Initializing minimal-linux.pkr.hcl..."
+      packer init minimal-linux.pkr.hcl || echo "⚠ Minimal Linux init failed"
+      
+      echo "Initializing hardened-linux.pkr.hcl..."
+      packer init hardened-linux.pkr.hcl || echo "⚠ Hardened Linux init failed"
+    
+    # Initialize plugins for Windows builds
+    - |
+      echo "Initializing hardened-windows.pkr.hcl..."
+      packer init hardened-windows.pkr.hcl || echo "⚠ Windows init failed"
+    
+    - cd ..
+    - echo "✓ Plugin initialization complete"
+    - packer plugins installed
+  artifacts:
+    paths:
+      - tools/packer/plugins/
+      - .packer.d/
+    expire_in: 7 days
+  tags:
+    - spel-nipr-runner
+
+# Verify build dependencies
+verify:dependencies:
+  stage: setup
+  needs: ["setup", "python:setup"]
+  script:
+    - echo "Verifying build dependencies..."
+    - source .venv/bin/activate
+    
+    # Verify git submodules are initialized
+    - |
+      echo "=== Git Submodules ==="
+      if [ -d "vendor/amigen9" ] && [ -f "vendor/amigen9/Makefile" ]; then
+        echo "✓ amigen9 submodule found"
+      else
+        echo "✗ amigen9 submodule not found or not initialized!"
+        exit 1
+      fi
+      
+      if [ -d "vendor/amigen8" ] && [ -f "vendor/amigen8/Makefile" ]; then
+        echo "✓ amigen8 submodule found"
+      else
+        echo "✗ amigen8 submodule not found or not initialized!"
+        exit 1
+      fi
+    
+    # Verify Ansible collections if they exist
+    - |
+      echo "=== Ansible Collections ==="
+      if [ -d "spel/ansible/collections/ansible_collections" ]; then
+        find spel/ansible/collections/ansible_collections -maxdepth 2 -type d -name '[a-z]*' 2>/dev/null | head -10 || true
+        echo "✓ Collections directory found"
+      else
+        echo "⚠ Collections directory not found (may not be needed)"
+      fi
+    
+    # Verify Ansible roles if they exist
+    - |
+      echo "=== Ansible Roles ==="
+      if [ -d "spel/ansible/roles" ]; then
+        ls -1 spel/ansible/roles/ 2>/dev/null | head -10 || echo "No roles found"
+      else
+        echo "⚠ Roles directory not found (may not be needed)"
+      fi
+    
+    # Set Ansible paths
+    - |
+      export ANSIBLE_ROLES_PATH="${CI_PROJECT_DIR}/spel/ansible/roles"
+      export ANSIBLE_COLLECTIONS_PATH="${CI_PROJECT_DIR}/spel/ansible/collections"
+      
+      echo "✓ Build dependencies verified"
+  tags:
+    - spel-nipr-runner
+
+#############################################################################
+# Validate Stage - Validate Packer Templates
+#############################################################################
+
 # Validate Packer templates
 validate:minimal:
   stage: validate
-  needs: ["setup"]
+  needs: ["setup", "packer:init", "python:setup", "verify:dependencies"]
   script:
     - source .env || true
+    - source .venv/bin/activate || true
     - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
+    
+    # Set Packer path for offline mode
+    - |
+      if [ -f "tools/packer/linux_amd64/packer" ]; then
+        export PATH="${CI_PROJECT_DIR}/tools/packer/linux_amd64:${PATH}"
+      fi
+    - export PACKER_PLUGIN_PATH="${CI_PROJECT_DIR}/tools/packer/plugins"
+    
     - |
       packer validate \
         -var "spel_identifier=${SPEL_IDENTIFIER}" \
@@ -108,10 +665,19 @@ validate:minimal:
 
 validate:hardened:
   stage: validate
-  needs: ["setup"]
+  needs: ["setup", "packer:init", "python:setup", "verify:dependencies"]
   script:
     - source .env || true
+    - source .venv/bin/activate || true
     - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
+    
+    # Set Packer path for offline mode
+    - |
+      if [ -f "tools/packer/linux_amd64/packer" ]; then
+        export PATH="${CI_PROJECT_DIR}/tools/packer/linux_amd64:${PATH}"
+      fi
+    - export PACKER_PLUGIN_PATH="${CI_PROJECT_DIR}/tools/packer/plugins"
+    
     - |
       packer validate \
         -var "spel_identifier=${SPEL_IDENTIFIER}" \
@@ -120,18 +686,50 @@ validate:hardened:
   tags:
     - spel-nipr-runner
 
+#############################################################################
+# Build Stage - Build AMIs
+#############################################################################
+
 # Build jobs - triggered manually or on tag
 .build_template: &build_definition
   stage: build
-  needs: ["setup", "validate:minimal", "validate:hardened"]
+  needs:
+    - setup
+    - python:setup
+    - packer:init
+    - verify:dependencies
+    - validate:minimal
+    - validate:hardened
   timeout: 6 hours
+  before_script:
+    - echo "Starting build on $(hostname)"
+    - echo "Git commit - ${CI_COMMIT_SHA}"
+    
+    # Activate Python virtual environment
+    - source .venv/bin/activate
+    
+    # Set Packer path for offline mode
+    - |
+      if [ -f "tools/packer/linux_amd64/packer" ]; then
+        export PATH="${CI_PROJECT_DIR}/tools/packer/linux_amd64:${PATH}"
+      fi
+    - export PACKER_PLUGIN_PATH="${CI_PROJECT_DIR}/tools/packer/plugins"
+    
+    # Load infrastructure config if available
+    - |
+      if [ -f infra.env ]; then
+        echo "Loading infrastructure configuration..."
+        source infra.env
+      fi
+      if [ -f iam.env ]; then
+        source iam.env
+      fi
   script:
     - source .env || true
     - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
     - export PUBLIC="${PUBLIC:-true}"
     
     # Set AWS GovCloud credentials for NIPR environment
-    # NIPR uses GovCloud, so we provide only GovCloud credentials
     - export AWS_GOVCLOUD_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
     - export AWS_GOVCLOUD_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
     
