@@ -131,6 +131,15 @@ for pkg in "${EC2_EL8_PACKAGES[@]}"; do
     fi
 done
 
+# Download ec2-utils from Oracle Linux repository (not available in EPEL for RHEL)
+log_debug "  Downloading ec2-utils from Oracle Linux repository..."
+EC2_UTILS_URL="https://yum.oracle.com/repo/OracleLinux/OL8/baseos/latest/x86_64/getPackage/ec2-utils-2.2.0-1.el8.0.2.noarch.rpm"
+if wget -N "$EC2_UTILS_URL" -O "${EC2_EL8_DIR}/ec2-utils-2.2.0-1.el8.0.2.noarch.rpm" 2>&1 | grep -v "^$"; then
+    log_debug "    ✓ Downloaded ec2-utils (Oracle Linux)"
+else
+    log_warn "    ⚠ Failed to download ec2-utils from Oracle Linux repo"
+fi
+
 EC2_EL8_COUNT=$(find "$EC2_EL8_DIR" -name "*.rpm" 2>/dev/null | wc -l)
 if [ "$EC2_EL8_COUNT" -gt 0 ]; then
     EC2_EL8_SIZE=$(du -sh "$EC2_EL8_DIR" | awk '{print $1}')
@@ -158,6 +167,15 @@ for pkg in "${EC2_EL9_PACKAGES[@]}"; do
         log_warn "    ⚠ Failed to download $pkg (may not be available)"
     fi
 done
+
+# Download ec2-utils from Oracle Linux repository (not available in EPEL for RHEL)
+log_debug "  Downloading ec2-utils from Oracle Linux repository..."
+EC2_UTILS_URL="https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/ec2-utils-2.2.0-1.el9.noarch.rpm"
+if wget -N "$EC2_UTILS_URL" -O "${EC2_EL9_DIR}/ec2-utils-2.2.0-1.el9.noarch.rpm" 2>&1 | grep -v "^$"; then
+    log_debug "    ✓ Downloaded ec2-utils (Oracle Linux)"
+else
+    log_warn "    ⚠ Failed to download ec2-utils from Oracle Linux repo"
+fi
 
 EC2_EL9_COUNT=$(find "$EC2_EL9_DIR" -name "*.rpm" 2>/dev/null | wc -l)
 if [ "$EC2_EL9_COUNT" -gt 0 ]; then
