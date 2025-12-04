@@ -451,7 +451,6 @@ variable "amigen9_extra_rpms" {
     "crypto-policies-scripts",
     "amazon-ec2-net-utils",
     "ec2-hibinit-agent",
-    "ec2-utils",
     "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm",
   ]
 }
