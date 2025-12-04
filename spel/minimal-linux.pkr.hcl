@@ -502,9 +502,6 @@ variable "amigen8_extra_rpms" {
     "python39-pip",
     "python39-setuptools",
     "crypto-policies-scripts",
-    "spel-release",
-    "spel-dod-certs",
-    "spel-wcf-certs",
     "ec2-hibinit-agent",
     "ec2-instance-connect",
     "ec2-instance-connect-selinux",
@@ -534,15 +531,13 @@ variable "amigen8_package_manifest" {
 variable "amigen8_repo_names" {
   description = "List of yum repo names to enable in the EL8 builders and EL8 images"
   type        = list(string)
-  default     = ["spel"]
+  default     = []
 }
 
 variable "amigen8_repo_sources" {
   description = "List of yum package refs (names or urls to .rpm files) that install yum repo definitions in EL8 builders and images"
   type        = list(string)
-  default = [
-    "https://spel-packages.cloudarmor.io/spel-packages/repo/spel-release-latest-8.noarch.rpm",
-  ]
+  default     = []
 }
 
 variable "amigen8_source_branch" {
@@ -597,9 +592,6 @@ variable "amigen9_extra_rpms" {
   type        = list(string)
   default = [
     "crypto-policies-scripts",
-    "spel-release",
-    "spel-dod-certs",
-    "spel-wcf-certs",
     "ec2-hibinit-agent",
     "ec2-utils",
     "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm",
@@ -633,17 +625,13 @@ variable "amigen9_package_manifest_al2023" {
 variable "amigen9_repo_names" {
   description = "List of yum repo names to enable in the EL9 builders and EL9 images"
   type        = list(string)
-  default = [
-    "spel",
-  ]
+  default     = []
 }
 
 variable "amigen9_repo_sources" {
   description = "List of yum package refs (names or urls to .rpm files) that install yum repo definitions in EL9 builders and images"
   type        = list(string)
-  default = [
-    "https://spel-packages.cloudarmor.io/spel-packages/repo/spel-release-latest-9.noarch.rpm",
-  ]
+  default     = []
 }
 
 variable "amigen9_source_branch" {

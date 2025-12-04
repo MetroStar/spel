@@ -356,9 +356,6 @@ variable "amigen8_extra_rpms" {
     "python39-pip",
     "python39-setuptools",
     "crypto-policies-scripts",
-    "spel-release",
-    "spel-dod-certs",
-    "spel-wcf-certs",
     "amazon-ec2-net-utils",
     "ec2-hibinit-agent",
     "ec2-instance-connect",
@@ -389,7 +386,7 @@ variable "amigen8_package_manifest" {
 variable "amigen8_repo_names" {
   description = "List of yum repo names to enable in the EL8 builders and EL8 images"
   type        = list(string)
-  default     = ["spel"]
+  default     = []
 }
 
 variable "amigen8_repo_sources" {
@@ -397,7 +394,6 @@ variable "amigen8_repo_sources" {
   type        = list(string)
   default = [
     "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm",
-    "https://spel-packages.cloudarmor.io/spel-packages/repo/spel-release-latest-8.noarch.rpm",
   ]
 }
 
@@ -453,9 +449,6 @@ variable "amigen9_extra_rpms" {
   type        = list(string)
   default = [
     "crypto-policies-scripts",
-    "spel-release",
-    "spel-dod-certs",
-    "spel-wcf-certs",
     "amazon-ec2-net-utils",
     "ec2-hibinit-agent",
     "ec2-utils",
@@ -484,10 +477,7 @@ variable "amigen9_package_manifest" {
 variable "amigen9_repo_names" {
   description = "List of yum repo names to enable in the EL9 builders and EL9 images"
   type        = list(string)
-  default = [
-    "epel",
-    "spel",
-  ]
+  default     = []
 }
 
 variable "amigen9_repo_sources" {
@@ -495,7 +485,6 @@ variable "amigen9_repo_sources" {
   type        = list(string)
   default = [
     "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm",
-    "https://spel-packages.cloudarmor.io/spel-packages/repo/spel-release-latest-9.noarch.rpm",
   ]
 }
 

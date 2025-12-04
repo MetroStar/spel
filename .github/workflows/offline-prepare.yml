@@ -3,11 +3,6 @@ name: Prepare Offline Transfer Archives
 on:
   workflow_dispatch:
     inputs:
-      sync_spel:
-        description: "Sync SPEL custom packages"
-        required: false
-        default: true
-        type: boolean
       download_packer:
         description: "Download Packer binaries (Linux + Windows)"
         required: false
@@ -153,7 +148,6 @@ jobs:
           echo "SPEL Version: $SPEL_VERSION"
           echo ""
           echo "Tasks:"
-          echo "  Sync SPEL Packages: ${{ github.event.inputs.sync_spel }}"
           echo "  Download Packer: ${{ github.event.inputs.download_packer }}"
           echo "  Download Packer Plugins: ${{ github.event.inputs.download_packer_plugins }}"
           echo "  Download Ansible Core: ${{ github.event.inputs.download_ansible }}"
@@ -172,19 +166,6 @@ jobs:
           echo ""
           echo "Note: YUM/DNF mirrors are NOT synced - Offline has its own RPM repositories"
           echo "================================================="
-      
-      - name: Sync SPEL custom packages
-        if: github.event.inputs.sync_spel != 'false'
-        run: |
-          echo "=== Syncing SPEL Custom Packages ==="
-          ./scripts/sync-spel-packages.sh
-          
-          echo ""
-          echo "SPEL packages:"
-          find mirrors/spel-packages -name "*.rpm" -exec ls -lh {} \; 2>/dev/null || echo "No RPMs found"
-          echo ""
-          echo "Total SPEL packages size:"
-          du -sh mirrors/spel-packages/
       
       - name: Download Packer binaries
         if: github.event.inputs.download_packer != 'false'
@@ -308,7 +289,6 @@ jobs:
           
           # Scan directories containing downloaded/vendored content
           SCAN_DIRS=(
-            "mirrors/spel-packages"
             "tools/packer"
             "tools/python-deps"
             "offline-packages"
@@ -416,7 +396,6 @@ jobs:
           
           # Directories to scan (same as ClamAV for consistency)
           SCAN_DIRS=(
-            "mirrors/spel-packages"
             "tools/packer"
             "tools/python-deps"
             "offline-packages"
