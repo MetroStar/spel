@@ -41,9 +41,14 @@ log_debug() {
     echo -e "${BLUE}[DEBUG]${NC} $1"
 }
 
-# Check for wget
+# Check for required commands
 if ! command -v wget &> /dev/null; then
     log_error "wget is required but not installed"
+    exit 1
+fi
+
+if ! command -v dnf &> /dev/null; then
+    log_error "dnf is required but not installed (needed to download EPEL packages)"
     exit 1
 fi
 
@@ -53,12 +58,14 @@ log_debug "  Create compressed archive: $COMPRESS"
 log_debug "  Verify downloads: $VERIFY_DOWNLOADS"
 
 mkdir -p "$OFFLINE_DIR"
+mkdir -p "$OFFLINE_DIR/ec2-utils-el8"
+mkdir -p "$OFFLINE_DIR/ec2-utils-el9"
 
 # Track download sizes
 TOTAL_SIZE=0
 
 # 1. AWS CLI v2
-log_info "[1/3] Downloading AWS CLI v2..."
+log_info "[1/6] Downloading AWS CLI v2..."
 AWS_CLI_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
 AWS_CLI_FILE="${OFFLINE_DIR}/awscli-exe-linux-x86_64.zip"
 
@@ -71,7 +78,7 @@ else
 fi
 
 # 2. CloudFormation Bootstrap
-log_info "[2/3] Downloading AWS CloudFormation Bootstrap..."
+log_info "[2/6] Downloading AWS CloudFormation Bootstrap..."
 CFN_URL="https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz"
 CFN_FILE="${OFFLINE_DIR}/aws-cfn-bootstrap-py3-latest.tar.gz"
 
@@ -84,7 +91,7 @@ else
 fi
 
 # 3. SSM Agent (single version for both EL8/EL9)
-log_info "[3/3] Downloading AWS SSM Agent..."
+log_info "[3/6] Downloading AWS SSM Agent..."
 SSM_URL="https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
 SSM_FILE="${OFFLINE_DIR}/amazon-ssm-agent.rpm"
 
@@ -95,6 +102,90 @@ if wget -N "$SSM_URL" -O "$SSM_FILE"; then
     TOTAL_SIZE=$((TOTAL_SIZE + $(stat -c%s "$SSM_FILE")))
 else
     log_error "  Failed to download SSM Agent"
+fi
+
+# 4. EC2 utility packages for EL8 from EPEL
+log_info "[4/6] Downloading EC2 utility packages for EL8 from EPEL..."
+EC2_EL8_DIR="${OFFLINE_DIR}/ec2-utils-el8"
+
+# Enable EPEL repository for downloads
+if ! dnf repolist 2>/dev/null | grep -q epel; then
+    log_debug "  Installing EPEL repository..."
+    dnf install -y epel-release 2>&1 | grep -v "^$" || true
+fi
+
+# Download EL8 EC2 packages
+EC2_EL8_PACKAGES=(
+    "ec2-hibinit-agent"
+    "ec2-instance-connect"
+    "ec2-instance-connect-selinux"
+)
+
+for pkg in "${EC2_EL8_PACKAGES[@]}"; do
+    log_debug "  Downloading $pkg for EL8..."
+    if dnf download --downloadonly --downloaddir="$EC2_EL8_DIR" \
+        --enablerepo=epel --releasever=8 "$pkg" 2>&1 | grep -v "^$"; then
+        log_debug "    ✓ Downloaded $pkg"
+    else
+        log_warn "    ⚠ Failed to download $pkg (may not be available)"
+    fi
+done
+
+EC2_EL8_COUNT=$(find "$EC2_EL8_DIR" -name "*.rpm" 2>/dev/null | wc -l)
+if [ "$EC2_EL8_COUNT" -gt 0 ]; then
+    EC2_EL8_SIZE=$(du -sh "$EC2_EL8_DIR" | awk '{print $1}')
+    log_info "  Downloaded $EC2_EL8_COUNT EL8 packages ($EC2_EL8_SIZE)"
+    TOTAL_SIZE=$((TOTAL_SIZE + $(du -sb "$EC2_EL8_DIR" | awk '{print $1}')))
+else
+    log_warn "  No EL8 packages downloaded"
+fi
+
+# 5. EC2 utility packages for EL9 from EPEL
+log_info "[5/6] Downloading EC2 utility packages for EL9 from EPEL..."
+EC2_EL9_DIR="${OFFLINE_DIR}/ec2-utils-el9"
+
+# Download EL9 EC2 packages
+EC2_EL9_PACKAGES=(
+    "ec2-hibinit-agent"
+)
+
+for pkg in "${EC2_EL9_PACKAGES[@]}"; do
+    log_debug "  Downloading $pkg for EL9..."
+    if dnf download --downloadonly --downloaddir="$EC2_EL9_DIR" \
+        --enablerepo=epel --releasever=9 "$pkg" 2>&1 | grep -v "^$"; then
+        log_debug "    ✓ Downloaded $pkg"
+    else
+        log_warn "    ⚠ Failed to download $pkg (may not be available)"
+    fi
+done
+
+EC2_EL9_COUNT=$(find "$EC2_EL9_DIR" -name "*.rpm" 2>/dev/null | wc -l)
+if [ "$EC2_EL9_COUNT" -gt 0 ]; then
+    EC2_EL9_SIZE=$(du -sh "$EC2_EL9_DIR" | awk '{print $1}')
+    log_info "  Downloaded $EC2_EL9_COUNT EL9 packages ($EC2_EL9_SIZE)"
+    TOTAL_SIZE=$((TOTAL_SIZE + $(du -sb "$EC2_EL9_DIR" | awk '{print $1}')))
+else
+    log_warn "  No EL9 packages downloaded"
+fi
+
+# 6. Create repository metadata for EC2 packages
+log_info "[6/6] Creating repository metadata for EC2 packages..."
+
+if command -v createrepo_c &> /dev/null; then
+    if [ "$EC2_EL8_COUNT" -gt 0 ]; then
+        log_debug "  Creating EL8 repository metadata..."
+        createrepo_c "$EC2_EL8_DIR" &>/dev/null
+        log_debug "    ✓ Created EL8 repository"
+    fi
+    
+    if [ "$EC2_EL9_COUNT" -gt 0 ]; then
+        log_debug "  Creating EL9 repository metadata..."
+        createrepo_c "$EC2_EL9_DIR" &>/dev/null
+        log_debug "    ✓ Created EL9 repository"
+    fi
+else
+    log_warn "  createrepo_c not found - skipping repository metadata creation"
+    log_warn "  Install with: dnf install createrepo_c"
 fi
 
 # Verify downloads
@@ -148,7 +239,28 @@ SSM Agent:
   SHA256: $(sha256sum "$SSM_FILE" 2>/dev/null | awk '{print $1}' || echo "N/A")
   Compatible: EL8, EL9
 
+EC2 Utility Packages (EL8):
+  Source: EPEL 8
+  Directory: ec2-utils-el8/
+  Packages: $EC2_EL8_COUNT
+  Size: $(du -sh "$EC2_EL8_DIR" 2>/dev/null | awk '{print $1}' || echo "N/A")
+  Files:
+$(find "$EC2_EL8_DIR" -name "*.rpm" -type f 2>/dev/null | sort | sed 's|^|    - |' || echo "    None")
+
+EC2 Utility Packages (EL9):
+  Source: EPEL 9
+  Directory: ec2-utils-el9/
+  Packages: $EC2_EL9_COUNT
+  Size: $(du -sh "$EC2_EL9_DIR" 2>/dev/null | awk '{print $1}' || echo "N/A")
+  Files:
+$(find "$EC2_EL9_DIR" -name "*.rpm" -type f 2>/dev/null | sort | sed 's|^|    - |' || echo "    None")
+
 Total Size: $(du -sh "$OFFLINE_DIR" | awk '{print $1}')
+
+Notes:
+  - python39* and crypto-policies-scripts packages are available in RHEL base repositories
+  - EC2 utility packages are from EPEL and required for RHEL builds
+  - Repository metadata created for EC2 packages (if createrepo_c available)
 EOF
 
 log_info "Version information saved to VERSIONS.txt"
