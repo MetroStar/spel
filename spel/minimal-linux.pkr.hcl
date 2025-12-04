@@ -1067,6 +1067,25 @@ build {
   }
 
   # Common provisioners
+  
+  # Upload offline packages directory if it exists (for offline/air-gapped builds)
+  # This provisioner will fail gracefully if the directory doesn't exist
+  provisioner "file" {
+    source      = "${path.root}/../offline-packages/"
+    destination = "/tmp/offline-packages/"
+    only = [
+      "amazon-ebssurrogate.minimal-rhel-9-hvm",
+      "amazon-ebssurrogate.minimal-rhel-8-hvm",
+      "amazon-ebssurrogate.minimal-ol-9-hvm",
+      "amazon-ebssurrogate.minimal-ol-8-hvm",
+      "amazon-ebssurrogate.minimal-centos-9stream-hvm",
+      "amazon-ebssurrogate.minimal-centos-8stream-hvm",
+      "amazon-ebssurrogate.minimal-amzn-2023-hvm",
+      "amazon-ebssurrogate.minimal-alma-9-hvm",
+      "amazon-ebssurrogate.minimal-rl-9-hvm",
+    ]
+  }
+  
   provisioner "shell" {
     environment_vars = [
       "DNF_VAR_ociregion=",
