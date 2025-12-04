@@ -194,13 +194,6 @@ if [[ -n "$SPEL_BUILDERS" ]]; then
 
     build_packer_templates
 
-    # Retry failed builds until there are no more failed builds
-    while [[ ${#FAILED_BUILDS[@]} -gt 0 ]]; do
-        echo "Retrying failed builds: ${FAILED_BUILDS[*]}"
-        SPEL_BUILDERS=$(IFS=, ; echo "${FAILED_BUILDS[*]}")
-        build_packer_templates
-    done
-
     SUCCESS_BUILDERS=$(IFS=, ; echo "${SUCCESS_BUILDS[*]}")
     ANSIBLE_LOCKDOWNS=${SUCCESS_BUILDERS//amazon-ebssurrogate.minimal/amazon-ebs.hardened}
 
