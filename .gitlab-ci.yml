@@ -1006,10 +1006,10 @@ validate:hardened:
         export PKR_VAR_spel_ssm_agent_source="file://${CI_PROJECT_DIR}/offline-packages/amazon-ssm-agent.rpm"
         
         # Override EC2 packages for EL8
-        export PKR_VAR_amigen8_extra_rpms='["python39","python39-pip","python39-setuptools","crypto-policies-scripts","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-hibinit-agent.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-instance-connect.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-utils-2.2-1.0.2.el8.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/amazon-ssm-agent.rpm"]'
+        export PKR_VAR_amigen8_extra_rpms='["python39","python39-pip","python39-setuptools","crypto-policies-scripts","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-hibinit-agent-1.0.7-1.el8.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-instance-connect-1.1.17-1.el8.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux-1.1.17-1.el8.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-utils-2.2-1.0.2.el8.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/amazon-ssm-agent.rpm"]'
         
         # Override EC2 packages for EL9
-        export PKR_VAR_amigen9_extra_rpms='["crypto-policies-scripts","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el9/ec2-hibinit-agent.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el9/ec2-utils-2.2-1.0.1.el9.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/amazon-ssm-agent.rpm"]'
+        export PKR_VAR_amigen9_extra_rpms='["crypto-policies-scripts","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el9/ec2-hibinit-agent-1.0.8-1.el9.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el9/ec2-utils-2.2-1.0.1.el9.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/amazon-ssm-agent.rpm"]'
         
         # Disable EPEL repositories for offline builds
         export PKR_VAR_amigen8_repo_names='[]'
