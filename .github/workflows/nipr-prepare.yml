@@ -526,15 +526,15 @@ jobs:
           echo "Scan completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
           echo "========================================" | tee -a "$SCAN_LOG"
           
-          # Count total detections from JSON output (ensure it's a valid integer)
+          # Count total detections from JSON output
           if [ -f "$SCAN_JSON" ]; then
             TOTAL_DETECTIONS=$(grep -c '"Raw"' "$SCAN_JSON" 2>/dev/null || echo "0")
           else
             TOTAL_DETECTIONS=0
           fi
           
-          # Ensure it's a single integer (handle any weird output)
-          TOTAL_DETECTIONS=$(printf "%d" "$TOTAL_DETECTIONS" 2>/dev/null || echo "0")
+          # Ensure it's a valid integer
+          TOTAL_DETECTIONS=${TOTAL_DETECTIONS:-0}
           
           # Summary
           echo "" | tee -a "$SCAN_LOG"
