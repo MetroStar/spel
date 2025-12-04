@@ -1183,6 +1183,33 @@ build {
     ]
   }
 
+  # Bind-mount offline-packages into chroot (for offline/air-gapped builds)
+  # This allows file:// URLs in package lists to work from within the chroot
+  provisioner "shell" {
+    inline = [
+      "if [ -d /tmp/offline-packages ]; then",
+      "  echo 'Setting up offline-packages in chroot...'",
+      "  sudo mkdir -p /mnt/ec2-root/tmp/offline-packages",
+      "  sudo mount --bind /tmp/offline-packages /mnt/ec2-root/tmp/offline-packages",
+      "  echo 'Offline packages mounted:'",
+      "  ls -lh /tmp/offline-packages/ | head -20",
+      "else",
+      "  echo 'No offline-packages directory found (online mode)'",
+      "fi",
+    ]
+    only = [
+      "amazon-ebssurrogate.minimal-rhel-9-hvm",
+      "amazon-ebssurrogate.minimal-rhel-8-hvm",
+      "amazon-ebssurrogate.minimal-ol-9-hvm",
+      "amazon-ebssurrogate.minimal-ol-8-hvm",
+      "amazon-ebssurrogate.minimal-centos-9stream-hvm",
+      "amazon-ebssurrogate.minimal-centos-8stream-hvm",
+      "amazon-ebssurrogate.minimal-amzn-2023-hvm",
+      "amazon-ebssurrogate.minimal-alma-9-hvm",
+      "amazon-ebssurrogate.minimal-rl-9-hvm",
+    ]
+  }
+
   # AWS EL8 provisioners
   provisioner "shell" {
     environment_vars = [
