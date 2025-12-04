@@ -531,7 +531,7 @@ variable "amigen8_package_manifest" {
 variable "amigen8_repo_names" {
   description = "List of yum repo names to enable in the EL8 builders and EL8 images"
   type        = list(string)
-  default     = []
+  default     = ["epel"]
 }
 
 variable "amigen8_repo_sources" {
@@ -627,7 +627,7 @@ variable "amigen9_package_manifest_al2023" {
 variable "amigen9_repo_names" {
   description = "List of yum repo names to enable in the EL9 builders and EL9 images"
   type        = list(string)
-  default     = []
+  default     = ["epel"]
 }
 
 variable "amigen9_repo_sources" {
