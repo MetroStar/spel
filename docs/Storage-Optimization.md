@@ -1,8 +1,8 @@
-# Storage Optimization Guide for NIPR Transfers
+# Storage Optimization Guide for Offline Transfers
 
-This guide provides strategies to minimize storage requirements and transfer sizes for SPEL NIPR deployments.
+This guide provides strategies to minimize storage requirements and transfer sizes for SPEL Offline deployments.
 
-**Note**: NIPR builds use RHUI repositories available within the NIPR AWS GovCloud environment, eliminating the need for local YUM/DNF mirrors.
+**Note**: Offline builds use RHUI repositories available within the Offline AWS GovCloud environment, eliminating the need for local YUM/DNF mirrors.
 
 ## Quick Reference
 
@@ -46,18 +46,18 @@ SPEL_OFFLINE_COMPRESS=true \
 ./scripts/create-transfer-archive.sh
 
 # 6. Verify and prepare for transfer
-sha256sum -c spel-nipr-*-checksums.txt
+sha256sum -c spel-offline-*-checksums.txt
 ls -lh spel-*.tar.gz
 ```
 
-### On NIPR System
+### On Offline System
 
 ```bash
 # 1. Verify checksums after transfer
-sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
+sha256sum -c spel-offline-YYYYMMDD-checksums.txt
 
 # 2. Extract all archives
-./scripts/extract-nipr-archives.sh
+./scripts/extract-offline-archives.sh
 
 # 3. Initialize environment (uses RHUI repos)
 ./build/ci-setup.sh
@@ -97,7 +97,7 @@ SPEL_ROLES_TAG=v1.2.3 \
 
 **Result:**
 - Locks to specific tested version
-- Recommended for production NIPR environments
+- Recommended for production Offline environments
 
 ### 2. Ansible Collections (20 MB → 5 MB)
 
@@ -152,7 +152,7 @@ pip download ansible-core --no-deps --dest tools/python-deps/
 wget https://releases.hashicorp.com/packer/1.11.2/packer_1.11.2_linux_amd64.zip
 ```
 
-**Note**: NIPR builds use Packer v1.11.2 for compatibility with vendored plugins.
+**Note**: Offline builds use Packer v1.11.2 for compatibility with vendored plugins.
 
 ## Transfer Archive Strategies
 
@@ -170,7 +170,7 @@ SPEL_ARCHIVE_COMBINED=true \
 SPEL_ARCHIVE_SEPARATE=false \
 ./scripts/create-transfer-archive.sh
 
-# Result: spel-nipr-complete-YYYYMMDD.tar.gz (1.1 GB)
+# Result: spel-offline-complete-YYYYMMDD.tar.gz (1.1 GB)
 ```
 
 ### Option 2: Separate Component Archives (Recommended)
@@ -216,19 +216,19 @@ Note: ClamAV DB downloaded during scan, not included in transfer
 
 ```
 Minimum (compressed archives only):
-  └── spel-nipr-*.tar.gz   1.1 GB
+  └── spel-offline-*.tar.gz   1.1 GB
 
 Recommended (archives + security artifacts):
   ├── spel-base-*.tar.gz       118 MB
   ├── spel-tools-*.tar.gz      289 MB
-  ├── spel-nipr-complete-*.tar.gz  694 MB
+  ├── spel-offline-complete-*.tar.gz  694 MB
   ├── checksums.txt            ~2 KB
   ├── manifest.txt             ~5 KB
   └── clamav-scan.log          ~50 KB (security audit trail)
   Total: 1.1 GB
 ```
 
-### NIPR System (Deployed)
+### Offline System (Deployed)
 
 ```
 Deployed workspace:
@@ -247,7 +247,7 @@ Minimum: 1.1 GB
 Recommended: 20-35 GB (allows 1-2 concurrent builds)
 ```
 
-**Note**: NIPR builds use RHUI repositories within AWS GovCloud, so no local mirrors are needed.
+**Note**: Offline builds use RHUI repositories within AWS GovCloud, so no local mirrors are needed.
 
 ## Configuration Variables Reference
 
@@ -274,7 +274,7 @@ Recommended: 20-35 GB (allows 1-2 concurrent builds)
 | `SPEL_ARCHIVE_COMBINED` | `true` | Create combined archive |
 | `SPEL_ARCHIVE_OUTPUT` | `$PWD` | Output directory for archives |
 
-### NIPR Extraction (`extract-nipr-archives.sh`)
+### Offline Extraction (`extract-offline-archives.sh`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -306,7 +306,7 @@ Output: ~1 GB extracted files + scan log
 - Packer binaries: 97 MB → `tools/packer-linux/`, `tools/packer-windows/`
 - Packer plugins: 241 MB → `tools/packer-plugins/`
 - Python packages: 16 MB → `tools/python-deps/`
-- ClamAV scan log: ~50 KB → `spel-nipr-YYYYMMDD-clamav-scan.log`
+- ClamAV scan log: ~50 KB → `spel-offline-YYYYMMDD-clamav-scan.log`
 
 **Security Artifacts**:
 - Checksums file: ~2 KB
@@ -466,7 +466,7 @@ SPEL_ARCHIVE_COMBINED=false \
 ./scripts/create-transfer-archive.sh
 ```
 
-### Issue: Slow extraction in NIPR
+### Issue: Slow extraction in Offline
 
 **Solution:**
 ```bash
@@ -480,13 +480,13 @@ tar xzf archive.tar.gz -C /final/destination/
 1. **Always verify checksums** after transfer
 2. **Test extraction** before deleting transfer media
 3. **Document versions** in transfer package (use VERSIONS.txt files)
-4. **Keep one previous version** in NIPR for rollback
+4. **Keep one previous version** in Offline for rollback
 5. **Update monthly** for security patches (Ansible roles and collections)
 6. **Use separate archives** for updates (don't re-transfer everything)
 7. **Compress before transfer** (default in scripts)
 
 ## See Also
 
-- `docs/NIPR-Setup.md` - Complete NIPR setup guide
+- `docs/Offline-Setup.md` - Complete Offline setup guide
 - `offline-packages/README.md` - AWS utilities documentation
 - `tools/README.md` - Build tools documentation

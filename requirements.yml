@@ -1,6 +1,6 @@
 # requirements.yml for ansible-galaxy
 # This file installs the Ansible Lockdown roles from vendored local copies
-# For NIPR air-gapped environments, roles are cloned from GitHub and committed to this repo
+# For Offline air-gapped environments, roles are cloned from GitHub and committed to this repo
 roles:
   - src: ./spel/ansible/roles/Windows-2016-STIG
     name: Windows-2016-STIG

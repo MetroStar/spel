@@ -1,4 +1,4 @@
-name: Prepare NIPR Transfer Archives
+name: Prepare Offline Transfer Archives
 
 on:
   workflow_dispatch:
@@ -53,8 +53,8 @@ permissions:
   contents: read
 
 jobs:
-  prepare-nipr-transfer:
-    name: Prepare NIPR Transfer Archives
+  prepare-offline-transfer:
+    name: Prepare Offline Transfer Archives
     runs-on: ubuntu-latest
     container:
       image: fedora:latest
@@ -148,7 +148,7 @@ jobs:
       
       - name: Display configuration
         run: |
-          echo "=== NIPR Transfer Preparation Configuration ==="
+          echo "=== Offline Transfer Preparation Configuration ==="
           echo "Date: $DATE"
           echo "SPEL Version: $SPEL_VERSION"
           echo ""
@@ -170,7 +170,7 @@ jobs:
           echo "  Python version: $SPEL_PYTHON_VERSION"
           echo "  Ansible version: $SPEL_ANSIBLE_VERSION"
           echo ""
-          echo "Note: YUM/DNF mirrors are NOT synced - NIPR has its own RPM repositories"
+          echo "Note: YUM/DNF mirrors are NOT synced - Offline has its own RPM repositories"
           echo "================================================="
       
       - name: Sync SPEL custom packages
@@ -388,7 +388,7 @@ jobs:
             echo "  3. Remove or quarantine infected files" | tee -a "$SCAN_LOG"
             echo "  4. Re-run workflow after remediation" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
-            echo "NIPR SECURITY POLICY: Infected files cannot be transferred" | tee -a "$SCAN_LOG"
+            echo "Offline SECURITY POLICY: Infected files cannot be transferred" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
             
             # Fail workflow
@@ -397,12 +397,12 @@ jobs:
             echo "" | tee -a "$SCAN_LOG"
             echo "✅ ALL FILES CLEAN - No threats detected" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
-            echo "Files are safe for NIPR transfer" | tee -a "$SCAN_LOG"
+            echo "Files are safe for Offline transfer" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
           fi
           
           # Save scan log as artifact
-          mv "$SCAN_LOG" "spel-nipr-${DATE}-clamav-scan.log"
+          mv "$SCAN_LOG" "spel-offline-${DATE}-clamav-scan.log"
       
       - name: Scan for secrets with TruffleHog
         run: |
@@ -569,7 +569,7 @@ jobs:
             echo "  4. Rotate any exposed credentials immediately" | tee -a "$SCAN_LOG"
             echo "  5. Re-run workflow after remediation" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
-            echo "NIPR SECURITY POLICY: No secrets allowed in transfer" | tee -a "$SCAN_LOG"
+            echo "Offline SECURITY POLICY: No secrets allowed in transfer" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
             
             # Clean up
@@ -581,7 +581,7 @@ jobs:
             echo "" | tee -a "$SCAN_LOG"
             echo "✅ NO SECRETS DETECTED - All files clean" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
-            echo "Files are safe for NIPR transfer" | tee -a "$SCAN_LOG"
+            echo "Files are safe for Offline transfer" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
           fi
           
@@ -589,7 +589,7 @@ jobs:
           rm -f "$SCAN_JSON"
           
           # Save scan log as artifact
-          mv "$SCAN_LOG" "spel-nipr-${DATE}-trufflehog-scan.log"
+          mv "$SCAN_LOG" "spel-offline-${DATE}-trufflehog-scan.log"
       
       - name: Create transfer archives
         if: github.event.inputs.create_archives != 'false'
@@ -607,7 +607,7 @@ jobs:
         if: github.event.inputs.create_archives != 'false'
         run: |
           echo "=== Verifying Archive Checksums ==="
-          sha256sum -c spel-nipr-${DATE}-checksums.txt
+          sha256sum -c spel-offline-${DATE}-checksums.txt
           
           echo ""
           echo "Checksum verification passed!"
@@ -615,10 +615,10 @@ jobs:
       - name: Generate transfer manifest
         if: github.event.inputs.create_archives != 'false'
         run: |
-          MANIFEST_FILE="spel-nipr-${DATE}-manifest.txt"
+          MANIFEST_FILE="spel-offline-${DATE}-manifest.txt"
           
           cat > "$MANIFEST_FILE" <<MANIFEST_EOF
-          SPEL NIPR Transfer Manifest
+          SPEL Offline Transfer Manifest
           ============================
           Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
           SPEL Version: ${SPEL_VERSION}
@@ -650,12 +650,12 @@ jobs:
           
           Transfer Instructions
           ---------------------
-          1. Verify checksums: sha256sum -c spel-nipr-${DATE}-checksums.txt
-          2. Transfer all spel-*.tar.gz files to NIPR environment
-          3. Transfer spel-nipr-${DATE}-checksums.txt for verification
-          4. On NIPR: verify checksums again after transfer
-          5. On NIPR: run ./scripts/extract-nipr-archives.sh
-          6. On NIPR: configure to use NIPR RPM repositories (no local mirrors needed)
+          1. Verify checksums: sha256sum -c spel-offline-${DATE}-checksums.txt
+          2. Transfer all spel-*.tar.gz files to Offline environment
+          3. Transfer spel-offline-${DATE}-checksums.txt for verification
+          4. On Offline: verify checksums again after transfer
+          5. On Offline: run ./scripts/extract-offline-archives.sh
+          6. On Offline: configure to use Offline RPM repositories (no local mirrors needed)
           
           Storage Optimization Applied
           ----------------------------
@@ -669,8 +669,8 @@ jobs:
           - TruffleHog secrets scan: PASSED
           - All files scanned and verified clean
           - Scan logs: 
-              spel-nipr-${DATE}-clamav-scan.log
-              spel-nipr-${DATE}-trufflehog-scan.log
+              spel-offline-${DATE}-clamav-scan.log
+              spel-offline-${DATE}-trufflehog-scan.log
           
           Expected Sizes (Actual Measured)
           --------------------------------
@@ -685,9 +685,9 @@ jobs:
           - Total compressed archives: 1.1 GB
             - spel-base: 118 MB
             - spel-tools: 289 MB
-            - spel-nipr-complete: 694 MB
+            - spel-offline-complete: 694 MB
           
-          Note: YUM/DNF mirrors are NOT included - NIPR environment
+          Note: YUM/DNF mirrors are NOT included - Offline environment
                 uses its own RPM repositories
           MANIFEST_EOF
           
@@ -698,7 +698,7 @@ jobs:
         run: |
           echo ""
           echo "========================================="
-          echo "NIPR Transfer Preparation Complete!"
+          echo "Offline Transfer Preparation Complete!"
           echo "========================================="
           echo ""
           echo "Archives created:"
@@ -717,31 +717,31 @@ jobs:
           echo "  - Packer plugins (all required for SPEL builds)"
           echo "  - Build scripts and configurations"
           echo ""
-          echo "Note: YUM/DNF mirrors NOT included - use NIPR RPM repositories"
+          echo "Note: YUM/DNF mirrors NOT included - use Offline RPM repositories"
           echo ""
           echo "Files ready for transfer:"
-          echo "  - spel-nipr-${DATE}-checksums.txt (verification)"
-          echo "  - spel-nipr-${DATE}-manifest.txt (documentation)"
+          echo "  - spel-offline-${DATE}-checksums.txt (verification)"
+          echo "  - spel-offline-${DATE}-manifest.txt (documentation)"
           echo "  - spel-*.tar.gz (archives)"
           echo ""
           echo "Next steps:"
           echo "  1. Download artifacts from GitHub Actions"
           echo "  2. Verify checksums locally"
-          echo "  3. Transfer to NIPR using approved method"
-          echo "  4. Set up GitLab CI in NIPR for automated deployment"
+          echo "  3. Transfer to Offline using approved method"
+          echo "  4. Set up GitLab CI in Offline for automated deployment"
           echo "========================================="
       
       - name: Upload transfer archives
         if: github.event.inputs.upload_artifacts != 'false' && github.event.inputs.create_archives != 'false'
         uses: actions/upload-artifact@v4
         with:
-          name: spel-nipr-transfer-${{ env.DATE }}
+          name: spel-offline-transfer-${{ env.DATE }}
           path: |
             spel-*.tar.gz
-            spel-nipr-*-checksums.txt
-            spel-nipr-*-manifest.txt
-            spel-nipr-*-clamav-scan.log
-            spel-nipr-*-trufflehog-scan.log
+            spel-offline-*-checksums.txt
+            spel-offline-*-manifest.txt
+            spel-offline-*-clamav-scan.log
+            spel-offline-*-trufflehog-scan.log
           retention-days: 90
           compression-level: 0
       
@@ -749,7 +749,7 @@ jobs:
         if: github.event.inputs.upload_artifacts != 'false' && github.event.inputs.create_archives != 'false'
         uses: actions/upload-artifact@v4
         with:
-          name: spel-nipr-base-${{ env.DATE }}
+          name: spel-offline-base-${{ env.DATE }}
           path: spel-base-*.tar.gz
           retention-days: 90
           compression-level: 0
@@ -757,7 +757,7 @@ jobs:
       - name: Create summary
         if: always()
         run: |
-          echo "## NIPR Transfer Preparation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Offline Transfer Preparation Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
           echo "**SPEL Version:** ${SPEL_VERSION}" >> $GITHUB_STEP_SUMMARY
@@ -783,14 +783,14 @@ jobs:
           echo "- ✅ Removed git history from roles (saves ~80%)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Single SSM agent for EL8/EL9 (saves ~25%)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Compressed archives" >> $GITHUB_STEP_SUMMARY
-          echo "- ℹ️  YUM/DNF mirrors NOT included - NIPR uses its own RPM repositories" >> $GITHUB_STEP_SUMMARY
+          echo "- ℹ️  YUM/DNF mirrors NOT included - Offline uses its own RPM repositories" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           echo "### Security Scans" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # ClamAV results
-          if [ -f "spel-nipr-${DATE}-clamav-scan.log" ]; then
+          if [ -f "spel-offline-${DATE}-clamav-scan.log" ]; then
             echo "- ✅ **ClamAV virus scan: PASSED**" >> $GITHUB_STEP_SUMMARY
             echo "  - All files verified clean before archiving" >> $GITHUB_STEP_SUMMARY
           else
@@ -798,7 +798,7 @@ jobs:
           fi
           
           # TruffleHog results
-          if [ -f "spel-nipr-${DATE}-trufflehog-scan.log" ]; then
+          if [ -f "spel-offline-${DATE}-trufflehog-scan.log" ]; then
             echo "- ✅ **TruffleHog secrets scan: PASSED**" >> $GITHUB_STEP_SUMMARY
             echo "  - No credentials or secrets detected" >> $GITHUB_STEP_SUMMARY
           else
@@ -811,7 +811,7 @@ jobs:
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "1. Download artifacts from this workflow run" >> $GITHUB_STEP_SUMMARY
-          echo "2. Verify checksums: \`sha256sum -c spel-nipr-${DATE}-checksums.txt\`" >> $GITHUB_STEP_SUMMARY
-          echo "3. Transfer archives to NIPR environment" >> $GITHUB_STEP_SUMMARY
-          echo "4. Extract on NIPR: \`./scripts/extract-nipr-archives.sh\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify checksums: \`sha256sum -c spel-offline-${DATE}-checksums.txt\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Transfer archives to Offline environment" >> $GITHUB_STEP_SUMMARY
+          echo "4. Extract on Offline: \`./scripts/extract-offline-archives.sh\`" >> $GITHUB_STEP_SUMMARY
           echo "5. Run GitLab CI pipeline to build AMIs (uses RHUI repositories)" >> $GITHUB_STEP_SUMMARY

@@ -1,4 +1,4 @@
-# TruffleHog exclusions for SPEL NIPR preparation
+# TruffleHog exclusions for SPEL Offline preparation
 # These paths contain expected patterns that trigger false positives
 
 # Documentation files (may contain example credentials)

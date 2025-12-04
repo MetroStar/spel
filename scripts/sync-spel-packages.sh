@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Sync SPEL custom packages for NIPR offline builds
+# Sync SPEL custom packages for Offline offline builds
 # Downloads only the latest spel-release RPMs and current package versions
-# Run this on a system with internet access before transferring to NIPR
+# Run this on a system with internet access before transferring to Offline
 #
 set -euo pipefail
 

@@ -1,4 +1,4 @@
-# NIPR Transfer & GitLab CI Quick Reference
+# Offline Transfer & GitLab CI Quick Reference
 
 ## Pipeline Overview
 
@@ -17,24 +17,24 @@
 - Monthly builds: ~6 min (setup + validate) + build time
 - Quick rebuild: ~6 min setup + build time
 
-## First-Time NIPR Setup
+## First-Time Offline Setup
 
 ### Step 1: Prepare Archives on Internet System
 ```bash
 # GitHub Actions runs automatically on 15th of month
 # Or manually trigger workflow at:
-# https://github.com/MetroStar/spel/actions/workflows/nipr-prepare.yml
+# https://github.com/MetroStar/spel/actions/workflows/offline-prepare.yml
 
 # Workflow duration: 7-11 minutes (includes ClamAV + TruffleHog scans)
 
 # Download artifacts after workflow completes:
-# - spel-nipr-YYYYMMDD-base.tar.gz (118 MB)
-# - spel-nipr-YYYYMMDD-tools.tar.gz (289 MB)  
-# - spel-nipr-YYYYMMDD-complete.tar.gz (694 MB)
-# - spel-nipr-YYYYMMDD-checksums.txt
-# - spel-nipr-YYYYMMDD-manifest.txt
-# - spel-nipr-YYYYMMDD-clamav-scan.log (virus scan audit trail)
-# - spel-nipr-YYYYMMDD-trufflehog-scan.log (secrets scan audit trail)
+# - spel-offline-YYYYMMDD-base.tar.gz (118 MB)
+# - spel-offline-YYYYMMDD-tools.tar.gz (289 MB)  
+# - spel-offline-YYYYMMDD-complete.tar.gz (694 MB)
+# - spel-offline-YYYYMMDD-checksums.txt
+# - spel-offline-YYYYMMDD-manifest.txt
+# - spel-offline-YYYYMMDD-clamav-scan.log (virus scan audit trail)
+# - spel-offline-YYYYMMDD-trufflehog-scan.log (secrets scan audit trail)
 
 # Verify security scans passed (check GitHub Actions summary)
 # ClamAV scans ~1.6 GB across 7 directories (3-5 min)
@@ -43,38 +43,38 @@
 #   → Scan log shows: NO SECRETS DETECTED
 
 # Verify checksums before transfer
-sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
+sha256sum -c spel-offline-YYYYMMDD-checksums.txt
 ```
 
-### Step 2: Transfer to NIPR
+### Step 2: Transfer to Offline
 ```bash
 # Transfer via approved method (DVD, secure transfer, etc.)
 # Total transfer size: ~1.1 GB (includes both security scan logs)
 # Verify checksums after transfer
-sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
+sha256sum -c spel-offline-YYYYMMDD-checksums.txt
 
 # Review security scan logs for compliance
-less spel-nipr-YYYYMMDD-clamav-scan.log
+less spel-offline-YYYYMMDD-clamav-scan.log
 # Verify: "Infected files: 0" in scan summary
 
-less spel-nipr-YYYYMMDD-trufflehog-scan.log
+less spel-offline-YYYYMMDD-trufflehog-scan.log
 # Verify: "NO SECRETS DETECTED" in scan summary
 ```
 
-### Step 3: Upload to GitLab NIPR
+### Step 3: Upload to GitLab Offline
 ```bash
-# Clone your NIPR GitLab repository
-git clone https://your-gitlab-nipr-instance.mil/your-group/spel.git
+# Clone your Offline GitLab repository
+git clone https://your-gitlab-offline-instance.mil/your-group/spel.git
 cd spel/
 
 # Add archives and security artifacts
 git lfs track "*.tar.gz"
 git add .gitattributes spel-*.tar.gz \
-  spel-nipr-*-checksums.txt \
-  spel-nipr-*-manifest.txt \
-  spel-nipr-*-clamav-scan.log \
-  spel-nipr-*-trufflehog-scan.log
-git commit -m "Add NIPR transfer archives for December 2025 (security: clean)"
+  spel-offline-*-checksums.txt \
+  spel-offline-*-manifest.txt \
+  spel-offline-*-clamav-scan.log \
+  spel-offline-*-trufflehog-scan.log
+git commit -m "Add Offline transfer archives for December 2025 (security: clean)"
 git push
 ```
 
@@ -86,7 +86,7 @@ git push
 # Manually click ▶ on "extract:archives" job
 # Wait 2-3 minutes for extraction + dual security verification
 # Job verifies both ClamAV and TruffleHog scan logs
-# Note: Job fails if scan logs missing or issues found (NIPR compliance)
+# Note: Job fails if scan logs missing or issues found (Offline compliance)
 #   - ClamAV: Checks for "Infected files: 0"
 #   - TruffleHog: Checks for "NO SECRETS DETECTED"
 ```
@@ -120,9 +120,9 @@ git push
 
 ### Step 1: Update Archives (if new transfer)
 ```bash
-# Transfer new archives to NIPR
+# Transfer new archives to Offline
 # Update in GitLab repository
-git add spel-*.tar.gz spel-nipr-*-checksums.txt
+git add spel-*.tar.gz spel-offline-*-checksums.txt
 git commit -m "Update archives for $(date +%Y%m)"
 git push
 
@@ -152,19 +152,19 @@ git push
 
 ### GitHub Actions Output (Total: 1.1 GB)
 
-**Base Archive** (`spel-nipr-YYYYMMDD-base.tar.gz`): **118 MB**
+**Base Archive** (`spel-offline-YYYYMMDD-base.tar.gz`): **118 MB**
 - SPEL packages: 56 KB
 - Ansible roles: 4 MB (git clones without history)
 - Offline packages: 86 MB (AWS CLI, utilities)
 - Scripts and configs: minimal
 
-**Tools Archive** (`spel-nipr-YYYYMMDD-tools.tar.gz`): **289 MB**
+**Tools Archive** (`spel-offline-YYYYMMDD-tools.tar.gz`): **289 MB**
 - Packer binaries: 97 MB (Linux 49 MB + Windows 48 MB)
 - Packer plugins: 241 MB (Amazon, Ansible, PowerShell)
 - Python packages: 16 MB (wheels)
 - Ansible collections: 3.5 MB (tarballs)
 
-**Complete Archive** (`spel-nipr-YYYYMMDD-complete.tar.gz`): **694 MB**
+**Complete Archive** (`spel-offline-YYYYMMDD-complete.tar.gz`): **694 MB**
 - Everything from base + tools combined
 - Optional (use for initial setup or when transferring everything)
 
@@ -190,7 +190,7 @@ git push
 |----------|-------------|---------|
 | `AWS_GOVCLOUD_ACCESS_KEY_ID` | GovCloud access key | `AKIA...` |
 | `AWS_GOVCLOUD_SECRET_ACCESS_KEY` | GovCloud secret key | `wJa...` |
-| `PKR_VAR_aws_nipr_account_id` | AWS account ID | `123456789012` |
+| `PKR_VAR_aws_offline_account_id` | AWS account ID | `123456789012` |
 | `PKR_VAR_aws_vpc_id` | VPC ID (if not using infra stage) | `vpc-abc123` |
 | `PKR_VAR_aws_subnet_id` | Subnet ID (if not using infra stage) | `subnet-xyz789` |
 
@@ -215,7 +215,7 @@ git push
 | `CREATE_INFRASTRUCTURE` | Enable infrastructure jobs | `false` |
 | `INFRA_PREFIX` | Prefix for resource names | `spel-packer` |
 | `INFRA_TAGS` | JSON tags for resources | `{"Project":"SPEL"}` |
-| `PKR_VAR_aws_nipr_ami_regions` | Regions for AMI copy | `["us-gov-east-1"]` |
+| `PKR_VAR_aws_offline_ami_regions` | Regions for AMI copy | `["us-gov-east-1"]` |
 
 ## Build Times by OS
 
@@ -250,7 +250,7 @@ git push
   - Manifest: minimal
   - ClamAV scan log: ~50 KB (security audit trail)
 
-### NIPR System (GitLab Runner)
+### Offline System (GitLab Runner)
 - Extracted archives: ~1 GB
 - Python venv: ~200 MB (created by `python:setup`)
 - Packer plugin cache: ~300 MB (after `packer:init`)
@@ -267,7 +267,7 @@ git push
 ls -lh spel-*.tar.gz
 
 # Checksum failed
-sha256sum -c spel-nipr-YYYYMMDD-checksums.txt
+sha256sum -c spel-offline-YYYYMMDD-checksums.txt
 
 # Extraction incomplete
 ls -lh tools/packer-linux/
@@ -315,15 +315,15 @@ ls -lh vendor/amigen8/ vendor/amigen9/
 # Look for: "Security Scan: ✅ PASSED (0 infected files)"
 
 # Review scan log details
-less spel-nipr-YYYYMMDD-clamav-scan.log
+less spel-offline-YYYYMMDD-clamav-scan.log
 
 # Check scan summary
-grep "SCAN SUMMARY" -A 10 spel-nipr-YYYYMMDD-clamav-scan.log
+grep "SCAN SUMMARY" -A 10 spel-offline-YYYYMMDD-clamav-scan.log
 # Verify: "Infected files: 0"
 # Typical: 5000+ files scanned, 3-5 min duration
 
 # If virus detected (workflow fails)
-grep "FOUND" spel-nipr-YYYYMMDD-clamav-scan.log
+grep "FOUND" spel-offline-YYYYMMDD-clamav-scan.log
 # Investigate detected files, verify false positives
 
 # ClamAV version check (on Internet system)
@@ -400,7 +400,7 @@ rm -rf spel-artifacts-*
 rm -rf .venv/
 
 # Re-extract archives
-./scripts/extract-nipr-archives.sh
+./scripts/extract-offline-archives.sh
 ```
 
 ## Monthly Workflow Calendar
@@ -415,10 +415,10 @@ rm -rf .venv/
 - Download archives from GitHub artifacts
 - Verify checksums before transfer
 
-### Days 16-20: Transfer to NIPR
+### Days 16-20: Transfer to Offline
 - Transfer archives via approved method
 - Verify checksums after transfer
-- Upload to GitLab NIPR repository
+- Upload to GitLab Offline repository
 
 ### Days 21-25: AMI Builds
 - Extract archives (if updated)
@@ -427,7 +427,7 @@ rm -rf .venv/
 - Verify AMI IDs and test instances
 
 ### Days 26-31: Validation & Cleanup
-- Test AMIs in NIPR environment
+- Test AMIs in Offline environment
 - Document any issues
 - Clean up old AMIs and artifacts
 - Update runbooks if needed
@@ -436,9 +436,9 @@ rm -rf .venv/
 
 - **Full CI/CD Setup Guide**: `docs/CI-CD-Setup.md` - Complete pipeline documentation
 - **Storage Optimization**: `docs/Storage-Optimization.md` - Detailed optimization strategies
-- **NIPR Setup**: `docs/NIPR-Setup.md` - NIPR environment configuration
-- **GitHub Actions Workflow**: `.github/workflows/nipr-prepare.yml` - Automated preparation
-- **GitLab CI Pipeline**: `.gitlab-ci.yml` - NIPR build automation
+- **Offline Setup**: `docs/Offline-Setup.md` - Offline environment configuration
+- **GitHub Actions Workflow**: `.github/workflows/offline-prepare.yml` - Automated preparation
+- **GitLab CI Pipeline**: `.gitlab-ci.yml` - Offline build automation
 - **Offline Packages**: `offline-packages/README.md` - Package details
 - **Build Tools**: `tools/README.md` - Packer and Python tools
 
@@ -462,22 +462,22 @@ rm -rf .venv/
 ```bash
 # Check workflow logs for virus definition update errors
 # Verify network connectivity during freshclam
-# Review infected files: grep FOUND spel-nipr-*-clamav-scan.log
+# Review infected files: grep FOUND spel-offline-*-clamav-scan.log
 ```
 
 **TruffleHog scan fails - secrets detected**:
 ```bash
-# Review detected secrets: grep "Detector Type:" spel-nipr-*-trufflehog-scan.log
+# Review detected secrets: grep "Detector Type:" spel-offline-*-trufflehog-scan.log
 # Add false positives to .trufflehog-exclude.txt
 # Remove real credentials and use environment variables
-# Re-run nipr-prepare workflow after remediation
+# Re-run offline-prepare workflow after remediation
 ```
 
 **Security logs missing in GitLab CI**:
 ```bash
 # Verify archives include both scan logs
 # Set REQUIRE_VIRUS_SCAN=false / REQUIRE_SECRETS_SCAN=false only for testing
-# NOT recommended for NIPR compliance
+# NOT recommended for Offline compliance
 # Re-prepare archives with security scanning enabled
 ```
 

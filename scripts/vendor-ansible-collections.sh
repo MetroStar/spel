@@ -1,14 +1,14 @@
 #!/bin/bash
 #
-# Vendor Ansible collections for offline NIPR builds
-# Run this on a system with internet access before transferring to NIPR
+# Vendor Ansible collections for offline Offline builds
+# Run this on a system with internet access before transferring to Offline
 #
 # This script downloads:
 # - ansible.windows (latest version)
 # - community.windows (latest version)
 #
 # Collections are kept as tarballs for smaller transfer size
-# They will be extracted in NIPR environment during archive extraction
+# They will be extracted in Offline environment during archive extraction
 #
 set -euo pipefail
 
@@ -148,7 +148,7 @@ Extraction Instructions
 =======================
 
 Collections are stored as tarballs for smaller transfer size.
-They will be automatically extracted during NIPR archive extraction.
+They will be automatically extracted during Offline archive extraction.
 
 Manual extraction (if needed):
 
@@ -194,10 +194,10 @@ README_FILE="${COLLECTIONS_DIR}/README.txt"
 log_info "Creating README..."
 
 cat > "$README_FILE" <<EOF
-# Ansible Collections for SPEL NIPR Builds
+# Ansible Collections for SPEL Offline Builds
 # Downloaded: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-This directory contains Ansible collections required for offline NIPR builds.
+This directory contains Ansible collections required for offline Offline builds.
 
 ## Contents
 
@@ -207,7 +207,7 @@ This directory contains Ansible collections required for offline NIPR builds.
 ## Format
 
 Collections are stored as compressed tarballs (.tar.gz) for efficient transfer.
-They will be automatically extracted during NIPR archive extraction.
+They will be automatically extracted during Offline archive extraction.
 
 ## Authentication (Optional)
 
@@ -241,7 +241,7 @@ script to pin versions:
 
   ansible-galaxy collection download ansible.windows:1.14.0
 
-## Usage in NIPR
+## Usage in Offline
 
 After extraction, collections will be available at:
   spel/ansible/collections/ansible_collections/
@@ -271,7 +271,7 @@ Collections are kept as tarballs during transfer:
 - Faster checksum verification
 - Simpler archive management
 
-Extraction happens automatically during ./scripts/extract-nipr-archives.sh
+Extraction happens automatically during ./scripts/extract-offline-archives.sh
 
 ## Support
 
@@ -314,5 +314,5 @@ log_info "  Manifest: ${MANIFEST_FILE}"
 log_info "  README: ${README_FILE}"
 log_info ""
 log_info "Collections are stored as tarballs for efficient transfer"
-log_info "They will be extracted automatically in NIPR environment"
+log_info "They will be extracted automatically in Offline environment"
 log_info "========================================="

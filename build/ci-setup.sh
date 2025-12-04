@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # CI Setup Script for SPEL Builds
-# Supports both online (GitHub Actions) and offline (NIPR) modes
+# Supports both online (GitHub Actions) and offline (Offline) modes
 # Detects environment and installs Packer, Python, and Ansible dependencies
 #
 set -euo pipefail

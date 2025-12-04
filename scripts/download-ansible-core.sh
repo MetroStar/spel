@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Download Ansible Core and dependencies for offline NIPR builds
-# Run this on a system with internet access before transferring to NIPR
+# Download Ansible Core and dependencies for offline Offline builds
+# Run this on a system with internet access before transferring to Offline
 #
 # This script downloads:
 # - ansible-core (>=2.16.0, <2.19.0)
@@ -150,7 +150,7 @@ Total Size: ${TOTAL_SIZE}
 Installation Instructions
 =========================
 
-On NIPR system after extraction:
+On Offline system after extraction:
 
 1. Ensure Python ${PYTHON_VERSION} is installed:
    python3.9 --version
@@ -253,6 +253,6 @@ log_info "  Total size: ${TOTAL_SIZE}"
 log_info "  Location: ${TOOLS_DIR}"
 log_info "  Manifest: ${VERSION_FILE}"
 log_info ""
-log_info "Installation command for NIPR:"
+log_info "Installation command for Offline:"
 log_info "  pip install --no-index --find-links tools/python-deps/ \"ansible-core${ANSIBLE_VERSION}\""
 log_info "========================================="

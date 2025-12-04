@@ -1,17 +1,17 @@
-# CI/CD Setup for NIPR Transfers
+# CI/CD Setup for Offline Transfers
 
-This guide explains how to set up and use the automated CI/CD pipelines for NIPR SPEL deployments.
+This guide explains how to set up and use the automated CI/CD pipelines for Offline SPEL deployments.
 
 ## Overview
 
-The NIPR transfer and build workflow spans multiple CI/CD systems:
+The Offline transfer and build workflow spans multiple CI/CD systems:
 
-1. **GitHub Actions** (Internet-connected) - Prepares optimized transfer archives (nipr-prepare.yml)
-2. **GitHub Actions** (Optional testing) - Tests offline builds with NIPR artifacts (build.yml)  
-3. **GitLab CI** (NIPR air-gapped) - Extracts archives and builds AMIs (.gitlab-ci.yml)
+1. **GitHub Actions** (Internet-connected) - Prepares optimized transfer archives (offline-prepare.yml)
+2. **GitHub Actions** (Optional testing) - Tests offline builds with Offline artifacts (build.yml)  
+3. **GitLab CI** (Offline air-gapped) - Extracts archives and builds AMIs (.gitlab-ci.yml)
 
 ```
-Internet System (GitHub)          NIPR System (GitLab)
+Internet System (GitHub)          Offline System (GitLab)
 ┌─────────────────────┐          ┌──────────────────────┐
 │ 1. Vendor Roles     │          │ 9. Extract Archives  │
 │ 2. Vendor Colls     │          │ 10. Verify Security ✓│
@@ -28,7 +28,7 @@ Internet System (GitHub)          NIPR System (GitLab)
 ┌─────────────────────┐                   │
 │ Test Offline Build  │                   │
 │ - Verify Security ✓ │  (If successful,  │
-│   • ClamAV          │   transfer to NIPR)
+│   • ClamAV          │   transfer to Offline)
 │   • TruffleHog      │                   │
 │ - Test Extraction   │                   │
 │ - Validate Build    │                   │
@@ -40,7 +40,7 @@ Internet System (GitHub)          NIPR System (GitLab)
 
 ### Workflow File
 
-Location: `.github/workflows/nipr-prepare.yml`
+Location: `.github/workflows/offline-prepare.yml`
 
 ### Features
 
@@ -59,7 +59,7 @@ The workflow runs automatically on the 15th of each month to prepare archives fo
 
 #### Manual Trigger
 
-1. Go to **Actions** → **Prepare NIPR Transfer Archives**
+1. Go to **Actions** → **Prepare Offline Transfer Archives**
 2. Click **Run workflow**
 3. Select options:
    - **Vendor roles**: Clone Ansible roles (default: true)
@@ -76,8 +76,8 @@ After workflow completes:
 1. Go to workflow run summary
 2. Scroll to **Artifacts** section
 3. Download:
-   - `spel-nipr-transfer-YYYYMMDD` - Complete transfer package
-   - `spel-nipr-base-YYYYMMDD` - Base code only (for updates)
+   - `spel-offline-transfer-YYYYMMDD` - Complete transfer package
+   - `spel-offline-base-YYYYMMDD` - Base code only (for updates)
 
 ### Environment Variables
 
@@ -119,17 +119,17 @@ Security Scans:
 Archives created:
   spel-base-20251202.tar.gz                  118 MB
   spel-tools-20251202.tar.gz                 289 MB
-  spel-nipr-complete-20251202.tar.gz         694 MB
+  spel-offline-complete-20251202.tar.gz         694 MB
 
 Total archive size: 1.1 GB
 
 Workflow duration: 7-11 minutes (includes 3-5 min ClamAV + 2-3 min TruffleHog)
 
 Files ready for transfer:
-  - spel-nipr-20251202-checksums.txt
-  - spel-nipr-20251202-manifest.txt
-  - spel-nipr-20251202-clamav-scan.log
-  - spel-nipr-20251202-trufflehog-scan.log
+  - spel-offline-20251202-checksums.txt
+  - spel-offline-20251202-manifest.txt
+  - spel-offline-20251202-clamav-scan.log
+  - spel-offline-20251202-trufflehog-scan.log
   - spel-*.tar.gz
 ```
 
@@ -139,7 +139,7 @@ Before creating transfer archives, all files are scanned with **dual security ve
 - **ClamAV** - Antivirus scanning for malware/viruses
 - **TruffleHog** - Secrets detection for credentials/sensitive data
 
-This ensures NIPR security compliance by preventing both malware and credential leakage.
+This ensures Offline security compliance by preventing both malware and credential leakage.
 
 #### ClamAV Virus Scanning
 
@@ -161,7 +161,7 @@ The workflow performs a comprehensive recursive scan of all directories that wil
 2. **Update Virus Definitions**: Downloads latest signatures (~200-300 MB) via `freshclam`
 3. **Scan Files**: Executes `clamscan -r` on all 7 directories (3-5 minutes)
 4. **Verify Results**: Checks exit code and scanned file count
-5. **Log Results**: Saves detailed scan log as `spel-nipr-YYYYMMDD-clamav-scan.log`
+5. **Log Results**: Saves detailed scan log as `spel-offline-YYYYMMDD-clamav-scan.log`
 
 **Scan Output Example** (Success):
 
@@ -181,7 +181,7 @@ End Date:   2025:01:15 10:33:00
 
 **Failure Handling**:
 
-The workflow uses **fail-fast** behavior for NIPR security requirements:
+The workflow uses **fail-fast** behavior for Offline security requirements:
 
 - **Exit Code 0**: Clean scan - workflow continues ✅
 - **Exit Code 1**: Virus detected - **workflow fails immediately** ❌
@@ -195,7 +195,7 @@ When a virus is detected or scan error occurs:
 
 **Scan Log Details**:
 
-The scan log (`spel-nipr-YYYYMMDD-clamav-scan.log`) includes:
+The scan log (`spel-offline-YYYYMMDD-clamav-scan.log`) includes:
 - Complete list of scanned files
 - Virus signatures database version
 - Scan timing and performance metrics
@@ -206,14 +206,14 @@ The scan log is:
 - Included in transfer archives for audit trail
 - Added to GitHub Actions artifacts (90-day retention)
 - Referenced in the transfer manifest
-- Available for security review on NIPR side
+- Available for security review on Offline side
 
 **Security Compliance**:
 
-- **NIPR Requirement**: All files must be virus-scanned before air-gap transfer
+- **Offline Requirement**: All files must be virus-scanned before air-gap transfer
 - **Audit Trail**: Scan log provides verifiable security compliance
 - **Database Updates**: Latest virus definitions ensure current threat detection
-- **Fail-Fast**: Prevents any infected files from reaching NIPR environment
+- **Fail-Fast**: Prevents any infected files from reaching Offline environment
 
 #### TruffleHog Secrets Scanning
 
@@ -235,7 +235,7 @@ The workflow performs comprehensive secrets detection across the same directorie
 1. **Install TruffleHog**: Downloads v3.82.13 binary from GitHub releases
 2. **Scan Files**: Executes `trufflehog filesystem` on all directories and config files (2-3 minutes)
 3. **Verify Results**: Checks exit code (0 = clean, 183 = secrets found)
-4. **Log Results**: Saves detailed scan log as `spel-nipr-YYYYMMDD-trufflehog-scan.log`
+4. **Log Results**: Saves detailed scan log as `spel-offline-YYYYMMDD-trufflehog-scan.log`
 
 **Scan Output Example** (Success):
 
@@ -281,7 +281,7 @@ The file `.trufflehog-exclude.txt` contains patterns to exclude false positives:
 
 **Scan Log Details**:
 
-The scan log (`spel-nipr-YYYYMMDD-trufflehog-scan.log`) includes:
+The scan log (`spel-offline-YYYYMMDD-trufflehog-scan.log`) includes:
 - List of scanned files/directories
 - Detected secrets with file paths and line numbers (if any)
 - Secret types detected (API keys, passwords, tokens, etc.)
@@ -292,29 +292,29 @@ The scan log is:
 - Included in transfer archives for audit trail
 - Added to GitHub Actions artifacts (90-day retention)
 - Referenced in the transfer manifest
-- Available for security review on NIPR side
+- Available for security review on Offline side
 
 **Security Compliance**:
 
-- **NIPR Requirement**: All files must be free of credentials/secrets before air-gap transfer
+- **Offline Requirement**: All files must be free of credentials/secrets before air-gap transfer
 - **Audit Trail**: Scan log provides verifiable secrets detection compliance
-- **Fail-Fast**: Prevents any secrets from reaching NIPR environment
+- **Fail-Fast**: Prevents any secrets from reaching Offline environment
 - **Comprehensive Detection**: Scans for 700+ secret types (AWS keys, GitHub tokens, private keys, etc.)
 
 ### Build Workflow (Optional - Testing)
 
 Location: `.github/workflows/build.yml`
 
-**Purpose**: Test NIPR offline builds in GitHub Actions using transferred artifacts
+**Purpose**: Test Offline offline builds in GitHub Actions using transferred artifacts
 
-This workflow allows testing the complete NIPR offline build process in GitHub Actions before deploying to actual NIPR environments. It's useful for:
-- Validating NIPR transfer archives before physical transfer
+This workflow allows testing the complete Offline offline build process in GitHub Actions before deploying to actual Offline environments. It's useful for:
+- Validating Offline transfer archives before physical transfer
 - Testing builds in a controlled environment
 - Verifying security scanning compliance
 - Debugging offline mode issues
 
 **Key Features**:
-- **Offline Mode Support**: Can use NIPR artifacts from nipr-prepare.yml workflow
+- **Offline Mode Support**: Can use Offline artifacts from offline-prepare.yml workflow
 - **Security Verification**: Validates ClamAV and TruffleHog scan logs in offline mode
 - **Flexible Builders**: Select specific OS builds to test
 - **AWS Integration**: Tests against Commercial AWS (can be adapted for GovCloud)
@@ -322,18 +322,18 @@ This workflow allows testing the complete NIPR offline build process in GitHub A
 
 **Usage**:
 
-1. Run nipr-prepare.yml workflow first to create artifacts
+1. Run offline-prepare.yml workflow first to create artifacts
 2. Go to **Actions** → **Build STIGed AMI's**
 3. Click **Run workflow**
 4. Configure options:
-   - **offline_mode**: true (to test NIPR archives)
-   - **nipr_artifact_name**: Name of artifact from nipr-prepare workflow (e.g., spel-nipr-transfer-20251203)
+   - **offline_mode**: true (to test Offline archives)
+   - **offline_artifact_name**: Name of artifact from offline-prepare workflow (e.g., spel-offline-transfer-20251203)
    - Select OS builders to test (e.g., run_rhel9, run_ol9)
 5. Click **Run workflow**
 
 **Security Features in Offline Mode**:
-- Verifies ClamAV scan log presence and results in NIPR artifacts
-- Verifies TruffleHog scan log presence and results in NIPR artifacts
+- Verifies ClamAV scan log presence and results in Offline artifacts
+- Verifies TruffleHog scan log presence and results in Offline artifacts
 - Checks for "Infected files: 0" in ClamAV results
 - Checks for "NO SECRETS DETECTED" in TruffleHog results
 - Displays scan summaries (files scanned, duration, status)
@@ -344,11 +344,11 @@ This workflow allows testing the complete NIPR offline build process in GitHub A
 **Output**:
 - Build summary with security verification section
 - Scan statistics (if offline mode used)
-- NIPR compliance indication
+- Offline compliance indication
 - Build configuration details
 - Selected builders list
 
-## GitLab CI Setup (NIPR)
+## GitLab CI Setup (Offline)
 
 ### Configuration File
 
@@ -368,7 +368,7 @@ The GitLab CI pipeline consists of 5 stages:
 
 #### GitLab Runner
 
-Install and configure a GitLab Runner on NIPR system:
+Install and configure a GitLab Runner on Offline system:
 
 ```bash
 # Install GitLab Runner
@@ -377,11 +377,11 @@ sudo dnf install gitlab-runner
 
 # Register runner
 sudo gitlab-runner register \
-  --url https://your-gitlab-nipr-instance.mil \
+  --url https://your-gitlab-offline-instance.mil \
   --registration-token YOUR_TOKEN \
   --executor shell \
-  --description "SPEL NIPR Builder" \
-  --tag-list "spel-nipr-runner"
+  --description "SPEL Offline Builder" \
+  --tag-list "spel-offline-runner"
 ```
 
 #### Infrastructure Requirements
@@ -432,11 +432,11 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `AWS_GOVCLOUD_ACCESS_KEY_ID` | NIPR GovCloud access key | `AKIA...` |
-| `AWS_GOVCLOUD_SECRET_ACCESS_KEY` | NIPR GovCloud secret key | `secret` |
-| `PKR_VAR_aws_nipr_account_id` | NIPR AWS account ID for source AMI filters | `123456789012` |
-| `PKR_VAR_aws_vpc_id` | VPC ID in NIPR (if not using infra stage) | `vpc-abc123` |
-| `PKR_VAR_aws_subnet_id` | Subnet ID in NIPR (if not using infra stage) | `subnet-xyz789` |
+| `AWS_GOVCLOUD_ACCESS_KEY_ID` | Offline GovCloud access key | `AKIA...` |
+| `AWS_GOVCLOUD_SECRET_ACCESS_KEY` | Offline GovCloud secret key | `secret` |
+| `PKR_VAR_aws_offline_account_id` | Offline AWS account ID for source AMI filters | `123456789012` |
+| `PKR_VAR_aws_vpc_id` | VPC ID in Offline (if not using infra stage) | `vpc-abc123` |
+| `PKR_VAR_aws_subnet_id` | Subnet ID in Offline (if not using infra stage) | `subnet-xyz789` |
 
 **Optional Build Control Variables**:
 
@@ -459,26 +459,26 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | `CREATE_INFRASTRUCTURE` | Enable infrastructure creation jobs | `false` |
 | `INFRA_PREFIX` | Prefix for created resources | `spel-packer` |
 | `INFRA_TAGS` | JSON tags for AWS resources | `{"Project":"SPEL"}` |
-| `PKR_VAR_aws_nipr_ami_regions` | Target regions for AMI copy | `["us-gov-east-1"]` |
+| `PKR_VAR_aws_offline_ami_regions` | Target regions for AMI copy | `["us-gov-east-1"]` |
 
 ### Usage Workflows
 
 #### Scenario 1: Initial Setup (First Time)
 
-**Step 1: Transfer archives to NIPR GitLab**:
+**Step 1: Transfer archives to Offline GitLab**:
 ```bash
 # On transfer workstation
-git clone https://your-gitlab-nipr-instance.mil/your-group/spel.git
+git clone https://your-gitlab-offline-instance.mil/your-group/spel.git
 cd spel/
 
 # Copy transferred archives
 cp /path/to/transferred/spel-*.tar.gz .
-cp /path/to/transferred/spel-nipr-*-checksums.txt .
+cp /path/to/transferred/spel-offline-*-checksums.txt .
 
 # Commit archives (if using Git LFS)
 git lfs track "*.tar.gz"
-git add .gitattributes spel-*.tar.gz spel-nipr-*-checksums.txt
-git commit -m "Add NIPR transfer archives for $(date +%Y%m)"
+git add .gitattributes spel-*.tar.gz spel-offline-*-checksums.txt
+git commit -m "Add Offline transfer archives for $(date +%Y%m)"
 git push
 ```
 
@@ -501,7 +501,7 @@ git push
 
 **Step 4: Verify setup**:
 - Setup stage runs automatically after infrastructure stage:
-  - `verify:security` - Verifies ClamAV scan compliance (NIPR requirement)
+  - `verify:security` - Verifies ClamAV scan compliance (Offline requirement)
   - `verify:resources` - Checks disk (50+ GB), memory (2+ GB), commands
   - `aws:verify` - Tests AWS credentials, verifies VPC/subnet connectivity
   - `setup` - Initializes git submodules, detects offline Packer
@@ -522,11 +522,11 @@ After infrastructure is created and archives are extracted:
 1. **Update archives** (if new transfer available):
    ```bash
    # Replace old archives with new ones
-   rm spel-*.tar.gz spel-nipr-*-checksums.txt
+   rm spel-*.tar.gz spel-offline-*-checksums.txt
    cp /path/to/new/spel-*.tar.gz .
-   cp /path/to/new/spel-nipr-*-checksums.txt .
-   git add spel-*.tar.gz spel-nipr-*-checksums.txt
-   git commit -m "Update NIPR archives for $(date +%Y%m)"
+   cp /path/to/new/spel-offline-*-checksums.txt .
+   git add spel-*.tar.gz spel-offline-*-checksums.txt
+   git commit -m "Update Offline archives for $(date +%Y%m)"
    git push
    
    # Run pipeline with EXTRACT_ARCHIVES=true to re-extract
@@ -590,34 +590,34 @@ Extracts transferred archives and verifies checksums.
 - **Verifies dual security scan compliance**:
   
   **ClamAV Verification**:
-  - Checks for `spel-nipr-*-clamav-scan.log` presence
+  - Checks for `spel-offline-*-clamav-scan.log` presence
   - Verifies scan passed ("Infected files: 0")
   - Displays scan summary for audit trail
   - **Fails build if scan log missing** (controlled by `REQUIRE_VIRUS_SCAN` variable, default: true)
   - Shows infected files if detected
   
   **TruffleHog Verification**:
-  - Checks for `spel-nipr-*-trufflehog-scan.log` presence
+  - Checks for `spel-offline-*-trufflehog-scan.log` presence
   - Verifies scan passed ("NO SECRETS DETECTED")
   - **Fails build if secrets detected or log missing** (controlled by `REQUIRE_SECRETS_SCAN` variable, default: true)
   - Shows detected secret types if found
   
-- Runs `scripts/extract-nipr-archives.sh`
+- Runs `scripts/extract-offline-archives.sh`
 - Extracts to proper directory structure:
   - `tools/` - Packer binaries (Linux + Windows), Python packages
   - `offline-packages/` - SPEL offline installation packages
   - `vendor/ansible-roles/` - Ansible roles for amigen
   - `vendor/ansible-collections/` - Ansible collection tarballs
 - Preserves security artifacts:
-  - `spel-nipr-*-clamav-scan.log` - ClamAV virus scan results
-  - `spel-nipr-*-trufflehog-scan.log` - TruffleHog secrets scan results
-  - `spel-nipr-*-manifest.txt` - Archive contents manifest
+  - `spel-offline-*-clamav-scan.log` - ClamAV virus scan results
+  - `spel-offline-*-trufflehog-scan.log` - TruffleHog secrets scan results
+  - `spel-offline-*-manifest.txt` - Archive contents manifest
 - Creates artifact for use by subsequent stages
 
 **Run when**:
 - Initial setup
 - Monthly archive updates
-- After transferring new archives to NIPR
+- After transferring new archives to Offline
 
 #### Stage 2: Infrastructure (Optional)
 
@@ -680,7 +680,7 @@ Prepares build environment and verifies all dependencies.
 **What it does**:
 
 **`verify:security`** (runs first, after `extract:archives`):
-- **NIPR Security Compliance Verification** (required for all NIPR builds)
+- **Offline Security Compliance Verification** (required for all Offline builds)
 - **ClamAV Verification**:
   - Verifies ClamAV scan log presence in extracted artifacts
   - Checks scan results: "Infected files: 0" (fails if not found)
@@ -696,8 +696,8 @@ Prepares build environment and verifies all dependencies.
   - Provides comprehensive dual-scan compliance summary
   - Displays both ClamAV and TruffleHog results
 - **Failure Handling**:
-  - **Fails build if ClamAV scan log missing or scan failed** (NIPR security requirement)
-  - **Fails build if TruffleHog scan log missing or secrets detected** (NIPR security requirement)
+  - **Fails build if ClamAV scan log missing or scan failed** (Offline security requirement)
+  - **Fails build if TruffleHog scan log missing or secrets detected** (Offline security requirement)
   - Only runs when `EXTRACT_ARCHIVES=true`
 
 **`verify:resources`** (runs first, parallel with `aws:verify`):
@@ -819,7 +819,7 @@ The GitLab CI pipeline runs in **offline mode** (`SPEL_OFFLINE_MODE=true`), whic
 - **Version compatibility** - Ansible Core 2.15.13 with collection versions tested for compatibility
 - **Reproducible builds** - same vendored components ensure consistent results
 
-This ensures builds are completely independent of external networks and reproducible across different NIPR environments.
+This ensures builds are completely independent of external networks and reproducible across different Offline environments.
 
 ## Complete Workflow Example
 
@@ -837,17 +837,17 @@ This ensures builds are completely independent of external networks and reproduc
 **Transfer**:
 ```bash
 # Download from GitHub Actions artifacts
-# Transfer to NIPR using approved method (DVD, secure transfer, etc.)
+# Transfer to Offline using approved method (DVD, secure transfer, etc.)
 # Verify checksums after transfer
-sha256sum -c spel-nipr-20251115-checksums.txt
+sha256sum -c spel-offline-20251115-checksums.txt
 ```
 
-**NIPR System (GitLab CI)**:
+**Offline System (GitLab CI)**:
 ```bash
 # Upload archives to GitLab repository
 git lfs track "*.tar.gz"
-git add spel-*.tar.gz spel-nipr-*-checksums.txt
-git commit -m "Add November 2025 NIPR transfer archives"
+git add spel-*.tar.gz spel-offline-*-checksums.txt
+git commit -m "Add November 2025 Offline transfer archives"
 git push
 
 # Set variable: EXTRACT_ARCHIVES=true
@@ -871,7 +871,7 @@ git push
 # Smaller transfer size for incremental updates (~200-600 MB)
 ```
 
-**NIPR System (GitLab CI)**:
+**Offline System (GitLab CI)**:
 ```bash
 # Update only changed archives in repository
 # Re-run extract:archives if needed
@@ -888,15 +888,15 @@ Solution: Ensure archives are in repository root
 ls -lh spel-*.tar.gz
 
 # Expected files:
-# spel-nipr-YYYYMMDD-base.tar.gz (SPEL packages, roles)
-# spel-nipr-YYYYMMDD-tools.tar.gz (Packer, Python)
-# spel-nipr-YYYYMMDD-complete.tar.gz (Everything, optional)
+# spel-offline-YYYYMMDD-base.tar.gz (SPEL packages, roles)
+# spel-offline-YYYYMMDD-tools.tar.gz (Packer, Python)
+# spel-offline-YYYYMMDD-complete.tar.gz (Everything, optional)
 ```
 
 **Problem**: Checksum verification fails
 ```bash
 Solution: Re-transfer archives, verify file integrity
-sha256sum -c spel-nipr-*-checksums.txt
+sha256sum -c spel-offline-*-checksums.txt
 
 # If checksums don't match, archives were corrupted during transfer
 # Re-download from GitHub Actions and transfer again
@@ -905,7 +905,7 @@ sha256sum -c spel-nipr-*-checksums.txt
 **Problem**: Extraction succeeds but files missing
 ```bash
 Solution: Check extraction script logs
-cat scripts/extract-nipr-archives.sh
+cat scripts/extract-offline-archives.sh
 
 # Verify archives were extracted to correct paths:
 ls -lh tools/packer-linux/
@@ -1065,7 +1065,7 @@ sudo freshclam --verbose
 **Problem**: ClamAV scan fails - infected file detected
 ```bash
 Solution: Review scan log to identify infected files
-cat spel-nipr-YYYYMMDD-clamav-scan.log | grep FOUND
+cat spel-offline-YYYYMMDD-clamav-scan.log | grep FOUND
 
 # Output example:
 # /path/to/infected/file.exe: Win.Trojan.Generic FOUND
@@ -1074,7 +1074,7 @@ cat spel-nipr-YYYYMMDD-clamav-scan.log | grep FOUND
 # 1. Verify false positive (some security tools trigger AV)
 # 2. If legitimate file, report false positive to ClamAV
 # 3. If truly infected, remove file from repository
-# 4. Re-run nipr-prepare workflow after cleanup
+# 4. Re-run offline-prepare workflow after cleanup
 ```
 
 **Problem**: ClamAV scan timeout - exceeds 15 minutes
@@ -1087,7 +1087,7 @@ Solution: Large file sets may require more time
 # If timeout occurs:
 # 1. Check for extremely large files in scanned directories
 # 2. Verify system has sufficient CPU/memory resources
-# 3. Consider increasing timeout in .github/workflows/nipr-prepare.yml
+# 3. Consider increasing timeout in .github/workflows/offline-prepare.yml
 ```
 
 **Problem**: Scan completes but no log file created
@@ -1095,7 +1095,7 @@ Solution: Large file sets may require more time
 Solution: Check scan step logs for errors
 
 # Scan log should be created at:
-# spel-nipr-YYYYMMDD-clamav-scan.log
+# spel-offline-YYYYMMDD-clamav-scan.log
 
 # If missing:
 # 1. Review workflow logs for scan step errors
@@ -1118,16 +1118,16 @@ Solution: Verify scan passed before archiving
 
 **Problem**: GitLab CI extract:archives job fails - missing scan log
 ```bash
-Solution: Ensure NIPR archives include ClamAV scan log
+Solution: Ensure Offline archives include ClamAV scan log
 
-# GitLab CI verifies scan log presence (NIPR compliance requirement)
-# Job will fail if spel-nipr-*-clamav-scan.log is missing
+# GitLab CI verifies scan log presence (Offline compliance requirement)
+# Job will fail if spel-offline-*-clamav-scan.log is missing
 
 # Actions:
-# 1. Verify archives were created with nipr-prepare.yml workflow
+# 1. Verify archives were created with offline-prepare.yml workflow
 # 2. Check that ClamAV scanning step completed successfully
-# 3. Re-run nipr-prepare.yml if scan log missing
-# 4. Set REQUIRE_SCAN_LOG=false to bypass (NOT recommended for NIPR)
+# 3. Re-run offline-prepare.yml if scan log missing
+# 4. Set REQUIRE_SCAN_LOG=false to bypass (NOT recommended for Offline)
 ```
 
 **Problem**: GitLab CI verify:security job fails - infected files detected
@@ -1138,11 +1138,11 @@ Solution: Review scan log and clean infected files
 # Job fails if infected files found or scan incomplete
 
 # Actions:
-# 1. Review scan log: cat spel-nipr-*-clamav-scan.log
+# 1. Review scan log: cat spel-offline-*-clamav-scan.log
 # 2. Identify infected files (look for "FOUND" entries)
 # 3. Investigate false positives vs. actual infections
 # 4. Re-prepare archives after cleanup
-# 5. Do not bypass this check in NIPR environments
+# 5. Do not bypass this check in Offline environments
 ```
 
 **Problem**: GitHub Actions build.yml - warning about missing scan log
@@ -1153,17 +1153,17 @@ Solution: Verify offline mode artifacts include scan log
 # This is informational only (does not fail build)
 
 # To resolve:
-# 1. Ensure nipr_artifact_name references valid nipr-prepare.yml artifact
-# 2. Verify artifact includes spel-nipr-*-clamav-scan.log
+# 1. Ensure offline_artifact_name references valid offline-prepare.yml artifact
+# 2. Verify artifact includes spel-offline-*-clamav-scan.log
 # 3. Check that ClamAV scanning was enabled during archive preparation
-# 4. For testing only, you can ignore warning (not for NIPR use)
+# 4. For testing only, you can ignore warning (not for Offline use)
 ```
 
 **Problem**: TruffleHog scan fails - secrets detected
 ```bash
 Solution: Review scan log to identify detected secrets
 
-cat spel-nipr-YYYYMMDD-trufflehog-scan.log | grep "Detector Type:"
+cat spel-offline-YYYYMMDD-trufflehog-scan.log | grep "Detector Type:"
 
 # Output example:
 # File: /path/to/file.sh
@@ -1176,7 +1176,7 @@ cat spel-nipr-YYYYMMDD-trufflehog-scan.log | grep "Detector Type:"
 # 2. For test/example credentials, add to .trufflehog-exclude.txt
 # 3. For real credentials, remove from code immediately
 # 4. Use environment variables or AWS Secrets Manager instead
-# 5. Re-run nipr-prepare workflow after remediation
+# 5. Re-run offline-prepare workflow after remediation
 ```
 
 **Problem**: TruffleHog scan false positives in documentation
@@ -1227,16 +1227,16 @@ Solution: Large codebases may require more scan time
 
 **Problem**: GitLab CI extract:archives job fails - missing TruffleHog log
 ```bash
-Solution: Ensure NIPR archives include TruffleHog scan log
+Solution: Ensure Offline archives include TruffleHog scan log
 
-# GitLab CI verifies scan log presence (NIPR compliance requirement)
-# Job will fail if spel-nipr-*-trufflehog-scan.log is missing
+# GitLab CI verifies scan log presence (Offline compliance requirement)
+# Job will fail if spel-offline-*-trufflehog-scan.log is missing
 
 # Actions:
-# 1. Verify archives were created with nipr-prepare.yml workflow
+# 1. Verify archives were created with offline-prepare.yml workflow
 # 2. Check that TruffleHog scanning step completed successfully
-# 3. Re-run nipr-prepare.yml if scan log missing
-# 4. Set REQUIRE_SECRETS_SCAN=false to bypass (NOT recommended for NIPR)
+# 3. Re-run offline-prepare.yml if scan log missing
+# 4. Set REQUIRE_SECRETS_SCAN=false to bypass (NOT recommended for Offline)
 ```
 
 **Problem**: GitLab CI verify:security job fails - secrets detected
@@ -1247,12 +1247,12 @@ Solution: Review scan log and remediate secrets
 # Job fails if secrets found or scan incomplete
 
 # Actions:
-# 1. Review scan log: cat spel-nipr-*-trufflehog-scan.log
+# 1. Review scan log: cat spel-offline-*-trufflehog-scan.log
 # 2. Identify detected secrets (look for "Detector Type:" entries)
 # 3. Remove or rotate any real credentials found
 # 4. Add legitimate false positives to .trufflehog-exclude.txt
 # 5. Re-prepare archives after remediation
-# 6. Do not bypass this check in NIPR environments
+# 6. Do not bypass this check in Offline environments
 ```
 
 **Problem**: GitHub Actions build.yml - warning about missing TruffleHog log
@@ -1263,10 +1263,10 @@ Solution: Verify offline mode artifacts include TruffleHog scan log
 # This is informational only (does not fail build)
 
 # To resolve:
-# 1. Ensure nipr_artifact_name references valid nipr-prepare.yml artifact
-# 2. Verify artifact includes spel-nipr-*-trufflehog-scan.log
+# 1. Ensure offline_artifact_name references valid offline-prepare.yml artifact
+# 2. Verify artifact includes spel-offline-*-trufflehog-scan.log
 # 3. Check that TruffleHog scanning was enabled during archive preparation
-# 4. For testing only, you can ignore warning (not for NIPR use)
+# 4. For testing only, you can ignore warning (not for Offline use)
 ```
 
 ### Validate Stage Issues (continued)
@@ -1341,10 +1341,10 @@ aws service-quotas get-service-quota \
 
 **Problem**: Build succeeds but AMI not in expected region
 ```bash
-Solution: Verify PKR_VAR_aws_nipr_ami_regions is set correctly
+Solution: Verify PKR_VAR_aws_offline_ami_regions is set correctly
 
 # Check variable value
-echo $PKR_VAR_aws_nipr_ami_regions
+echo $PKR_VAR_aws_offline_ami_regions
 
 # Should be JSON array: ["us-gov-east-1", "us-gov-west-1"]
 # Packer copies AMI to all regions after build completes
@@ -1378,7 +1378,7 @@ Solution: Increase timeout-minutes in workflow file
 
 ## Performance Metrics
 
-### GitHub Actions (nipr-prepare.yml)
+### GitHub Actions (offline-prepare.yml)
 
 - **Typical Runtime**: 2-3 minutes (measured: 2:25)
 - **Timeout**: 10 minutes
@@ -1459,27 +1459,27 @@ Solution: Increase timeout-minutes in workflow file
 4. **Audit infrastructure access**: Review security group rules periodically
 5. **Keep GitLab variables protected**: Mark all credentials as "Protected" and "Masked"
 6. **Review ClamAV scan logs**: Always check scan results before transferring archives
-7. **Update virus definitions regularly**: Run nipr-prepare workflow frequently to get latest definitions
+7. **Update virus definitions regularly**: Run offline-prepare workflow frequently to get latest definitions
 8. **Investigate scan failures immediately**: Any virus detection requires immediate investigation
 9. **Maintain scan log audit trail**: Keep scan logs for compliance and security review
 10. **Verify scan completion**: Confirm ClamAV scanned expected file count before accepting results
 
 ### ClamAV Security Scanning
 
-1. **Run nipr-prepare before monthly transfers**: Ensures latest virus definitions are used
+1. **Run offline-prepare before monthly transfers**: Ensures latest virus definitions are used
 2. **Review scan summary in GitHub Actions**: Check "Infected files: 0" in workflow output
-3. **Verify scan logs in NIPR**: GitLab CI now validates scan log presence and results
-4. **Test with build.yml before NIPR**: Optional - validate archives work in offline mode
-5. **Never bypass REQUIRE_SCAN_LOG**: Keep default (true) for NIPR compliance enforcement
+3. **Verify scan logs in Offline**: GitLab CI now validates scan log presence and results
+4. **Test with build.yml before Offline**: Optional - validate archives work in offline mode
+5. **Never bypass REQUIRE_SCAN_LOG**: Keep default (true) for Offline compliance enforcement
 6. **Monitor verify:security job**: New GitLab CI job provides comprehensive compliance check
 7. **Preserve scan logs**: Kept in artifacts for audit trail (7-day retention in GitLab)
 8. **Check build summaries**: Both workflows display security scan status for transparency
-3. **Include scan log in NIPR transfer**: Provides security team with verification evidence
+3. **Include scan log in Offline transfer**: Provides security team with verification evidence
 4. **Archive scan logs long-term**: Keep scan logs beyond 90-day artifact retention for compliance
 5. **Report false positives**: If legitimate files trigger detection, report to ClamAV upstream
 6. **Monitor scan duration**: Typical scan is 3-5 minutes; longer times may indicate issues
 7. **Verify database version**: Scan summary shows virus definition count (8M+ is typical)
-8. **Use fail-fast for NIPR**: Never disable exit-on-error for security scans
+8. **Use fail-fast for Offline**: Never disable exit-on-error for security scans
 
 ## Infrastructure Setup Details (Manual Alternative)
 
@@ -1660,7 +1660,7 @@ AWS_GOVCLOUD_ACCESS_KEY_ID=<your-access-key>
 AWS_GOVCLOUD_SECRET_ACCESS_KEY=<your-secret-key>
 
 # Account ID
-PKR_VAR_aws_nipr_account_id=<your-account-id>
+PKR_VAR_aws_offline_account_id=<your-account-id>
 ```
 
 ## Migration from Old Pipeline
@@ -1706,7 +1706,7 @@ If you have an existing GitLab CI setup without the infrastructure and setup sta
 - **Archives**: 1.1 GB
 - **Total**: ~3 GB free space needed
 
-### GitLab Runner (NIPR)
+### GitLab Runner (Offline)
 
 - **Extracted archives**: ~1 GB
   - SPEL packages: 56 KB
@@ -1732,7 +1732,7 @@ If you have an existing GitLab CI setup without the infrastructure and setup sta
 ## References
 
 - **Storage Optimization Guide**: `docs/Storage-Optimization.md`
-- **NIPR Setup Guide**: `docs/NIPR-Setup.md`
+- **Offline Setup Guide**: `docs/Offline-Setup.md`
 - **Quick Reference**: `docs/QUICK-REFERENCE-Optimization.md`
-- **GitHub Actions Workflow**: `.github/workflows/nipr-prepare.yml`
+- **GitHub Actions Workflow**: `.github/workflows/offline-prepare.yml`
 - **GitLab CI Configuration**: `.gitlab-ci.yml`

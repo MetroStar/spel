@@ -227,31 +227,31 @@ variable "aws_subnet_id" {
 }
 
 variable "aws_vpc_id" {
-  description = "ID of the VPC where Packer will launch the EC2 instance. Required for NIPR deployments"
+  description = "ID of the VPC where Packer will launch the EC2 instance. Required for Offline deployments"
   type        = string
   default     = null
 }
 
 variable "aws_vpc_endpoint_ec2" {
-  description = "VPC endpoint DNS name for EC2 service (NIPR environments)"
+  description = "VPC endpoint DNS name for EC2 service (Offline environments)"
   type        = string
   default     = null
 }
 
 variable "aws_vpc_endpoint_s3" {
-  description = "VPC endpoint DNS name for S3 service (NIPR environments)"
+  description = "VPC endpoint DNS name for S3 service (Offline environments)"
   type        = string
   default     = null
 }
 
 variable "aws_vpc_endpoint_ssm" {
-  description = "VPC endpoint DNS name for SSM service (NIPR environments)"
+  description = "VPC endpoint DNS name for SSM service (Offline environments)"
   type        = string
   default     = null
 }
 
-variable "aws_nipr_ami_regions" {
-  description = "List of regions to copy AMIs to in NIPR environment. Overrides aws_ami_regions for NIPR builds"
+variable "aws_offline_ami_regions" {
+  description = "List of regions to copy AMIs to in Offline environment. Overrides aws_ami_regions for Offline builds"
   type        = list(string)
   default     = null
 }
@@ -274,8 +274,8 @@ variable "spel_ssm_agent_source" {
   default     = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
 }
 
-variable "aws_nipr_account_id" {
-  description = "AWS account ID for NIPR marketplace AMIs. When set, overrides default commercial account IDs in source AMI filters"
+variable "aws_offline_account_id" {
+  description = "AWS account ID for Offline marketplace AMIs. When set, overrides default commercial account IDs in source AMI filters"
   type        = string
   default     = ""
 }
@@ -672,24 +672,24 @@ locals {
   amigen9_repo_sources   = join(",", var.amigen9_repo_sources)
   amigen9_storage_layout = join(",", var.amigen9_storage_layout)
 
-  # NIPR-specific overrides
-  # Use NIPR AMI regions if specified, otherwise use commercial regions
-  effective_ami_regions = var.aws_nipr_ami_regions != null ? var.aws_nipr_ami_regions : var.aws_ami_regions
+  # Offline-specific overrides
+  # Use Offline AMI regions if specified, otherwise use commercial regions
+  effective_ami_regions = var.aws_offline_ami_regions != null ? var.aws_offline_ami_regions : var.aws_ami_regions
   
-  # Use NIPR account ID for source AMI owners if specified
-  # This allows using NIPR marketplace AMIs instead of commercial marketplace AMIs
-  use_nipr_ami_owners = var.aws_nipr_account_id != ""
+  # Use Offline account ID for source AMI owners if specified
+  # This allows using Offline marketplace AMIs instead of commercial marketplace AMIs
+  use_offline_ami_owners = var.aws_offline_account_id != ""
   
-  # Effective source AMI filter owners - use NIPR account if specified, otherwise use commercial
-  effective_al2023_owners        = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_al2023_hvm.owners
-  effective_centos9stream_owners = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_centos9stream_hvm.owners
-  effective_ol8_owners           = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_ol8_hvm.owners
-  effective_ol9_owners           = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_ol9_hvm.owners
-  effective_rhel8_owners         = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_rhel8_hvm.owners
-  effective_rhel9_owners         = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_rhel9_hvm.owners
-  effective_windows2016_owners   = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_windows2016_hvm.owners
-  effective_windows2019_owners   = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_windows2019_hvm.owners
-  effective_windows2022_owners   = local.use_nipr_ami_owners ? [var.aws_nipr_account_id] : var.aws_source_ami_filter_windows2022_hvm.owners
+  # Effective source AMI filter owners - use Offline account if specified, otherwise use commercial
+  effective_al2023_owners        = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_al2023_hvm.owners
+  effective_centos9stream_owners = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_centos9stream_hvm.owners
+  effective_ol8_owners           = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_ol8_hvm.owners
+  effective_ol9_owners           = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_ol9_hvm.owners
+  effective_rhel8_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_rhel8_hvm.owners
+  effective_rhel9_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_rhel9_hvm.owners
+  effective_windows2016_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2016_hvm.owners
+  effective_windows2019_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2019_hvm.owners
+  effective_windows2022_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2022_hvm.owners
 
   # Template the description strings
   description = "STIG-partitioned [*HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.spel_description_url}."

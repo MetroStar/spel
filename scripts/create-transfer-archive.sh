@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Create optimized transfer archive for NIPR deployment
+# Create optimized transfer archive for Offline deployment
 # This script creates separate archives for different components
 # allowing selective transfer and partial updates
 #
@@ -20,7 +20,7 @@ OUTPUT_DIR="${SPEL_ARCHIVE_OUTPUT:-${REPO_ROOT}}"
 # Configuration
 CREATE_SEPARATE="${SPEL_ARCHIVE_SEPARATE:-true}"
 CREATE_COMBINED="${SPEL_ARCHIVE_COMBINED:-true}"
-# Note: Mirrors are not synced for NIPR - NIPR has its own RPM repositories
+# Note: Mirrors are not synced for Offline - Offline has its own RPM repositories
 
 # Colors for output
 RED='\033[0;31m'
@@ -55,12 +55,12 @@ done
 
 cd "$REPO_ROOT"
 
-log_info "Creating NIPR transfer archives..."
+log_info "Creating Offline transfer archives..."
 log_debug "  Repository root: $REPO_ROOT"
 log_debug "  Output directory: $OUTPUT_DIR"
 log_debug "  Create separate archives: $CREATE_SEPARATE"
 log_debug "  Create combined archive: $CREATE_COMBINED"
-log_debug "  Include mirrors: false (NIPR has its own RPM repositories)"
+log_debug "  Include mirrors: false (Offline has its own RPM repositories)"
 
 # Common exclusions
 COMMON_EXCLUDES=(
@@ -184,20 +184,20 @@ if [ "$CREATE_COMBINED" = "true" ]; then
         --exclude='vendor/*/.git'
     )
     
-    create_archive "spel-nipr-complete-${DATE}.tar.gz" "combined archive" \
+    create_archive "spel-offline-complete-${DATE}.tar.gz" "combined archive" \
         "${COMBINED_EXCLUDES[@]}" \
         .
 fi
 
 # Generate master checksum file
 log_info "Generating master checksum file..."
-CHECKSUM_FILE="${OUTPUT_DIR}/spel-nipr-${DATE}-checksums.txt"
+CHECKSUM_FILE="${OUTPUT_DIR}/spel-offline-${DATE}-checksums.txt"
 
 cat > "$CHECKSUM_FILE" <<EOF
-# SPEL NIPR Transfer Archives - SHA256 Checksums
+# SPEL Offline Transfer Archives - SHA256 Checksums
 # Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 # 
-# Verify with: sha256sum -c spel-nipr-${DATE}-checksums.txt
+# Verify with: sha256sum -c spel-offline-${DATE}-checksums.txt
 #
 
 EOF
@@ -209,7 +209,7 @@ for archive in spel-*-${DATE}.tar.gz; do
     fi
 done
 
-log_info "Master checksum file created: spel-nipr-${DATE}-checksums.txt"
+log_info "Master checksum file created: spel-offline-${DATE}-checksums.txt"
 
 # Display summary
 log_info ""
@@ -230,7 +230,7 @@ log_info ""
 log_info "Total size: $TOTAL_SIZE"
 log_info ""
 log_info "Next steps:"
-log_info "  1. Verify checksums: sha256sum -c spel-nipr-${DATE}-checksums.txt"
-log_info "  2. Transfer to NIPR (Note: Mirrors NOT included - use NIPR RPM repos)"
-log_info "  3. Verify checksums on NIPR side"
-log_info "  4. Extract using scripts/extract-nipr-archives.sh"
+log_info "  1. Verify checksums: sha256sum -c spel-offline-${DATE}-checksums.txt"
+log_info "  2. Transfer to Offline (Note: Mirrors NOT included - use Offline RPM repos)"
+log_info "  3. Verify checksums on Offline side"
+log_info "  4. Extract using scripts/extract-offline-archives.sh"

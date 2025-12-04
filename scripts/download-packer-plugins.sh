@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Download Packer plugins for offline NIPR builds
-# Run this on a system with internet access before transferring to NIPR
+# Download Packer plugins for offline Offline builds
+# Run this on a system with internet access before transferring to Offline
 #
 # This script:
 # - Runs 'packer init' on all .pkr.hcl files to download required plugins
@@ -182,7 +182,7 @@ done
 
 cat >> "$MANIFEST_FILE" <<EOF
 
-Usage in NIPR Environment
+Usage in Offline Environment
 ==========================
 
 After extraction, set the PACKER_PLUGIN_PATH environment variable:
@@ -306,7 +306,7 @@ log_info "  Total size: ${TOTAL_SIZE}"
 log_info "  Location: ${PLUGINS_DIR}"
 log_info "  Manifest: ${MANIFEST_FILE}"
 log_info ""
-log_info "NIPR Usage:"
+log_info "Offline Usage:"
 log_info "  export PACKER_PLUGIN_PATH=\"\${PWD}/tools/packer/plugins\""
 log_info "  packer validate spel/minimal-linux.pkr.hcl"
 log_info "========================================="

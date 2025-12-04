@@ -1,7 +1,7 @@
-# Offline AWS Utilities Packages for NIPR Builds
+# Offline AWS Utilities Packages for Offline Builds
 
 > **Note**: This directory contains ONLY AWS-specific utilities (AWS CLI, SSM Agent, CFN Bootstrap).  
-> YUM/DNF repository mirrors are NOT synced for NIPR - the NIPR environment has its own RPM repositories available.
+> YUM/DNF repository mirrors are NOT synced for Offline - the Offline environment has its own RPM repositories available.
 
 ## Quick Download (Optimized)
 

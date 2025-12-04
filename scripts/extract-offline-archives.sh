@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Extract and configure NIPR transfer archives
-# Run this script on NIPR system after transferring archives
+# Extract and configure Offline transfer archives
+# Run this script on Offline system after transferring archives
 #
 # This script:
 # - Extracts compressed archives
@@ -52,14 +52,14 @@ done
 
 cd "$REPO_ROOT"
 
-log_info "NIPR archive extraction configuration:"
+log_info "Offline archive extraction configuration:"
 log_debug "  Repository root: $REPO_ROOT"
 log_debug "  Archive directory: $ARCHIVE_DIR"
 log_debug "  Verify checksums: $VERIFY_CHECKSUMS"
 log_debug "  Cleanup archives after extraction: $CLEANUP_ARCHIVES"
 
 # Find checksum file
-CHECKSUM_FILE=$(ls "${ARCHIVE_DIR}"/spel-nipr-*-checksums.txt 2>/dev/null | head -1)
+CHECKSUM_FILE=$(ls "${ARCHIVE_DIR}"/spel-offline-*-checksums.txt 2>/dev/null | head -1)
 
 if [ -z "$CHECKSUM_FILE" ]; then
     log_warn "No checksum file found, skipping verification"
@@ -136,7 +136,7 @@ else
 fi
 
 # Extract combined archive if separate archives weren't found
-COMBINED_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-nipr-complete-*.tar.gz 2>/dev/null | head -1)
+COMBINED_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-offline-complete-*.tar.gz 2>/dev/null | head -1)
 if [ -z "$BASE_ARCHIVE" ] && [ -z "$MIRRORS_ARCHIVE" ] && [ -n "$COMBINED_ARCHIVE" ]; then
     log_info "Extracting combined archive..."
     tar xzf "$COMBINED_ARCHIVE" -C "$REPO_ROOT"
@@ -203,8 +203,8 @@ else
     ((ERRORS++))
 fi
 
-# Check for scripts (sync-mirrors.sh was removed - NIPR has its own repos)
-if [ -f "${REPO_ROOT}/scripts/extract-nipr-archives.sh" ]; then
+# Check for scripts (sync-mirrors.sh was removed - Offline has its own repos)
+if [ -f "${REPO_ROOT}/scripts/extract-offline-archives.sh" ]; then
     log_debug "  ✓ Scripts found"
 else
     log_error "  ✗ Scripts missing!"
@@ -234,7 +234,7 @@ log_info "  2. Install Packer (Linux):"
 log_info "     sudo install -m 755 tools/packer/linux_amd64/packer /usr/local/bin/packer"
 log_info "  3. Set Packer plugin path:"
 log_info "     export PACKER_PLUGIN_PATH=\"\${PWD}/tools/packer/plugins\""
-log_info "  4. Configure to use NIPR RPM repositories (no local mirrors needed)"
+log_info "  4. Configure to use Offline RPM repositories (no local mirrors needed)"
 log_info "  5. Set GitLab CI variables (see docs/CI-CD-Setup.md)"
 log_info "  6. Test environment: ./build/ci-setup.sh"
 log_info "  7. Validate Packer: packer validate spel/minimal-linux.pkr.hcl"

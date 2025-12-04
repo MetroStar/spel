@@ -1,5 +1,5 @@
-# GitLab CI/CD Configuration for SPEL NIPR Builds
-# This pipeline builds STIGed AMIs in an air-gapped NIPR environment
+# GitLab CI/CD Configuration for SPEL Offline Builds
+# This pipeline builds STIGed AMIs in an air-gapped Offline environment
 
 variables:
   SPEL_OFFLINE_MODE: "true"
@@ -8,7 +8,7 @@ variables:
   PACKER_LOG: "1"
   CHECKPOINT_DISABLE: "1"
   # Infrastructure naming
-  INFRA_PREFIX: "spel-nipr"
+  INFRA_PREFIX: "spel-offline"
 
 stages:
   - extract      # Extract transferred archives
@@ -23,14 +23,14 @@ default:
     - echo "Starting job on $(hostname)"
     - echo "Git commit - ${CI_COMMIT_SHA}"
 
-# Extract NIPR transfer archives
+# Extract Offline transfer archives
 extract:archives:
   stage: extract
   script:
-    - echo "Extracting NIPR transfer archives..."
+    - echo "Extracting Offline transfer archives..."
     - |
       # Find the most recent checksum file
-      CHECKSUM_FILE=$(ls -t spel-nipr-*-checksums.txt 2>/dev/null | head -1)
+      CHECKSUM_FILE=$(ls -t spel-offline-*-checksums.txt 2>/dev/null | head -1)
       
       if [ -n "$CHECKSUM_FILE" ]; then
         echo "Found checksum file - $CHECKSUM_FILE"
@@ -52,7 +52,7 @@ extract:archives:
       echo "=== Verifying Security Scans ==="
       
       # Check ClamAV scan log
-      SCAN_LOG=$(ls -t spel-nipr-*-clamav-scan.log 2>/dev/null | head -1)
+      SCAN_LOG=$(ls -t spel-offline-*-clamav-scan.log 2>/dev/null | head -1)
       
       if [ -n "$SCAN_LOG" ]; then
         echo "ClamAV scan log found: $SCAN_LOG"
@@ -71,7 +71,7 @@ extract:archives:
           echo "❌ ClamAV scan: FAILED or UNCLEAR"
           echo ""
           echo "SECURITY POLICY VIOLATION:"
-          echo "  Files must pass virus scan before use in NIPR"
+          echo "  Files must pass virus scan before use in Offline"
           echo "  Review scan log: $SCAN_LOG"
           echo ""
           
@@ -87,20 +87,20 @@ extract:archives:
       else
         echo "⚠️  WARNING: No ClamAV scan log found!"
         echo ""
-        echo "NIPR SECURITY REQUIREMENT:"
+        echo "Offline SECURITY REQUIREMENT:"
         echo "  All transferred files must be scanned for viruses"
         echo "  Missing scan log indicates archives may not comply with security policy"
         echo ""
         echo "ACTION REQUIRED:"
-        echo "  1. Verify archives were prepared with nipr-prepare workflow"
+        echo "  1. Verify archives were prepared with offline-prepare workflow"
         echo "  2. Ensure ClamAV scanning was enabled during preparation"
         echo "  3. Re-prepare archives using the official workflow"
         echo ""
         
-        # Make this a hard failure for NIPR compliance
+        # Make this a hard failure for Offline compliance
         # Set REQUIRE_VIRUS_SCAN=false in CI/CD variables to override (not recommended)
         if [ "${REQUIRE_VIRUS_SCAN:-true}" = "true" ]; then
-          echo "❌ Failing build due to missing virus scan log (NIPR compliance)"
+          echo "❌ Failing build due to missing virus scan log (Offline compliance)"
           exit 1
         else
           echo "⚠️  Continuing despite missing scan log (REQUIRE_VIRUS_SCAN=false)"
@@ -108,7 +108,7 @@ extract:archives:
       fi
       
       # Check TruffleHog secrets scan log
-      SECRETS_LOG=$(ls -t spel-nipr-*-trufflehog-scan.log 2>/dev/null | head -1)
+      SECRETS_LOG=$(ls -t spel-offline-*-trufflehog-scan.log 2>/dev/null | head -1)
       
       if [ -n "$SECRETS_LOG" ]; then
         echo ""
@@ -139,20 +139,20 @@ extract:archives:
         echo ""
         echo "⚠️  WARNING: No TruffleHog scan log found!"
         echo ""
-        echo "NIPR SECURITY REQUIREMENT:"
+        echo "Offline SECURITY REQUIREMENT:"
           echo "  All transferred files must be scanned for secrets/credentials"
         echo "  Missing scan log indicates archives may not comply with security policy"
         echo ""
         echo "ACTION REQUIRED:"
-        echo "  1. Verify archives were prepared with nipr-prepare workflow"
+        echo "  1. Verify archives were prepared with offline-prepare workflow"
         echo "  2. Ensure TruffleHog scanning was enabled during preparation"
         echo "  3. Re-prepare archives using the official workflow"
         echo ""
         
-        # Make this a hard failure for NIPR compliance
+        # Make this a hard failure for Offline compliance
         # Set REQUIRE_SECRETS_SCAN=false in CI/CD variables to override (not recommended)
         if [ "${REQUIRE_SECRETS_SCAN:-true}" = "true" ]; then
-          echo "❌ Failing build due to missing secrets scan log (NIPR compliance)"
+          echo "❌ Failing build due to missing secrets scan log (Offline compliance)"
           exit 1
         else
           echo "⚠️  Continuing despite missing scan log (REQUIRE_SECRETS_SCAN=false)"
@@ -164,7 +164,7 @@ extract:archives:
       echo "============================"
     
     - echo "Extracting archives..."
-    - ./scripts/extract-nipr-archives.sh
+    - ./scripts/extract-offline-archives.sh
     
     - echo "Extraction complete!"
     - echo "Directory structure:"
@@ -187,12 +187,12 @@ extract:archives:
       - spel-packages/
       - tools/
       - vendor/
-      - spel-nipr-*-clamav-scan.log    # Preserve ClamAV scan log for audit trail
-      - spel-nipr-*-trufflehog-scan.log # Preserve TruffleHog scan log for audit trail
-      - spel-nipr-*-manifest.txt       # Preserve manifest
+      - spel-offline-*-clamav-scan.log    # Preserve ClamAV scan log for audit trail
+      - spel-offline-*-trufflehog-scan.log # Preserve TruffleHog scan log for audit trail
+      - spel-offline-*-manifest.txt       # Preserve manifest
     expire_in: 7 days
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
   only:
     variables:
       - $EXTRACT_ARCHIVES == "true"
@@ -221,7 +221,7 @@ infra:network:
         echo "Creating new VPC..."
         VPC_ID=$(aws ec2 create-vpc \
           --cidr-block 10.0.0.0/16 \
-          --tag-specifications "ResourceType=vpc,Tags=[{Key=Name,Value=${INFRA_PREFIX}-vpc},{Key=Project,Value=SPEL},{Key=Environment,Value=NIPR}]" \
+          --tag-specifications "ResourceType=vpc,Tags=[{Key=Name,Value=${INFRA_PREFIX}-vpc},{Key=Project,Value=SPEL},{Key=Environment,Value=Offline}]" \
           --query 'Vpc.VpcId' \
           --output text 2>/dev/null || \
           aws ec2 describe-vpcs \
@@ -325,7 +325,7 @@ infra:network:
       dotenv: infra.env
     expire_in: 90 days
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
   only:
     variables:
       - $CREATE_INFRASTRUCTURE == "true"
@@ -375,7 +375,7 @@ infra:security_group:
       dotenv: infra.env
     expire_in: 90 days
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
   only:
     variables:
       - $CREATE_INFRASTRUCTURE == "true"
@@ -418,7 +418,7 @@ infra:iam:
           --role-name "${ROLE_NAME}" \
           --assume-role-policy-document file://trust-policy.json \
           --description "Role for SPEL Packer builders" \
-          --tags Key=Project,Value=SPEL Key=Environment,Value=NIPR
+          --tags Key=Project,Value=SPEL Key=Environment,Value=Offline
       fi
     
     # Create IAM policy (truncated for brevity - see full implementation)
@@ -458,7 +458,7 @@ infra:iam:
           --policy-name "${POLICY_NAME}" \
           --policy-document file://packer-policy.json \
           --description "Policy for SPEL Packer builders" \
-          --tags Key=Project,Value=SPEL Key=Environment,Value=NIPR \
+          --tags Key=Project,Value=SPEL Key=Environment,Value=Offline \
           --query 'Policy.Arn' --output text)
       fi
       
@@ -473,7 +473,7 @@ infra:iam:
         echo "Creating instance profile..."
         aws iam create-instance-profile \
           --instance-profile-name "${PROFILE_NAME}" \
-          --tags Key=Project,Value=SPEL Key=Environment,Value=NIPR
+          --tags Key=Project,Value=SPEL Key=Environment,Value=Offline
         
         aws iam add-role-to-instance-profile \
           --instance-profile-name "${PROFILE_NAME}" \
@@ -488,7 +488,7 @@ infra:iam:
       dotenv: iam.env
     expire_in: 90 days
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
   only:
     variables:
       - $CREATE_INFRASTRUCTURE == "true"
@@ -498,23 +498,23 @@ infra:iam:
 # Setup Stage - Verify Resources and Initialize Tools
 #############################################################################
 
-# Verify security compliance (NIPR requirement)
+# Verify security compliance (Offline requirement)
 verify:security:
   stage: setup
   needs: ["extract:archives"]
   script:
-    - echo "=== NIPR Security Compliance Verification ==="
+    - echo "=== Offline Security Compliance Verification ==="
     - echo ""
     
     # Check for ClamAV scan log
     - |
-      SCAN_LOG=$(ls -t spel-nipr-*-clamav-scan.log 2>/dev/null | head -1)
+      SCAN_LOG=$(ls -t spel-offline-*-clamav-scan.log 2>/dev/null | head -1)
       
       if [ -z "$SCAN_LOG" ]; then
         echo "❌ COMPLIANCE FAILURE: ClamAV scan log not found"
         echo ""
-        echo "NIPR security policy requires virus scanning of all transferred files."
-        echo "Archives must be prepared using the nipr-prepare workflow with ClamAV scanning enabled."
+        echo "Offline security policy requires virus scanning of all transferred files."
+        echo "Archives must be prepared using the offline-prepare workflow with ClamAV scanning enabled."
         echo ""
         exit 1
       fi
@@ -571,13 +571,13 @@ verify:security:
     # Check for TruffleHog scan log
     - |
       echo ""
-      SECRETS_LOG=$(ls -t spel-nipr-*-trufflehog-scan.log 2>/dev/null | head -1)
+      SECRETS_LOG=$(ls -t spel-offline-*-trufflehog-scan.log 2>/dev/null | head -1)
       
       if [ -z "$SECRETS_LOG" ]; then
         echo "❌ COMPLIANCE FAILURE: TruffleHog scan log not found"
         echo ""
-        echo "NIPR security policy requires secrets scanning of all transferred files."
-        echo "Archives must be prepared using the nipr-prepare workflow with TruffleHog scanning enabled."
+        echo "Offline security policy requires secrets scanning of all transferred files."
+        echo "Archives must be prepared using the offline-prepare workflow with TruffleHog scanning enabled."
         echo ""
         exit 1
       fi
@@ -625,7 +625,7 @@ verify:security:
     
     # Check for manifest
     - |
-      MANIFEST=$(ls -t spel-nipr-*-manifest.txt 2>/dev/null | head -1)
+      MANIFEST=$(ls -t spel-offline-*-manifest.txt 2>/dev/null | head -1)
       
       if [ -n "$MANIFEST" ]; then
         echo ""
@@ -649,13 +649,13 @@ verify:security:
       echo "✅ ClamAV files verified: $SCANNED_FILES files scanned"
       echo "✅ TruffleHog scan log: PRESENT"
       echo "✅ TruffleHog secrets scan: PASSED (no credentials)"
-      echo "✅ NIPR security requirements: MET"
+      echo "✅ Offline security requirements: MET"
       echo ""
-      echo "Archives are compliant and ready for NIPR deployment."
+      echo "Archives are compliant and ready for Offline deployment."
       echo "All security scans passed - virus and secrets verification complete."
       echo "===================================="
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
   only:
     variables:
       - $EXTRACT_ARCHIVES == "true"
@@ -701,7 +701,7 @@ verify:resources:
         fi
       done
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
 
 # Verify AWS connectivity and infrastructure
 aws:verify:
@@ -757,7 +757,7 @@ aws:verify:
         echo "⚠ High AMI count (${AMI_COUNT}). Consider cleanup if PKR_VAR_aws_force_deregister=false"
       fi
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
 
 # Setup job - prepare environment
 setup:
@@ -783,7 +783,7 @@ setup:
       - vendor/
     expire_in: 1 hour
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
 
 # Install Python dependencies
 python:setup:
@@ -820,7 +820,7 @@ python:setup:
       - .venv/
     expire_in: 7 days
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
 
 # Initialize Packer plugins
 packer:init:
@@ -862,7 +862,7 @@ packer:init:
       - .packer.d/
     expire_in: 7 days
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
 
 # Verify build dependencies
 verify:dependencies:
@@ -915,7 +915,7 @@ verify:dependencies:
       
       echo "✓ Build dependencies verified"
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
 
 #############################################################################
 # Validate Stage - Validate Packer Templates
@@ -943,7 +943,7 @@ validate:minimal:
         -var "spel_version=${SPEL_VERSION}" \
         spel/minimal-linux.pkr.hcl
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
 
 validate:hardened:
   stage: validate
@@ -966,7 +966,7 @@ validate:hardened:
         -var "spel_version=${SPEL_VERSION}" \
         spel/hardened-linux.pkr.hcl
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
 
 #############################################################################
 # Build Stage - Build AMIs
@@ -1011,17 +1011,17 @@ validate:hardened:
     - export SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
     - export PUBLIC="${PUBLIC:-true}"
     
-    # Set AWS GovCloud credentials for NIPR environment
+    # Set AWS GovCloud credentials for Offline environment
     - export AWS_GOVCLOUD_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
     - export AWS_GOVCLOUD_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
     
-    # Set Packer variables for NIPR
+    # Set Packer variables for Offline
     - export PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister:-true}"
-    - export PKR_VAR_aws_ami_regions="${PKR_VAR_aws_nipr_ami_regions:-[\"us-gov-east-1\"]}"
+    - export PKR_VAR_aws_ami_regions="${PKR_VAR_aws_offline_ami_regions:-[\"us-gov-east-1\"]}"
     - export PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups:-[\"all\"]}"
     - export PKR_VAR_aws_vpc_id="${PKR_VAR_aws_vpc_id}"
     - export PKR_VAR_aws_subnet_id="${PKR_VAR_aws_subnet_id}"
-    - export PKR_VAR_aws_nipr_account_id="${PKR_VAR_aws_nipr_account_id}"
+    - export PKR_VAR_aws_offline_account_id="${PKR_VAR_aws_offline_account_id}"
     
     # Run build
     - make -f Makefile.spel build
@@ -1032,7 +1032,7 @@ validate:hardened:
       dotenv: .env
     expire_in: 30 days
   tags:
-    - spel-nipr-runner
+    - spel-offline-runner
   when: manual
 
 # Individual build jobs

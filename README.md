@@ -19,7 +19,7 @@ Notes on Lifecycle:
     VPC with no access to the internet at large, it will not be possible to
     install additional RPMs or patch systems without the use of either a proxy
     or standing up a private yum mirror. Note: RHEL images in AWS GovCloud (including
-    NIPR) have access to RHUI repositories within the isolated network
+    Offline) have access to RHUI repositories within the isolated network
 1.  Red Hat images are configured to use a given cloud service provider's (CSP) 
     [Red Hat Update Infrastructure](https://access.redhat.com/products/red-hat-update-infrastructure)
     (a.k.a., "RHUI") repositories. These repositories are managed by Red 
@@ -346,11 +346,11 @@ The SPEL build system supports three deployment modes to accommodate different A
 - **Network**: Full internet access for downloading dependencies
 - **Configuration**: See `.github/workflows/build.yml`
 
-#### 2. GitLab CI (NIPR Single-Environment)
-**Use case**: Building in air-gapped NIPR environment with only GovCloud access
+#### 2. GitLab CI (Offline Single-Environment)
+**Use case**: Building in air-gapped Offline environment with only GovCloud access
 
 - **Credentials**: Uses only `AWS_GOVCLOUD_*` environment variables  
-- **Regions**: Builds only in us-gov-east-1 (or configured NIPR region)
+- **Regions**: Builds only in us-gov-east-1 (or configured Offline region)
 - **Offline Mode**: All dependencies pre-vendored in transfer archives (~1 GB: Packer, Python packages, Ansible collections, AWS utilities)
 - **Network**: Air-gapped with AWS GovCloud RHUI repository access
 - **Configuration**: See `.gitlab-ci.yml` and `docs/CI-CD-Setup.md`
@@ -363,9 +363,9 @@ The SPEL build system supports three deployment modes to accommodate different A
 - **Network**: Can work online or offline (when `SPEL_OFFLINE_MODE=true`)
 - **Script**: `build/build.sh` automatically configures AWS CLI profiles based on detected credentials
 
-**Key Feature**: The `build/build.sh` script intelligently detects which AWS credentials are available and configures only the necessary profiles, making it compatible with single-environment (NIPR) or dual-environment (GitHub Actions) deployments without code changes.
+**Key Feature**: The `build/build.sh` script intelligently detects which AWS credentials are available and configures only the necessary profiles, making it compatible with single-environment (Offline) or dual-environment (GitHub Actions) deployments without code changes.
 
-For detailed NIPR/GitLab CI setup instructions, see [`docs/CI-CD-Setup.md`](docs/CI-CD-Setup.md).
+For detailed Offline/GitLab CI setup instructions, see [`docs/CI-CD-Setup.md`](docs/CI-CD-Setup.md).
 
 ### Local Build Prerequisites
 

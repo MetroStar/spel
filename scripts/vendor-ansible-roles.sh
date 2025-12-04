@@ -2,7 +2,7 @@
 #
 # Vendor Ansible roles from GitHub with storage optimization
 # This script clones only the latest version without git history
-# Run this on a system with internet access before transferring to NIPR
+# Run this on a system with internet access before transferring to Offline
 #
 # STORAGE OPTIMIZATION:
 # - Uses --depth 1 for shallow clone (no git history)

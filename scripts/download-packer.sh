@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Download Packer binaries for offline NIPR builds (multi-platform support)
-# Run this on a system with internet access before transferring to NIPR
+# Download Packer binaries for offline Offline builds (multi-platform support)
+# Run this on a system with internet access before transferring to Offline
 #
 # Supports downloading multiple platforms: linux_amd64, windows_amd64, etc.
 #
@@ -201,7 +201,7 @@ for platform in $PACKER_PLATFORMS; do
     log_info "  ${platform}: ${TOOLS_DIR}/${platform}/"
 done
 log_info ""
-log_info "NIPR Usage:"
+log_info "Offline Usage:"
 log_info "  Linux:   ${TOOLS_DIR}/linux_amd64/packer"
 log_info "  Windows: ${TOOLS_DIR}/windows_amd64/packer.exe"
 log_info ""

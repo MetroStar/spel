@@ -1,4 +1,4 @@
-# Offline Build Tools for NIPR Environment
+# Offline Build Tools for Offline Environment
 
 This directory contains pre-downloaded tools and dependencies required for SPEL AMI builds in air-gapped environments.
 
@@ -124,9 +124,9 @@ ls -lh tools/packer/plugins/
 ls -lh tools/python-deps/*.whl
 ```
 
-## Transfer to NIPR
+## Transfer to Offline
 
-When transferring to NIPR environment:
+When transferring to Offline environment:
 
 1. **Create archive** on internet-connected system:
    ```bash
@@ -135,7 +135,7 @@ When transferring to NIPR environment:
 
 2. **Transfer** via approved secure transfer method
 
-3. **Extract** in NIPR SPEL repository:
+3. **Extract** in Offline SPEL repository:
    ```bash
    cd /path/to/spel/
    tar xzf spel-offline-tools.tar.gz
@@ -149,12 +149,12 @@ When transferring to NIPR environment:
 
 ## Updates
 
-To update tools in NIPR:
+To update tools in Offline:
 
 1. Download updated versions on internet-connected system
 2. Replace files in `tools/` directory
 3. Re-create and transfer archive
-4. Extract in NIPR environment
+4. Extract in Offline environment
 
 ## Notes
 

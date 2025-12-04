@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# NIPR VPC Endpoint Configuration Script
+# Offline VPC Endpoint Configuration Script
 # This script configures DNS resolution for AWS service VPC endpoints
-# Used when building in air-gapped NIPR VPCs with privatelink endpoints
+# Used when building in air-gapped Offline VPCs with privatelink endpoints
 #
 set -euo pipefail
 
@@ -12,7 +12,7 @@ VPC_ENDPOINT_S3="${VPC_ENDPOINT_S3:-}"
 VPC_ENDPOINT_SSM="${VPC_ENDPOINT_SSM:-}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 
-echo "Configuring NIPR VPC endpoint DNS resolution..."
+echo "Configuring Offline VPC endpoint DNS resolution..."
 
 # Add EC2 endpoint to /etc/hosts if specified
 if [ -n "$VPC_ENDPOINT_EC2" ]; then

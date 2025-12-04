@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Download AWS utilities for offline NIPR builds with storage optimization
-# Run this on a system with internet access before transferring to NIPR
+# Download AWS utilities for offline Offline builds with storage optimization
+# Run this on a system with internet access before transferring to Offline
 #
 # STORAGE OPTIMIZATION:
 # - Single SSM Agent file (compatible with both EL8/EL9)

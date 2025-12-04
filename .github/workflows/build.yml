@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       offline_mode:
-        description: "Use offline mode with NIPR artifacts (includes ClamAV-scanned files)"
+        description: "Use offline mode with Offline artifacts (includes ClamAV-scanned files)"
         required: false
         default: false
         type: boolean
-      nipr_artifact_name:
-        description: "NIPR artifact name (e.g., spel-nipr-transfer-20251126)"
+      offline_artifact_name:
+        description: "Offline artifact name (e.g., spel-offline-transfer-20251126)"
         required: false
         default: ""
         type: string
@@ -72,13 +72,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download NIPR artifacts for offline mode
+      - name: Download Offline artifacts for offline mode
         if: github.event.inputs.offline_mode == 'true'
         uses: dawidd6/action-download-artifact@v6
         with:
-          name: ${{ github.event.inputs.nipr_artifact_name }}
-          path: ./nipr-artifacts/
-          workflow: nipr-prepare.yml
+          name: ${{ github.event.inputs.offline_artifact_name }}
+          path: ./offline-artifacts/
+          workflow: offline-prepare.yml
           workflow_conclusion: success
           search_artifacts: true
         continue-on-error: true
@@ -86,15 +86,15 @@ jobs:
       - name: Setup offline environment
         if: github.event.inputs.offline_mode == 'true'
         run: |
-          echo "=== Setting up offline mode with NIPR artifacts ==="
+          echo "=== Setting up offline mode with Offline artifacts ==="
           
           # Check if artifacts were downloaded
-          if [ -d "nipr-artifacts" ] && [ -n "$(ls -A nipr-artifacts 2>/dev/null)" ]; then
-            echo "✓ NIPR artifacts downloaded from GitHub"
-            cd nipr-artifacts
+          if [ -d "offline-artifacts" ] && [ -n "$(ls -A offline-artifacts 2>/dev/null)" ]; then
+            echo "✓ Offline artifacts downloaded from GitHub"
+            cd offline-artifacts
             
             # Verify checksums if available
-            CHECKSUM_FILE=$(ls spel-nipr-*-checksums.txt 2>/dev/null | head -1)
+            CHECKSUM_FILE=$(ls spel-offline-*-checksums.txt 2>/dev/null | head -1)
             if [ -n "$CHECKSUM_FILE" ]; then
               echo "Verifying checksums..."
               if sha256sum -c "$CHECKSUM_FILE"; then
@@ -105,7 +105,7 @@ jobs:
             fi
             
             # Check for ClamAV scan log
-            SCAN_LOG=$(ls spel-nipr-*-clamav-scan.log 2>/dev/null | head -1)
+            SCAN_LOG=$(ls spel-offline-*-clamav-scan.log 2>/dev/null | head -1)
             if [ -n "$SCAN_LOG" ]; then
               echo ""
               echo "=== Security Scan Verification ==="
@@ -130,12 +130,12 @@ jobs:
               echo ""
               echo "⚠️  WARNING: No ClamAV scan log found in artifacts"
               echo "   This may indicate archives were prepared without security scanning"
-              echo "   NIPR security policy requires all files to be virus-scanned"
+              echo "   Offline security policy requires all files to be virus-scanned"
               echo ""
             fi
             
             # Check for TruffleHog scan log
-            SECRETS_LOG=$(ls spel-nipr-*-trufflehog-scan.log 2>/dev/null | head -1)
+            SECRETS_LOG=$(ls spel-offline-*-trufflehog-scan.log 2>/dev/null | head -1)
             if [ -n "$SECRETS_LOG" ]; then
               echo ""
               echo "=== Secrets Scan Verification ==="
@@ -155,16 +155,16 @@ jobs:
               echo ""
               echo "⚠️  WARNING: No TruffleHog scan log found in artifacts"
               echo "   This may indicate archives were prepared without secrets scanning"
-              echo "   NIPR security policy requires secrets verification"
+              echo "   Offline security policy requires secrets verification"
               echo ""
             fi
             
             # Move archives to repository root
             mv spel-*.tar.gz ../ 2>/dev/null || true
-            mv spel-nipr-*-checksums.txt ../ 2>/dev/null || true
-            mv spel-nipr-*-manifest.txt ../ 2>/dev/null || true
-            mv spel-nipr-*-clamav-scan.log ../ 2>/dev/null || true
-            mv spel-nipr-*-trufflehog-scan.log ../ 2>/dev/null || true
+            mv spel-offline-*-checksums.txt ../ 2>/dev/null || true
+            mv spel-offline-*-manifest.txt ../ 2>/dev/null || true
+            mv spel-offline-*-clamav-scan.log ../ 2>/dev/null || true
+            mv spel-offline-*-trufflehog-scan.log ../ 2>/dev/null || true
             cd ..
           else
             echo "⚠ No artifacts downloaded - checking for archives in repository..."
@@ -172,13 +172,13 @@ jobs:
           
           # Check if archives exist (either downloaded or committed to repo)
           if ls spel-*.tar.gz 1> /dev/null 2>&1; then
-            echo "✓ Found NIPR transfer archives"
+            echo "✓ Found Offline transfer archives"
             ls -lh spel-*.tar.gz
             
             # Extract archives
             echo ""
-            echo "Extracting NIPR archives..."
-            bash ./scripts/extract-nipr-archives.sh
+            echo "Extracting Offline archives..."
+            bash ./scripts/extract-offline-archives.sh
             
             # Verify offline mode files exist
             echo ""
@@ -222,11 +222,11 @@ jobs:
             echo ""
             echo "=== Offline mode setup complete ==="
           else
-            echo "✗ No NIPR archives found!"
+            echo "✗ No Offline archives found!"
             echo ""
             echo "To use offline mode, either:"
-            echo "  1. Provide a valid nipr_artifact_name from a previous nipr-prepare workflow run"
-            echo "  2. Commit the NIPR archives to a test branch"
+            echo "  1. Provide a valid offline_artifact_name from a previous offline-prepare workflow run"
+            echo "  2. Commit the Offline archives to a test branch"
             echo "  3. Manually upload archives to the repository"
             exit 1
           fi
@@ -338,8 +338,8 @@ jobs:
             echo "### Security Verification" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
-            if [ -f spel-nipr-*-clamav-scan.log ]; then
-              SCAN_LOG=$(ls spel-nipr-*-clamav-scan.log | head -1)
+            if [ -f spel-offline-*-clamav-scan.log ]; then
+              SCAN_LOG=$(ls spel-offline-*-clamav-scan.log | head -1)
               
               # Check if scan passed
               if grep -q "Infected files: 0" "$SCAN_LOG" 2>/dev/null; then
@@ -352,18 +352,18 @@ jobs:
                 
                 echo "- Files scanned: $SCANNED_FILES" >> $GITHUB_STEP_SUMMARY
                 echo "- Scan duration: $SCAN_TIME" >> $GITHUB_STEP_SUMMARY
-                echo "- Compliant with NIPR security requirements" >> $GITHUB_STEP_SUMMARY
+                echo "- Compliant with Offline security requirements" >> $GITHUB_STEP_SUMMARY
               else
                 echo "- ⚠️ ClamAV scan status: **UNCLEAR**" >> $GITHUB_STEP_SUMMARY
                 echo "- Review scan log for details" >> $GITHUB_STEP_SUMMARY
               fi
             else
               echo "- ⚠️ No ClamAV scan log found" >> $GITHUB_STEP_SUMMARY
-              echo "- Archives may not meet NIPR security requirements" >> $GITHUB_STEP_SUMMARY
+              echo "- Archives may not meet Offline security requirements" >> $GITHUB_STEP_SUMMARY
             fi
             
             # TruffleHog results
-            SECRETS_LOG=$(ls spel-nipr-*-trufflehog-scan.log 2>/dev/null | head -1)
+            SECRETS_LOG=$(ls spel-offline-*-trufflehog-scan.log 2>/dev/null | head -1)
             if [ -n "$SECRETS_LOG" ]; then
               if grep -q "NO SECRETS DETECTED" "$SECRETS_LOG" 2>/dev/null; then
                 echo "- ✅ TruffleHog secrets scan: **PASSED**" >> $GITHUB_STEP_SUMMARY
@@ -384,9 +384,9 @@ jobs:
           echo "### Build Configuration" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ "${{ github.event.inputs.offline_mode }}" = "true" ]; then
-            echo "- **Mode**: Offline (NIPR artifacts)" >> $GITHUB_STEP_SUMMARY
-            if [ -n "${{ github.event.inputs.nipr_artifact_name }}" ]; then
-              echo "- **Artifact**: \`${{ github.event.inputs.nipr_artifact_name }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Mode**: Offline (Offline artifacts)" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ github.event.inputs.offline_artifact_name }}" ]; then
+              echo "- **Artifact**: \`${{ github.event.inputs.offline_artifact_name }}\`" >> $GITHUB_STEP_SUMMARY
             fi
           else
             echo "- **Mode**: Online (Internet-connected)" >> $GITHUB_STEP_SUMMARY
