@@ -997,6 +997,27 @@ validate:hardened:
       fi
     - export PACKER_PLUGIN_PATH="${CI_PROJECT_DIR}/tools/packer/plugins"
     
+    # Override Packer variables to use local offline packages
+    - |
+      if [ -d "offline-packages" ]; then
+        echo "Configuring Packer to use offline packages..."
+        export PKR_VAR_amigen_aws_cliv2_source="file://${CI_PROJECT_DIR}/offline-packages/awscli-exe-linux-x86_64.zip"
+        export PKR_VAR_amigen_aws_cfnbootstrap="file://${CI_PROJECT_DIR}/offline-packages/aws-cfn-bootstrap-py3-latest.tar.gz"
+        export PKR_VAR_spel_ssm_agent_source="file://${CI_PROJECT_DIR}/offline-packages/amazon-ssm-agent.rpm"
+        
+        # Override EC2 packages for EL8
+        export PKR_VAR_amigen8_extra_rpms='["file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-hibinit-agent.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-instance-connect.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux.rpm"]'
+        
+        # Override EC2 packages for EL9
+        export PKR_VAR_amigen9_extra_rpms='["file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el9/ec2-hibinit-agent.rpm"]'
+        
+        # Disable EPEL repositories for offline builds
+        export PKR_VAR_amigen8_repo_names='[]'
+        export PKR_VAR_amigen8_repo_sources='[]'
+        export PKR_VAR_amigen9_repo_names='[]'
+        export PKR_VAR_amigen9_repo_sources='[]'
+      fi
+    
     # Load infrastructure config if available
     - |
       if [ -f infra.env ]; then

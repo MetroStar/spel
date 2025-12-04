@@ -260,6 +260,23 @@ jobs:
             echo "SPEL packages: $(du -sh spel-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
             echo "==========================="
             echo ""
+            
+            # Override Packer variables to use local offline packages
+            echo "PKR_VAR_amigen_aws_cliv2_source=file:///github/workspace/offline-packages/awscli-exe-linux-x86_64.zip" >> $GITHUB_ENV
+            echo "PKR_VAR_amigen_aws_cfnbootstrap=file:///github/workspace/offline-packages/aws-cfn-bootstrap-py3-latest.tar.gz" >> $GITHUB_ENV
+            echo "PKR_VAR_spel_ssm_agent_source=file:///github/workspace/offline-packages/amazon-ssm-agent.rpm" >> $GITHUB_ENV
+            
+            # Override EC2 packages for EL8
+            echo "PKR_VAR_amigen8_extra_rpms=[\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-hibinit-agent.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-instance-connect.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux.rpm\"]" >> $GITHUB_ENV
+            
+            # Override EC2 packages for EL9
+            echo "PKR_VAR_amigen9_extra_rpms=[\"file:///github/workspace/offline-packages/ec2-utils-el9/ec2-hibinit-agent.rpm\"]" >> $GITHUB_ENV
+            
+            # Disable EPEL repositories for offline builds
+            echo "PKR_VAR_amigen8_repo_names=[]" >> $GITHUB_ENV
+            echo "PKR_VAR_amigen8_repo_sources=[]" >> $GITHUB_ENV
+            echo "PKR_VAR_amigen9_repo_names=[]" >> $GITHUB_ENV
+            echo "PKR_VAR_amigen9_repo_sources=[]" >> $GITHUB_ENV
           else
             echo "SPEL_OFFLINE_MODE=false" >> $GITHUB_ENV
             echo "Online mode - will download packages from internet"

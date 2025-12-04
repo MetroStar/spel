@@ -690,7 +690,7 @@ jobs:
           echo "  - Ansible roles (vendored)"
           echo "  - Ansible collections (ansible.windows, community.windows)"
           echo "  - Ansible Core with Python dependencies"
-          echo "  - Offline packages (AWS CLI, SSM Agent, CFN Bootstrap)"
+          echo "  - Offline packages (AWS CLI, SSM Agent, CFN Bootstrap, EC2 utilities)"
           echo "  - SPEL custom packages"
           echo "  - Packer binaries (Linux + Windows v$SPEL_PACKER_VERSION)"
           echo "  - Packer plugins (all required for SPEL builds)"

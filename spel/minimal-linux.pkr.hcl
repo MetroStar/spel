@@ -443,7 +443,7 @@ variable "amigen_amiutils_source_url" {
 }
 
 variable "amigen_aws_cfnbootstrap" {
-  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Defaults to spel_cfnbootstrap_source for Offline support"
+  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Use file:// prefix for offline/Offline builds. Defaults to spel_cfnbootstrap_source for Offline support"
   type        = string
   default     = ""
 }
@@ -455,7 +455,7 @@ variable "amigen_aws_cliv1_source" {
 }
 
 variable "amigen_aws_cliv2_source" {
-  description = "URL of the .zip bundle containing the installer for AWS CLI v2"
+  description = "URL of the .zip bundle containing the installer for AWS CLI v2. Use file:// prefix for offline/Offline builds"
   type        = string
   default     = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
 }
@@ -495,7 +495,7 @@ variable "amigen8_bootdev_size" {
 }
 
 variable "amigen8_extra_rpms" {
-  description = "List of package specs (rpm names or URLs to .rpm files) to install to the EL8 builders and images"
+  description = "List of package specs (rpm names or URLs to .rpm files) to install to the EL8 builders and images. Use file:// prefix for offline/Offline builds"
   type        = list(string)
   default = [
     "python39",
@@ -590,7 +590,7 @@ variable "amigen9_boot_dev_label" {
 }
 
 variable "amigen9_extra_rpms" {
-  description = "List of package specs (rpm names or URLs to .rpm files) to install to the EL9 builders and images"
+  description = "List of package specs (rpm names or URLs to .rpm files) to install to the EL9 builders and images. Use file:// prefix for offline/Offline builds"
   type        = list(string)
   default = [
     "crypto-policies-scripts",
