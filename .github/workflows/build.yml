@@ -267,10 +267,10 @@ jobs:
             echo "PKR_VAR_spel_ssm_agent_source=file:///github/workspace/offline-packages/amazon-ssm-agent.rpm" >> $GITHUB_ENV
             
             # Override EC2 packages for EL8
-            echo "PKR_VAR_amigen8_extra_rpms=[\"python39\",\"python39-pip\",\"python39-setuptools\",\"crypto-policies-scripts\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-hibinit-agent.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-instance-connect.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-utils-2.2.0-1.0.2.el8.noarch.rpm\",\"file:///github/workspace/offline-packages/amazon-ssm-agent.rpm\"]" >> $GITHUB_ENV
+            echo "PKR_VAR_amigen8_extra_rpms=[\"python39\",\"python39-pip\",\"python39-setuptools\",\"crypto-policies-scripts\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-hibinit-agent.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-instance-connect.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-utils-2.2-1.0.2.el8.noarch.rpm\",\"file:///github/workspace/offline-packages/amazon-ssm-agent.rpm\"]" >> $GITHUB_ENV
             
             # Override EC2 packages for EL9
-            echo "PKR_VAR_amigen9_extra_rpms=[\"crypto-policies-scripts\",\"file:///github/workspace/offline-packages/ec2-utils-el9/ec2-hibinit-agent.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el9/ec2-utils-2.2.0-1.0.1.el9.noarch.rpm\",\"file:///github/workspace/offline-packages/amazon-ssm-agent.rpm\"]" >> $GITHUB_ENV
+            echo "PKR_VAR_amigen9_extra_rpms=[\"crypto-policies-scripts\",\"file:///github/workspace/offline-packages/ec2-utils-el9/ec2-hibinit-agent.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el9/ec2-utils-2.2-1.0.1.el9.noarch.rpm\",\"file:///github/workspace/offline-packages/amazon-ssm-agent.rpm\"]" >> $GITHUB_ENV
             
             # Disable EPEL repositories for offline builds
             echo "PKR_VAR_amigen8_repo_names=[]" >> $GITHUB_ENV
