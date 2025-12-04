@@ -531,14 +531,14 @@ variable "amigen8_package_manifest" {
 variable "amigen8_repo_names" {
   description = "List of yum repo names to enable in the EL8 builders and EL8 images"
   type        = list(string)
-  default     = ["epel"]
+  default     = ["spel"]
 }
 
 variable "amigen8_repo_sources" {
   description = "List of yum package refs (names or urls to .rpm files) that install yum repo definitions in EL8 builders and images"
   type        = list(string)
   default = [
-    "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm",
+    "https://spel-packages.cloudarmor.io/spel-packages/repo/spel-release-latest-8.noarch.rpm",
   ]
 }
 
@@ -627,14 +627,14 @@ variable "amigen9_package_manifest_al2023" {
 variable "amigen9_repo_names" {
   description = "List of yum repo names to enable in the EL9 builders and EL9 images"
   type        = list(string)
-  default     = ["epel"]
+  default     = ["spel"]
 }
 
 variable "amigen9_repo_sources" {
   description = "List of yum package refs (names or urls to .rpm files) that install yum repo definitions in EL9 builders and images"
   type        = list(string)
   default = [
-    "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm",
+    "https://spel-packages.cloudarmor.io/spel-packages/repo/spel-release-latest-9.noarch.rpm",
   ]
 }
 
