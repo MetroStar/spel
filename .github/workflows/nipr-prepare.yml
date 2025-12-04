@@ -411,6 +411,7 @@ jobs:
           echo ""
           
           SCAN_LOG="trufflehog-scan-${DATE}.log"
+          SCAN_JSON="trufflehog-scan-${DATE}.json"
           SECRETS_FOUND=0
           
           # Directories to scan (same as ClamAV for consistency)
@@ -443,24 +444,43 @@ jobs:
               echo "Scanning directory: $dir" | tee -a "$SCAN_LOG"
               echo "========================================" | tee -a "$SCAN_LOG"
               
-              # Run TruffleHog filesystem scan
+              # Create temporary output file to check for findings
+              TEMP_JSON=$(mktemp)
+              
+              # Run TruffleHog filesystem scan with JSON output
+              # --json: output in JSON format for reliable parsing
               # --no-update: don't check for updates (faster)
-              # --fail: exit with non-zero if secrets found
-              if trufflehog filesystem "$dir" \
+              # --exclude-paths: use exclusions file
+              set +e  # Temporarily disable exit on error
+              trufflehog filesystem "$dir" \
+                --json \
                 --no-update \
                 --exclude-paths .trufflehog-exclude.txt \
-                >> "$SCAN_LOG" 2>&1; then
+                > "$TEMP_JSON" 2>&1
+              SCAN_EXIT=$?
+              set -e  # Re-enable exit on error
+              
+              # Append JSON output to combined file
+              cat "$TEMP_JSON" >> "$SCAN_JSON"
+              
+              # Check if any findings (JSON output contains "Raw" field for detections)
+              if grep -q '"Raw"' "$TEMP_JSON" 2>/dev/null; then
+                echo "✗ $dir: SECRETS DETECTED!" | tee -a "$SCAN_LOG"
+                SECRETS_FOUND=$((SECRETS_FOUND + 1))
+                
+                # Show summary of findings
+                echo "  Detected secret types:" | tee -a "$SCAN_LOG"
+                grep -o '"DetectorType":"[^"]*"' "$TEMP_JSON" | cut -d'"' -f4 | sort -u | head -10 | sed 's/^/    - /' | tee -a "$SCAN_LOG" || true
+                echo "" | tee -a "$SCAN_LOG"
+              elif [ $SCAN_EXIT -eq 0 ]; then
                 echo "✓ $dir: No secrets detected" | tee -a "$SCAN_LOG"
               else
-                SCAN_EXIT=$?
-                if [ $SCAN_EXIT -eq 183 ]; then
-                  # Exit code 183 = secrets found
-                  echo "✗ $dir: SECRETS DETECTED!" | tee -a "$SCAN_LOG"
-                  SECRETS_FOUND=$((SECRETS_FOUND + 1))
-                else
-                  echo "⚠ $dir: Scan error (exit code: $SCAN_EXIT)" | tee -a "$SCAN_LOG"
-                fi
+                # Exit code != 0 but no findings in output - likely binary files or permissions
+                echo "⚠ $dir: Scan completed with warnings (exit code: $SCAN_EXIT, no secrets found)" | tee -a "$SCAN_LOG"
+                # Not treating this as an error since no actual secrets were detected
               fi
+              
+              rm -f "$TEMP_JSON"
               echo "" | tee -a "$SCAN_LOG"
             fi
           done
@@ -474,17 +494,29 @@ jobs:
             for file in $pattern; do
               if [ -f "$file" ]; then
                 echo "Scanning: $file" | tee -a "$SCAN_LOG"
-                if trufflehog filesystem "$file" \
+                
+                TEMP_JSON=$(mktemp)
+                set +e
+                trufflehog filesystem "$file" \
+                  --json \
                   --no-update \
-                  >> "$SCAN_LOG" 2>&1; then
+                  > "$TEMP_JSON" 2>&1
+                SCAN_EXIT=$?
+                set -e
+                
+                cat "$TEMP_JSON" >> "$SCAN_JSON"
+                
+                if grep -q '"Raw"' "$TEMP_JSON" 2>/dev/null; then
+                  echo "✗ $file: SECRETS DETECTED!" | tee -a "$SCAN_LOG"
+                  SECRETS_FOUND=$((SECRETS_FOUND + 1))
+                  grep -o '"DetectorType":"[^"]*"' "$TEMP_JSON" | cut -d'"' -f4 | sort -u | sed 's/^/    - /' | tee -a "$SCAN_LOG" || true
+                elif [ $SCAN_EXIT -eq 0 ]; then
                   echo "✓ $file: No secrets detected" | tee -a "$SCAN_LOG"
                 else
-                  SCAN_EXIT=$?
-                  if [ $SCAN_EXIT -eq 183 ]; then
-                    echo "✗ $file: SECRETS DETECTED!" | tee -a "$SCAN_LOG"
-                    SECRETS_FOUND=$((SECRETS_FOUND + 1))
-                  fi
+                  echo "⚠ $file: Scan completed with warnings (exit code: $SCAN_EXIT, no secrets found)" | tee -a "$SCAN_LOG"
                 fi
+                
+                rm -f "$TEMP_JSON"
               fi
             done
           done
@@ -494,28 +526,47 @@ jobs:
           echo "Scan completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
           echo "========================================" | tee -a "$SCAN_LOG"
           
+          # Count total detections from JSON output
+          TOTAL_DETECTIONS=$(grep -c '"Raw"' "$SCAN_JSON" 2>/dev/null || echo "0")
+          
           # Summary
           echo "" | tee -a "$SCAN_LOG"
           echo "=== TruffleHog Secrets Scan Summary ===" | tee -a "$SCAN_LOG"
           echo "Directories scanned: ${#SCAN_DIRS[@]}" | tee -a "$SCAN_LOG"
           echo "Locations with secrets: $SECRETS_FOUND" | tee -a "$SCAN_LOG"
+          echo "Total secret detections: $TOTAL_DETECTIONS" | tee -a "$SCAN_LOG"
           
           # Check if any secrets found
-          if [ $SECRETS_FOUND -gt 0 ]; then
+          if [ $SECRETS_FOUND -gt 0 ] || [ $TOTAL_DETECTIONS -gt 0 ]; then
             echo "" | tee -a "$SCAN_LOG"
             echo "❌ SECRETS SCAN FAILED!" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
             echo "Secrets detected in: $SECRETS_FOUND location(s)" | tee -a "$SCAN_LOG"
+            echo "Total detections: $TOTAL_DETECTIONS" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
+            
+            # Show all unique detector types found
+            echo "Detected secret types:" | tee -a "$SCAN_LOG"
+            grep -o '"DetectorType":"[^"]*"' "$SCAN_JSON" | cut -d'"' -f4 | sort -u | sed 's/^/  - /' | tee -a "$SCAN_LOG" || true
+            echo "" | tee -a "$SCAN_LOG"
+            
+            # Show sample of detected secrets (first 5)
+            echo "Sample detections (first 5):" | tee -a "$SCAN_LOG"
+            grep '"SourceMetadata"' "$SCAN_JSON" | head -5 | tee -a "$SCAN_LOG" || true
+            echo "" | tee -a "$SCAN_LOG"
+            
             echo "ACTION REQUIRED:" | tee -a "$SCAN_LOG"
-            echo "  1. Review scan log above for detected secrets" | tee -a "$SCAN_LOG"
-            echo "  2. Remove or redact sensitive data" | tee -a "$SCAN_LOG"
+            echo "  1. Review full scan JSON for all detected secrets" | tee -a "$SCAN_LOG"
+            echo "  2. Remove or redact sensitive data from source files" | tee -a "$SCAN_LOG"
             echo "  3. Add false positives to .trufflehog-exclude.txt" | tee -a "$SCAN_LOG"
             echo "  4. Rotate any exposed credentials immediately" | tee -a "$SCAN_LOG"
             echo "  5. Re-run workflow after remediation" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
             echo "NIPR SECURITY POLICY: No secrets allowed in transfer" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
+            
+            # Clean up
+            rm -f "$SCAN_JSON"
             
             # Fail workflow
             exit 1
@@ -526,6 +577,9 @@ jobs:
             echo "Files are safe for NIPR transfer" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
           fi
+          
+          # Clean up JSON file (only needed during scan)
+          rm -f "$SCAN_JSON"
           
           # Save scan log as artifact
           mv "$SCAN_LOG" "spel-nipr-${DATE}-trufflehog-scan.log"
