@@ -262,15 +262,20 @@ jobs:
             echo ""
             
             # Override Packer variables to use local offline packages
-            echo "PKR_VAR_amigen_aws_cliv2_source=file:///github/workspace/offline-packages/awscli-exe-linux-x86_64.zip" >> $GITHUB_ENV
-            echo "PKR_VAR_amigen_aws_cfnbootstrap=file:///github/workspace/offline-packages/aws-cfn-bootstrap-py3-latest.tar.gz" >> $GITHUB_ENV
-            echo "PKR_VAR_spel_ssm_agent_source=file:///github/workspace/offline-packages/amazon-ssm-agent.rpm" >> $GITHUB_ENV
+            # Note: Offline packages are on GitHub Actions runner at /github/workspace/,
+            # but they need to be accessible on the EC2 instance during the build.
+            # AWS CLI, CFN Bootstrap, and SSM Agent are uploaded to S3 by amigen scripts.
+            # For EC2 utility packages, we skip them in offline mode since they require EPEL
+            # and are not critical for AMI functionality (hibernation and instance-connect are optional).
             
-            # Override EC2 packages for EL8
-            echo "PKR_VAR_amigen8_extra_rpms=[\"python39\",\"python39-pip\",\"python39-setuptools\",\"crypto-policies-scripts\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-hibinit-agent-1.0.9-6.el8.noarch.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-instance-connect-1.1.17-1.el8.noarch.rpm\",\"file:///github/workspace/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux-1.1.17-1.el8.noarch.rpm\",\"file:///github/workspace/offline-packages/amazon-ssm-agent.rpm\"]" >> $GITHUB_ENV
+            # AWS utilities - these are downloaded from public S3 by amigen during build
+            # (URLs remain as public https:// even in offline mode because amigen fetches them)
             
-            # Override EC2 packages for EL9
-            echo "PKR_VAR_amigen9_extra_rpms=[\"crypto-policies-scripts\",\"file:///github/workspace/offline-packages/ec2-utils-el9/ec2-hibinit-agent-1.0.9-6.el9.noarch.rpm\",\"file:///github/workspace/offline-packages/amazon-ssm-agent.rpm\"]" >> $GITHUB_ENV
+            # EC2 utility packages for EL8 - skip in offline mode (optional packages)
+            echo "PKR_VAR_amigen8_extra_rpms=[\"python39\",\"python39-pip\",\"python39-setuptools\",\"crypto-policies-scripts\"]" >> $GITHUB_ENV
+            
+            # EC2 utility packages for EL9 - skip in offline mode (optional packages)
+            echo "PKR_VAR_amigen9_extra_rpms=[\"crypto-policies-scripts\"]" >> $GITHUB_ENV
             
             # Disable EPEL repositories for offline builds
             echo "PKR_VAR_amigen8_repo_names=[]" >> $GITHUB_ENV

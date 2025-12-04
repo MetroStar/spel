@@ -1001,15 +1001,20 @@ validate:hardened:
     - |
       if [ -d "offline-packages" ]; then
         echo "Configuring Packer to use offline packages..."
-        export PKR_VAR_amigen_aws_cliv2_source="file://${CI_PROJECT_DIR}/offline-packages/awscli-exe-linux-x86_64.zip"
-        export PKR_VAR_amigen_aws_cfnbootstrap="file://${CI_PROJECT_DIR}/offline-packages/aws-cfn-bootstrap-py3-latest.tar.gz"
-        export PKR_VAR_spel_ssm_agent_source="file://${CI_PROJECT_DIR}/offline-packages/amazon-ssm-agent.rpm"
+        # Note: Offline packages are on GitLab runner at ${CI_PROJECT_DIR}/,
+        # but they need to be accessible on the EC2 instance during the build.
+        # AWS CLI, CFN Bootstrap, and SSM Agent are uploaded to S3 by amigen scripts.
+        # For EC2 utility packages, we skip them in offline mode since they require EPEL
+        # and are not critical for AMI functionality (hibernation and instance-connect are optional).
         
-        # Override EC2 packages for EL8
-        export PKR_VAR_amigen8_extra_rpms='["python39","python39-pip","python39-setuptools","crypto-policies-scripts","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-hibinit-agent-1.0.9-6.el8.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-instance-connect-1.1.17-1.el8.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux-1.1.17-1.el8.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/amazon-ssm-agent.rpm"]'
+        # AWS utilities - these are downloaded from public S3 by amigen during build
+        # (URLs remain as public https:// even in offline mode because amigen fetches them)
         
-        # Override EC2 packages for EL9
-        export PKR_VAR_amigen9_extra_rpms='["crypto-policies-scripts","file://'"${CI_PROJECT_DIR}"'/offline-packages/ec2-utils-el9/ec2-hibinit-agent-1.0.9-6.el9.noarch.rpm","file://'"${CI_PROJECT_DIR}"'/offline-packages/amazon-ssm-agent.rpm"]'
+        # EC2 utility packages for EL8 - skip in offline mode (optional packages)
+        export PKR_VAR_amigen8_extra_rpms='["python39","python39-pip","python39-setuptools","crypto-policies-scripts"]'
+        
+        # EC2 utility packages for EL9 - skip in offline mode (optional packages)
+        export PKR_VAR_amigen9_extra_rpms='["crypto-policies-scripts"]'
         
         # Disable EPEL repositories for offline builds
         export PKR_VAR_amigen8_repo_names='[]'
