@@ -1068,31 +1068,12 @@ build {
 
   # Common provisioners
   
-  # Create offline-packages directory on EC2 instance (for offline/air-gapped builds)
-  provisioner "shell" {
-    inline = [
-      "sudo mkdir -p /tmp/offline-packages",
-      "sudo chmod 755 /tmp/offline-packages",
-    ]
-    only = [
-      "amazon-ebssurrogate.minimal-rhel-9-hvm",
-      "amazon-ebssurrogate.minimal-rhel-8-hvm",
-      "amazon-ebssurrogate.minimal-ol-9-hvm",
-      "amazon-ebssurrogate.minimal-ol-8-hvm",
-      "amazon-ebssurrogate.minimal-centos-9stream-hvm",
-      "amazon-ebssurrogate.minimal-centos-8stream-hvm",
-      "amazon-ebssurrogate.minimal-amzn-2023-hvm",
-      "amazon-ebssurrogate.minimal-alma-9-hvm",
-      "amazon-ebssurrogate.minimal-rl-9-hvm",
-    ]
-  }
-  
   # Upload offline packages directory if it exists (for offline/air-gapped builds)
   # Note: In online mode, this will upload an empty directory (no impact)
   # In offline mode, extract-offline-archives.sh populates this directory before Packer runs
   provisioner "file" {
-    source      = "${path.root}/../offline-packages/"
-    destination = "/tmp/offline-packages/"
+    source      = "${path.root}/../offline-packages"
+    destination = "/tmp/"
     only = [
       "amazon-ebssurrogate.minimal-rhel-9-hvm",
       "amazon-ebssurrogate.minimal-rhel-8-hvm",
