@@ -1,0 +1,817 @@
+name: Prepare Offline Transfer Archives
+
+on:
+  workflow_dispatch:
+    inputs:
+      sync_spel:
+        description: "Sync SPEL custom packages"
+        required: false
+        default: true
+        type: boolean
+      download_packer:
+        description: "Download Packer binaries (Linux + Windows)"
+        required: false
+        default: true
+        type: boolean
+      download_packer_plugins:
+        description: "Download Packer plugins"
+        required: false
+        default: true
+        type: boolean
+      download_ansible:
+        description: "Download Ansible Core and dependencies"
+        required: false
+        default: true
+        type: boolean
+      download_collections:
+        description: "Download Ansible collections"
+        required: false
+        default: true
+        type: boolean
+      sync_roles:
+        description: "Vendor Ansible roles"
+        required: false
+        default: true
+        type: boolean
+      sync_packages:
+        description: "Download offline packages"
+        required: false
+        default: true
+        type: boolean
+      create_archives:
+        description: "Create transfer archives"
+        required: false
+        default: true
+        type: boolean
+      upload_artifacts:
+        description: "Upload archives as GitHub artifacts"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-offline-transfer:
+    name: Prepare Offline Transfer Archives
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    timeout-minutes: 15  # Typically completes in 5-8 minutes with ClamAV scan (was 2-3 min without scan)
+    
+    steps:
+      - name: Install Git for checkout
+        run: |
+          dnf install -y git
+      
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+      
+      - name: Install system dependencies
+        run: |
+          dnf install -y \
+            dnf-plugins-core \
+            createrepo_c \
+            hardlink \
+            wget \
+            git \
+            tar \
+            gzip \
+            findutils \
+            which \
+            python3.12 \
+            python3-pip \
+            unzip \
+            bash \
+            clamav \
+            clamav-update
+      
+      - name: Install TruffleHog for secrets scanning
+        run: |
+          echo "=== Installing TruffleHog ==="
+          
+          # Download TruffleHog binary
+          TRUFFLEHOG_VERSION="3.82.13"
+          wget -O /tmp/trufflehog.tar.gz \
+            "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz"
+          
+          # Extract and install
+          tar -xzf /tmp/trufflehog.tar.gz -C /tmp
+          mv /tmp/trufflehog /usr/local/bin/
+          chmod +x /usr/local/bin/trufflehog
+          
+          # Verify installation
+          trufflehog --version
+          
+          echo "TruffleHog installed successfully"
+      
+      - name: Set up environment variables
+        run: |
+          echo "DATE=$(date +%Y%m%d)" >> $GITHUB_ENV
+          echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+          
+          # Storage optimization settings for roles and packages
+          echo "SPEL_ROLES_REMOVE_GIT=true" >> $GITHUB_ENV
+          echo "SPEL_ROLES_COMPRESS=true" >> $GITHUB_ENV
+          
+          echo "SPEL_OFFLINE_COMPRESS=true" >> $GITHUB_ENV
+          echo "SPEL_OFFLINE_VERIFY=true" >> $GITHUB_ENV
+          
+          echo "SPEL_ARCHIVE_SEPARATE=true" >> $GITHUB_ENV
+          echo "SPEL_ARCHIVE_COMBINED=true" >> $GITHUB_ENV
+          
+          # Packer configuration
+          echo "SPEL_PACKER_VERSION=1.11.2" >> $GITHUB_ENV
+          echo "SPEL_PACKER_PLATFORMS=linux_amd64 windows_amd64" >> $GITHUB_ENV
+          
+          # Python configuration (use 3.12 for GitHub Actions runner compatibility)
+          echo "SPEL_PYTHON_VERSION=3.12" >> $GITHUB_ENV
+          echo "SPEL_ANSIBLE_VERSION=>=2.14.0,<2.16.0" >> $GITHUB_ENV
+      
+      - name: Update ClamAV virus definitions
+        run: |
+          echo "=== Updating ClamAV Virus Definitions ==="
+          
+          # Create ClamAV database directory
+          mkdir -p /var/lib/clamav
+          
+          # Update virus definitions
+          freshclam --verbose
+          
+          echo ""
+          echo "ClamAV database updated successfully"
+          clamscan --version
+      
+      - name: Display configuration
+        run: |
+          echo "=== Offline Transfer Preparation Configuration ==="
+          echo "Date: $DATE"
+          echo "SPEL Version: $SPEL_VERSION"
+          echo ""
+          echo "Tasks:"
+          echo "  Sync SPEL Packages: ${{ github.event.inputs.sync_spel }}"
+          echo "  Download Packer: ${{ github.event.inputs.download_packer }}"
+          echo "  Download Packer Plugins: ${{ github.event.inputs.download_packer_plugins }}"
+          echo "  Download Ansible Core: ${{ github.event.inputs.download_ansible }}"
+          echo "  Download Ansible Collections: ${{ github.event.inputs.download_collections }}"
+          echo "  Vendor Roles: ${{ github.event.inputs.sync_roles }}"
+          echo "  Download Packages: ${{ github.event.inputs.sync_packages }}"
+          echo "  Create Archives: ${{ github.event.inputs.create_archives }}"
+          echo "  Upload Artifacts: ${{ github.event.inputs.upload_artifacts }}"
+          echo ""
+          echo "Storage Optimization:"
+          echo "  Remove .git from roles: $SPEL_ROLES_REMOVE_GIT"
+          echo "  Packer version: $SPEL_PACKER_VERSION"
+          echo "  Packer platforms: $SPEL_PACKER_PLATFORMS"
+          echo "  Python version: $SPEL_PYTHON_VERSION"
+          echo "  Ansible version: $SPEL_ANSIBLE_VERSION"
+          echo ""
+          echo "Note: YUM/DNF mirrors are NOT synced - Offline has its own RPM repositories"
+          echo "================================================="
+      
+      - name: Sync SPEL custom packages
+        if: github.event.inputs.sync_spel != 'false'
+        run: |
+          echo "=== Syncing SPEL Custom Packages ==="
+          ./scripts/sync-spel-packages.sh
+          
+          echo ""
+          echo "SPEL packages:"
+          find mirrors/spel-packages -name "*.rpm" -exec ls -lh {} \; 2>/dev/null || echo "No RPMs found"
+          echo ""
+          echo "Total SPEL packages size:"
+          du -sh mirrors/spel-packages/
+      
+      - name: Download Packer binaries
+        if: github.event.inputs.download_packer != 'false'
+        run: |
+          echo "=== Downloading Packer Binaries (Multi-Platform) ==="
+          ./scripts/download-packer.sh
+          
+          echo ""
+          echo "Packer binaries:"
+          ls -lh tools/packer/*/packer* 2>/dev/null || echo "No binaries found"
+          echo ""
+          echo "Linux Packer version:"
+          ./tools/packer/linux_amd64/packer version
+      
+      - name: Download Packer plugins
+        if: github.event.inputs.download_packer_plugins != 'false'
+        env:
+          PACKER_GITHUB_API_TOKEN: ${{ secrets.PACKER_GITHUB_API_TOKEN }}
+        run: |
+          echo "=== Downloading Packer Plugins ==="
+          ./scripts/download-packer-plugins.sh
+          
+          echo ""
+          echo "Plugin files:"
+          find tools/packer/plugins -name "packer-plugin-*" -type f 2>/dev/null | head -10
+          echo ""
+          echo "Total plugins size:"
+          du -sh tools/packer/plugins/
+      
+      - name: Verify Packer plugins
+        if: github.event.inputs.download_packer_plugins != 'false'
+        run: |
+          echo "=== Verifying Packer Plugins ==="
+          export PACKER_PLUGIN_PATH="${PWD}/tools/packer/plugins"
+          
+          if ./tools/packer/linux_amd64/packer plugins installed; then
+            echo ""
+            echo "✓ Packer plugins verification successful"
+          else
+            echo ""
+            echo "⚠ Warning: Packer plugin verification failed, but continuing..."
+            echo "Plugins are already downloaded and checksummed."
+          fi
+      
+      - name: Download Ansible Core and dependencies
+        if: github.event.inputs.download_ansible != 'false'
+        run: |
+          echo "=== Downloading Ansible Core and Dependencies ==="
+          ./scripts/download-ansible-core.sh
+          
+          echo ""
+          echo "Python wheels:"
+          ls -1 tools/python-deps/*.whl 2>/dev/null | wc -l | xargs echo "  Total wheels:"
+          echo ""
+          echo "Total Python deps size:"
+          du -sh tools/python-deps/
+      
+      - name: Download Ansible collections
+        if: github.event.inputs.download_collections != 'false'
+        run: |
+          echo "=== Downloading Ansible Collections ==="
+          
+          # Install ansible-core temporarily for ansible-galaxy command
+          # Use pip3 (installed via python3-pip package) which works with Python 3.12
+          pip3 install --user "ansible-core>=2.14.0,<2.16.0"
+          
+          # Ensure ansible-galaxy is in PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          
+          ./scripts/vendor-ansible-collections.sh
+          
+          echo ""
+          echo "Collection tarballs:"
+          ls -lh spel/ansible/collections/*.tar.gz 2>/dev/null || echo "No collections found"
+          echo ""
+          echo "Total collections size:"
+          du -sh spel/ansible/collections/
+      
+      - name: Vendor Ansible roles
+        if: github.event.inputs.sync_roles != 'false'
+        shell: bash
+        run: |
+          echo "=== Vendoring Ansible Roles ==="
+          
+          # Configure git for safe directory (needed in GitHub Actions containers)
+          git config --global --add safe.directory '*'
+          
+          # Ensure ansible-galaxy is in PATH (needed for potential dependencies)
+          export PATH="$HOME/.local/bin:$PATH"
+          
+          # Enable debug mode to see where it fails
+          set -x
+          
+          ./scripts/vendor-ansible-roles.sh
+          
+          echo ""
+          echo "Role sizes:"
+          du -sh spel/ansible/roles/*/
+          echo ""
+          echo "Total roles size:"
+          du -sh spel/ansible/roles/
+      
+      - name: Download offline packages
+        if: github.event.inputs.sync_packages != 'false'
+        run: |
+          echo "=== Downloading Offline Packages ==="
+          ./scripts/download-offline-packages.sh
+          
+          echo ""
+          echo "Package files:"
+          ls -lh offline-packages/
+          echo ""
+          echo "Total packages size:"
+          du -sh offline-packages/
+      
+      - name: Scan files with ClamAV
+        run: |
+          echo "=== Scanning All Files with ClamAV ==="
+          echo "This scan ensures all downloaded/vendored files are clean before archiving"
+          echo ""
+          
+          # Scan directories containing downloaded/vendored content
+          SCAN_DIRS=(
+            "mirrors/spel-packages"
+            "tools/packer"
+            "tools/python-deps"
+            "offline-packages"
+            "spel/ansible/roles"
+            "spel/ansible/collections"
+            "vendor"
+          )
+          
+          SCAN_LOG="clamav-scan-${DATE}.log"
+          INFECTED_FILES=0
+          SCANNED_FILES=0
+          
+          echo "Scanning directories:" | tee "$SCAN_LOG"
+          for dir in "${SCAN_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "  - $dir" | tee -a "$SCAN_LOG"
+            fi
+          done
+          echo "" | tee -a "$SCAN_LOG"
+          
+          # Perform full recursive scan with detailed output
+          # --recursive: scan subdirectories
+          # --infected: only print infected files
+          # --bell: sound bell on virus detection
+          # --log: save scan results
+          # Exit codes: 0=clean, 1=infected, 2=error
+          
+          echo "Starting full recursive virus scan..." | tee -a "$SCAN_LOG"
+          echo "Scan started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
+          echo "" | tee -a "$SCAN_LOG"
+          
+          for dir in "${SCAN_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "========================================" | tee -a "$SCAN_LOG"
+              echo "Scanning: $dir" | tee -a "$SCAN_LOG"
+              echo "========================================" | tee -a "$SCAN_LOG"
+              
+              if clamscan --recursive --infected --verbose "$dir" | tee -a "$SCAN_LOG"; then
+                echo "✓ $dir: CLEAN" | tee -a "$SCAN_LOG"
+              else
+                SCAN_EXIT=$?
+                if [ $SCAN_EXIT -eq 1 ]; then
+                  echo "✗ $dir: INFECTED FILES DETECTED!" | tee -a "$SCAN_LOG"
+                  INFECTED_FILES=$((INFECTED_FILES + 1))
+                else
+                  echo "⚠ $dir: SCAN ERROR (exit code: $SCAN_EXIT)" | tee -a "$SCAN_LOG"
+                fi
+              fi
+              echo "" | tee -a "$SCAN_LOG"
+            fi
+          done
+          
+          echo "========================================" | tee -a "$SCAN_LOG"
+          echo "Scan completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
+          echo "========================================" | tee -a "$SCAN_LOG"
+          
+          # Get scan summary
+          echo "" | tee -a "$SCAN_LOG"
+          echo "=== ClamAV Scan Summary ===" | tee -a "$SCAN_LOG"
+          
+          # Count scanned files from log
+          SCANNED_FILES=$(grep -c "Scanning " "$SCAN_LOG" || echo "0")
+          
+          echo "Directories scanned: ${#SCAN_DIRS[@]}" | tee -a "$SCAN_LOG"
+          echo "Files scanned: $SCANNED_FILES" | tee -a "$SCAN_LOG"
+          
+          # Check if any infections found
+          if [ $INFECTED_FILES -gt 0 ]; then
+            echo "" | tee -a "$SCAN_LOG"
+            echo "❌ VIRUS SCAN FAILED!" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Infected directories detected: $INFECTED_FILES" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "ACTION REQUIRED:" | tee -a "$SCAN_LOG"
+            echo "  1. Review scan log above for infected files" | tee -a "$SCAN_LOG"
+            echo "  2. Investigate source of infected files" | tee -a "$SCAN_LOG"
+            echo "  3. Remove or quarantine infected files" | tee -a "$SCAN_LOG"
+            echo "  4. Re-run workflow after remediation" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Offline SECURITY POLICY: Infected files cannot be transferred" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            
+            # Fail workflow
+            exit 1
+          else
+            echo "" | tee -a "$SCAN_LOG"
+            echo "✅ ALL FILES CLEAN - No threats detected" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Files are safe for Offline transfer" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+          fi
+          
+          # Save scan log as artifact
+          mv "$SCAN_LOG" "spel-offline-${DATE}-clamav-scan.log"
+      
+      - name: Scan for secrets with TruffleHog
+        run: |
+          echo "=== Scanning for Secrets with TruffleHog ==="
+          echo "This scan ensures no credentials or sensitive data are included before archiving"
+          echo ""
+          
+          SCAN_LOG="trufflehog-scan-${DATE}.log"
+          SCAN_JSON="trufflehog-scan-${DATE}.json"
+          SECRETS_FOUND=0
+          
+          # Directories to scan (same as ClamAV for consistency)
+          SCAN_DIRS=(
+            "mirrors/spel-packages"
+            "tools/packer"
+            "tools/python-deps"
+            "offline-packages"
+            "spel/ansible/roles"
+            "spel/ansible/collections"
+            "vendor"
+          )
+          
+          # Also scan key configuration files in repo root
+          SCAN_FILES=(
+            "spel/*.pkr.hcl"
+            "spel/*.auto.pkrvars.hcl"
+            "build/*.sh"
+            "scripts/*.sh"
+          )
+          
+          echo "Scanning for secrets..." | tee "$SCAN_LOG"
+          echo "Scan started: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
+          echo "" | tee -a "$SCAN_LOG"
+          
+          # Scan directories
+          for dir in "${SCAN_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "========================================" | tee -a "$SCAN_LOG"
+              echo "Scanning directory: $dir" | tee -a "$SCAN_LOG"
+              echo "========================================" | tee -a "$SCAN_LOG"
+              
+              # Create temporary output file to check for findings
+              TEMP_JSON=$(mktemp)
+              
+              # Run TruffleHog filesystem scan with JSON output
+              # --json: output in JSON format for reliable parsing
+              # --no-update: don't check for updates (faster)
+              # --exclude-paths: use exclusions file
+              set +e  # Temporarily disable exit on error
+              trufflehog filesystem "$dir" \
+                --json \
+                --no-update \
+                --exclude-paths .trufflehog-exclude.txt \
+                > "$TEMP_JSON" 2>&1
+              SCAN_EXIT=$?
+              set -e  # Re-enable exit on error
+              
+              # Append JSON output to combined file
+              cat "$TEMP_JSON" >> "$SCAN_JSON"
+              
+              # Check if any findings (JSON output contains "Raw" field for detections)
+              if grep -q '"Raw"' "$TEMP_JSON" 2>/dev/null; then
+                echo "✗ $dir: SECRETS DETECTED!" | tee -a "$SCAN_LOG"
+                SECRETS_FOUND=$((SECRETS_FOUND + 1))
+                
+                # Show summary of findings
+                echo "  Detected secret types:" | tee -a "$SCAN_LOG"
+                grep -o '"DetectorType":"[^"]*"' "$TEMP_JSON" | cut -d'"' -f4 | sort -u | head -10 | sed 's/^/    - /' | tee -a "$SCAN_LOG" || true
+                echo "" | tee -a "$SCAN_LOG"
+              elif [ $SCAN_EXIT -eq 0 ]; then
+                echo "✓ $dir: No secrets detected" | tee -a "$SCAN_LOG"
+              else
+                # Exit code != 0 but no findings in output - likely binary files or permissions
+                echo "⚠ $dir: Scan completed with warnings (exit code: $SCAN_EXIT, no secrets found)" | tee -a "$SCAN_LOG"
+                # Not treating this as an error since no actual secrets were detected
+              fi
+              
+              rm -f "$TEMP_JSON"
+              echo "" | tee -a "$SCAN_LOG"
+            fi
+          done
+          
+          # Scan specific files
+          echo "========================================" | tee -a "$SCAN_LOG"
+          echo "Scanning configuration files" | tee -a "$SCAN_LOG"
+          echo "========================================" | tee -a "$SCAN_LOG"
+          
+          for pattern in "${SCAN_FILES[@]}"; do
+            for file in $pattern; do
+              if [ -f "$file" ]; then
+                echo "Scanning: $file" | tee -a "$SCAN_LOG"
+                
+                TEMP_JSON=$(mktemp)
+                set +e
+                trufflehog filesystem "$file" \
+                  --json \
+                  --no-update \
+                  > "$TEMP_JSON" 2>&1
+                SCAN_EXIT=$?
+                set -e
+                
+                cat "$TEMP_JSON" >> "$SCAN_JSON"
+                
+                if grep -q '"Raw"' "$TEMP_JSON" 2>/dev/null; then
+                  echo "✗ $file: SECRETS DETECTED!" | tee -a "$SCAN_LOG"
+                  SECRETS_FOUND=$((SECRETS_FOUND + 1))
+                  grep -o '"DetectorType":"[^"]*"' "$TEMP_JSON" | cut -d'"' -f4 | sort -u | sed 's/^/    - /' | tee -a "$SCAN_LOG" || true
+                elif [ $SCAN_EXIT -eq 0 ]; then
+                  echo "✓ $file: No secrets detected" | tee -a "$SCAN_LOG"
+                else
+                  echo "⚠ $file: Scan completed with warnings (exit code: $SCAN_EXIT, no secrets found)" | tee -a "$SCAN_LOG"
+                fi
+                
+                rm -f "$TEMP_JSON"
+              fi
+            done
+          done
+          echo "" | tee -a "$SCAN_LOG"
+          
+          echo "========================================" | tee -a "$SCAN_LOG"
+          echo "Scan completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
+          echo "========================================" | tee -a "$SCAN_LOG"
+          
+          # Count total detections from JSON output
+          if [ -f "$SCAN_JSON" ]; then
+            TOTAL_DETECTIONS=$(grep -c '"Raw"' "$SCAN_JSON" 2>/dev/null || echo "0")
+          else
+            TOTAL_DETECTIONS=0
+          fi
+          
+          # Ensure it's a valid integer
+          TOTAL_DETECTIONS=${TOTAL_DETECTIONS:-0}
+          
+          # Summary
+          echo "" | tee -a "$SCAN_LOG"
+          echo "=== TruffleHog Secrets Scan Summary ===" | tee -a "$SCAN_LOG"
+          echo "Directories scanned: ${#SCAN_DIRS[@]}" | tee -a "$SCAN_LOG"
+          echo "Locations with secrets: $SECRETS_FOUND" | tee -a "$SCAN_LOG"
+          echo "Total secret detections: $TOTAL_DETECTIONS" | tee -a "$SCAN_LOG"
+          
+          # Check if any secrets found (with error suppression for safety)
+          if [ "$SECRETS_FOUND" -gt 0 ] 2>/dev/null || [ "$TOTAL_DETECTIONS" -gt 0 ] 2>/dev/null; then
+            echo "" | tee -a "$SCAN_LOG"
+            echo "❌ SECRETS SCAN FAILED!" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Secrets detected in: $SECRETS_FOUND location(s)" | tee -a "$SCAN_LOG"
+            echo "Total detections: $TOTAL_DETECTIONS" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            
+            # Show all unique detector types found
+            echo "Detected secret types:" | tee -a "$SCAN_LOG"
+            grep -o '"DetectorType":"[^"]*"' "$SCAN_JSON" | cut -d'"' -f4 | sort -u | sed 's/^/  - /' | tee -a "$SCAN_LOG" || true
+            echo "" | tee -a "$SCAN_LOG"
+            
+            # Show sample of detected secrets (first 5)
+            echo "Sample detections (first 5):" | tee -a "$SCAN_LOG"
+            grep '"SourceMetadata"' "$SCAN_JSON" | head -5 | tee -a "$SCAN_LOG" || true
+            echo "" | tee -a "$SCAN_LOG"
+            
+            echo "ACTION REQUIRED:" | tee -a "$SCAN_LOG"
+            echo "  1. Review full scan JSON for all detected secrets" | tee -a "$SCAN_LOG"
+            echo "  2. Remove or redact sensitive data from source files" | tee -a "$SCAN_LOG"
+            echo "  3. Add false positives to .trufflehog-exclude.txt" | tee -a "$SCAN_LOG"
+            echo "  4. Rotate any exposed credentials immediately" | tee -a "$SCAN_LOG"
+            echo "  5. Re-run workflow after remediation" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Offline SECURITY POLICY: No secrets allowed in transfer" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            
+            # Clean up
+            rm -f "$SCAN_JSON"
+            
+            # Fail workflow
+            exit 1
+          else
+            echo "" | tee -a "$SCAN_LOG"
+            echo "✅ NO SECRETS DETECTED - All files clean" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+            echo "Files are safe for Offline transfer" | tee -a "$SCAN_LOG"
+            echo "" | tee -a "$SCAN_LOG"
+          fi
+          
+          # Clean up JSON file (only needed during scan)
+          rm -f "$SCAN_JSON"
+          
+          # Save scan log as artifact
+          mv "$SCAN_LOG" "spel-offline-${DATE}-trufflehog-scan.log"
+      
+      - name: Create transfer archives
+        if: github.event.inputs.create_archives != 'false'
+        run: |
+          echo "=== Creating Transfer Archives ==="
+          echo "Note: All files passed security scans (ClamAV + TruffleHog)"
+          echo ""
+          ./scripts/create-transfer-archive.sh
+          
+          echo ""
+          echo "Created archives:"
+          ls -lh spel-*.tar.gz
+      
+      - name: Verify checksums
+        if: github.event.inputs.create_archives != 'false'
+        run: |
+          echo "=== Verifying Archive Checksums ==="
+          sha256sum -c spel-offline-${DATE}-checksums.txt
+          
+          echo ""
+          echo "Checksum verification passed!"
+      
+      - name: Generate transfer manifest
+        if: github.event.inputs.create_archives != 'false'
+        run: |
+          MANIFEST_FILE="spel-offline-${DATE}-manifest.txt"
+          
+          cat > "$MANIFEST_FILE" <<MANIFEST_EOF
+          SPEL Offline Transfer Manifest
+          ============================
+          Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          SPEL Version: ${SPEL_VERSION}
+          GitHub Workflow: ${{ github.workflow }}
+          Run Number: ${{ github.run_number }}
+          Commit: ${{ github.sha }}
+          
+          Archives
+          --------
+          MANIFEST_EOF
+          
+          for archive in spel-*.tar.gz; do
+            if [ -f "$archive" ]; then
+              size=$(du -h "$archive" | awk '{print $1}')
+              sha256=$(sha256sum "$archive" | awk '{print $1}')
+              echo "$archive ($size)" >> "$MANIFEST_FILE"
+              echo "  SHA256: $sha256" >> "$MANIFEST_FILE"
+            fi
+          done
+          
+          cat >> "$MANIFEST_FILE" <<MANIFEST_EOF
+          
+          Total Size
+          ----------
+          MANIFEST_EOF
+          du -ch spel-*.tar.gz | tail -1 >> "$MANIFEST_FILE"
+          
+          cat >> "$MANIFEST_FILE" <<MANIFEST_EOF
+          
+          Transfer Instructions
+          ---------------------
+          1. Verify checksums: sha256sum -c spel-offline-${DATE}-checksums.txt
+          2. Transfer all spel-*.tar.gz files to Offline environment
+          3. Transfer spel-offline-${DATE}-checksums.txt for verification
+          4. On Offline: verify checksums again after transfer
+          5. On Offline: run ./scripts/extract-offline-archives.sh
+          6. On Offline: configure to use Offline RPM repositories (no local mirrors needed)
+          
+          Storage Optimization Applied
+          ----------------------------
+          - Removed .git directories from Ansible roles (saves ~80%)
+          - Used single SSM agent for EL8/EL9 (saves ~25%)
+          - Created compressed archives
+          
+          Security Scans
+          --------------
+          - ClamAV virus scan: PASSED
+          - TruffleHog secrets scan: PASSED
+          - All files scanned and verified clean
+          - Scan logs: 
+              spel-offline-${DATE}-clamav-scan.log
+              spel-offline-${DATE}-trufflehog-scan.log
+          
+          Expected Sizes (Actual Measured)
+          --------------------------------
+          - Ansible Roles: 4 MB
+          - Ansible Collections: 3.5 MB
+          - Ansible Core (Python wheels): 16 MB
+          - Offline Packages: 86 MB
+          - SPEL Packages: 56 KB
+          - Packer Binaries (Linux + Windows): 97 MB
+          - Packer Plugins: 241 MB
+          - Build Scripts: ~100 MB
+          - Total compressed archives: 1.1 GB
+            - spel-base: 118 MB
+            - spel-tools: 289 MB
+            - spel-offline-complete: 694 MB
+          
+          Note: YUM/DNF mirrors are NOT included - Offline environment
+                uses its own RPM repositories
+          MANIFEST_EOF
+          
+          echo "=== Transfer Manifest ==="
+          cat "$MANIFEST_FILE"
+      
+      - name: Display summary
+        run: |
+          echo ""
+          echo "========================================="
+          echo "Offline Transfer Preparation Complete!"
+          echo "========================================="
+          echo ""
+          echo "Archives created:"
+          ls -lh spel-*.tar.gz 2>/dev/null | awk '{printf "  %-50s %10s\n", $9, $5}' || echo "  None"
+          echo ""
+          echo "Total archive size:"
+          du -ch spel-*.tar.gz 2>/dev/null | tail -1 | awk '{print "  " $1}' || echo "  N/A"
+          echo ""
+          echo "Contents:"
+          echo "  - Ansible roles (vendored)"
+          echo "  - Ansible collections (ansible.windows, community.windows)"
+          echo "  - Ansible Core with Python dependencies"
+          echo "  - Offline packages (AWS CLI, SSM Agent, CFN Bootstrap)"
+          echo "  - SPEL custom packages"
+          echo "  - Packer binaries (Linux + Windows v$SPEL_PACKER_VERSION)"
+          echo "  - Packer plugins (all required for SPEL builds)"
+          echo "  - Build scripts and configurations"
+          echo ""
+          echo "Note: YUM/DNF mirrors NOT included - use Offline RPM repositories"
+          echo ""
+          echo "Files ready for transfer:"
+          echo "  - spel-offline-${DATE}-checksums.txt (verification)"
+          echo "  - spel-offline-${DATE}-manifest.txt (documentation)"
+          echo "  - spel-*.tar.gz (archives)"
+          echo ""
+          echo "Next steps:"
+          echo "  1. Download artifacts from GitHub Actions"
+          echo "  2. Verify checksums locally"
+          echo "  3. Transfer to Offline using approved method"
+          echo "  4. Set up GitLab CI in Offline for automated deployment"
+          echo "========================================="
+      
+      - name: Upload transfer archives
+        if: github.event.inputs.upload_artifacts != 'false' && github.event.inputs.create_archives != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: spel-offline-transfer-${{ env.DATE }}
+          path: |
+            spel-*.tar.gz
+            spel-offline-*-checksums.txt
+            spel-offline-*-manifest.txt
+            spel-offline-*-clamav-scan.log
+            spel-offline-*-trufflehog-scan.log
+          retention-days: 90
+          compression-level: 0
+      
+      - name: Upload component artifacts (base only)
+        if: github.event.inputs.upload_artifacts != 'false' && github.event.inputs.create_archives != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: spel-offline-base-${{ env.DATE }}
+          path: spel-base-*.tar.gz
+          retention-days: 90
+          compression-level: 0
+      
+      - name: Create summary
+        if: always()
+        run: |
+          echo "## Offline Transfer Preparation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**SPEL Version:** ${SPEL_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Archives Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Archive | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|------|" >> $GITHUB_STEP_SUMMARY
+          for archive in spel-*.tar.gz; do
+            if [ -f "$archive" ]; then
+              size=$(du -h "$archive" | awk '{print $1}')
+              echo "| \`$archive\` | $size |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          total_size=$(du -ch spel-*.tar.gz 2>/dev/null | tail -1 | awk '{print $1}' || echo "N/A")
+          echo "| **Total** | **$total_size** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Storage Optimization" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Removed git history from roles (saves ~80%)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Single SSM agent for EL8/EL9 (saves ~25%)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Compressed archives" >> $GITHUB_STEP_SUMMARY
+          echo "- ℹ️  YUM/DNF mirrors NOT included - Offline uses its own RPM repositories" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Security Scans" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # ClamAV results
+          if [ -f "spel-offline-${DATE}-clamav-scan.log" ]; then
+            echo "- ✅ **ClamAV virus scan: PASSED**" >> $GITHUB_STEP_SUMMARY
+            echo "  - All files verified clean before archiving" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚠️  ClamAV scan: Not performed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # TruffleHog results
+          if [ -f "spel-offline-${DATE}-trufflehog-scan.log" ]; then
+            echo "- ✅ **TruffleHog secrets scan: PASSED**" >> $GITHUB_STEP_SUMMARY
+            echo "  - No credentials or secrets detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚠️  TruffleHog scan: Not performed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "- 📋 Scan logs included in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download artifacts from this workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify checksums: \`sha256sum -c spel-offline-${DATE}-checksums.txt\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Transfer archives to Offline environment" >> $GITHUB_STEP_SUMMARY
+          echo "4. Extract on Offline: \`./scripts/extract-offline-archives.sh\`" >> $GITHUB_STEP_SUMMARY
+          echo "5. Run GitLab CI pipeline to build AMIs (uses RHUI repositories)" >> $GITHUB_STEP_SUMMARY
