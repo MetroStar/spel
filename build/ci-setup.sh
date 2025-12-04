@@ -193,6 +193,14 @@ main() {
     
     detect_offline_mode
     
+    # Ensure offline-packages directory exists (even if empty) to prevent Packer file provisioner errors
+    # In offline mode, this directory is populated by extract-offline-archives.sh
+    # In online mode, it remains empty and Packer will upload an empty directory (no harm)
+    if [ ! -d "${REPO_ROOT}/offline-packages" ]; then
+        log_info "Creating empty offline-packages directory..."
+        mkdir -p "${REPO_ROOT}/offline-packages"
+    fi
+    
     install_system_packages
     install_packer
     install_python_deps

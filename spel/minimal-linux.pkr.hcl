@@ -1069,7 +1069,8 @@ build {
   # Common provisioners
   
   # Upload offline packages directory if it exists (for offline/air-gapped builds)
-  # This provisioner will fail gracefully if the directory doesn't exist
+  # Directory is created by ci-setup.sh if it doesn't exist (empty in online mode)
+  # In offline mode, the directory is populated by extract-offline-archives.sh
   provisioner "file" {
     source      = "${path.root}/../offline-packages/"
     destination = "/tmp/offline-packages/"
