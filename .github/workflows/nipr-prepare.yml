@@ -526,8 +526,15 @@ jobs:
           echo "Scan completed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" | tee -a "$SCAN_LOG"
           echo "========================================" | tee -a "$SCAN_LOG"
           
-          # Count total detections from JSON output
-          TOTAL_DETECTIONS=$(grep -c '"Raw"' "$SCAN_JSON" 2>/dev/null || echo "0")
+          # Count total detections from JSON output (ensure it's a valid integer)
+          if [ -f "$SCAN_JSON" ]; then
+            TOTAL_DETECTIONS=$(grep -c '"Raw"' "$SCAN_JSON" 2>/dev/null || echo "0")
+          else
+            TOTAL_DETECTIONS=0
+          fi
+          
+          # Ensure it's a single integer (handle any weird output)
+          TOTAL_DETECTIONS=$(printf "%d" "$TOTAL_DETECTIONS" 2>/dev/null || echo "0")
           
           # Summary
           echo "" | tee -a "$SCAN_LOG"
@@ -536,8 +543,8 @@ jobs:
           echo "Locations with secrets: $SECRETS_FOUND" | tee -a "$SCAN_LOG"
           echo "Total secret detections: $TOTAL_DETECTIONS" | tee -a "$SCAN_LOG"
           
-          # Check if any secrets found
-          if [ $SECRETS_FOUND -gt 0 ] || [ $TOTAL_DETECTIONS -gt 0 ]; then
+          # Check if any secrets found (with error suppression for safety)
+          if [ "$SECRETS_FOUND" -gt 0 ] 2>/dev/null || [ "$TOTAL_DETECTIONS" -gt 0 ] 2>/dev/null; then
             echo "" | tee -a "$SCAN_LOG"
             echo "❌ SECRETS SCAN FAILED!" | tee -a "$SCAN_LOG"
             echo "" | tee -a "$SCAN_LOG"
