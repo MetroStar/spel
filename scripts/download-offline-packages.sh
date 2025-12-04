@@ -104,39 +104,33 @@ else
     log_error "  Failed to download SSM Agent"
 fi
 
-# 4. EC2 utility packages for EL8 from EPEL
-log_info "[4/6] Downloading EC2 utility packages for EL8 from EPEL..."
+# 4. EC2 utility packages for EL8
+log_info "[4/6] Downloading EC2 utility packages for EL8..."
 EC2_EL8_DIR="${OFFLINE_DIR}/ec2-utils-el8"
 
-# Enable EPEL repository for downloads
-if ! dnf repolist 2>/dev/null | grep -q epel; then
-    log_debug "  Installing EPEL repository..."
-    dnf install -y epel-release 2>&1 | grep -v "^$" || true
+# Download EL8 EC2 packages directly from EPEL mirror
+log_debug "  Downloading ec2-hibinit-agent from EPEL..."
+if wget -N "https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/e/ec2-hibinit-agent-1.0.9-6.el8.noarch.rpm" \
+    -O "${EC2_EL8_DIR}/ec2-hibinit-agent-1.0.9-6.el8.noarch.rpm" 2>&1 | grep -v "^$"; then
+    log_debug "    ✓ Downloaded ec2-hibinit-agent"
+else
+    log_warn "    ⚠ Failed to download ec2-hibinit-agent"
 fi
 
-# Download EL8 EC2 packages
-EC2_EL8_PACKAGES=(
-    "ec2-hibinit-agent"
-    "ec2-instance-connect"
-    "ec2-instance-connect-selinux"
-)
-
-for pkg in "${EC2_EL8_PACKAGES[@]}"; do
-    log_debug "  Downloading $pkg for EL8..."
-    if dnf download --releasever=8 --destdir="$EC2_EL8_DIR" "$pkg" 2>&1 | grep -v "^$"; then
-        log_debug "    ✓ Downloaded $pkg"
-    else
-        log_warn "    ⚠ Failed to download $pkg (may not be available)"
-    fi
-done
-
-# Download ec2-utils from Oracle Linux repository (not available in EPEL for RHEL)
-log_debug "  Downloading ec2-utils from Oracle Linux repository..."
-EC2_UTILS_URL="https://yum.oracle.com/repo/OracleLinux/OL8/baseos/latest/x86_64/getPackage/ec2-utils-2.2-1.0.2.el8.noarch.rpm"
-if wget -N "$EC2_UTILS_URL" -O "${EC2_EL8_DIR}/ec2-utils-2.2-1.0.2.el8.noarch.rpm" 2>&1 | grep -v "^$"; then
-    log_debug "    ✓ Downloaded ec2-utils (Oracle Linux)"
+log_debug "  Downloading ec2-instance-connect from EPEL..."
+if wget -N "https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/e/ec2-instance-connect-1.1.17-1.el8.noarch.rpm" \
+    -O "${EC2_EL8_DIR}/ec2-instance-connect-1.1.17-1.el8.noarch.rpm" 2>&1 | grep -v "^$"; then
+    log_debug "    ✓ Downloaded ec2-instance-connect"
 else
-    log_warn "    ⚠ Failed to download ec2-utils from Oracle Linux repo"
+    log_warn "    ⚠ Failed to download ec2-instance-connect"
+fi
+
+log_debug "  Downloading ec2-instance-connect-selinux from EPEL..."
+if wget -N "https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/Packages/e/ec2-instance-connect-selinux-1.1.17-1.el8.noarch.rpm" \
+    -O "${EC2_EL8_DIR}/ec2-instance-connect-selinux-1.1.17-1.el8.noarch.rpm" 2>&1 | grep -v "^$"; then
+    log_debug "    ✓ Downloaded ec2-instance-connect-selinux"
+else
+    log_warn "    ⚠ Failed to download ec2-instance-connect-selinux"
 fi
 
 EC2_EL8_COUNT=$(find "$EC2_EL8_DIR" -name "*.rpm" 2>/dev/null | wc -l)
