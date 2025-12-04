@@ -210,6 +210,20 @@ function BuildChroot {
     bash -euxo pipefail "${ELBUILD}"/$( ComposeChrootMountString ) || \
         err_exit "Failure encountered with MkChrootTree.sh"
 
+    # Bind-mount offline-packages into chroot for offline/air-gapped builds
+    if [[ -d /tmp/offline-packages ]]
+    then
+        echo "Setting up offline-packages in chroot..."
+        mkdir -p "${AMIGENCHROOT}/tmp/offline-packages" || \
+            err_exit "Failed creating ${AMIGENCHROOT}/tmp/offline-packages"
+        mount --bind /tmp/offline-packages "${AMIGENCHROOT}/tmp/offline-packages" || \
+            err_exit "Failed bind-mounting offline-packages into chroot"
+        echo "Offline packages mounted at ${AMIGENCHROOT}/tmp/offline-packages:"
+        ls -lh /tmp/offline-packages/ | head -20 || true
+    else
+        echo "No offline-packages directory found (online mode)"
+    fi
+
     # Invoke OS software installer
     bash -euxo pipefail "${ELBUILD}"/$( ComposeOSpkgString ) || \
         err_exit "Failure encountered with OSpackages.sh"
