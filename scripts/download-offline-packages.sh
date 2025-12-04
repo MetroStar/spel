@@ -148,20 +148,11 @@ EC2_EL9_DIR="${OFFLINE_DIR}/ec2-utils-el9"
 
 # Download EL9 EC2 packages directly from EPEL mirror
 log_debug "  Downloading ec2-hibinit-agent from EPEL..."
-if wget -N "https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/e/ec2-hibinit-agent-1.0.8-1.el9.noarch.rpm" \
-    -O "${EC2_EL9_DIR}/ec2-hibinit-agent-1.0.8-1.el9.noarch.rpm" 2>&1 | grep -v "^$"; then
+if wget -N "https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/e/ec2-hibinit-agent-1.0.9-6.el9.noarch.rpm" \
+    -O "${EC2_EL9_DIR}/ec2-hibinit-agent-1.0.9-6.el9.noarch.rpm" 2>&1 | grep -v "^$"; then
     log_debug "    ✓ Downloaded ec2-hibinit-agent"
 else
     log_warn "    ⚠ Failed to download ec2-hibinit-agent"
-fi
-
-# Download ec2-utils from Oracle Linux repository (not available in EPEL for RHEL)
-log_debug "  Downloading ec2-utils from Oracle Linux repository..."
-if wget -N "https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/ec2-utils-2.2-1.0.1.el9.noarch.rpm" \
-    -O "${EC2_EL9_DIR}/ec2-utils-2.2-1.0.1.el9.noarch.rpm" 2>&1 | grep -v "^$"; then
-    log_debug "    ✓ Downloaded ec2-utils (Oracle Linux)"
-else
-    log_warn "    ⚠ Failed to download ec2-utils from Oracle Linux repo"
 fi
 
 EC2_EL9_COUNT=$(find "$EC2_EL9_DIR" -name "*.rpm" 2>/dev/null | wc -l)
