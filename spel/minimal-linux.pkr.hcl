@@ -537,7 +537,9 @@ variable "amigen8_repo_names" {
 variable "amigen8_repo_sources" {
   description = "List of yum package refs (names or urls to .rpm files) that install yum repo definitions in EL8 builders and images"
   type        = list(string)
-  default     = []
+  default = [
+    "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm",
+  ]
 }
 
 variable "amigen8_source_branch" {
@@ -631,7 +633,9 @@ variable "amigen9_repo_names" {
 variable "amigen9_repo_sources" {
   description = "List of yum package refs (names or urls to .rpm files) that install yum repo definitions in EL9 builders and images"
   type        = list(string)
-  default     = []
+  default = [
+    "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm",
+  ]
 }
 
 variable "amigen9_source_branch" {
