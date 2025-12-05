@@ -343,6 +343,38 @@ jobs:
         run: |
           bash build/ci-setup.sh
 
+      - name: Configure offline build environment
+        if: env.SPEL_OFFLINE_MODE == 'true'
+        run: |
+          echo "=== Configuring Offline Build Environment ==="
+          
+          # Set Packer binary path
+          if [ -f "tools/packer/linux_amd64/packer" ]; then
+            export PATH="${GITHUB_WORKSPACE}/tools/packer/linux_amd64:${PATH}"
+            echo "PATH=${GITHUB_WORKSPACE}/tools/packer/linux_amd64:${PATH}" >> $GITHUB_ENV
+            echo "✓ Packer binary path configured"
+          fi
+          
+          # Set Packer plugin directory
+          if [ -d "tools/packer/plugins" ]; then
+            echo "PACKER_PLUGIN_PATH=${GITHUB_WORKSPACE}/tools/packer/plugins" >> $GITHUB_ENV
+            echo "✓ Packer plugin path configured"
+          fi
+          
+          # Set Ansible roles path
+          if [ -d "spel/ansible/roles" ]; then
+            echo "ANSIBLE_ROLES_PATH=${GITHUB_WORKSPACE}/spel/ansible/roles" >> $GITHUB_ENV
+            echo "✓ Ansible roles path configured"
+          fi
+          
+          # Set Ansible collections path
+          if [ -d "spel/ansible/collections" ]; then
+            echo "ANSIBLE_COLLECTIONS_PATH=${GITHUB_WORKSPACE}/spel/ansible/collections" >> $GITHUB_ENV
+            echo "✓ Ansible collections path configured"
+          fi
+          
+          echo "==================================="
+
       - name: Build STIGed AMI's
         run: |
           make -f Makefile.spel build

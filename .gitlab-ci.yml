@@ -872,6 +872,31 @@ verify:dependencies:
     - echo "Verifying build dependencies..."
     - source .venv/bin/activate
     
+    # Set and verify Ansible paths
+    - |
+      export ANSIBLE_ROLES_PATH="${CI_PROJECT_DIR}/spel/ansible/roles"
+      export ANSIBLE_COLLECTIONS_PATH="${CI_PROJECT_DIR}/spel/ansible/collections"
+      
+      echo "=== Ansible Configuration ==="
+      ansible --version
+      echo ""
+      echo "Roles path: ${ANSIBLE_ROLES_PATH}"
+      if [ -d "${ANSIBLE_ROLES_PATH}" ]; then
+        echo "✓ Ansible roles directory exists"
+        echo "  Roles count: $(ls -1 ${ANSIBLE_ROLES_PATH} 2>/dev/null | wc -l)"
+      else
+        echo "⚠ Ansible roles directory not found"
+      fi
+      echo ""
+      echo "Collections path: ${ANSIBLE_COLLECTIONS_PATH}"
+      if [ -d "${ANSIBLE_COLLECTIONS_PATH}" ]; then
+        echo "✓ Ansible collections directory exists"
+        echo "  Collections: $(ls -1 ${ANSIBLE_COLLECTIONS_PATH}/ansible_collections 2>/dev/null | wc -l)"
+      else
+        echo "⚠ Ansible collections directory not found"
+      fi
+      echo "============================"
+    
     # Verify git submodules are initialized
     - |
       echo "=== Git Submodules ==="
@@ -989,6 +1014,17 @@ validate:hardened:
     
     # Activate Python virtual environment
     - source .venv/bin/activate
+    
+    # Set Ansible paths for offline builds
+    - |
+      if [ -d "spel/ansible/roles" ]; then
+        export ANSIBLE_ROLES_PATH="${CI_PROJECT_DIR}/spel/ansible/roles"
+        echo "✓ Ansible roles path: ${ANSIBLE_ROLES_PATH}"
+      fi
+      if [ -d "spel/ansible/collections" ]; then
+        export ANSIBLE_COLLECTIONS_PATH="${CI_PROJECT_DIR}/spel/ansible/collections"
+        echo "✓ Ansible collections path: ${ANSIBLE_COLLECTIONS_PATH}"
+      fi
     
     # Set Packer path for offline mode
     - |
