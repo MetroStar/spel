@@ -868,6 +868,19 @@ build {
   provisioner "file" {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
+      "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-centos-9stream-hvm",
+      "amazon-ebs.hardened-ol-9-hvm",
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
+    ]
+    source      = "${path.root}/../tools/python-deps/"
+    destination = "/tmp/python-deps/"
+  }
+
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-amzn-2023-hvm",
     ]
     source      = "${path.root}/ansible/roles/AMAZON2023-CIS"
     destination = "/tmp/AMAZON2023-CIS"
@@ -882,7 +895,7 @@ build {
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
       "echo 'Running Ansible Lockdown'",
-      "python3 -m pip install ansible",
+      "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index --find-links=/tmp/python-deps ansible; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible; fi",
       "export PATH=/usr/local/bin:$PATH",
       "yum install -y aide rsyslog",
       "mkdir -p $HOME/.ansible/roles",
@@ -917,7 +930,7 @@ build {
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
       "echo 'Running Ansible Lockdown'",
-      "python3 -m pip install ansible",
+      "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index --find-links=/tmp/python-deps ansible; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible; fi",
       "export PATH=/usr/local/bin:$PATH",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL9-STIG $HOME/.ansible/roles/",
@@ -958,7 +971,7 @@ build {
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
-      "python3 -m pip install ansible",
+      "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index --find-links=/tmp/python-deps ansible; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible; fi",
       "export PATH=/usr/local/bin:$PATH",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
@@ -980,7 +993,7 @@ build {
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
-      "python3 -m pip install ansible",
+      "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index --find-links=/tmp/python-deps ansible; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible; fi",
       "export PATH=/usr/local/bin:$PATH",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
