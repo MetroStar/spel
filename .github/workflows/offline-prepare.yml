@@ -218,7 +218,15 @@ jobs:
           
           echo ""
           echo "Python wheels:"
-          ls -1 tools/python-deps/*.whl 2>/dev/null | wc -l | xargs echo "  Total wheels:"
+          wheel_count=$(ls -1 tools/python-deps/*.whl 2>/dev/null | wc -l)
+          echo "  Total wheels: ${wheel_count}"
+          
+          if [ "$wheel_count" -eq 0 ]; then
+            echo "❌ ERROR: No Python wheels were downloaded!"
+            echo "This will cause Ansible to install from PyPI during builds."
+            exit 1
+          fi
+          
           echo ""
           echo "Total Python deps size:"
           du -sh tools/python-deps/

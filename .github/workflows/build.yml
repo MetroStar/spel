@@ -192,8 +192,15 @@ jobs:
             fi
             
             if [ -d "tools/python-deps" ] && [ -n "$(ls -A tools/python-deps 2>/dev/null)" ]; then
-              echo "✓ Python dependencies extracted successfully"
-              du -sh tools/python-deps/
+              wheel_count=$(find tools/python-deps -name "*.whl" 2>/dev/null | wc -l)
+              if [ "$wheel_count" -gt 0 ]; then
+                echo "✓ Python dependencies extracted successfully (${wheel_count} wheels)"
+                du -sh tools/python-deps/
+              else
+                echo "⚠ Python dependencies directory exists but contains no wheel files"
+                echo "   This means offline-prepare.yml may have been run with download_ansible=false"
+                ls -la tools/python-deps/
+              fi
             else
               echo "⚠ Python dependencies directory empty or missing"
             fi
@@ -371,6 +378,16 @@ jobs:
           if [ -d "spel/ansible/collections" ]; then
             echo "ANSIBLE_COLLECTIONS_PATH=${GITHUB_WORKSPACE}/spel/ansible/collections" >> $GITHUB_ENV
             echo "✓ Ansible collections path configured"
+          fi
+          
+          # Verify Python dependencies for offline Ansible installation
+          wheel_count=$(find tools/python-deps -name "*.whl" 2>/dev/null | wc -l || echo "0")
+          if [ "$wheel_count" -gt 0 ]; then
+            echo "✓ Python wheels available for offline Ansible installation (${wheel_count} wheels)"
+          else
+            echo "⚠ WARNING: No Python wheels found in tools/python-deps/"
+            echo "   Ansible will be installed from PyPI (requires internet access)"
+            echo "   To fix: Re-run offline-prepare.yml with download_ansible=true"
           fi
           
           echo "==================================="
