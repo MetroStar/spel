@@ -875,7 +875,7 @@ build {
       "amazon-ebs.hardened-ol-8-hvm",
     ]
     source      = "${path.root}/../tools/python-deps/"
-    destination = "/tmp/python-deps/"
+    destination = "/tmp/python-deps"
   }
 
   provisioner "file" {
