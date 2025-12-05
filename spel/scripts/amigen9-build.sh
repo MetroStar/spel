@@ -253,6 +253,15 @@ function BuildChroot {
             ;;
     esac
 
+    # Unmount offline-packages bind-mount before PostBuild to prevent fstab entry
+    if [[ -d /tmp/offline-packages ]] && mountpoint -q "${AMIGENCHROOT}/tmp/offline-packages"
+    then
+        echo "Unmounting offline-packages bind-mount before PostBuild..."
+        umount "${AMIGENCHROOT}/tmp/offline-packages" || \
+            err_exit "Failed unmounting offline-packages bind-mount"
+        rm -rf "${AMIGENCHROOT}/tmp/offline-packages" || true
+    fi
+
     # Post-installation configurator
     bash -euxo pipefail "${ELBUILD}"/$( PostBuildString ) || \
         err_exit "Failure encountered with PostBuild.sh"
