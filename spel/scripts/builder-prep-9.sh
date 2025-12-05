@@ -245,7 +245,9 @@ IFS="," read -r -a BUILDER_EXTRARPMS <<< "$EXTRARPMS"
 for RPM in "${BUILDER_EXTRARPMS[@]}"
 do
     {
-        STDERR=$( yum -y install "$RPM" 2>&1 1>&$out );
+        # Don't quote $RPM to allow space-separated packages in single transaction
+        # This is needed for packages with conditional dependencies (e.g., ec2-instance-connect + ec2-instance-connect-selinux)
+        STDERR=$( yum -y install $RPM 2>&1 1>&$out );
     } {out}>&1 || echo "$STDERR" | grep "Error: Nothing to do"
 done
 

@@ -1006,7 +1006,10 @@ validate:hardened:
         # This allows file:// URLs to work correctly during the build.
         
         # EC2 utility packages for EL8 (uploaded to /tmp/offline-packages/ on EC2 instance)
-        export PKR_VAR_amigen8_extra_rpms='["python39","python39-pip","python39-setuptools","crypto-policies-scripts","file:///tmp/offline-packages/ec2-utils-el8/ec2-hibinit-agent-1.0.9-6.el8.noarch.rpm","file:///tmp/offline-packages/ec2-utils-el8/ec2-instance-connect-1.1.17-1.el8.noarch.rpm","file:///tmp/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux-1.1.17-1.el8.noarch.rpm","file:///tmp/offline-packages/amazon-ssm-agent.rpm"]'
+        # NOTE: ec2-instance-connect and ec2-instance-connect-selinux must be installed together
+        # to satisfy conditional dependency: "ec2-instance-connect-selinux if selinux-policy-targeted"
+        # We put them in a single array element (space-separated) so they install in one transaction
+        export PKR_VAR_amigen8_extra_rpms='["python39","python39-pip","python39-setuptools","crypto-policies-scripts","file:///tmp/offline-packages/ec2-utils-el8/ec2-hibinit-agent-1.0.9-6.el8.noarch.rpm","file:///tmp/offline-packages/ec2-utils-el8/ec2-instance-connect-1.1.17-1.el8.noarch.rpm file:///tmp/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux-1.1.17-1.el8.noarch.rpm","file:///tmp/offline-packages/amazon-ssm-agent.rpm"]'
         
         # EC2 utility packages for EL9 (uploaded to /tmp/offline-packages/ on EC2 instance)
         export PKR_VAR_amigen9_extra_rpms='["crypto-policies-scripts","file:///tmp/offline-packages/ec2-utils-el9/ec2-hibinit-agent-1.0.9-6.el9.noarch.rpm","file:///tmp/offline-packages/amazon-ssm-agent.rpm"]'
