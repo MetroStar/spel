@@ -239,12 +239,22 @@ function BuildChroot {
     esac
 
     # Unmount offline-packages bind-mount before PostBuild to prevent fstab entry
-    if [[ -d /tmp/offline-packages ]] && mountpoint -q "${AMIGENCHROOT}/tmp/offline-packages"
+    if [[ -d "${AMIGENCHROOT}/tmp/offline-packages" ]]
     then
-        echo "Unmounting offline-packages bind-mount before PostBuild..."
-        umount "${AMIGENCHROOT}/tmp/offline-packages" || \
-            err_exit "Failed unmounting offline-packages bind-mount"
+        echo "Checking offline-packages mount status..."
+        if mountpoint "${AMIGENCHROOT}/tmp/offline-packages" > /dev/null 2>&1
+        then
+            echo "Unmounting offline-packages bind-mount before PostBuild..."
+            umount "${AMIGENCHROOT}/tmp/offline-packages" || \
+                err_exit "Failed unmounting offline-packages bind-mount"
+            echo "Successfully unmounted offline-packages"
+        else
+            echo "offline-packages directory exists but is not mounted"
+        fi
         rm -rf "${AMIGENCHROOT}/tmp/offline-packages" || true
+        echo "Cleaned up offline-packages directory in chroot"
+    else
+        echo "No offline-packages directory found in chroot (online mode or already cleaned)"
     fi
 
     # Post-installation configurator
