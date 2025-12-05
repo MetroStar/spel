@@ -898,6 +898,8 @@ build {
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
       "echo 'Running Ansible Lockdown'",
+      "echo 'Checking for offline Python wheels...'",
+      "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
       "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index --find-links=/tmp/python-deps ansible; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible; fi",
       "export PATH=/usr/local/bin:$PATH",
       "yum install -y aide rsyslog",
@@ -933,6 +935,8 @@ build {
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
       "echo 'Running Ansible Lockdown'",
+      "echo 'Checking for offline Python wheels...'",
+      "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
       "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index --find-links=/tmp/python-deps ansible; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible; fi",
       "export PATH=/usr/local/bin:$PATH",
       "mkdir -p $HOME/.ansible/roles",
@@ -974,6 +978,8 @@ build {
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
+      "echo 'Checking for offline Python wheels...'",
+      "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
       "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index --find-links=/tmp/python-deps ansible; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible; fi",
       "export PATH=/usr/local/bin:$PATH",
       "mkdir -p $HOME/.ansible/roles",
@@ -996,6 +1002,8 @@ build {
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
+      "echo 'Checking for offline Python wheels...'",
+      "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
       "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index --find-links=/tmp/python-deps ansible; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible; fi",
       "export PATH=/usr/local/bin:$PATH",
       "mkdir -p $HOME/.ansible/roles",
