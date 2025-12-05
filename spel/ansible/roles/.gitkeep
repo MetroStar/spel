@@ -1,4 +1,4 @@
-# Vendored Ansible roles for NIPR offline builds
+# Vendored Ansible roles for offline builds
 #
 # This directory should contain cloned Git repositories of required Ansible roles:
 # - Windows-2016-STIG (from ansible-lockdown)

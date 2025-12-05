@@ -832,7 +832,7 @@ build {
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
     # Point to internal WSUS server instead of Microsoft
-    # update_server = "http://wsus.internal.nipr.mil:8530"
+    # update_server = "http://wsus.internal.offline.mil:8530"
     # search_criteria = "IsInstalled=0"
   }
 

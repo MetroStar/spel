@@ -809,7 +809,7 @@ The GitLab CI pipeline runs in **offline mode** (`SPEL_OFFLINE_MODE=true`), whic
 - **No internet access** during builds - completely air-gapped operation
 - **Pre-vendored dependencies** - all components included in transfer archives:
   - Packer v1.11.2 (Linux and Windows binaries)
-  - Packer plugins (Amazon, Ansible, PowerShell)
+  - Packer plugins (Amazon, Ansible, PowerShell, windows-update)
   - Python packages as wheels
   - Ansible collections as tarballs (ansible.windows:1.14.0, community.windows:1.13.0, community.general:7.5.0)
   - Ansible roles cloned locally
@@ -820,6 +820,50 @@ The GitLab CI pipeline runs in **offline mode** (`SPEL_OFFLINE_MODE=true`), whic
 - **Reproducible builds** - same vendored components ensure consistent results
 
 This ensures builds are completely independent of external networks and reproducible across different Offline environments.
+
+#### Windows Update Configuration
+
+For **Windows Server** builds in offline environments:
+
+**⚠️ Important**: The `windows-update` Packer plugin requires internet access to Microsoft Update servers, which is **NOT available in air-gapped Offline environments**.
+
+**Options for Windows Updates**:
+
+1. **WSUS Server (Recommended)**:
+   - Configure an internal Windows Server Update Services (WSUS) server in your Offline environment
+   - Edit `spel/hardened-linux.pkr.hcl` to point to your WSUS server:
+     ```hcl
+     provisioner "windows-update" {
+       pause_before = "30s"
+       only = [
+         "amazon-ebs.hardened-windows-2016-hvm",
+         "amazon-ebs.hardened-windows-2019-hvm",
+         "amazon-ebs.hardened-windows-2022-hvm"
+       ]
+       # Uncomment and configure for Offline WSUS:
+       update_server = "http://wsus.internal.offline.mil:8530"
+       search_criteria = "IsInstalled=0"
+     }
+     ```
+   - **Prerequisites**:
+     - WSUS server must be synchronized with Microsoft Update before transfer to Offline
+     - Updates must be approved and available in WSUS catalog
+     - Network connectivity from build EC2 instances to WSUS server
+
+2. **Pre-Patched Base AMI** (Simplest):
+   - Build Windows AMIs with all updates in commercial AWS
+   - Export and transfer AMI snapshots to Offline via approved process
+   - Use pre-patched AMIs as `source_ami` in Packer builds
+   - No `windows-update` provisioner needed
+   - **Best for**: Air-gapped environments with strict update control
+
+3. **Pre-Downloaded .msu Files** (Advanced):
+   - Download Windows update packages (`.msu` files) in commercial environment
+   - Transfer to Offline in separate archive
+   - Install via PowerShell provisioner during build
+   - See Windows Update documentation for implementation details
+
+**Current Configuration**: The `windows-update` provisioner in `hardened-linux.pkr.hcl` includes commented-out WSUS configuration. Uncomment and configure if using Option 1 (WSUS server).
 
 ## Complete Workflow Example
 
