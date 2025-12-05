@@ -831,6 +831,9 @@ build {
       "amazon-ebs.hardened-windows-2019-hvm",
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
+    # Point to internal WSUS server instead of Microsoft
+    # update_server = "http://wsus.internal.nipr.mil:8530"
+    # search_criteria = "IsInstalled=0"
   }
 
   provisioner "ansible" {
