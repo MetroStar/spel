@@ -242,12 +242,34 @@ yum-config-manager --enable "$ENABLEDREPOS" > /dev/null
 
 echo "Installing specified extra packages in the builder box"
 IFS="," read -r -a BUILDER_EXTRARPMS <<< "$EXTRARPMS"
+
+# Separate ec2-instance-connect packages from other packages
+# These must be installed together to satisfy conditional SELinux dependency
+EC2_CONNECT_PKGS=()
+OTHER_PKGS=()
+
 for RPM in "${BUILDER_EXTRARPMS[@]}"
 do
+    if [[ $RPM =~ ec2-instance-connect ]]; then
+        EC2_CONNECT_PKGS+=("$RPM")
+    else
+        OTHER_PKGS+=("$RPM")
+    fi
+done
+
+# Install ec2-instance-connect packages together in one transaction
+if [[ ${#EC2_CONNECT_PKGS[@]} -gt 0 ]]; then
+    echo "Installing ec2-instance-connect packages together..."
     {
-        # Don't quote $RPM to allow space-separated packages in single transaction
-        # This is needed for packages with conditional dependencies (e.g., ec2-instance-connect + ec2-instance-connect-selinux)
-        STDERR=$( yum -y install $RPM 2>&1 1>&$out );
+        STDERR=$( yum -y install "${EC2_CONNECT_PKGS[@]}" 2>&1 1>&$out );
+    } {out}>&1 || echo "$STDERR" | grep "Error: Nothing to do"
+fi
+
+# Install other packages individually
+for RPM in "${OTHER_PKGS[@]}"
+do
+    {
+        STDERR=$( yum -y install "$RPM" 2>&1 1>&$out );
     } {out}>&1 || echo "$STDERR" | grep "Error: Nothing to do"
 done
 
