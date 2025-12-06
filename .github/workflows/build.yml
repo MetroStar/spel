@@ -384,6 +384,12 @@ jobs:
           wheel_count=$(find tools/python-deps -name "*.whl" 2>/dev/null | wc -l || echo "0")
           if [ "$wheel_count" -gt 0 ]; then
             echo "✓ Python wheels available for offline Ansible installation (${wheel_count} wheels)"
+            echo ""
+            echo "Verifying Packer can access wheels from spel/ directory:"
+            ls -lh tools/python-deps/*.whl 2>/dev/null | head -5 || echo "ERROR: Cannot list wheels!"
+            echo ""
+            echo "Testing path resolution from spel/ directory:"
+            (cd spel && ls -lh ../tools/python-deps/*.whl 2>/dev/null | head -5) || echo "ERROR: Path ../tools/python-deps/ not accessible from spel/!"
           else
             echo "⚠ WARNING: No Python wheels found in tools/python-deps/"
             echo "   Ansible will be installed from PyPI (requires internet access)"
