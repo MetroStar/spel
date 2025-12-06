@@ -137,10 +137,33 @@ fi
 
 # Extract combined archive if separate archives weren't found
 COMBINED_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-offline-complete-*.tar.gz 2>/dev/null | head -1)
+
+log_debug "Checking archive types:"
+log_debug "  BASE_ARCHIVE: ${BASE_ARCHIVE:-<none>}"
+log_debug "  TOOLS_ARCHIVE: ${TOOLS_ARCHIVE:-<none>}"
+log_debug "  COMBINED_ARCHIVE: ${COMBINED_ARCHIVE:-<none>}"
+
 if [ -z "$BASE_ARCHIVE" ] && [ -z "$TOOLS_ARCHIVE" ] && [ -n "$COMBINED_ARCHIVE" ]; then
-    log_info "Extracting combined archive..."
-    tar xzf "$COMBINED_ARCHIVE" -C "$REPO_ROOT"
-    log_info "  ✓ Combined archive extracted"
+    log_info "Extracting combined archive: $(basename "$COMBINED_ARCHIVE")..."
+    log_debug "  Archive path: $COMBINED_ARCHIVE"
+    log_debug "  Extract to: $REPO_ROOT"
+    
+    # Disable error exit temporarily for tar to capture exit code
+    set +e
+    tar xzf "$COMBINED_ARCHIVE" -C "$REPO_ROOT" 2>&1
+    TAR_EXIT=$?
+    set -e
+    
+    if [ $TAR_EXIT -eq 0 ]; then
+        log_info "  ✓ Combined archive extracted successfully"
+    else
+        log_error "  ✗ Failed to extract combined archive (tar exit code: $TAR_EXIT)"
+        log_error "  This may be due to:"
+        log_error "    - Corrupted archive file"
+        log_error "    - Insufficient disk space"
+        log_error "    - Permission issues"
+        exit 1
+    fi
 elif [ -n "$COMBINED_ARCHIVE" ]; then
     log_warn "Combined archive found but skipped (separate archives already extracted)"
 elif [ -z "$BASE_ARCHIVE" ] && [ -z "$TOOLS_ARCHIVE" ]; then
@@ -155,11 +178,22 @@ fi
 if [ -f "${REPO_ROOT}/.gitmodules" ]; then
     log_info "Initializing git submodules..."
     
-    if git submodule init && git submodule update; then
+    # Disable error exit temporarily for git submodule commands
+    set +e
+    git submodule init
+    INIT_EXIT=$?
+    git submodule update
+    UPDATE_EXIT=$?
+    set -e
+    
+    if [ $INIT_EXIT -eq 0 ] && [ $UPDATE_EXIT -eq 0 ]; then
         log_info "  ✓ Git submodules initialized"
     else
-        log_warn "  ⚠ Git submodule initialization had warnings (this may be expected)"
+        log_warn "  ⚠ Git submodule initialization had warnings (init: $INIT_EXIT, update: $UPDATE_EXIT)"
+        log_debug "  This is expected if submodules were already initialized or if running in CI"
     fi
+else
+    log_debug "No .gitmodules file found, skipping submodule initialization"
 fi
 
 # Validation
