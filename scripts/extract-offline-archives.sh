@@ -82,7 +82,7 @@ if [ "$VERIFY_CHECKSUMS" = "true" ]; then
 fi
 
 # Extract base archive
-BASE_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-base-*.tar.gz 2>/dev/null | head -1)
+BASE_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-base-*.tar.gz 2>/dev/null | head -1 || true)
 if [ -n "$BASE_ARCHIVE" ]; then
     log_info "Extracting base archive..."
     tar xzf "$BASE_ARCHIVE" -C "$REPO_ROOT"
@@ -92,7 +92,7 @@ else
 fi
 
 # Extract tools archive
-TOOLS_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-tools-*.tar.gz 2>/dev/null | head -1)
+TOOLS_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-tools-*.tar.gz 2>/dev/null | head -1 || true)
 if [ -n "$TOOLS_ARCHIVE" ]; then
     log_info "Extracting tools archive..."
     tar xzf "$TOOLS_ARCHIVE" -C "$REPO_ROOT"
@@ -136,7 +136,7 @@ else
 fi
 
 # Extract combined archive if separate archives weren't found
-COMBINED_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-offline-complete-*.tar.gz 2>/dev/null | head -1)
+COMBINED_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-offline-complete-*.tar.gz 2>/dev/null | head -1 || true)
 
 log_debug "Checking archive types:"
 log_debug "  BASE_ARCHIVE: ${BASE_ARCHIVE:-<none>}"
