@@ -151,11 +151,17 @@ install_ansible_collections() {
                 INSTALLED_COUNT=0
                 for tarball in "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz; do
                     log_info "Installing $(basename "$tarball")..."
-                    # Install collection and capture exit code
-                    if ansible-galaxy collection install "$tarball" --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)"; then
+                    # Install collection and suppress verbose output
+                    # Use a subshell to prevent pipefail from affecting the main script
+                    set +e
+                    ansible-galaxy collection install "$tarball" --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)" || true
+                    INSTALL_EXIT=${PIPESTATUS[0]}
+                    set -e
+                    
+                    if [ $INSTALL_EXIT -eq 0 ]; then
                         ((INSTALLED_COUNT++))
                     else
-                        log_warn "Failed to install $(basename "$tarball") (may already be installed)"
+                        log_warn "Failed to install $(basename "$tarball") (exit code: $INSTALL_EXIT)"
                     fi
                 done
                 
