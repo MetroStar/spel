@@ -156,6 +156,7 @@ install_ansible_collections() {
                     set +e +o pipefail
                     ansible-galaxy collection install "$tarball" --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)"
                     INSTALL_EXIT=${PIPESTATUS[0]}
+                    true  # Reset $? to 0 before re-enabling errexit
                     set -e -o pipefail
                     
                     if [ $INSTALL_EXIT -eq 0 ]; then
