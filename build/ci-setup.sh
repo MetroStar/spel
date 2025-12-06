@@ -78,15 +78,21 @@ install_packer() {
 # Install Python dependencies
 install_python_deps() {
     # Find Python executable
-    PLAYBOOK=$(command -v ansible-playbook 2>/dev/null || true)
-    if [ -n "$PLAYBOOK" ]; then
-        SHEBANG=$(head -1 "$PLAYBOOK")
-        PY_EXEC=$(echo "$SHEBANG" | awk 'NR==1{if($0 ~ /^#!/){sub("^#!","",$0); print $0}}')
-        if echo "$PY_EXEC" | grep -q "env "; then 
-            PY_EXEC=$(command -v python3)
-        fi
+    # Prefer python3.9 if available (from setup-python action)
+    if command -v python3.9 &> /dev/null; then
+        PY_EXEC=$(command -v python3.9)
+        log_info "Using Python 3.9 from setup-python action"
     else
-        PY_EXEC=$(command -v python3 2>/dev/null || echo "/usr/bin/python3")
+        PLAYBOOK=$(command -v ansible-playbook 2>/dev/null || true)
+        if [ -n "$PLAYBOOK" ]; then
+            SHEBANG=$(head -1 "$PLAYBOOK")
+            PY_EXEC=$(echo "$SHEBANG" | awk 'NR==1{if($0 ~ /^#!/){sub("^#!","",$0); print $0}}')
+            if echo "$PY_EXEC" | grep -q "env "; then 
+                PY_EXEC=$(command -v python3)
+            fi
+        else
+            PY_EXEC=$(command -v python3 2>/dev/null || echo "/usr/bin/python3")
+        fi
     fi
     
     log_info "Using Python: $PY_EXEC"
