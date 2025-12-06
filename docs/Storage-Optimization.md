@@ -173,24 +173,26 @@ SPEL_ARCHIVE_SEPARATE=false \
 # Result: spel-offline-complete-YYYYMMDD.tar.gz (1.1 GB)
 ```
 
-### Option 2: Separate Component Archives (Recommended)
+### Option 2: Separate Component Archives (Optional)
 
-**Best for:** Partial updates, large networks, parallel transfers
+**Best for:** Incremental updates when base components don't change
 
 ```bash
-# Creates separate archives (default)
-./scripts/create-transfer-archive.sh
+# Creates separate archives (opt-in)
+SPEL_ARCHIVE_SEPARATE=true ./scripts/create-transfer-archive.sh
 
 # Results:
 # - spel-base-YYYYMMDD.tar.gz (118 MB)
 # - spel-tools-YYYYMMDD.tar.gz (~400 MB)
+# - spel-offline-complete-YYYYMMDD.tar.gz (694 MB)
 ```
 
 **Benefits:**
-- Transfer only what changed
+- Transfer only what changed between releases
 - Parallel transfers possible
-- Faster verification
-- Smaller individual files
+- Faster verification for incremental updates
+
+**Note:** Most users should use Option 1 (single complete archive) unless doing frequent incremental updates.
 
 ## Storage Requirement Summary
 
@@ -215,10 +217,14 @@ Note: ClamAV DB downloaded during scan, not included in transfer
 ### Transfer Media
 
 ```
-Minimum (compressed archives only):
-  └── spel-offline-*.tar.gz   1.1 GB
+Standard (single complete archive):
+  ├── spel-offline-complete-*.tar.gz  694 MB
+  ├── checksums.txt            ~2 KB
+  ├── manifest.txt             ~5 KB
+  └── clamav-scan.log          ~50 KB (security audit trail)
+  Total: ~694 MB
 
-Recommended (archives + security artifacts):
+With separate archives (opt-in via SPEL_ARCHIVE_SEPARATE=true):
   ├── spel-base-*.tar.gz       118 MB
   ├── spel-tools-*.tar.gz      289 MB
   ├── spel-offline-complete-*.tar.gz  694 MB
@@ -270,8 +276,8 @@ Recommended: 20-35 GB (allows 1-2 concurrent builds)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SPEL_ARCHIVE_SEPARATE` | `true` | Create separate component archives |
-| `SPEL_ARCHIVE_COMBINED` | `true` | Create combined archive |
+| `SPEL_ARCHIVE_SEPARATE` | `false` | Create separate component archives (opt-in) |
+| `SPEL_ARCHIVE_COMBINED` | `true` | Create combined complete archive |
 | `SPEL_ARCHIVE_OUTPUT` | `$PWD` | Output directory for archives |
 
 ### Offline Extraction (`extract-offline-archives.sh`)

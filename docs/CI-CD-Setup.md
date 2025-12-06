@@ -87,8 +87,8 @@ All optimization settings are pre-configured:
 SPEL_ROLES_REMOVE_GIT=true        # Remove .git dirs (saves 50%)
 SPEL_ROLES_COMPRESS=true          # Compress roles archive
 SPEL_OFFLINE_COMPRESS=true        # Compress offline packages
-SPEL_ARCHIVE_SEPARATE=true        # Create separate archives
-SPEL_ARCHIVE_COMBINED=true        # Also create combined archive
+SPEL_ARCHIVE_SEPARATE=false       # Create separate archives (opt-in)
+SPEL_ARCHIVE_COMBINED=true        # Create combined complete archive (default)
 ```
 
 ### Workflow Steps
