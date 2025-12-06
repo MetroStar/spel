@@ -92,18 +92,39 @@ install_python_deps() {
     log_info "Using Python: $PY_EXEC"
     
     if detect_offline_mode; then
-        # Offline mode - use vendored wheels
+        # Offline mode - install from vendored wheels matching Python version
         log_info "Installing Python packages from vendored wheels..."
+        
+        # Detect Python version (e.g., "3.9", "3.12")
+        PY_VERSION=$("$PY_EXEC" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+        log_info "Detected Python version: $PY_VERSION"
+        
         if [ -d "${REPO_ROOT}/tools/python-deps" ]; then
-            sudo "$PY_EXEC" -m pip install --upgrade pip --no-index \
-                --find-links="${REPO_ROOT}/tools/python-deps/"
-            sudo "$PY_EXEC" -m pip install --no-index \
-                --find-links="${REPO_ROOT}/tools/python-deps/" \
-                "ansible-core<2.19" \
-                pywinrm requests requests-ntlm \
-                passlib lxml xmltodict jmespath \
-                distro pytest pytest-logger pytest-testinfra
-            log_info "Python packages installed from vendored wheels"
+            # Check if we have wheels compatible with this Python version
+            # Wheels can be: cp39 (Python 3.9 specific), cp312 (Python 3.12 specific), 
+            # py3 (any Python 3), or abi3 (stable ABI, forward compatible)
+            PY_MAJOR_MINOR=$(echo "$PY_VERSION" | tr -d '.')  # e.g., "39" or "312"
+            
+            # Count compatible wheels (cp39, cp312, py3, abi3, none-any)
+            COMPAT_WHEELS=$(find "${REPO_ROOT}/tools/python-deps" -name "*.whl" \
+                \( -name "*cp${PY_MAJOR_MINOR}*" -o -name "*py3*" -o -name "*abi3*" -o -name "*none-any*" \) \
+                2>/dev/null | wc -l)
+            
+            if [ "$COMPAT_WHEELS" -gt 0 ]; then
+                log_info "Found $COMPAT_WHEELS compatible wheels for Python $PY_VERSION"
+                sudo "$PY_EXEC" -m pip install --no-index \
+                    --find-links="${REPO_ROOT}/tools/python-deps/" \
+                    "ansible-core<2.19" \
+                    pywinrm requests requests-ntlm \
+                    passlib lxml xmltodict jmespath \
+                    distro pytest pytest-logger pytest-testinfra
+                log_info "Python packages installed from vendored wheels"
+            else
+                log_error "No compatible wheels found for Python $PY_VERSION in ${REPO_ROOT}/tools/python-deps/"
+                log_error "Available wheels:"
+                ls -1 "${REPO_ROOT}/tools/python-deps/"*.whl 2>/dev/null | head -5 || echo "  (none found)"
+                exit 1
+            fi
         else
             log_error "Vendored Python wheels not found at ${REPO_ROOT}/tools/python-deps/"
             exit 1

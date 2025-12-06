@@ -123,8 +123,8 @@ jobs:
           echo "SPEL_PACKER_VERSION=1.11.2" >> $GITHUB_ENV
           echo "SPEL_PACKER_PLATFORMS=linux_amd64 windows_amd64" >> $GITHUB_ENV
           
-          # Python configuration (use 3.9 for RHEL 8/9 compatibility on EC2 instances)
-          echo "SPEL_PYTHON_VERSION=3.9" >> $GITHUB_ENV
+          # Python configuration - download wheels for both EC2 (3.9) and runner (3.12)
+          echo "SPEL_PYTHON_VERSIONS=3.9 3.12" >> $GITHUB_ENV
           echo "SPEL_ANSIBLE_VERSION=>=2.14.0,<2.16.0" >> $GITHUB_ENV
       
       - name: Update ClamAV virus definitions
@@ -161,7 +161,7 @@ jobs:
           echo "  Remove .git from roles: $SPEL_ROLES_REMOVE_GIT"
           echo "  Packer version: $SPEL_PACKER_VERSION"
           echo "  Packer platforms: $SPEL_PACKER_PLATFORMS"
-          echo "  Python version: $SPEL_PYTHON_VERSION"
+          echo "  Python versions: $SPEL_PYTHON_VERSIONS"
           echo "  Ansible version: $SPEL_ANSIBLE_VERSION"
           echo ""
           echo "Note: YUM/DNF mirrors are NOT synced - Offline has its own RPM repositories"

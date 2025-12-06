@@ -18,7 +18,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_DIR="${SCRIPT_DIR}/../tools/python-deps"
 
 # Configuration
-PYTHON_VERSION="${SPEL_PYTHON_VERSION:-3.9}"  # RHEL 8/9 default Python version
+# Download wheels for both Python 3.9 (EC2 instances) and 3.12 (GitHub Actions runner)
+PYTHON_VERSIONS="${SPEL_PYTHON_VERSIONS:-3.9 3.12}"  # Space-separated list
 ANSIBLE_VERSION="${SPEL_ANSIBLE_VERSION:->=2.14.0,<2.16.0}"  # 2.14.x and 2.15.x support Python 3.9+
 
 # Colors for output
@@ -53,14 +54,14 @@ for cmd in pip python3; do
 done
 
 log_info "Ansible Core download configuration:"
-log_debug "  Python version: ${PYTHON_VERSION}"
+log_debug "  Python versions: ${PYTHON_VERSIONS}"
 log_debug "  Ansible Core version: ${ANSIBLE_VERSION}"
 log_debug "  Target directory: ${TOOLS_DIR}"
 
 mkdir -p "$TOOLS_DIR"
 
 # Download Ansible Core and dependencies
-log_info "Downloading Ansible Core and dependencies..."
+log_info "Downloading Ansible Core and dependencies for multiple Python versions..."
 log_debug "  Using combined pure-Python and platform-specific approach"
 
 # List of packages to download
@@ -86,24 +87,28 @@ done
 
 # Download wheels with combined approach
 # This will get pure-Python wheels where available and platform-specific where needed
-log_info "Downloading Python wheels..."
+log_info "Downloading Python wheels for multiple Python versions..."
 
-# Download for the specified Python version (defaults to 3.12 for GitHub Actions compatibility)
-# This will download all dependencies including lxml with proper binary wheels
-if pip download \
-    --dest "$TOOLS_DIR" \
-    --python-version "$PYTHON_VERSION" \
-    --platform manylinux2014_x86_64 \
-    --implementation cp \
-    --only-binary=:all: \
-    "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download.log; then
+# Download for each Python version
+for PYTHON_VERSION in $PYTHON_VERSIONS; do
+    log_info "Downloading wheels for Python ${PYTHON_VERSION}..."
     
-    log_info "  ✓ Wheels downloaded successfully"
-else
-    log_error "  ✗ Failed to download wheels"
-    log_error "Check /tmp/pip-download.log for details"
-    exit 1
-fi
+    # Download all dependencies including lxml with proper binary wheels
+    if pip download \
+        --dest "$TOOLS_DIR" \
+        --python-version "$PYTHON_VERSION" \
+        --platform manylinux2014_x86_64 \
+        --implementation cp \
+        --only-binary=:all: \
+        "${PACKAGES[@]}" 2>&1 | tee "/tmp/pip-download-py${PYTHON_VERSION}.log"; then
+        
+        log_info "  ✓ Wheels downloaded successfully for Python ${PYTHON_VERSION}"
+    else
+        log_error "  ✗ Failed to download wheels for Python ${PYTHON_VERSION}"
+        log_error "Check /tmp/pip-download-py${PYTHON_VERSION}.log for details"
+        exit 1
+    fi
+done
 
 # Count downloaded wheels
 WHEEL_COUNT=$(find "$TOOLS_DIR" -name "*.whl" | wc -l)
@@ -121,7 +126,7 @@ cat > "$VERSION_FILE" <<EOF
 # Ansible Core and Dependencies - Python Wheels
 # Downloaded on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-Python Version: ${PYTHON_VERSION}
+Python Versions: ${PYTHON_VERSIONS}
 Platform: manylinux2014_x86_64
 Ansible Core Version: ${ANSIBLE_VERSION}
 
