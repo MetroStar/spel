@@ -154,7 +154,7 @@ install_ansible_collections() {
                     # Install collection and suppress verbose output
                     # Temporarily disable both errexit and pipefail to capture exit code correctly
                     set +e +o pipefail
-                    ansible-galaxy collection install "$tarball" --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)" || true
+                    ansible-galaxy collection install "$tarball" --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)"
                     INSTALL_EXIT=${PIPESTATUS[0]}
                     set -e -o pipefail
                     
