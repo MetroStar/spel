@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_DIR="${SCRIPT_DIR}/../tools/python-deps"
 
 # Configuration
-PYTHON_VERSION="${SPEL_PYTHON_VERSION:-3.12}"
+PYTHON_VERSION="${SPEL_PYTHON_VERSION:-3.9}"  # RHEL 8/9 default Python version
 ANSIBLE_VERSION="${SPEL_ANSIBLE_VERSION:->=2.14.0,<2.16.0}"  # 2.14.x and 2.15.x support Python 3.9+
 
 # Colors for output
