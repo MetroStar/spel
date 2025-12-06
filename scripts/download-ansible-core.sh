@@ -90,7 +90,8 @@ log_info "Downloading Python wheels..."
 
 # Download for the specified Python version (defaults to 3.9 for RHEL 8/9 compatibility)
 # This will download all dependencies including lxml with proper binary wheels
-if pip download \
+# Use python3.9 -m pip to ensure we use the correct interpreter (not shebang)
+if python3.9 -m pip download \
     --dest "$TOOLS_DIR" \
     --python-version "$PYTHON_VERSION" \
     --platform manylinux2014_x86_64 \
