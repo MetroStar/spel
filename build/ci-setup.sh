@@ -159,7 +159,7 @@ install_ansible_collections() {
                     set -e -o pipefail
                     
                     if [ $INSTALL_EXIT -eq 0 ]; then
-                        ((INSTALLED_COUNT++))
+                        INSTALLED_COUNT=$((INSTALLED_COUNT + 1))
                     else
                         log_warn "Failed to install $(basename "$tarball") (exit code: $INSTALL_EXIT)"
                     fi
