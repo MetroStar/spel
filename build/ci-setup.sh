@@ -136,16 +136,42 @@ install_ansible_collections() {
     if detect_offline_mode; then
         # Offline mode - install from vendored tarballs
         log_info "Installing Ansible collections from vendored tarballs..."
-        if [ -d "${REPO_ROOT}/spel/ansible/collections" ] && ls "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz 1> /dev/null 2>&1; then
-            for tarball in "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz; do
-                log_info "Installing $(basename "$tarball")..."
-                # Filter out dependency version warnings - we only need the collections we're explicitly installing
-                ansible-galaxy collection install "$tarball" --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)" || true
-            done
-            log_info "Ansible collections installed from vendored tarballs"
+        log_debug "Looking for tarballs in: ${REPO_ROOT}/spel/ansible/collections/"
+        
+        if [ -d "${REPO_ROOT}/spel/ansible/collections" ]; then
+            log_debug "Collections directory exists"
+            ls -lh "${REPO_ROOT}/spel/ansible/collections/" || log_warn "Cannot list collections directory"
+            
+            if ls "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz 1> /dev/null 2>&1; then
+                INSTALLED_COUNT=0
+                for tarball in "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz; do
+                    log_info "Installing $(basename "$tarball")..."
+                    # Install collection and capture exit code
+                    if ansible-galaxy collection install "$tarball" --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)"; then
+                        ((INSTALLED_COUNT++))
+                    else
+                        log_warn "Failed to install $(basename "$tarball") (may already be installed)"
+                    fi
+                done
+                
+                if [ $INSTALLED_COUNT -gt 0 ]; then
+                    log_info "Ansible collections installed from vendored tarballs (${INSTALLED_COUNT} collections)"
+                else
+                    log_error "No collections were successfully installed!"
+                    log_error "This will cause Windows builds to fail"
+                    return 1
+                fi
+            else
+                log_error "No tarball files found in ${REPO_ROOT}/spel/ansible/collections/"
+                log_warn "Directory contents:"
+                ls -la "${REPO_ROOT}/spel/ansible/collections/" || true
+                log_warn "Windows builds will fail without collections"
+                return 1
+            fi
         else
-            log_warn "Vendored Ansible collection tarballs not found - builds may fail for Windows"
-            log_warn "Expected location: ${REPO_ROOT}/spel/ansible/collections/*.tar.gz"
+            log_error "Collections directory not found: ${REPO_ROOT}/spel/ansible/collections/"
+            log_warn "Windows builds will fail without collections"
+            return 1
         fi
     else
         # Online mode - download specific versions from Galaxy
@@ -154,6 +180,14 @@ install_ansible_collections() {
         ansible-galaxy collection install community.windows:1.13.0 --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)" || true
         ansible-galaxy collection install community.general:7.5.0 --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)" || true
         log_info "Ansible collections installed from Galaxy"
+    fi
+    
+    # Verify collections were installed
+    log_info "Verifying installed collections..."
+    if ansible-galaxy collection list 2>/dev/null | grep -E "(ansible\.windows|community\.windows)"; then
+        log_info "✓ Required collections verified"
+    else
+        log_warn "⚠ Collections verification unclear - ansible-galaxy list may not show them"
     fi
 }
 
