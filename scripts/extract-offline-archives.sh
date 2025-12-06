@@ -137,10 +137,18 @@ fi
 
 # Extract combined archive if separate archives weren't found
 COMBINED_ARCHIVE=$(ls "${ARCHIVE_DIR}"/spel-offline-complete-*.tar.gz 2>/dev/null | head -1)
-if [ -z "$BASE_ARCHIVE" ] && [ -z "$MIRRORS_ARCHIVE" ] && [ -n "$COMBINED_ARCHIVE" ]; then
+if [ -z "$BASE_ARCHIVE" ] && [ -z "$TOOLS_ARCHIVE" ] && [ -n "$COMBINED_ARCHIVE" ]; then
     log_info "Extracting combined archive..."
     tar xzf "$COMBINED_ARCHIVE" -C "$REPO_ROOT"
     log_info "  ✓ Combined archive extracted"
+elif [ -n "$COMBINED_ARCHIVE" ]; then
+    log_warn "Combined archive found but skipped (separate archives already extracted)"
+elif [ -z "$BASE_ARCHIVE" ] && [ -z "$TOOLS_ARCHIVE" ]; then
+    log_error "No archives found to extract!"
+    log_error "Expected either:"
+    log_error "  - spel-offline-complete-*.tar.gz (single combined archive), OR"
+    log_error "  - spel-base-*.tar.gz + spel-tools-*.tar.gz (separate archives)"
+    exit 1
 fi
 
 # Initialize git submodules
