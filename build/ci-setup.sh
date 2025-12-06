@@ -151,13 +151,11 @@ install_ansible_collections() {
                 INSTALLED_COUNT=0
                 for tarball in "${REPO_ROOT}"/spel/ansible/collections/*.tar.gz; do
                     log_info "Installing $(basename "$tarball")..."
-                    # Install collection and suppress verbose output
-                    # Temporarily disable both errexit and pipefail to capture exit code correctly
-                    set +e +o pipefail
-                    ansible-galaxy collection install "$tarball" --force 2>&1 | grep -vE "(does not support Ansible version|^[0-9]+\.[0-9]+\.[0-9]+$|^Warning: : Collection)"
-                    INSTALL_EXIT=${PIPESTATUS[0]}
-                    true  # Reset $? to 0 before re-enabling errexit
-                    set -e -o pipefail
+                    # Install collection (allow command to fail without exiting script)
+                    set +e
+                    ansible-galaxy collection install "$tarball" --force >/dev/null 2>&1
+                    INSTALL_EXIT=$?
+                    set -e
                     
                     if [ $INSTALL_EXIT -eq 0 ]; then
                         INSTALLED_COUNT=$((INSTALLED_COUNT + 1))
