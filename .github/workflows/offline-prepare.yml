@@ -121,7 +121,8 @@ jobs:
           echo "SPEL_OFFLINE_COMPRESS=true" >> $GITHUB_ENV
           echo "SPEL_OFFLINE_VERIFY=true" >> $GITHUB_ENV
           
-          echo "SPEL_ARCHIVE_SEPARATE=true" >> $GITHUB_ENV
+          # Archive configuration - only create complete archive
+          echo "SPEL_ARCHIVE_SEPARATE=false" >> $GITHUB_ENV
           echo "SPEL_ARCHIVE_COMBINED=true" >> $GITHUB_ENV
           
           # Packer configuration
@@ -729,20 +730,11 @@ jobs:
         with:
           name: spel-offline-transfer-${{ env.DATE }}
           path: |
-            spel-*.tar.gz
+            spel-offline-complete-*.tar.gz
             spel-offline-*-checksums.txt
             spel-offline-*-manifest.txt
             spel-offline-*-clamav-scan.log
             spel-offline-*-trufflehog-scan.log
-          retention-days: 90
-          compression-level: 0
-      
-      - name: Upload component artifacts (base only)
-        if: github.event.inputs.upload_artifacts != 'false' && github.event.inputs.create_archives != 'false'
-        uses: actions/upload-artifact@v4
-        with:
-          name: spel-offline-base-${{ env.DATE }}
-          path: spel-base-*.tar.gz
           retention-days: 90
           compression-level: 0
       
