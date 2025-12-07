@@ -21,10 +21,12 @@ COLLECTIONS_DIR="${SCRIPT_DIR}/../spel/ansible/collections"
 # - ansible.windows 1.14.0 is the last 1.x release (supports Ansible Core 2.14-2.15)
 # - community.windows 1.13.0 is the last 1.x release (supports Ansible Core 2.14-2.15)
 # - community.general 7.5.0 is a stable 7.x release (supports Ansible Core 2.14-2.15)
+# - ansible.posix 1.5.4 is the last 1.x release (supports Ansible Core 2.14-2.16, required for Linux STIG playbooks)
 COLLECTIONS=(
     "ansible.windows:1.14.0"
     "community.windows:1.13.0"
     "community.general:7.5.0"
+    "ansible.posix:1.5.4"
 )
 
 # Colors for output
