@@ -884,6 +884,19 @@ build {
   provisioner "file" {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
+      "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-centos-9stream-hvm",
+      "amazon-ebs.hardened-ol-9-hvm",
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
+    ]
+    source      = "${path.root}/ansible/collections"
+    destination = "/tmp/ansible-collections"
+  }
+
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-amzn-2023-hvm",
     ]
     source      = "${path.root}/ansible/roles/AMAZON2023-CIS"
     destination = "/tmp/AMAZON2023-CIS"
@@ -902,6 +915,8 @@ build {
       "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
       "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index /tmp/python-deps/*.whl; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible-core; fi",
       "export PATH=/usr/local/bin:$PATH",
+      "echo 'Installing Ansible collections...'",
+      "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "yum install -y aide rsyslog",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/AMAZON2023-CIS $HOME/.ansible/roles/",
@@ -939,6 +954,8 @@ build {
       "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
       "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index /tmp/python-deps/*.whl; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible-core; fi",
       "export PATH=/usr/local/bin:$PATH",
+      "echo 'Installing Ansible collections...'",
+      "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL9-STIG $HOME/.ansible/roles/",
       "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true}'",
@@ -982,6 +999,8 @@ build {
       "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
       "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index /tmp/python-deps/*.whl; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible-core; fi",
       "export PATH=/usr/local/bin:$PATH",
+      "echo 'Installing Ansible collections...'",
+      "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
@@ -1006,6 +1025,8 @@ build {
       "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
       "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3 -m pip install --no-index /tmp/python-deps/*.whl; else echo 'Installing Ansible from PyPI...'; python3 -m pip install ansible-core; fi",
       "export PATH=/usr/local/bin:$PATH",
+      "echo 'Installing Ansible collections...'",
+      "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/libexec/platform-python\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
