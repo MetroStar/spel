@@ -790,11 +790,39 @@ python:setup:
   stage: setup
   needs: ["setup"]
   script:
-    - echo "Installing Python dependencies..."
+    - echo "Setting up Python 3.9 environment..."
     
-    # Create virtual environment
-    - python3 -m venv .venv
+    # Ensure Python 3.9 is available
+    - |
+      if ! command -v python3.9 &> /dev/null; then
+        echo "Python 3.9 not found, attempting installation..."
+        if command -v dnf &> /dev/null; then
+          sudo dnf install -y python39 python39-pip
+        elif command -v yum &> /dev/null; then
+          sudo yum install -y python39 python39-pip
+        elif command -v apt-get &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y python3.9 python3.9-venv
+        else
+          echo "❌ Could not install Python 3.9 - unsupported package manager"
+          exit 1
+        fi
+      fi
+    
+    # Verify Python 3.9 version
+    - |
+      echo "=== Python Version ==="
+      python3.9 --version
+      echo "======================"
+    
+    # Create virtual environment with Python 3.9
+    - python3.9 -m venv .venv
     - source .venv/bin/activate
+    
+    # Verify virtual environment is using Python 3.9
+    - |
+      echo "=== Virtual Environment Python ==="
+      python --version
+      echo "==================================="
     
     # Install from offline wheels if available
     - |
