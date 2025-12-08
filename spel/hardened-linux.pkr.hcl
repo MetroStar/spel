@@ -916,7 +916,7 @@ build {
       "python3.9 --version",
       "echo 'Checking for offline Python wheels...'",
       "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
-      "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3.9 -m pip install --no-index --ignore-installed /tmp/python-deps/*.whl; else echo 'Installing Ansible from PyPI...'; python3.9 -m pip install ansible-core; fi",
+      "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3.9 -m pip install --no-index --ignore-installed --no-warn-conflicts /tmp/python-deps/*.whl; else echo 'Installing Ansible from PyPI...'; python3.9 -m pip install ansible-core; fi",
       "export PATH=/usr/local/bin:$PATH",
       "echo 'Installing Ansible collections...'",
       "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
