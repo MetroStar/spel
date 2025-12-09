@@ -109,8 +109,8 @@ fi
 # Note: ansible-core 2.11.x was removed from PyPI, but 'ansible' 4.x (includes core 2.11.x) is still available
 log_info "Downloading Python 3.6 wheels for RHEL 8, Oracle Linux 8 (using ansible 4.x package)..."
 
+# First, download all dependencies as wheels
 PACKAGES_PY36=(
-    "ansible>=4.0.0,<5.0.0"
     "pywinrm>=0.4.3"
     "requests>=2.27.0,<2.32.0"
     "requests-ntlm>=1.1.0"
@@ -124,21 +124,25 @@ PACKAGES_PY36=(
     "pytest-testinfra>=6.0.0,<10.0.0"
 )
 
-# Note: ansible package for Python 3.6 is only available as source (.tar.gz)
-# We allow source distributions for Python 3.6 since wheels aren't available
-if python3.9 -m pip download \
+python3.9 -m pip download \
     --dest "$TOOLS_DIR" \
     --python-version 36 \
     --platform manylinux2014_x86_64 \
     --implementation cp \
-    "${PACKAGES_PY36[@]}" 2>&1 | tee /tmp/pip-download-py36.log; then
-    
-    log_info "  ✓ Python 3.6 packages downloaded successfully"
-else
-    log_warn "  ⚠ Some Python 3.6 packages may not be available"
-    log_warn "Check /tmp/pip-download-py36.log for details"
-    log_warn "This is expected for some packages - continuing..."
-fi
+    --only-binary=:all: \
+    "${PACKAGES_PY36[@]}" 2>&1 | tee /tmp/pip-download-py36-wheels.log
+
+log_info "  ✓ Python 3.6 dependency wheels downloaded"
+
+# Second, download ansible package separately as source (no platform constraints needed)
+# Note: ansible 4.x only available as source distribution (.tar.gz)
+log_info "Downloading ansible 4.x package for Python 3.6 (source distribution)..."
+python3.9 -m pip download \
+    --dest "$TOOLS_DIR" \
+    --python-version 36 \
+    "ansible>=4.0.0,<5.0.0" 2>&1 | tee /tmp/pip-download-py36-ansible.log
+
+log_info "  ✓ ansible package downloaded (source distribution)"
 
 # Count downloaded packages (wheels and source distributions)
 WHEEL_COUNT=$(find "$TOOLS_DIR" -name "*.whl" | wc -l)
