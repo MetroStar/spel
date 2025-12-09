@@ -88,22 +88,38 @@ done
 # This will get pure-Python wheels where available and platform-specific where needed
 log_info "Downloading Python wheels..."
 
-# Download for the specified Python version (defaults to 3.9 for RHEL 8/9 compatibility)
-# This will download all dependencies including lxml with proper binary wheels
-# Use python3.9 -m pip to ensure we use the correct interpreter (not shebang)
+# Download for Python 3.9 (EL9, AL2023, CI/CD runners)
+log_info "Downloading Python 3.9 wheels for RHEL 9, Oracle Linux 9, Amazon Linux 2023, CI/CD..."
 if python3.9 -m pip download \
     --dest "$TOOLS_DIR" \
-    --python-version "$PYTHON_VERSION" \
+    --python-version 39 \
     --platform manylinux2014_x86_64 \
     --implementation cp \
     --only-binary=:all: \
-    "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download.log; then
+    "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download-py39.log; then
     
-    log_info "  ✓ Wheels downloaded successfully"
+    log_info "  ✓ Python 3.9 wheels downloaded successfully"
 else
-    log_error "  ✗ Failed to download wheels"
-    log_error "Check /tmp/pip-download.log for details"
+    log_error "  ✗ Failed to download Python 3.9 wheels"
+    log_error "Check /tmp/pip-download-py39.log for details"
     exit 1
+fi
+
+# Download for Python 3.6 (EL8 - RHEL 8, Oracle Linux 8)
+log_info "Downloading Python 3.6 wheels for RHEL 8, Oracle Linux 8..."
+if python3.9 -m pip download \
+    --dest "$TOOLS_DIR" \
+    --python-version 36 \
+    --platform manylinux2014_x86_64 \
+    --implementation cp \
+    --only-binary=:all: \
+    "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download-py36.log; then
+    
+    log_info "  ✓ Python 3.6 wheels downloaded successfully"
+else
+    log_warn "  ⚠ Some Python 3.6 wheels may not be available"
+    log_warn "Check /tmp/pip-download-py36.log for details"
+    log_warn "This is expected for some packages - continuing..."
 fi
 
 # Count downloaded wheels
@@ -122,7 +138,7 @@ cat > "$VERSION_FILE" <<EOF
 # Ansible Core and Dependencies - Python Wheels
 # Downloaded on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-Python Version: ${PYTHON_VERSION}
+Python Versions: 3.6 (EL8), 3.9 (EL9, AL2023, CI/CD)
 Platform: manylinux2014_x86_64
 Ansible Core Version: ${ANSIBLE_VERSION}
 
@@ -153,27 +169,29 @@ Installation Instructions
 
 On Offline system after extraction:
 
-1. Ensure Python ${PYTHON_VERSION} is installed:
+For EL8 (RHEL 8, Oracle Linux 8) - Python 3.6:
+   python3.6 --version
+   python3.6 -m pip install --upgrade pip
+   python3.6 -m pip install --no-index --find-links tools/python-deps/ "ansible-core${ANSIBLE_VERSION}"
+
+For EL9, AL2023, CI/CD - Python 3.9:
    python3.9 --version
+   python3.9 -m pip install --no-index --find-links tools/python-deps/ "ansible-core${ANSIBLE_VERSION}"
 
-2. Install Ansible Core and dependencies from wheels:
-   pip install --no-index --find-links tools/python-deps/ "ansible-core${ANSIBLE_VERSION}"
-
-   Or install all wheels:
-   pip install --no-index --find-links tools/python-deps/ tools/python-deps/*.whl
-
-3. Verify installation:
+Verify installation:
    ansible --version
    ansible-galaxy --version
 
-4. Test Ansible:
+Test Ansible:
    ansible localhost -m ping
 
 Notes
 =====
-- Wheels are compatible with Python ${PYTHON_VERSION} on Linux x86_64
-- Includes both pure-Python and platform-specific binary wheels
-- All dependencies for pywinrm, requests, passlib, lxml, xmltodict, jmespath included
+- Wheels for both Python 3.6 and 3.9 are included
+- Python 3.6: RHEL 8, Oracle Linux 8 (system default)
+- Python 3.9: RHEL 9, Oracle Linux 9, Amazon Linux 2023, GitHub/GitLab CI
+- Compatible with Linux x86_64 (manylinux2014)
+- All dependencies included (pywinrm, requests, passlib, lxml, etc.)
 - No internet connection required for installation
 
 Package Details
