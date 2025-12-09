@@ -124,24 +124,27 @@ PACKAGES_PY36=(
     "pytest-testinfra>=6.0.0,<10.0.0"
 )
 
+# Note: ansible package for Python 3.6 is only available as source (.tar.gz)
+# We allow source distributions for Python 3.6 since wheels aren't available
 if python3.9 -m pip download \
     --dest "$TOOLS_DIR" \
     --python-version 36 \
     --platform manylinux2014_x86_64 \
     --implementation cp \
-    --only-binary=:all: \
     "${PACKAGES_PY36[@]}" 2>&1 | tee /tmp/pip-download-py36.log; then
     
-    log_info "  ✓ Python 3.6 wheels downloaded successfully"
+    log_info "  ✓ Python 3.6 packages downloaded successfully"
 else
-    log_warn "  ⚠ Some Python 3.6 wheels may not be available"
+    log_warn "  ⚠ Some Python 3.6 packages may not be available"
     log_warn "Check /tmp/pip-download-py36.log for details"
     log_warn "This is expected for some packages - continuing..."
 fi
 
-# Count downloaded wheels
+# Count downloaded packages (wheels and source distributions)
 WHEEL_COUNT=$(find "$TOOLS_DIR" -name "*.whl" | wc -l)
-log_info "Downloaded ${WHEEL_COUNT} wheel files"
+SDIST_COUNT=$(find "$TOOLS_DIR" -name "*.tar.gz" | wc -l)
+TOTAL_PACKAGES=$((WHEEL_COUNT + SDIST_COUNT))
+log_info "Downloaded ${WHEEL_COUNT} wheels and ${SDIST_COUNT} source distributions (${TOTAL_PACKAGES} total)"
 
 # Calculate total size
 TOTAL_SIZE=$(du -sh "$TOOLS_DIR" | awk '{print $1}')
@@ -165,12 +168,12 @@ Downloaded Packages
 ===================
 EOF
 
-# List all downloaded wheels with sizes
-log_debug "Listing downloaded wheels..."
-find "$TOOLS_DIR" -name "*.whl" -type f | sort | while read -r wheel; do
-    filename=$(basename "$wheel")
-    size=$(du -h "$wheel" | awk '{print $1}')
-    sha256=$(sha256sum "$wheel" | awk '{print $1}')
+# List all downloaded packages (wheels and source distributions) with sizes
+log_debug "Listing downloaded packages..."
+find "$TOOLS_DIR" \( -name "*.whl" -o -name "*.tar.gz" \) -type f | sort | while read -r package; do
+    filename=$(basename "$package")
+    size=$(du -h "$package" | awk '{print $1}')
+    sha256=$(sha256sum "$package" | awk '{print $1}')
     
     echo "${filename}" >> "$VERSION_FILE"
     echo "  Size: ${size}" >> "$VERSION_FILE"
@@ -279,16 +282,18 @@ log_info "========================================="
 log_info "Ansible Core Download Complete!"
 log_info "========================================="
 log_info ""
-log_info "Downloaded wheels:"
-find "$TOOLS_DIR" -name "*.whl" -type f | sort | while read -r wheel; do
-    filename=$(basename "$wheel")
-    size=$(du -h "$wheel" | awk '{print $1}')
+log_info "Downloaded packages:"
+find "$TOOLS_DIR" \( -name "*.whl" -o -name "*.tar.gz" \) -type f | sort | while read -r package; do
+    filename=$(basename "$package")
+    size=$(du -h "$package" | awk '{print $1}')
     printf "  %-60s %10s\n" "$filename" "$size"
 done
 
 log_info ""
 log_info "Summary:"
-log_info "  Total wheels: ${WHEEL_COUNT}"
+log_info "  Wheels: ${WHEEL_COUNT}"
+log_info "  Source distributions: ${SDIST_COUNT}"
+log_info "  Total packages: ${TOTAL_PACKAGES}"
 log_info "  Total size: ${TOTAL_SIZE}"
 log_info "  Location: ${TOOLS_DIR}"
 log_info "  Manifest: ${VERSION_FILE}"
