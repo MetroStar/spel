@@ -1043,7 +1043,7 @@ build {
       "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
+      "ansible-playbook -vvv -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
       "bash /tmp/boot-fips-wrapper.sh post",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
