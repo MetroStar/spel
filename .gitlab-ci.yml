@@ -865,19 +865,14 @@ packer:init:
     - export PACKER_PLUGIN_PATH="${CI_PROJECT_DIR}/tools/packer/plugins"
     - mkdir -p "${PACKER_PLUGIN_PATH}"
     
-    # Initialize plugins for Linux builds
+    # Initialize plugins for builds
     - |
       cd spel
       echo "Initializing minimal-linux.pkr.hcl..."
-      packer init minimal-linux.pkr.hcl || echo "⚠ Minimal Linux init failed"
+      packer init minimal-linux.pkr.hcl || echo "⚠ Minimal init failed"
       
       echo "Initializing hardened-linux.pkr.hcl..."
-      packer init hardened-linux.pkr.hcl || echo "⚠ Hardened Linux init failed"
-    
-    # Initialize plugins for Windows builds
-    - |
-      echo "Initializing hardened-windows.pkr.hcl..."
-      packer init hardened-windows.pkr.hcl || echo "⚠ Windows init failed"
+      packer init hardened-linux.pkr.hcl || echo "⚠ Hardened init failed"
     
     - cd ..
     - echo "✓ Plugin initialization complete"
