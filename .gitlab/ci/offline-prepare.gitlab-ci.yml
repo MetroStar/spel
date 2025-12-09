@@ -1,0 +1,479 @@
+# GitLab CI workflow for preparing offline transfer archives
+# This workflow runs in the Offline environment (with proxy access)
+# and creates archives containing Packer, Ansible, and other dependencies
+# for use in air-gapped AWS GovCloud environments.
+#
+# Trigger this workflow manually by setting:
+#   PREPARE_OFFLINE_TRANSFER=true
+#
+# Archive outputs:
+# - offline-transfer-base.tar.gz: Core dependencies (~100 MB)
+# - offline-transfer-complete.tar.gz: All dependencies (~500 MB)
+
+workflow:
+  rules:
+    - if: '$PREPARE_OFFLINE_TRANSFER == "true"'
+
+variables:
+  # Packer configuration
+  PACKER_VERSION: "1.11.2"
+  PACKER_PLUGIN_VERSION_AMAZON: "1.3.3"
+  PACKER_PLUGIN_VERSION_ANSIBLE: "1.1.2"
+  
+  # Ansible configuration
+  ANSIBLE_CORE_MIN: "2.14"
+  ANSIBLE_CORE_MAX: "2.16"
+  
+  # Python configuration (RHEL 8/9 compatible)
+  PYTHON_VERSION: "3.9"
+  
+  # Archive configuration
+  ARCHIVE_RETENTION_DAYS: "90"
+
+stages:
+  - prepare
+
+prepare:offline-archives:
+  stage: prepare
+  image: fedora:latest
+  tags:
+    - spel-offline-runner
+  timeout: 30 minutes
+  
+  before_script:
+    # Configure proxy for offline environment
+    - |
+      if [ -n "$HTTP_PROXY" ]; then
+        echo "Configuring HTTP proxy: $HTTP_PROXY"
+        export http_proxy="$HTTP_PROXY"
+        export HTTP_PROXY="$HTTP_PROXY"
+      fi
+      if [ -n "$HTTPS_PROXY" ]; then
+        echo "Configuring HTTPS proxy: $HTTPS_PROXY"
+        export https_proxy="$HTTPS_PROXY"
+        export HTTPS_PROXY="$HTTPS_PROXY"
+      fi
+      if [ -n "$NO_PROXY" ]; then
+        echo "Configuring NO_PROXY: $NO_PROXY"
+        export no_proxy="$NO_PROXY"
+        export NO_PROXY="$NO_PROXY"
+      fi
+    
+    # Update system and install dependencies
+    - echo "Installing system dependencies..."
+    - dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip wget unzip tar gzip findutils clamav clamav-update clamd
+    
+    # Configure ClamAV with proxy support
+    - |
+      if [ -n "$HTTP_PROXY" ]; then
+        PROXY_HOST=$(echo "$HTTP_PROXY" | sed -e 's|^[^/]*//||' -e 's|:.*$||')
+        PROXY_PORT=$(echo "$HTTP_PROXY" | sed -e 's|^.*:||' -e 's|/.*$||')
+        echo "Configuring ClamAV proxy: $PROXY_HOST:$PROXY_PORT"
+        cat > /etc/freshclam.conf << EOF
+      DatabaseMirror database.clamav.net
+      HTTPProxyServer $PROXY_HOST
+      HTTPProxyPort $PROXY_PORT
+      LogVerbose yes
+      DatabaseDirectory /var/lib/clamav
+      EOF
+      fi
+    
+    # Create working directories
+    - mkdir -p offline-transfer/packer/binaries
+    - mkdir -p offline-transfer/packer/plugins
+    - mkdir -p offline-transfer/ansible/collections
+    - mkdir -p offline-transfer/ansible/roles
+    - mkdir -p offline-transfer/python
+    - mkdir -p offline-transfer/scripts
+    - mkdir -p offline-transfer/security-scans
+    - mkdir -p base-transfer
+    
+  script:
+    # Download Packer if enabled
+    - |
+      if [ "${DOWNLOAD_PACKER:-true}" = "true" ]; then
+        echo "=== Downloading Packer binaries ==="
+        cd offline-transfer/packer/binaries
+        
+        # Download Linux version
+        echo "Downloading Packer ${PACKER_VERSION} for Linux..."
+        wget -q "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip"
+        wget -q "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_SHA256SUMS"
+        
+        # Download Windows version
+        echo "Downloading Packer ${PACKER_VERSION} for Windows..."
+        wget -q "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_windows_amd64.zip"
+        
+        # Verify checksum for Linux
+        echo "Verifying Packer checksums..."
+        grep "packer_${PACKER_VERSION}_linux_amd64.zip" packer_${PACKER_VERSION}_SHA256SUMS | sha256sum -c -
+        
+        # Extract Linux version for plugin downloads
+        unzip -q packer_${PACKER_VERSION}_linux_amd64.zip
+        chmod +x packer
+        
+        cd ../../..
+      fi
+    
+    # Download Packer plugins if enabled
+    - |
+      if [ "${DOWNLOAD_PACKER_PLUGINS:-true}" = "true" ]; then
+        echo "=== Downloading Packer plugins ==="
+        cd offline-transfer/packer
+        
+        # Set Packer plugin directory
+        export PACKER_PLUGIN_PATH="$PWD/plugins"
+        export PATH="$PWD/binaries:$PATH"
+        
+        # Create packer config for plugins
+        cat > config.pkr.hcl << 'EOF'
+      packer {
+        required_plugins {
+          amazon = {
+            version = ">= ${PACKER_PLUGIN_VERSION_AMAZON}"
+            source  = "github.com/hashicorp/amazon"
+          }
+          ansible = {
+            version = ">= ${PACKER_PLUGIN_VERSION_ANSIBLE}"
+            source  = "github.com/hashicorp/ansible"
+          }
+        }
+      }
+      EOF
+        
+        echo "Initializing Packer plugins..."
+        packer init config.pkr.hcl
+        
+        # List downloaded plugins
+        echo "Downloaded plugins:"
+        find plugins -type f -name "packer-plugin-*"
+        
+        cd ../..
+      fi
+    
+    # Download Ansible Core if enabled
+    - |
+      if [ "${DOWNLOAD_ANSIBLE_CORE:-true}" = "true" ]; then
+        echo "=== Downloading Ansible Core ==="
+        
+        # Create Python virtual environment
+        python${PYTHON_VERSION} -m venv offline-transfer/python/venv
+        source offline-transfer/python/venv/bin/activate
+        
+        # Upgrade pip
+        pip install --upgrade pip setuptools wheel
+        
+        # Download Ansible Core within version range
+        echo "Downloading Ansible Core ${ANSIBLE_CORE_MIN}...${ANSIBLE_CORE_MAX}..."
+        pip download "ansible-core>=${ANSIBLE_CORE_MIN},<${ANSIBLE_CORE_MAX}" -d offline-transfer/python/packages
+        
+        # Install ansible-core for collection downloads
+        pip install "ansible-core>=${ANSIBLE_CORE_MIN},<${ANSIBLE_CORE_MAX}"
+        
+        # Save requirements
+        pip freeze > offline-transfer/python/requirements.txt
+        
+        deactivate
+      fi
+    
+    # Download Ansible collections if enabled
+    - |
+      if [ "${DOWNLOAD_ANSIBLE_COLLECTIONS:-true}" = "true" ]; then
+        echo "=== Downloading Ansible collections ==="
+        
+        source offline-transfer/python/venv/bin/activate
+        
+        # Parse requirements.yml for collections
+        if [ -f requirements.yml ]; then
+          echo "Downloading collections from requirements.yml..."
+          ansible-galaxy collection download -r requirements.yml -p offline-transfer/ansible/collections --no-deps
+          
+          # Also download with dependencies for complete archive
+          if [ "${INCLUDE_COLLECTION_DEPENDENCIES:-true}" = "true" ]; then
+            echo "Downloading collection dependencies..."
+            ansible-galaxy collection download -r requirements.yml -p offline-transfer/ansible/collections
+          fi
+        else
+          echo "No requirements.yml found, skipping collection download"
+        fi
+        
+        deactivate
+      fi
+    
+    # Download Ansible roles if enabled
+    - |
+      if [ "${DOWNLOAD_ANSIBLE_ROLES:-true}" = "true" ]; then
+        echo "=== Downloading Ansible roles ==="
+        
+        source offline-transfer/python/venv/bin/activate
+        
+        # Parse requirements.yml for roles
+        if [ -f requirements.yml ]; then
+          echo "Downloading roles from requirements.yml..."
+          ansible-galaxy role install -r requirements.yml -p offline-transfer/ansible/roles
+        else
+          echo "No requirements.yml found, skipping role download"
+        fi
+        
+        deactivate
+      fi
+    
+    # Download Python packages if enabled
+    - |
+      if [ "${DOWNLOAD_PYTHON_PACKAGES:-true}" = "true" ]; then
+        echo "=== Downloading Python packages ==="
+        
+        source offline-transfer/python/venv/bin/activate
+        
+        # Download packages from requirements.txt if it exists
+        if [ -f requirements.txt ]; then
+          echo "Downloading packages from requirements.txt..."
+          pip download -r requirements.txt -d offline-transfer/python/packages
+        fi
+        
+        # Download additional common packages
+        echo "Downloading common Python packages..."
+        pip download boto3 botocore jinja2 -d offline-transfer/python/packages
+        
+        deactivate
+      fi
+    
+    # Create installation scripts
+    - |
+      echo "=== Creating installation scripts ==="
+      
+      # Create Packer installation script
+      cat > offline-transfer/scripts/install-packer.sh << 'EOF'
+      #!/bin/bash
+      set -euo pipefail
+      
+      INSTALL_DIR="${1:-/usr/local/bin}"
+      PLUGIN_DIR="${HOME}/.config/packer/plugins"
+      
+      echo "Installing Packer to $INSTALL_DIR..."
+      
+      # Extract and install Packer binary
+      cd packer/binaries
+      unzip -o packer_*_linux_amd64.zip
+      sudo install -m 755 packer "$INSTALL_DIR/packer"
+      
+      # Install plugins
+      echo "Installing Packer plugins to $PLUGIN_DIR..."
+      mkdir -p "$PLUGIN_DIR"
+      cp -r ../plugins/* "$PLUGIN_DIR/"
+      
+      echo "Packer installation complete!"
+      packer version
+      EOF
+      
+      # Create Ansible installation script
+      cat > offline-transfer/scripts/install-ansible.sh << 'EOF'
+      #!/bin/bash
+      set -euo pipefail
+      
+      PYTHON_VERSION="${1:-3.9}"
+      
+      echo "Installing Ansible with Python ${PYTHON_VERSION}..."
+      
+      # Create virtual environment
+      python${PYTHON_VERSION} -m venv ansible-venv
+      source ansible-venv/bin/activate
+      
+      # Install from downloaded packages
+      pip install --no-index --find-links=python/packages ansible-core
+      
+      # Install collections
+      echo "Installing Ansible collections..."
+      for collection in ansible/collections/*.tar.gz; do
+        if [ -f "$collection" ]; then
+          ansible-galaxy collection install "$collection"
+        fi
+      done
+      
+      # Install roles
+      echo "Installing Ansible roles..."
+      for role in ansible/roles/*/; do
+        if [ -d "$role" ]; then
+          ansible-galaxy role install "$role"
+        fi
+      done
+      
+      echo "Ansible installation complete!"
+      ansible --version
+      EOF
+      
+      # Create README
+      cat > offline-transfer/README.md << 'EOF'
+      # Offline Transfer Archive
+      
+      This archive contains dependencies for building SPEL images in air-gapped environments.
+      
+      ## Contents
+      
+      - `packer/`: Packer binaries and plugins
+      - `ansible/`: Ansible collections and roles
+      - `python/`: Python packages and virtual environment
+      - `scripts/`: Installation scripts
+      - `security-scans/`: ClamAV and TruffleHog scan results
+      
+      ## Installation
+      
+      ### Install Packer
+      ```bash
+      cd offline-transfer
+      bash scripts/install-packer.sh
+      ```
+      
+      ### Install Ansible
+      ```bash
+      cd offline-transfer
+      bash scripts/install-ansible.sh 3.9
+      source ansible-venv/bin/activate
+      ```
+      
+      ## Generated By
+      
+      Pipeline: $CI_PIPELINE_URL
+      Job: $CI_JOB_ID
+      Commit: $CI_COMMIT_SHA
+      Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+      EOF
+      
+      chmod +x offline-transfer/scripts/*.sh
+    
+    # Run ClamAV scan
+    - |
+      echo "=== Running ClamAV virus scan ==="
+      
+      # Update virus definitions
+      echo "Updating ClamAV definitions..."
+      freshclam || echo "Warning: freshclam update failed, using existing definitions"
+      
+      # Scan the offline-transfer directory
+      echo "Scanning offline-transfer directory..."
+      clamscan -r -i --log=offline-transfer/security-scans/clamav-scan.log offline-transfer/ || {
+        echo "ERROR: ClamAV detected threats!"
+        cat offline-transfer/security-scans/clamav-scan.log
+        exit 1
+      }
+      
+      # Create scan summary
+      echo "ClamAV scan completed successfully" > offline-transfer/security-scans/clamav-summary.txt
+      echo "Scan date: $(date -u)" >> offline-transfer/security-scans/clamav-summary.txt
+      echo "Files scanned: $(grep 'Scanned files' offline-transfer/security-scans/clamav-scan.log | awk '{print $3}')" >> offline-transfer/security-scans/clamav-summary.txt
+      cat offline-transfer/security-scans/clamav-summary.txt
+    
+    # Run TruffleHog scan
+    - |
+      if [ "${RUN_TRUFFLEHOG:-true}" = "true" ]; then
+        echo "=== Running TruffleHog secrets scan ==="
+        
+        # Install TruffleHog
+        source offline-transfer/python/venv/bin/activate
+        pip install truffleHog3
+        
+        # Scan for secrets
+        echo "Scanning for secrets..."
+        trufflehog3 -f json -o offline-transfer/security-scans/trufflehog-results.json offline-transfer/ || {
+          echo "ERROR: TruffleHog detected secrets!"
+          cat offline-transfer/security-scans/trufflehog-results.json
+          exit 1
+        }
+        
+        # Create scan summary
+        echo "TruffleHog scan completed successfully" > offline-transfer/security-scans/trufflehog-summary.txt
+        echo "Scan date: $(date -u)" >> offline-transfer/security-scans/trufflehog-summary.txt
+        echo "No secrets detected" >> offline-transfer/security-scans/trufflehog-summary.txt
+        cat offline-transfer/security-scans/trufflehog-summary.txt
+        
+        deactivate
+      fi
+    
+    # Create base archive (core dependencies only)
+    - |
+      if [ "${CREATE_BASE_ARCHIVE:-true}" = "true" ]; then
+        echo "=== Creating base archive ==="
+        
+        # Copy core dependencies to base-transfer
+        cp -r offline-transfer/packer base-transfer/
+        cp -r offline-transfer/python base-transfer/
+        cp -r offline-transfer/scripts base-transfer/
+        cp -r offline-transfer/security-scans base-transfer/
+        cp offline-transfer/README.md base-transfer/
+        
+        # Create archive
+        echo "Creating offline-transfer-base.tar.gz..."
+        tar -czf offline-transfer-base.tar.gz -C base-transfer .
+        
+        # Generate checksum
+        sha256sum offline-transfer-base.tar.gz > offline-transfer-base.tar.gz.sha256
+        
+        # Display size
+        ls -lh offline-transfer-base.tar.gz
+        cat offline-transfer-base.tar.gz.sha256
+      fi
+    
+    # Create complete archive
+    - |
+      if [ "${CREATE_COMPLETE_ARCHIVE:-true}" = "true" ]; then
+        echo "=== Creating complete archive ==="
+        
+        # Create archive with all dependencies
+        echo "Creating offline-transfer-complete.tar.gz..."
+        tar -czf offline-transfer-complete.tar.gz offline-transfer/
+        
+        # Generate checksum
+        sha256sum offline-transfer-complete.tar.gz > offline-transfer-complete.tar.gz.sha256
+        
+        # Display size
+        ls -lh offline-transfer-complete.tar.gz
+        cat offline-transfer-complete.tar.gz.sha256
+      fi
+    
+    # Generate manifest
+    - |
+      echo "=== Generating manifest ==="
+      
+      cat > archive-manifest.txt << EOF
+      Offline Transfer Archive Manifest
+      ===================================
+      
+      Pipeline: $CI_PIPELINE_URL
+      Job: $CI_JOB_ID
+      Commit: $CI_COMMIT_SHA
+      Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+      
+      Archives:
+      EOF
+      
+      if [ -f offline-transfer-base.tar.gz ]; then
+        echo "  - offline-transfer-base.tar.gz" >> archive-manifest.txt
+        echo "    Size: $(du -h offline-transfer-base.tar.gz | cut -f1)" >> archive-manifest.txt
+        echo "    SHA256: $(cut -d' ' -f1 offline-transfer-base.tar.gz.sha256)" >> archive-manifest.txt
+      fi
+      
+      if [ -f offline-transfer-complete.tar.gz ]; then
+        echo "  - offline-transfer-complete.tar.gz" >> archive-manifest.txt
+        echo "    Size: $(du -h offline-transfer-complete.tar.gz | cut -f1)" >> archive-manifest.txt
+        echo "    SHA256: $(cut -d' ' -f1 offline-transfer-complete.tar.gz.sha256)" >> archive-manifest.txt
+      fi
+      
+      echo "" >> archive-manifest.txt
+      echo "Components:" >> archive-manifest.txt
+      echo "  - Packer: ${PACKER_VERSION}" >> archive-manifest.txt
+      echo "  - Ansible Core: ${ANSIBLE_CORE_MIN}-${ANSIBLE_CORE_MAX}" >> archive-manifest.txt
+      echo "  - Python: ${PYTHON_VERSION}" >> archive-manifest.txt
+      
+      cat archive-manifest.txt
+  
+  artifacts:
+    name: "offline-transfer-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - offline-transfer-base.tar.gz
+      - offline-transfer-base.tar.gz.sha256
+      - offline-transfer-complete.tar.gz
+      - offline-transfer-complete.tar.gz.sha256
+      - archive-manifest.txt
+      - offline-transfer/security-scans/
+    expire_in: 90 days
+    when: on_success
