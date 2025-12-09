@@ -177,14 +177,12 @@ extract:archives:
       echo "Collections: $(du -sh spel/ansible/collections 2>/dev/null | awk '{print $1}' || echo 'N/A')"
       echo "Roles: $(du -sh spel/ansible/roles 2>/dev/null | awk '{print $1}' || echo 'N/A')"
       echo "Packages: $(du -sh offline-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
-      echo "SPEL packages: $(du -sh spel-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
       echo "========================="
   artifacts:
     paths:
       - offline-packages/
       - spel/ansible/roles/
       - spel/ansible/collections/
-      - spel-packages/
       - tools/
       - vendor/
       - spel-offline-*-clamav-scan.log    # Preserve ClamAV scan log for audit trail
