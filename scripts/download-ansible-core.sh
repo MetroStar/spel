@@ -105,12 +105,12 @@ else
     exit 1
 fi
 
-# Download for Python 3.6 (EL8 - RHEL 8, Oracle Linux 8) - Ansible 2.11.x
-# Note: Ansible Core 2.12+ requires Python 3.8+, so we use 2.11.x for Python 3.6
-log_info "Downloading Python 3.6 wheels for RHEL 8, Oracle Linux 8 (using Ansible 2.11.x)..."
+# Download for Python 3.6 (EL8 - RHEL 8, Oracle Linux 8) - Use 'ansible' package
+# Note: ansible-core 2.11.x was removed from PyPI, but 'ansible' 4.x (includes core 2.11.x) is still available
+log_info "Downloading Python 3.6 wheels for RHEL 8, Oracle Linux 8 (using ansible 4.x package)..."
 
 PACKAGES_PY36=(
-    "ansible-core>=2.11.0,<2.12.0"
+    "ansible>=4.0.0,<5.0.0"
     "pywinrm>=0.4.3"
     "requests>=2.27.0,<2.32.0"
     "requests-ntlm>=1.1.0"
@@ -156,7 +156,8 @@ cat > "$VERSION_FILE" <<EOF
 # Downloaded on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 Python Versions: 
-  - 3.6 (EL8): Ansible Core 2.11.x (last version supporting Python 3.6)
+  - 3.6 (EL8): ansible 4.x package (includes ansible-core 2.11.x)
+    Note: ansible-core 2.11.x was removed from PyPI, using 'ansible' package instead
   - 3.9 (EL9, AL2023, CI/CD): Ansible Core 2.14-2.15.x
 Platform: manylinux2014_x86_64
 
@@ -187,10 +188,10 @@ Installation Instructions
 
 On Offline system after extraction:
 
-For EL8 (RHEL 8, Oracle Linux 8) - Python 3.6 with Ansible 2.11.x:
+For EL8 (RHEL 8, Oracle Linux 8) - Python 3.6 with ansible 4.x:
    python3.6 --version
    python3.6 -m pip install --upgrade pip
-   python3.6 -m pip install --no-index --find-links tools/python-deps/ "ansible-core>=2.11.0,<2.12.0"
+   python3.6 -m pip install --no-index --find-links tools/python-deps/ "ansible>=4.0.0,<5.0.0"
 
 For EL9, AL2023, CI/CD - Python 3.9 with Ansible 2.14-2.15.x:
    python3.9 --version
@@ -206,9 +207,10 @@ Test Ansible:
 Notes
 =====
 - Wheels for both Python 3.6 and 3.9 are included
-- Python 3.6: RHEL 8, Oracle Linux 8 (system default) - Ansible Core 2.11.x
+- Python 3.6: RHEL 8, Oracle Linux 8 (system default) - ansible 4.x package (includes ansible-core 2.11.x)
+  * ansible-core 2.11.x was removed from PyPI, so we use the 'ansible' package instead
 - Python 3.9: RHEL 9, Oracle Linux 9, Amazon Linux 2023, GitHub/GitLab CI - Ansible Core 2.14-2.15.x
-- Ansible Core 2.12+ requires Python 3.8+, so EL8 uses the last 2.11.x release
+- Ansible Core 2.12+ requires Python 3.8+, so EL8 uses ansible 4.x (last version supporting Python 3.6)
 - Compatible with Linux x86_64 (manylinux2014)
 - All dependencies included (pywinrm, requests, passlib, lxml, etc.)
 - No internet connection required for installation
@@ -292,5 +294,6 @@ log_info "  Location: ${TOOLS_DIR}"
 log_info "  Manifest: ${VERSION_FILE}"
 log_info ""
 log_info "Installation command for Offline:"
-log_info "  pip install --no-index --find-links tools/python-deps/ \"ansible-core${ANSIBLE_VERSION}\""
+log_info "  EL8:  python3.6 -m pip install --no-index --find-links tools/python-deps/ \"ansible>=4.0.0,<5.0.0\""
+log_info "  EL9+: python3.9 -m pip install --no-index --find-links tools/python-deps/ \"ansible-core>=2.14.0,<2.16.0\""
 log_info "========================================="
