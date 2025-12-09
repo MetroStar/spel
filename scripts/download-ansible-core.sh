@@ -88,7 +88,7 @@ done
 # This will get pure-Python wheels where available and platform-specific where needed
 log_info "Downloading Python wheels..."
 
-# Download for Python 3.9 (EL9, AL2023, CI/CD runners)
+# Download for Python 3.9 (EL9, AL2023, CI/CD runners) - Ansible 2.14-2.15
 log_info "Downloading Python 3.9 wheels for RHEL 9, Oracle Linux 9, Amazon Linux 2023, CI/CD..."
 if python3.9 -m pip download \
     --dest "$TOOLS_DIR" \
@@ -105,15 +105,32 @@ else
     exit 1
 fi
 
-# Download for Python 3.6 (EL8 - RHEL 8, Oracle Linux 8)
-log_info "Downloading Python 3.6 wheels for RHEL 8, Oracle Linux 8..."
+# Download for Python 3.6 (EL8 - RHEL 8, Oracle Linux 8) - Ansible 2.11.x
+# Note: Ansible Core 2.12+ requires Python 3.8+, so we use 2.11.x for Python 3.6
+log_info "Downloading Python 3.6 wheels for RHEL 8, Oracle Linux 8 (using Ansible 2.11.x)..."
+
+PACKAGES_PY36=(
+    "ansible-core>=2.11.0,<2.12.0"
+    "pywinrm>=0.4.3"
+    "requests>=2.27.0,<2.32.0"
+    "requests-ntlm>=1.1.0"
+    "passlib>=1.7.4"
+    "lxml>=4.6.0,<5.0.0"
+    "xmltodict>=0.13.0"
+    "jmespath>=0.10.0"
+    "distro>=1.6.0"
+    "pytest>=6.2.0,<8.0.0"
+    "pytest-logger>=0.5.1"
+    "pytest-testinfra>=6.0.0,<10.0.0"
+)
+
 if python3.9 -m pip download \
     --dest "$TOOLS_DIR" \
     --python-version 36 \
     --platform manylinux2014_x86_64 \
     --implementation cp \
     --only-binary=:all: \
-    "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download-py36.log; then
+    "${PACKAGES_PY36[@]}" 2>&1 | tee /tmp/pip-download-py36.log; then
     
     log_info "  ✓ Python 3.6 wheels downloaded successfully"
 else
@@ -138,9 +155,10 @@ cat > "$VERSION_FILE" <<EOF
 # Ansible Core and Dependencies - Python Wheels
 # Downloaded on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-Python Versions: 3.6 (EL8), 3.9 (EL9, AL2023, CI/CD)
+Python Versions: 
+  - 3.6 (EL8): Ansible Core 2.11.x (last version supporting Python 3.6)
+  - 3.9 (EL9, AL2023, CI/CD): Ansible Core 2.14-2.15.x
 Platform: manylinux2014_x86_64
-Ansible Core Version: ${ANSIBLE_VERSION}
 
 Downloaded Packages
 ===================
@@ -169,14 +187,14 @@ Installation Instructions
 
 On Offline system after extraction:
 
-For EL8 (RHEL 8, Oracle Linux 8) - Python 3.6:
+For EL8 (RHEL 8, Oracle Linux 8) - Python 3.6 with Ansible 2.11.x:
    python3.6 --version
    python3.6 -m pip install --upgrade pip
-   python3.6 -m pip install --no-index --find-links tools/python-deps/ "ansible-core${ANSIBLE_VERSION}"
+   python3.6 -m pip install --no-index --find-links tools/python-deps/ "ansible-core>=2.11.0,<2.12.0"
 
-For EL9, AL2023, CI/CD - Python 3.9:
+For EL9, AL2023, CI/CD - Python 3.9 with Ansible 2.14-2.15.x:
    python3.9 --version
-   python3.9 -m pip install --no-index --find-links tools/python-deps/ "ansible-core${ANSIBLE_VERSION}"
+   python3.9 -m pip install --no-index --find-links tools/python-deps/ "ansible-core>=2.14.0,<2.16.0"
 
 Verify installation:
    ansible --version
@@ -188,8 +206,9 @@ Test Ansible:
 Notes
 =====
 - Wheels for both Python 3.6 and 3.9 are included
-- Python 3.6: RHEL 8, Oracle Linux 8 (system default)
-- Python 3.9: RHEL 9, Oracle Linux 9, Amazon Linux 2023, GitHub/GitLab CI
+- Python 3.6: RHEL 8, Oracle Linux 8 (system default) - Ansible Core 2.11.x
+- Python 3.9: RHEL 9, Oracle Linux 9, Amazon Linux 2023, GitHub/GitLab CI - Ansible Core 2.14-2.15.x
+- Ansible Core 2.12+ requires Python 3.8+, so EL8 uses the last 2.11.x release
 - Compatible with Linux x86_64 (manylinux2014)
 - All dependencies included (pywinrm, requests, passlib, lxml, etc.)
 - No internet connection required for installation
