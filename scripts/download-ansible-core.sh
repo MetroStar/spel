@@ -134,12 +134,12 @@ python3.9 -m pip download \
 
 log_info "  ✓ Python 3.6 dependency wheels downloaded"
 
-# Second, download ansible package separately as source (no platform constraints needed)
+# Second, download ansible package separately as source (no platform constraints)
 # Note: ansible 4.x only available as source distribution (.tar.gz)
+# We download without platform constraints since source distributions are platform-independent
 log_info "Downloading ansible 4.x package for Python 3.6 (source distribution)..."
 python3.9 -m pip download \
     --dest "$TOOLS_DIR" \
-    --python-version 36 \
     "ansible>=4.0.0,<5.0.0" 2>&1 | tee /tmp/pip-download-py36-ansible.log
 
 log_info "  ✓ ansible package downloaded (source distribution)"
