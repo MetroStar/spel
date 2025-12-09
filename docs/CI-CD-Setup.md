@@ -53,10 +53,6 @@ Location: `.github/workflows/offline-prepare.yml`
 
 ### Usage
 
-#### Automatic Monthly Run
-
-The workflow runs automatically on the 15th of each month to prepare archives for monthly SPEL builds.
-
 #### Manual Trigger
 
 1. Go to **Actions** → **Prepare Offline Transfer Archives**
@@ -147,13 +143,12 @@ This ensures Offline security compliance by preventing both malware and credenti
 
 The workflow performs a comprehensive recursive scan of all directories that will be archived:
 
-1. **mirrors/spel-packages/** - SPEL repository RPMs (~800 MB)
-2. **tools/packer/** - Packer binaries and plugins (~500 MB)
-3. **tools/python-deps/** - Python wheels and dependencies (~150 MB)
-4. **offline-packages/** - AWS utilities and tools (~5 MB)
-5. **spel/ansible/roles/** - Vendored Ansible roles (~10 MB)
-6. **spel/ansible/collections/** - Ansible collection tarballs (~50 MB)
-7. **vendor/** - Submodule dependencies (~100 MB)
+1. **tools/packer/** - Packer binaries and plugins (~500 MB)
+2. **tools/python-deps/** - Python wheels and dependencies (~150 MB)
+3. **offline-packages/** - AWS utilities and tools (~5 MB)
+4. **spel/ansible/roles/** - Vendored Ansible roles (~10 MB)
+5. **spel/ansible/collections/** - Ansible collection tarballs (~50 MB)
+6. **vendor/** - Submodule dependencies (~100 MB)
 
 **Scan Process**:
 
@@ -221,14 +216,13 @@ The scan log is:
 
 The workflow performs comprehensive secrets detection across the same directories scanned by ClamAV, plus configuration files:
 
-1. **mirrors/spel-packages/** - SPEL repository RPMs
-2. **tools/packer/** - Packer binaries and plugins
-3. **tools/python-deps/** - Python wheels and dependencies
-4. **offline-packages/** - AWS utilities and tools
-5. **spel/ansible/roles/** - Vendored Ansible roles
-6. **spel/ansible/collections/** - Ansible collection tarballs
-7. **vendor/** - Submodule dependencies
-8. **Configuration files** - `*.pkr.hcl`, `*.sh` scripts
+1. **tools/packer/** - Packer binaries and plugins
+2. **tools/python-deps/** - Python wheels and dependencies
+3. **offline-packages/** - AWS utilities and tools
+4. **spel/ansible/roles/** - Vendored Ansible roles
+5. **spel/ansible/collections/** - Ansible collection tarballs
+6. **vendor/** - Submodule dependencies
+7. **Configuration files** - `*.pkr.hcl`, `*.sh` scripts
 
 **Scan Process**:
 
@@ -241,7 +235,6 @@ The workflow performs comprehensive secrets detection across the same directorie
 
 ```
 === TruffleHog Secrets Scan Summary ===
-Scanning: mirrors/spel-packages
 Scanning: tools/packer
 Scanning: tools/python-deps
 Scanning: offline-packages
@@ -515,7 +508,7 @@ git push
 - Build stage jobs are manual - click **▶** on desired `build:*` job
 - Each OS build takes 2-5 hours depending on hardening level
 
-#### Scenario 2: Monthly AMI Builds (After Initial Setup)
+#### Scenario 2: Subsequent AMI Builds (After Initial Setup)
 
 After infrastructure is created and archives are extracted:
 
@@ -798,7 +791,7 @@ Builds AMI images for specific operating systems.
 - `build:all` - All OS builds in parallel (only on tagged releases)
 
 **Run when**:
-- Monthly AMI builds
+- Regular AMI builds (as needed)
 - Ad-hoc rebuilds for specific OS
 - Full release builds (on tags)
 
@@ -867,11 +860,11 @@ For **Windows Server** builds in offline environments:
 
 ## Complete Workflow Example
 
-### Month 1: Initial Setup
+### Initial Setup
 
 **Internet System (GitHub Actions)**:
 ```bash
-# Automatic on 15th of month, or manually trigger
+# Manually trigger workflow
 # Downloads: roles, collections, packages, tools
 # Creates: spel-*.tar.gz archives (~1 GB)
 # Uploads to GitHub artifacts
@@ -901,11 +894,11 @@ git push
 # Repository setup complete!
 ```
 
-### Month 2+: Updates Only
+### Subsequent Updates
 
 **Internet System (GitHub Actions)**:
 ```bash
-# Automatic monthly run creates new archives
+# Manually trigger workflow to create new archives
 # Only changed components need transfer (usually just roles/collections)
 ```
 
@@ -932,7 +925,7 @@ Solution: Ensure archives are in repository root
 ls -lh spel-*.tar.gz
 
 # Expected files:
-# spel-offline-YYYYMMDD-base.tar.gz (SPEL packages, roles)
+# spel-offline-YYYYMMDD-base.tar.gz (offline packages, roles)
 # spel-offline-YYYYMMDD-tools.tar.gz (Packer, Python)
 # spel-offline-YYYYMMDD-complete.tar.gz (Everything, optional)
 ```
@@ -1400,9 +1393,9 @@ echo $PKR_VAR_aws_offline_ami_regions
 ```bash
 Solution: Archives are split into base, tools, complete
 
-# Base archive (~700 MB): SPEL packages, offline packages, roles
+# Base archive (~100 MB): offline packages, roles
 # Tools archive (~400 MB): Packer, Python, collections
-# Complete archive (~1.1 GB): Everything combined (optional)
+# Complete archive (~500 MB): Everything combined (optional)
 
 # Maximum artifact size: 2 GB per file
 # Current archives are well within limits
@@ -1426,10 +1419,10 @@ Solution: Increase timeout-minutes in workflow file
 
 - **Typical Runtime**: 2-3 minutes (measured: 2:25)
 - **Timeout**: 10 minutes
-- **Archives Created**: 1.1 GB total
-  - Base archive: ~700 MB (SPEL packages, offline packages, roles)
+- **Archives Created**: 500 MB total
+  - Base archive: ~100 MB (offline packages, roles)
   - Tools archive: ~400 MB (Packer binaries, Python wheels, collections)
-  - Complete archive: ~1.1 GB (everything combined, optional)
+  - Complete archive: ~500 MB (everything combined, optional)
 
 ### GitLab CI Pipeline Stages
 
@@ -1753,7 +1746,6 @@ If you have an existing GitLab CI setup without the infrastructure and setup sta
 ### GitLab Runner (Offline)
 
 - **Extracted archives**: ~1 GB
-  - SPEL packages: 56 KB
   - Offline packages: 86 MB
   - Ansible roles: 4 MB (git clones)
   - Ansible collections: 3.5 MB (tarballs)
