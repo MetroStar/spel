@@ -88,67 +88,27 @@ done
 # This will get pure-Python wheels where available and platform-specific where needed
 log_info "Downloading Python wheels..."
 
-# Download for Python 3.9 (EL9, AL2023, CI/CD runners) - Ansible 2.14-2.15
-log_info "Downloading Python 3.9 wheels for RHEL 9, Oracle Linux 9, Amazon Linux 2023, CI/CD..."
+# Download for the specified Python version (defaults to 3.9 for RHEL 8/9 compatibility)
+# This will download all dependencies including lxml with proper binary wheels
+# Use python3.9 -m pip to ensure we use the correct interpreter (not shebang)
 if python3.9 -m pip download \
     --dest "$TOOLS_DIR" \
-    --python-version 39 \
+    --python-version "$PYTHON_VERSION" \
     --platform manylinux2014_x86_64 \
     --implementation cp \
     --only-binary=:all: \
-    "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download-py39.log; then
+    "${PACKAGES[@]}" 2>&1 | tee /tmp/pip-download.log; then
     
-    log_info "  ✓ Python 3.9 wheels downloaded successfully"
+    log_info "  ✓ Wheels downloaded successfully"
 else
-    log_error "  ✗ Failed to download Python 3.9 wheels"
-    log_error "Check /tmp/pip-download-py39.log for details"
+    log_error "  ✗ Failed to download wheels"
+    log_error "Check /tmp/pip-download.log for details"
     exit 1
 fi
 
-# Download for Python 3.6 (EL8 - RHEL 8, Oracle Linux 8) - Use 'ansible' package
-# Note: ansible-core 2.11.x was removed from PyPI, but 'ansible' 4.x (includes core 2.11.x) is still available
-log_info "Downloading Python 3.6 wheels for RHEL 8, Oracle Linux 8 (using ansible 4.x package)..."
-
-# First, download all dependencies as wheels
-PACKAGES_PY36=(
-    "pywinrm>=0.4.3"
-    "requests>=2.27.0,<2.32.0"
-    "requests-ntlm>=1.1.0"
-    "passlib>=1.7.4"
-    "lxml>=4.6.0,<5.0.0"
-    "xmltodict>=0.13.0"
-    "jmespath>=0.10.0"
-    "distro>=1.6.0"
-    "pytest>=6.2.0,<8.0.0"
-    "pytest-logger>=0.5.1"
-    "pytest-testinfra>=6.0.0,<10.0.0"
-)
-
-python3.9 -m pip download \
-    --dest "$TOOLS_DIR" \
-    --python-version 36 \
-    --platform manylinux2014_x86_64 \
-    --implementation cp \
-    --only-binary=:all: \
-    "${PACKAGES_PY36[@]}" 2>&1 | tee /tmp/pip-download-py36-wheels.log
-
-log_info "  ✓ Python 3.6 dependency wheels downloaded"
-
-# Second, download ansible package separately as source (no platform constraints)
-# Note: ansible 4.x only available as source distribution (.tar.gz)
-# We download without platform constraints since source distributions are platform-independent
-log_info "Downloading ansible 4.x package for Python 3.6 (source distribution)..."
-python3.9 -m pip download \
-    --dest "$TOOLS_DIR" \
-    "ansible>=4.0.0,<5.0.0" 2>&1 | tee /tmp/pip-download-py36-ansible.log
-
-log_info "  ✓ ansible package downloaded (source distribution)"
-
-# Count downloaded packages (wheels and source distributions)
+# Count downloaded wheels
 WHEEL_COUNT=$(find "$TOOLS_DIR" -name "*.whl" | wc -l)
-SDIST_COUNT=$(find "$TOOLS_DIR" -name "*.tar.gz" | wc -l)
-TOTAL_PACKAGES=$((WHEEL_COUNT + SDIST_COUNT))
-log_info "Downloaded ${WHEEL_COUNT} wheels and ${SDIST_COUNT} source distributions (${TOTAL_PACKAGES} total)"
+log_info "Downloaded ${WHEEL_COUNT} wheel files"
 
 # Calculate total size
 TOTAL_SIZE=$(du -sh "$TOOLS_DIR" | awk '{print $1}')
@@ -162,22 +122,20 @@ cat > "$VERSION_FILE" <<EOF
 # Ansible Core and Dependencies - Python Wheels
 # Downloaded on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-Python Versions: 
-  - 3.6 (EL8): ansible 4.x package (includes ansible-core 2.11.x)
-    Note: ansible-core 2.11.x was removed from PyPI, using 'ansible' package instead
-  - 3.9 (EL9, AL2023, CI/CD): Ansible Core 2.14-2.15.x
+Python Version: ${PYTHON_VERSION}
 Platform: manylinux2014_x86_64
+Ansible Core Version: ${ANSIBLE_VERSION}
 
 Downloaded Packages
 ===================
 EOF
 
-# List all downloaded packages (wheels and source distributions) with sizes
-log_debug "Listing downloaded packages..."
-find "$TOOLS_DIR" \( -name "*.whl" -o -name "*.tar.gz" \) -type f | sort | while read -r package; do
-    filename=$(basename "$package")
-    size=$(du -h "$package" | awk '{print $1}')
-    sha256=$(sha256sum "$package" | awk '{print $1}')
+# List all downloaded wheels with sizes
+log_debug "Listing downloaded wheels..."
+find "$TOOLS_DIR" -name "*.whl" -type f | sort | while read -r wheel; do
+    filename=$(basename "$wheel")
+    size=$(du -h "$wheel" | awk '{print $1}')
+    sha256=$(sha256sum "$wheel" | awk '{print $1}')
     
     echo "${filename}" >> "$VERSION_FILE"
     echo "  Size: ${size}" >> "$VERSION_FILE"
@@ -195,31 +153,27 @@ Installation Instructions
 
 On Offline system after extraction:
 
-For EL8 (RHEL 8, Oracle Linux 8) - Python 3.6 with ansible 4.x:
-   python3.6 --version
-   python3.6 -m pip install --upgrade pip
-   python3.6 -m pip install --no-index --find-links tools/python-deps/ "ansible>=4.0.0,<5.0.0"
-
-For EL9, AL2023, CI/CD - Python 3.9 with Ansible 2.14-2.15.x:
+1. Ensure Python ${PYTHON_VERSION} is installed:
    python3.9 --version
-   python3.9 -m pip install --no-index --find-links tools/python-deps/ "ansible-core>=2.14.0,<2.16.0"
 
-Verify installation:
+2. Install Ansible Core and dependencies from wheels:
+   pip install --no-index --find-links tools/python-deps/ "ansible-core${ANSIBLE_VERSION}"
+
+   Or install all wheels:
+   pip install --no-index --find-links tools/python-deps/ tools/python-deps/*.whl
+
+3. Verify installation:
    ansible --version
    ansible-galaxy --version
 
-Test Ansible:
+4. Test Ansible:
    ansible localhost -m ping
 
 Notes
 =====
-- Wheels for both Python 3.6 and 3.9 are included
-- Python 3.6: RHEL 8, Oracle Linux 8 (system default) - ansible 4.x package (includes ansible-core 2.11.x)
-  * ansible-core 2.11.x was removed from PyPI, so we use the 'ansible' package instead
-- Python 3.9: RHEL 9, Oracle Linux 9, Amazon Linux 2023, GitHub/GitLab CI - Ansible Core 2.14-2.15.x
-- Ansible Core 2.12+ requires Python 3.8+, so EL8 uses ansible 4.x (last version supporting Python 3.6)
-- Compatible with Linux x86_64 (manylinux2014)
-- All dependencies included (pywinrm, requests, passlib, lxml, etc.)
+- Wheels are compatible with Python ${PYTHON_VERSION} on Linux x86_64
+- Includes both pure-Python and platform-specific binary wheels
+- All dependencies for pywinrm, requests, passlib, lxml, xmltodict, jmespath included
 - No internet connection required for installation
 
 Package Details
@@ -286,23 +240,20 @@ log_info "========================================="
 log_info "Ansible Core Download Complete!"
 log_info "========================================="
 log_info ""
-log_info "Downloaded packages:"
-find "$TOOLS_DIR" \( -name "*.whl" -o -name "*.tar.gz" \) -type f | sort | while read -r package; do
-    filename=$(basename "$package")
-    size=$(du -h "$package" | awk '{print $1}')
+log_info "Downloaded wheels:"
+find "$TOOLS_DIR" -name "*.whl" -type f | sort | while read -r wheel; do
+    filename=$(basename "$wheel")
+    size=$(du -h "$wheel" | awk '{print $1}')
     printf "  %-60s %10s\n" "$filename" "$size"
 done
 
 log_info ""
 log_info "Summary:"
-log_info "  Wheels: ${WHEEL_COUNT}"
-log_info "  Source distributions: ${SDIST_COUNT}"
-log_info "  Total packages: ${TOTAL_PACKAGES}"
+log_info "  Total wheels: ${WHEEL_COUNT}"
 log_info "  Total size: ${TOTAL_SIZE}"
 log_info "  Location: ${TOOLS_DIR}"
 log_info "  Manifest: ${VERSION_FILE}"
 log_info ""
 log_info "Installation command for Offline:"
-log_info "  EL8:  python3.6 -m pip install --no-index --find-links tools/python-deps/ \"ansible>=4.0.0,<5.0.0\""
-log_info "  EL9+: python3.9 -m pip install --no-index --find-links tools/python-deps/ \"ansible-core>=2.14.0,<2.16.0\""
+log_info "  pip install --no-index --find-links tools/python-deps/ \"ansible-core${ANSIBLE_VERSION}\""
 log_info "========================================="
