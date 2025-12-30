@@ -1,5 +1,6 @@
 # Dockerfile for SPEL build environment
 # Base: Rocky Linux 8 UBI Micro (minimal image)
+# Uses multi-stage build to keep final image small
 #
 # Build:
 #   docker build -t spel-builder .
@@ -16,70 +17,37 @@
 #     -e SPEL_IDENTIFIER=spel \
 #     spel-builder make -f Makefile.spel build
 
-FROM rockylinux/rockylinux:8-ubi-micro
+# =============================================================================
+# Stage 1: Builder - Install all dependencies
+# =============================================================================
+FROM rockylinux/rockylinux:8 AS builder
 
 # Build arguments
 ARG PACKER_VERSION=1.11.2
 ARG ANSIBLE_VERSION=">=2.14.0,<2.19.0"
 
-# Environment variables
+# Environment variables for build
 ENV PACKER_VERSION=${PACKER_VERSION} \
     ANSIBLE_VERSION=${ANSIBLE_VERSION} \
-    # Packer plugin path (baked into image)
     PACKER_PLUGIN_PATH=/opt/packer/plugins \
-    # Ansible paths (baked into image)
     ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections \
     ANSIBLE_ROLES_PATH=/opt/ansible/roles \
-    # Offline packages path
-    SPEL_OFFLINE_PACKAGES=/opt/offline-packages \
-    # Workspace for bind mount
-    WORKSPACE=/workspace
+    SPEL_OFFLINE_PACKAGES=/opt/offline-packages
 
-# Install microdnf and dnf for full package management
-RUN microdnf install -y \
-        dnf \
-        dnf-plugins-core \
-    && microdnf clean all
-
-# Install system dependencies
+# Install build dependencies
 RUN dnf install -y \
-        # Version control
         git \
-        # Build tools
         make \
-        gcc \
-        gcc-c++ \
-        # Archive and compression
         tar \
         gzip \
-        xz \
-        bzip2 \
         unzip \
-        # Download tools
         curl \
         wget \
-        # Utilities
         findutils \
         which \
         jq \
-        vim-minimal \
-        # Development libraries
-        openssl-devel \
-        zlib-devel \
-        bzip2-devel \
-        readline-devel \
-        sqlite-devel \
-        libffi-devel \
-        xz-devel \
-        ncurses-devel \
-        libxml2-devel \
-        libxslt-devel \
-        # Python 3.9 (RHEL 8/9 compatible)
         python39 \
         python39-pip \
-        python39-devel \
-        python39-setuptools \
-        python39-wheel \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
@@ -92,14 +60,13 @@ RUN alternatives --set python3 /usr/bin/python3.9 \
 # Install Packer
 # =============================================================================
 RUN echo "=== Installing Packer ${PACKER_VERSION} ===" \
-    && curl -fsSL -o /tmp/packer.zip \
-        "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip" \
-    && curl -fsSL -o /tmp/packer_SHA256SUMS \
-        "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_SHA256SUMS" \
-    && cd /tmp && grep "linux_amd64" packer_SHA256SUMS | sha256sum -c - \
-    && unzip -q /tmp/packer.zip -d /usr/local/bin/ \
+    && cd /tmp \
+    && curl -fsSLO "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip" \
+    && curl -fsSLO "https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_SHA256SUMS" \
+    && grep "linux_amd64.zip" "packer_${PACKER_VERSION}_SHA256SUMS" | sha256sum -c - \
+    && unzip -q "packer_${PACKER_VERSION}_linux_amd64.zip" -d /usr/local/bin/ \
     && chmod +x /usr/local/bin/packer \
-    && rm -f /tmp/packer.zip /tmp/packer_SHA256SUMS \
+    && rm -f packer_${PACKER_VERSION}_* \
     && packer version
 
 # =============================================================================
@@ -140,7 +107,8 @@ packer {
   }
 }
 EOF
-    && echo "=== Installing Packer plugins ===" \
+
+RUN echo "=== Installing Packer plugins ===" \
     && packer init /tmp/plugins.pkr.hcl \
     && rm -f /tmp/plugins.pkr.hcl \
     && echo "Installed plugins:" \
@@ -225,13 +193,8 @@ RUN mkdir -p ${SPEL_OFFLINE_PACKAGES} \
     && ls -lh ${SPEL_OFFLINE_PACKAGES} \
     && du -sh ${SPEL_OFFLINE_PACKAGES}
 
-# =============================================================================
-# Create workspace directory
-# =============================================================================
-WORKDIR ${WORKSPACE}
-
-# Create entrypoint script
-RUN cat > /entrypoint.sh << 'EOF'
+# Create entrypoint script in builder
+RUN cat > /opt/entrypoint.sh << 'EOF'
 #!/bin/bash
 set -e
 
@@ -283,7 +246,111 @@ fi
 # Execute command
 exec "$@"
 EOF
-    && chmod +x /entrypoint.sh
+
+RUN chmod +x /opt/entrypoint.sh
+
+# =============================================================================
+# Stage 2: Final image - Rocky Linux 8 UBI Micro
+# =============================================================================
+FROM rockylinux/rockylinux:8-ubi-micro
+
+# Environment variables
+ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
+    ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections \
+    ANSIBLE_ROLES_PATH=/opt/ansible/roles \
+    SPEL_OFFLINE_PACKAGES=/opt/offline-packages \
+    WORKSPACE=/workspace \
+    PATH="/usr/local/bin:/opt/python/bin:${PATH}" \
+    PYTHONPATH="/opt/python/lib/python3.9/site-packages"
+
+# Copy Packer binary
+COPY --from=builder /usr/local/bin/packer /usr/local/bin/packer
+
+# Copy Packer plugins
+COPY --from=builder /opt/packer/plugins /opt/packer/plugins
+
+# Copy Python 3.9 installation and site-packages
+COPY --from=builder /usr/bin/python3.9 /usr/bin/python3.9
+COPY --from=builder /usr/lib64/python3.9 /usr/lib64/python3.9
+COPY --from=builder /usr/lib/python3.9 /usr/lib/python3.9
+COPY --from=builder /usr/local/lib/python3.9 /usr/local/lib/python3.9
+COPY --from=builder /usr/local/lib64/python3.9 /usr/local/lib64/python3.9
+COPY --from=builder /usr/local/bin/ansible* /usr/local/bin/
+
+# Copy required shared libraries for Python
+COPY --from=builder /usr/lib64/libpython3.9.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libexpat.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libffi.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libsqlite3.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libcrypt.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libssl.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libcrypto.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libbz2.so* /usr/lib64/
+COPY --from=builder /usr/lib64/liblzma.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libreadline.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libncurses*.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libtinfo.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libz.so* /usr/lib64/
+# Libraries for curl
+COPY --from=builder /usr/lib64/libcurl.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libnghttp2.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libidn2.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libssh.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libpsl.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libgssapi_krb5.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libkrb5.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libk5crypto.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libcom_err.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libkrb5support.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libldap*.so* /usr/lib64/
+COPY --from=builder /usr/lib64/liblber*.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libbrotli*.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libunistring.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libsasl2.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libselinux.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libpcre*.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libkeyutils.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libresolv.so* /usr/lib64/
+# Libraries for jq
+COPY --from=builder /usr/lib64/libjq.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libonig.so* /usr/lib64/
+# Libraries for gawk
+COPY --from=builder /usr/lib64/libsigsegv.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libmpfr.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libgmp.so* /usr/lib64/
+
+# Copy Ansible collections and roles
+COPY --from=builder /opt/ansible/collections /opt/ansible/collections
+COPY --from=builder /opt/ansible/roles /opt/ansible/roles
+
+# Copy offline packages
+COPY --from=builder /opt/offline-packages /opt/offline-packages
+
+# Copy entrypoint script
+COPY --from=builder /opt/entrypoint.sh /entrypoint.sh
+
+# Copy essential binaries from builder
+COPY --from=builder /usr/bin/make /usr/bin/make
+COPY --from=builder /usr/bin/git /usr/bin/git
+COPY --from=builder /usr/bin/curl /usr/bin/curl
+COPY --from=builder /usr/bin/jq /usr/bin/jq
+COPY --from=builder /usr/bin/unzip /usr/bin/unzip
+COPY --from=builder /usr/bin/find /usr/bin/find
+COPY --from=builder /usr/bin/xargs /usr/bin/xargs
+COPY --from=builder /usr/bin/which /usr/bin/which
+COPY --from=builder /usr/bin/tar /usr/bin/tar
+COPY --from=builder /usr/bin/gzip /usr/bin/gzip
+COPY --from=builder /usr/bin/gunzip /usr/bin/gunzip
+COPY --from=builder /usr/bin/grep /usr/bin/grep
+COPY --from=builder /usr/bin/awk /usr/bin/awk
+COPY --from=builder /usr/bin/sed /usr/bin/sed
+
+# Create symlinks
+RUN ln -sf /usr/bin/python3.9 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.9 /usr/bin/python
+
+# Create workspace directory
+WORKDIR ${WORKSPACE}
 
 ENTRYPOINT ["/entrypoint.sh"]
 
