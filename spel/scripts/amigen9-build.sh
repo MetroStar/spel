@@ -693,7 +693,7 @@ fi
 if [[ "${AMIGENSOURCE}" == file://* ]]; then
     AMIGEN_LOCAL_PATH="${AMIGENSOURCE#file://}"
     err_exit "Copying build-tools from local source [${AMIGEN_LOCAL_PATH}]..." NONE
-    cp -r "${AMIGEN_LOCAL_PATH}" "${ELBUILD}" || \
+    cp -r "${AMIGEN_LOCAL_PATH}/." "${ELBUILD}" || \
         err_exit "Failed copying build-tools from local source"
 else
     git clone --branch "${AMIGENBRANCH}" "${AMIGENSOURCE}" "${ELBUILD}"
