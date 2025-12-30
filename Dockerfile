@@ -32,7 +32,9 @@ ENV PACKER_VERSION=${PACKER_VERSION} \
     PACKER_PLUGIN_PATH=/opt/packer/plugins \
     ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections \
     ANSIBLE_ROLES_PATH=/opt/ansible/roles \
-    SPEL_OFFLINE_PACKAGES=/opt/offline-packages
+    SPEL_OFFLINE_PACKAGES=/opt/offline-packages \
+    AMIGEN8_PATH=/opt/amigen8 \
+    AMIGEN9_PATH=/opt/amigen9
 
 # Install build dependencies
 RUN dnf install -y \
@@ -48,6 +50,7 @@ RUN dnf install -y \
         jq \
         python39 \
         python39-pip \
+        openssh-clients \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
@@ -193,6 +196,64 @@ RUN mkdir -p ${SPEL_OFFLINE_PACKAGES} \
     && ls -lh ${SPEL_OFFLINE_PACKAGES} \
     && du -sh ${SPEL_OFFLINE_PACKAGES}
 
+# =============================================================================
+# Download Python wheels for EC2 offline Ansible installation
+# These wheels are uploaded to the EC2 instance and installed there
+# (for STIG playbooks that run locally on the EC2 instance)
+# =============================================================================
+ENV PYTHON_DEPS_PATH=/opt/python-deps
+RUN mkdir -p ${PYTHON_DEPS_PATH} \
+    && echo "=== Downloading Python wheels for EC2 offline installation ===" \
+    && python3.9 -m pip download \
+        --dest ${PYTHON_DEPS_PATH} \
+        --platform manylinux2014_x86_64 \
+        --python-version 3.9 \
+        --only-binary=:all: \
+        ansible-core \
+        pywinrm \
+        requests \
+        passlib \
+        jmespath \
+    && echo "Downloaded Python wheels:" \
+    && ls -lh ${PYTHON_DEPS_PATH} \
+    && du -sh ${PYTHON_DEPS_PATH}
+
+# =============================================================================
+# Download Ansible collection tarballs for EC2 offline installation
+# These are uploaded to EC2 and installed with ansible-galaxy
+# =============================================================================
+ENV ANSIBLE_COLLECTIONS_TARBALLS=/opt/ansible-collections-tarballs
+RUN mkdir -p ${ANSIBLE_COLLECTIONS_TARBALLS} \
+    && echo "=== Downloading Ansible collection tarballs for EC2 ===" \
+    && ansible-galaxy collection download -p ${ANSIBLE_COLLECTIONS_TARBALLS} \
+        ansible.posix:1.5.4 \
+        community.general:7.5.0 \
+        community.crypto:2.16.0 \
+    && echo "Downloaded collection tarballs:" \
+    && ls -lh ${ANSIBLE_COLLECTIONS_TARBALLS} \
+    && du -sh ${ANSIBLE_COLLECTIONS_TARBALLS}
+
+# =============================================================================
+# Copy AMIgen scripts from vendor directory (for offline EC2 builds)
+# These are uploaded to EC2 so it doesn't need to git clone from GitHub
+# =============================================================================
+COPY vendor/amigen8 ${AMIGEN8_PATH}
+COPY vendor/amigen9 ${AMIGEN9_PATH}
+RUN echo "=== Baked-in AMIgen scripts ===" \
+    && echo "AMIgen8:" && ls -la ${AMIGEN8_PATH}/*.sh 2>/dev/null | head -5 \
+    && echo "AMIgen9:" && ls -la ${AMIGEN9_PATH}/*.sh 2>/dev/null | head -5 \
+    && du -sh ${AMIGEN8_PATH} ${AMIGEN9_PATH}
+
+# =============================================================================
+# Install AWS CLI v2 (for container use)
+# =============================================================================
+RUN echo "=== Installing AWS CLI v2 ===" \
+    && cd /tmp \
+    && unzip -q ${SPEL_OFFLINE_PACKAGES}/awscli-exe-linux-x86_64.zip \
+    && ./aws/install --install-dir /opt/aws-cli --bin-dir /usr/local/bin \
+    && rm -rf /tmp/aws \
+    && aws --version
+
 # Create entrypoint script in builder
 RUN cat > /opt/entrypoint.sh << 'EOF'
 #!/bin/bash
@@ -204,6 +265,19 @@ echo "Ansible: $(ansible --version | head -1)"
 echo "Python: $(python3 --version)"
 echo ""
 
+# =============================================================================
+# Set AWS region for Packer
+# Makefile.spel expects PKR_VAR_aws_region or AWS_REGION (not AWS_DEFAULT_REGION)
+# =============================================================================
+if [ -z "${PKR_VAR_aws_region}" ]; then
+    if [ -n "${AWS_REGION}" ]; then
+        export PKR_VAR_aws_region="${AWS_REGION}"
+    elif [ -n "${AWS_DEFAULT_REGION}" ]; then
+        export PKR_VAR_aws_region="${AWS_DEFAULT_REGION}"
+        export AWS_REGION="${AWS_DEFAULT_REGION}"
+    fi
+fi
+
 # Show environment configuration
 echo "Environment:"
 echo "  SPEL_IDENTIFIER: ${SPEL_IDENTIFIER:-not set}"
@@ -211,6 +285,7 @@ echo "  SPEL_VERSION: ${SPEL_VERSION:-not set}"
 echo "  SPEL_BUILDERS: ${SPEL_BUILDERS:-not set}"
 echo "  WINDOWS_BUILDERS: ${WINDOWS_BUILDERS:-not set}"
 echo "  AWS_REGION: ${AWS_REGION:-not set}"
+echo "  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-not set}"
 echo "  PKR_VAR_aws_region: ${PKR_VAR_aws_region:-not set}"
 echo ""
 
@@ -220,6 +295,10 @@ echo "  Packer plugins: ${PACKER_PLUGIN_PATH}"
 echo "  Ansible collections: ${ANSIBLE_COLLECTIONS_PATH}"
 echo "  Ansible roles: ${ANSIBLE_ROLES_PATH}"
 echo "  Offline packages: ${SPEL_OFFLINE_PACKAGES}"
+echo "  Python wheels (for EC2): ${PYTHON_DEPS_PATH}"
+echo "  Collection tarballs (for EC2): ${ANSIBLE_COLLECTIONS_TARBALLS}"
+echo "  AMIgen8 scripts: ${AMIGEN8_PATH}"
+echo "  AMIgen9 scripts: ${AMIGEN9_PATH}"
 echo ""
 
 # Check if workspace is mounted
@@ -229,6 +308,88 @@ if [ ! -f "${WORKSPACE}/Makefile.spel" ]; then
     echo "Mount your repository to ${WORKSPACE}:"
     echo "  docker run -v \$(pwd):/workspace spel-builder make -f Makefile.spel build"
     exit 1
+fi
+
+# =============================================================================
+# Symlink baked-in Ansible roles to workspace location
+# Packer templates expect roles at spel/ansible/roles/<ROLE_NAME>
+# =============================================================================
+ROLES_DEST="${WORKSPACE}/spel/ansible/roles"
+if [ -d "${ANSIBLE_ROLES_PATH}" ] && [ -d "${ROLES_DEST}" ]; then
+    echo "Symlinking baked-in Ansible roles to workspace..."
+    for role in "${ANSIBLE_ROLES_PATH}"/*; do
+        if [ -d "$role" ]; then
+            role_name=$(basename "$role")
+            target="${ROLES_DEST}/${role_name}"
+            if [ ! -e "$target" ]; then
+                ln -sf "$role" "$target"
+                echo "  Linked: ${role_name}"
+            fi
+        fi
+    done
+    echo ""
+fi
+
+# =============================================================================
+# Symlink/copy baked-in Python wheels to workspace location
+# Packer file provisioner uploads tools/python-deps/ to EC2
+# =============================================================================
+PYTHON_DEPS_DEST="${WORKSPACE}/tools/python-deps"
+if [ -d "${PYTHON_DEPS_PATH}" ]; then
+    echo "Populating Python wheels in workspace..."
+    mkdir -p "${PYTHON_DEPS_DEST}"
+    # Copy wheels (symlinks don't work well with Packer file provisioner)
+    for whl in "${PYTHON_DEPS_PATH}"/*.whl; do
+        if [ -f "$whl" ]; then
+            whl_name=$(basename "$whl")
+            target="${PYTHON_DEPS_DEST}/${whl_name}"
+            if [ ! -e "$target" ]; then
+                cp "$whl" "$target"
+            fi
+        fi
+    done
+    echo "  Wheels available: $(ls ${PYTHON_DEPS_DEST}/*.whl 2>/dev/null | wc -l)"
+    echo ""
+fi
+
+# =============================================================================
+# Symlink/copy baked-in Ansible collection tarballs to workspace location
+# Packer file provisioner uploads spel/ansible/collections/ to EC2
+# =============================================================================
+COLLECTIONS_DEST="${WORKSPACE}/spel/ansible/collections"
+if [ -d "${ANSIBLE_COLLECTIONS_TARBALLS}" ]; then
+    echo "Populating Ansible collection tarballs in workspace..."
+    mkdir -p "${COLLECTIONS_DEST}"
+    for tarball in "${ANSIBLE_COLLECTIONS_TARBALLS}"/*.tar.gz; do
+        if [ -f "$tarball" ]; then
+            tarball_name=$(basename "$tarball")
+            target="${COLLECTIONS_DEST}/${tarball_name}"
+            if [ ! -e "$target" ]; then
+                cp "$tarball" "$target"
+            fi
+        fi
+    done
+    echo "  Collections available: $(ls ${COLLECTIONS_DEST}/*.tar.gz 2>/dev/null | wc -l)"
+    echo ""
+fi
+
+# =============================================================================
+# Copy baked-in AMIgen scripts to offline-packages for EC2 upload
+# Packer file provisioner uploads offline-packages/ to EC2
+# =============================================================================
+AMIGEN_DEST="${WORKSPACE}/offline-packages"
+if [ -d "${AMIGEN8_PATH}" ] || [ -d "${AMIGEN9_PATH}" ]; then
+    echo "Populating AMIgen scripts in offline-packages..."
+    mkdir -p "${AMIGEN_DEST}"
+    if [ -d "${AMIGEN8_PATH}" ] && [ ! -d "${AMIGEN_DEST}/amigen8" ]; then
+        cp -r "${AMIGEN8_PATH}" "${AMIGEN_DEST}/amigen8"
+        echo "  Copied: amigen8"
+    fi
+    if [ -d "${AMIGEN9_PATH}" ] && [ ! -d "${AMIGEN_DEST}/amigen9" ]; then
+        cp -r "${AMIGEN9_PATH}" "${AMIGEN_DEST}/amigen9"
+        echo "  Copied: amigen9"
+    fi
+    echo ""
 fi
 
 # Check AWS credentials
@@ -259,12 +420,19 @@ ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
     ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections \
     ANSIBLE_ROLES_PATH=/opt/ansible/roles \
     SPEL_OFFLINE_PACKAGES=/opt/offline-packages \
+    PYTHON_DEPS_PATH=/opt/python-deps \
+    ANSIBLE_COLLECTIONS_TARBALLS=/opt/ansible-collections-tarballs \
+    AMIGEN8_PATH=/opt/amigen8 \
+    AMIGEN9_PATH=/opt/amigen9 \
     WORKSPACE=/workspace \
     PATH="/usr/local/bin:/opt/python/bin:${PATH}" \
     PYTHONPATH="/opt/python/lib/python3.9/site-packages"
 
 # Copy Packer binary
 COPY --from=builder /usr/local/bin/packer /usr/local/bin/packer
+
+# Copy AWS CLI v2 (entire install directory with bundled Python)
+COPY --from=builder /opt/aws-cli /opt/aws-cli
 
 # Copy Packer plugins
 COPY --from=builder /opt/packer/plugins /opt/packer/plugins
@@ -326,6 +494,16 @@ COPY --from=builder /opt/ansible/roles /opt/ansible/roles
 # Copy offline packages
 COPY --from=builder /opt/offline-packages /opt/offline-packages
 
+# Copy Python wheels for EC2 offline installation
+COPY --from=builder /opt/python-deps /opt/python-deps
+
+# Copy Ansible collection tarballs for EC2 offline installation
+COPY --from=builder /opt/ansible-collections-tarballs /opt/ansible-collections-tarballs
+
+# Copy AMIgen scripts for EC2 offline builds
+COPY --from=builder /opt/amigen8 /opt/amigen8
+COPY --from=builder /opt/amigen9 /opt/amigen9
+
 # Copy entrypoint script
 COPY --from=builder /opt/entrypoint.sh /entrypoint.sh
 
@@ -345,9 +523,25 @@ COPY --from=builder /usr/bin/grep /usr/bin/grep
 COPY --from=builder /usr/bin/awk /usr/bin/awk
 COPY --from=builder /usr/bin/sed /usr/bin/sed
 
+# Copy SSH client (required for Ansible to connect to EC2 instances)
+COPY --from=builder /usr/bin/ssh /usr/bin/ssh
+COPY --from=builder /usr/bin/ssh-keygen /usr/bin/ssh-keygen
+COPY --from=builder /usr/bin/ssh-keyscan /usr/bin/ssh-keyscan
+COPY --from=builder /usr/bin/scp /usr/bin/scp
+COPY --from=builder /usr/bin/sftp /usr/bin/sftp
+COPY --from=builder /etc/ssh/ssh_config /etc/ssh/ssh_config
+COPY --from=builder /etc/crypto-policies /etc/crypto-policies
+
+# Copy CA certificates for SSL/TLS
+COPY --from=builder /etc/pki/tls/certs /etc/pki/tls/certs
+COPY --from=builder /etc/pki/ca-trust /etc/pki/ca-trust
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+
 # Create symlinks
 RUN ln -sf /usr/bin/python3.9 /usr/bin/python3 \
-    && ln -sf /usr/bin/python3.9 /usr/bin/python
+    && ln -sf /usr/bin/python3.9 /usr/bin/python \
+    && ln -sf /opt/aws-cli/v2/current/bin/aws /usr/local/bin/aws \
+    && ln -sf /opt/aws-cli/v2/current/bin/aws_completer /usr/local/bin/aws_completer
 
 # Create workspace directory
 WORKDIR ${WORKSPACE}

@@ -1,0 +1,9 @@
+# Offline packages downloaded at build time
+awscli-exe-linux-x86_64.zip
+aws-cfn-bootstrap-py3-latest.tar.gz
+amazon-ssm-agent.rpm
+VERSIONS.txt
+
+# AMIgen scripts copied from Docker container
+amigen8/
+amigen9/

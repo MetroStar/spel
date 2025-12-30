@@ -549,9 +549,9 @@ variable "amigen8_source_branch" {
 }
 
 variable "amigen8_source_url" {
-  description = "URL that will be used to clone amigen8"
+  description = "URL or file:// path for amigen8. Use file:///tmp/offline-packages/amigen8 for offline builds."
   type        = string
-  default     = "https://github.com/MetroStar/amigen8.git"
+  default     = "file:///tmp/offline-packages/amigen8"
 }
 
 variable "amigen8_storage_layout" {
@@ -645,9 +645,9 @@ variable "amigen9_source_branch" {
 }
 
 variable "amigen9_source_url" {
-  description = "URL that will be used to clone amigen9"
+  description = "URL or file:// path for amigen9. Use file:///tmp/offline-packages/amigen9 for offline builds."
   type        = string
-  default     = "https://github.com/MetroStar/amigen9.git"
+  default     = "file:///tmp/offline-packages/amigen9"
 }
 
 variable "amigen9_storage_layout" {

@@ -1,0 +1,7 @@
+# Symlinks created by container entrypoint (point to /opt/ansible/roles/)
+AMAZON2023-CIS
+RHEL8-STIG
+RHEL9-STIG
+Windows-2016-STIG
+Windows-2019-STIG
+Windows-2022-STIG
