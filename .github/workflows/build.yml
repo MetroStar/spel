@@ -118,11 +118,16 @@ jobs:
           if [ -f "$CHECKSUM_FILE" ]; then
             echo ""
             echo "Verifying checksum..."
-            if sha256sum -c "$CHECKSUM_FILE"; then
+            # Run checksum from the directory containing the tarball
+            TARBALL_DIR=$(dirname "${TARBALL}")
+            TARBALL_NAME=$(basename "${TARBALL}")
+            pushd "${TARBALL_DIR}" > /dev/null
+            if sha256sum -c "${TARBALL_NAME}.sha256"; then
               echo "✓ Checksum verification passed"
             else
               echo "WARNING: Checksum verification failed"
             fi
+            popd > /dev/null
           fi
           
           # Import the image
@@ -157,7 +162,7 @@ jobs:
         with:
           aws-region: us-east-1
           role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
-          role-duration-seconds: 43200
+          role-duration-seconds: 3600  # 1 hour - credentials will be refreshed automatically
 
       - name: Set up environment
         run: |
