@@ -1053,7 +1053,7 @@ build {
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "echo 'Running RHEL8-STIG playbook with Python 3.6 (for SELinux module support)...'",
-      "ansible-playbook -vvv -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
       "bash /tmp/boot-fips-wrapper.sh post",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
