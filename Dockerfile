@@ -327,107 +327,131 @@ echo "  AMIgen8 scripts: ${AMIGEN8_PATH}"
 echo "  AMIgen9 scripts: ${AMIGEN9_PATH}"
 echo ""
 
-# Check if workspace is mounted
-if [ ! -f "${WORKSPACE}/Makefile.spel" ]; then
-    echo "ERROR: Makefile.spel not found in ${WORKSPACE}"
-    echo ""
-    echo "Mount your repository to ${WORKSPACE}:"
-    echo "  docker run -v \$(pwd):/workspace spel-builder make -f Makefile.spel build"
-    exit 1
-fi
+# =============================================================================
+# Check if this is a simple command (version check, help, etc.)
+# Skip workspace validation for these commands
+# =============================================================================
+FIRST_ARG="${1:-}"
+SKIP_WORKSPACE_CHECK=false
 
-# =============================================================================
-# Symlink baked-in Ansible roles to workspace location
-# Packer templates expect roles at spel/ansible/roles/<ROLE_NAME>
-# =============================================================================
-ROLES_DEST="${WORKSPACE}/spel/ansible/roles"
-if [ -d "${ANSIBLE_ROLES_PATH}" ] && [ -d "${ROLES_DEST}" ]; then
-    echo "Symlinking baked-in Ansible roles to workspace..."
-    for role in "${ANSIBLE_ROLES_PATH}"/*; do
-        if [ -d "$role" ]; then
-            role_name=$(basename "$role")
-            target="${ROLES_DEST}/${role_name}"
-            if [ ! -e "$target" ]; then
-                ln -sf "$role" "$target"
-                echo "  Linked: ${role_name}"
-            fi
-        fi
-    done
-    echo ""
-fi
+# Detect version/help commands that don't need workspace
+case "${FIRST_ARG}" in
+    packer|ansible|ansible-playbook|python|python3|aws|pip|pip3)
+        # Check if second arg is version/help related
+        case "${2:-}" in
+            version|--version|-v|-V|--help|-h|help)
+                SKIP_WORKSPACE_CHECK=true
+                ;;
+        esac
+        ;;
+    --version|--help|-h|-v)
+        SKIP_WORKSPACE_CHECK=true
+        ;;
+esac
 
-# =============================================================================
-# Symlink/copy baked-in Python wheels to workspace location
-# Packer file provisioner uploads tools/python-deps/ to EC2
-# =============================================================================
-PYTHON_DEPS_DEST="${WORKSPACE}/tools/python-deps"
-if [ -d "${PYTHON_DEPS_PATH}" ]; then
-    echo "Populating Python wheels in workspace..."
-    mkdir -p "${PYTHON_DEPS_DEST}"
-    # Copy wheels (symlinks don't work well with Packer file provisioner)
-    for whl in "${PYTHON_DEPS_PATH}"/*.whl; do
-        if [ -f "$whl" ]; then
-            whl_name=$(basename "$whl")
-            target="${PYTHON_DEPS_DEST}/${whl_name}"
-            if [ ! -e "$target" ]; then
-                cp "$whl" "$target"
-            fi
-        fi
-    done
-    echo "  Wheels available: $(ls ${PYTHON_DEPS_DEST}/*.whl 2>/dev/null | wc -l)"
-    echo ""
-fi
-
-# =============================================================================
-# Symlink/copy baked-in Ansible collection tarballs to workspace location
-# Packer file provisioner uploads spel/ansible/collections/ to EC2
-# =============================================================================
-COLLECTIONS_DEST="${WORKSPACE}/spel/ansible/collections"
-if [ -d "${ANSIBLE_COLLECTIONS_TARBALLS}" ]; then
-    echo "Populating Ansible collection tarballs in workspace..."
-    mkdir -p "${COLLECTIONS_DEST}"
-    for tarball in "${ANSIBLE_COLLECTIONS_TARBALLS}"/*.tar.gz; do
-        if [ -f "$tarball" ]; then
-            tarball_name=$(basename "$tarball")
-            target="${COLLECTIONS_DEST}/${tarball_name}"
-            if [ ! -e "$target" ]; then
-                cp "$tarball" "$target"
-            fi
-        fi
-    done
-    echo "  Collections available: $(ls ${COLLECTIONS_DEST}/*.tar.gz 2>/dev/null | wc -l)"
-    echo ""
-fi
-
-# =============================================================================
-# Copy baked-in AMIgen scripts to offline-packages for EC2 upload
-# Packer file provisioner uploads offline-packages/ to EC2
-# =============================================================================
-AMIGEN_DEST="${WORKSPACE}/offline-packages"
-if [ -d "${AMIGEN8_PATH}" ] || [ -d "${AMIGEN9_PATH}" ]; then
-    echo "Populating AMIgen scripts in offline-packages..."
-    mkdir -p "${AMIGEN_DEST}"
-    if [ -d "${AMIGEN8_PATH}" ] && [ ! -d "${AMIGEN_DEST}/amigen8" ]; then
-        cp -r "${AMIGEN8_PATH}" "${AMIGEN_DEST}/amigen8"
-        echo "  Copied: amigen8"
+# Check if workspace is mounted (skip for version/help commands)
+if [ "${SKIP_WORKSPACE_CHECK}" = "false" ]; then
+    if [ ! -f "${WORKSPACE}/Makefile.spel" ]; then
+        echo "ERROR: Makefile.spel not found in ${WORKSPACE}"
+        echo ""
+        echo "Mount your repository to ${WORKSPACE}:"
+        echo "  docker run -v \$(pwd):/workspace spel-builder make -f Makefile.spel build"
+        exit 1
     fi
-    if [ -d "${AMIGEN9_PATH}" ] && [ ! -d "${AMIGEN_DEST}/amigen9" ]; then
-        cp -r "${AMIGEN9_PATH}" "${AMIGEN_DEST}/amigen9"
-        echo "  Copied: amigen9"
-    fi
-    echo ""
-fi
 
-# Check AWS credentials
-if [ -z "${AWS_ACCESS_KEY_ID}" ] && [ -z "${AWS_SESSION_TOKEN}" ] && [ ! -d "/root/.aws" ]; then
-    echo "WARNING: AWS credentials not detected"
-    echo "  Pass credentials via environment variables:"
-    echo "    -e AWS_ACCESS_KEY_ID"
-    echo "    -e AWS_SECRET_ACCESS_KEY"
-    echo "    -e AWS_SESSION_TOKEN (optional)"
-    echo "  Or mount AWS config:"
-    echo "    -v ~/.aws:/root/.aws:ro"
-    echo ""
+    # =============================================================================
+    # Symlink baked-in Ansible roles to workspace location
+    # Packer templates expect roles at spel/ansible/roles/<ROLE_NAME>
+    # =============================================================================
+    ROLES_DEST="${WORKSPACE}/spel/ansible/roles"
+    if [ -d "${ANSIBLE_ROLES_PATH}" ] && [ -d "${ROLES_DEST}" ]; then
+        echo "Symlinking baked-in Ansible roles to workspace..."
+        for role in "${ANSIBLE_ROLES_PATH}"/*; do
+            if [ -d "$role" ]; then
+                role_name=$(basename "$role")
+                target="${ROLES_DEST}/${role_name}"
+                if [ ! -e "$target" ]; then
+                    ln -sf "$role" "$target"
+                    echo "  Linked: ${role_name}"
+                fi
+            fi
+        done
+        echo ""
+    fi
+
+    # =============================================================================
+    # Symlink/copy baked-in Python wheels to workspace location
+    # Packer file provisioner uploads tools/python-deps/ to EC2
+    # =============================================================================
+    PYTHON_DEPS_DEST="${WORKSPACE}/tools/python-deps"
+    if [ -d "${PYTHON_DEPS_PATH}" ]; then
+        echo "Populating Python wheels in workspace..."
+        mkdir -p "${PYTHON_DEPS_DEST}"
+        # Copy wheels (symlinks don't work well with Packer file provisioner)
+        for whl in "${PYTHON_DEPS_PATH}"/*.whl; do
+            if [ -f "$whl" ]; then
+                whl_name=$(basename "$whl")
+                target="${PYTHON_DEPS_DEST}/${whl_name}"
+                if [ ! -e "$target" ]; then
+                    cp "$whl" "$target"
+                fi
+            fi
+        done
+        echo "  Wheels available: $(ls ${PYTHON_DEPS_DEST}/*.whl 2>/dev/null | wc -l)"
+        echo ""
+    fi
+
+    # =============================================================================
+    # Symlink/copy baked-in Ansible collection tarballs to workspace location
+    # Packer file provisioner uploads spel/ansible/collections/ to EC2
+    # =============================================================================
+    COLLECTIONS_DEST="${WORKSPACE}/spel/ansible/collections"
+    if [ -d "${ANSIBLE_COLLECTIONS_TARBALLS}" ]; then
+        echo "Populating Ansible collection tarballs in workspace..."
+        mkdir -p "${COLLECTIONS_DEST}"
+        for tarball in "${ANSIBLE_COLLECTIONS_TARBALLS}"/*.tar.gz; do
+            if [ -f "$tarball" ]; then
+                tarball_name=$(basename "$tarball")
+                target="${COLLECTIONS_DEST}/${tarball_name}"
+                if [ ! -e "$target" ]; then
+                    cp "$tarball" "$target"
+                fi
+            fi
+        done
+        echo "  Collections available: $(ls ${COLLECTIONS_DEST}/*.tar.gz 2>/dev/null | wc -l)"
+        echo ""
+    fi
+
+    # =============================================================================
+    # Copy baked-in AMIgen scripts to offline-packages for EC2 upload
+    # Packer file provisioner uploads offline-packages/ to EC2
+    # =============================================================================
+    AMIGEN_DEST="${WORKSPACE}/offline-packages"
+    if [ -d "${AMIGEN8_PATH}" ] || [ -d "${AMIGEN9_PATH}" ]; then
+        echo "Populating AMIgen scripts in offline-packages..."
+        mkdir -p "${AMIGEN_DEST}"
+        if [ -d "${AMIGEN8_PATH}" ] && [ ! -d "${AMIGEN_DEST}/amigen8" ]; then
+            cp -r "${AMIGEN8_PATH}" "${AMIGEN_DEST}/amigen8"
+            echo "  Copied: amigen8"
+        fi
+        if [ -d "${AMIGEN9_PATH}" ] && [ ! -d "${AMIGEN_DEST}/amigen9" ]; then
+            cp -r "${AMIGEN9_PATH}" "${AMIGEN_DEST}/amigen9"
+            echo "  Copied: amigen9"
+        fi
+        echo ""
+    fi
+
+    # Check AWS credentials
+    if [ -z "${AWS_ACCESS_KEY_ID}" ] && [ -z "${AWS_SESSION_TOKEN}" ] && [ ! -d "/root/.aws" ]; then
+        echo "WARNING: AWS credentials not detected"
+        echo "  Pass credentials via environment variables:"
+        echo "    -e AWS_ACCESS_KEY_ID"
+        echo "    -e AWS_SECRET_ACCESS_KEY"
+        echo "    -e AWS_SESSION_TOKEN (optional)"
+        echo "  Or mount AWS config:"
+        echo "    -v ~/.aws:/root/.aws:ro"
+        echo ""
+    fi
 fi
 
 # Execute command
