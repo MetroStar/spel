@@ -81,11 +81,16 @@ import:docker:
       if [ -f "$CHECKSUM_FILE" ]; then
         echo ""
         echo "Verifying checksum..."
-        if sha256sum -c "$CHECKSUM_FILE"; then
+        # Run checksum from the directory containing the tarball
+        TARBALL_DIR=$(dirname "${TARBALL}")
+        TARBALL_NAME=$(basename "${TARBALL}")
+        pushd "${TARBALL_DIR}" > /dev/null
+        if sha256sum -c "${TARBALL_NAME}.sha256"; then
           echo "✓ Checksum verification passed"
         else
           echo "⚠ Checksum verification failed - continuing anyway"
         fi
+        popd > /dev/null
       fi
     
     # Import the Docker image
