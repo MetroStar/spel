@@ -36,8 +36,14 @@ if [[ "$HAS_COMMERCIAL" == "true" ]]; then
 [commercial]
 aws_access_key_id = ${AWS_COMMERCIAL_ACCESS_KEY_ID}
 aws_secret_access_key = ${AWS_COMMERCIAL_SECRET_ACCESS_KEY}
-
 EOL
+    # Add session token if available (for OIDC/STS credentials)
+    if [[ -n "${AWS_COMMERCIAL_SESSION_TOKEN:-}" ]]; then
+        cat >> ~/.aws/credentials <<EOL
+aws_session_token = ${AWS_COMMERCIAL_SESSION_TOKEN}
+EOL
+    fi
+    echo "" >> ~/.aws/credentials
 fi
 
 if [[ "$HAS_GOVCLOUD" == "true" ]]; then
@@ -45,8 +51,14 @@ if [[ "$HAS_GOVCLOUD" == "true" ]]; then
 [govcloud]
 aws_access_key_id = ${AWS_GOVCLOUD_ACCESS_KEY_ID}
 aws_secret_access_key = ${AWS_GOVCLOUD_SECRET_ACCESS_KEY}
-
 EOL
+    # Add session token if available (for OIDC/STS credentials)
+    if [[ -n "${AWS_GOVCLOUD_SESSION_TOKEN:-}" ]]; then
+        cat >> ~/.aws/credentials <<EOL
+aws_session_token = ${AWS_GOVCLOUD_SESSION_TOKEN}
+EOL
+    fi
+    echo "" >> ~/.aws/credentials
 fi
 
 # Build config file dynamically
