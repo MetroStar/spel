@@ -1,23 +1,29 @@
+# =============================================================================
+# Build STIGed AMI's using Docker Container
+# =============================================================================
+# This workflow builds STIGed AMIs using the pre-built Docker container
+# that contains all dependencies baked in.
+#
+# PREREQUISITES:
+#   - Run the "Prepare Offline Docker Image" workflow first (offline-prepare.yml)
+#   - Download the spel-builder-YYYYMMDD artifact from that workflow
+#   - Provide the artifact name when running this workflow
+#
+# WORKFLOW:
+#   1. Download Docker image artifact from offline-prepare.yml
+#   2. Import the Docker image
+#   3. Run Packer builds inside the container
+# =============================================================================
+
 name: Build STIGed AMI's
 
 on:
   workflow_dispatch:
     inputs:
-      offline_mode:
-        description: "Use offline mode with Offline artifacts (includes ClamAV-scanned files)"
-        required: false
-        default: false
-        type: boolean
-      offline_artifact_name:
-        description: "Offline artifact name (e.g., spel-offline-transfer-20251126)"
-        required: false
-        default: ""
+      docker_image_artifact:
+        description: "Docker image artifact name (e.g., spel-builder-20251231)"
+        required: true
         type: string
-      # govcloud:
-      #   description: "Copy AMI's to GovCloud"
-      #   required: false
-      #   default: false
-      #   type: boolean
       run_amzn2023:
         description: "Run Amazon Linux 2023 builder"
         required: false
@@ -67,231 +73,100 @@ jobs:
   build:
     name: Build SPEL AMI's
     runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours for multiple AMI builds
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
 
-      - name: Download Offline artifacts for offline mode
-        if: github.event.inputs.offline_mode == 'true'
+      - name: Download Docker image artifact
         uses: dawidd6/action-download-artifact@v6
         with:
-          name: ${{ github.event.inputs.offline_artifact_name }}
-          path: ./offline-artifacts/
+          name: ${{ github.event.inputs.docker_image_artifact }}
+          path: ./docker-image/
           workflow: offline-prepare.yml
           workflow_conclusion: success
           search_artifacts: true
-        continue-on-error: true
 
-      - name: Setup offline environment
-        if: github.event.inputs.offline_mode == 'true'
+      - name: Import Docker image
         run: |
-          echo "=== Setting up offline mode with Offline artifacts ==="
+          echo "=== Importing Docker Image ==="
           
-          # Check if artifacts were downloaded
-          if [ -d "offline-artifacts" ] && [ -n "$(ls -A offline-artifacts 2>/dev/null)" ]; then
-            echo "✓ Offline artifacts downloaded from GitHub"
-            cd offline-artifacts
-            
-            # Verify checksums if available
-            CHECKSUM_FILE=$(ls spel-offline-*-checksums.txt 2>/dev/null | head -1)
-            if [ -n "$CHECKSUM_FILE" ]; then
-              echo "Verifying checksums..."
-              if sha256sum -c "$CHECKSUM_FILE"; then
-                echo "✓ Checksum verification passed"
-              else
-                echo "⚠ Checksum verification failed, but continuing..."
-              fi
-            fi
-            
-            # Check for ClamAV scan log
-            SCAN_LOG=$(ls spel-offline-*-clamav-scan.log 2>/dev/null | head -1)
-            if [ -n "$SCAN_LOG" ]; then
-              echo ""
-              echo "=== Security Scan Verification ==="
-              echo "ClamAV scan log found: $SCAN_LOG"
-              
-              # Check if scan passed
-              if grep -q "Infected files: 0" "$SCAN_LOG"; then
-                echo "✅ ClamAV scan: PASSED"
-                echo "   All files verified clean before archiving"
-                
-                # Display scan summary
-                echo ""
-                echo "Scan summary:"
-                grep -A 10 "SCAN SUMMARY" "$SCAN_LOG" | head -12 || true
-              else
-                echo "⚠️  ClamAV scan status unclear - review log"
-                echo "   Infected files may have been detected"
-              fi
-              echo "======================="
-              echo ""
-            else
-              echo ""
-              echo "⚠️  WARNING: No ClamAV scan log found in artifacts"
-              echo "   This may indicate archives were prepared without security scanning"
-              echo "   Offline security policy requires all files to be virus-scanned"
-              echo ""
-            fi
-            
-            # Check for TruffleHog scan log
-            SECRETS_LOG=$(ls spel-offline-*-trufflehog-scan.log 2>/dev/null | head -1)
-            if [ -n "$SECRETS_LOG" ]; then
-              echo ""
-              echo "=== Secrets Scan Verification ==="
-              echo "TruffleHog scan log found: $SECRETS_LOG"
-              
-              # Check if scan passed
-              if grep -q "NO SECRETS DETECTED" "$SECRETS_LOG"; then
-                echo "✅ TruffleHog scan: PASSED"
-                echo "   No credentials or secrets detected"
-              else
-                echo "⚠️  TruffleHog scan status unclear - review log"
-                echo "   Secrets may have been detected"
-              fi
-              echo "======================="
-              echo ""
-            else
-              echo ""
-              echo "⚠️  WARNING: No TruffleHog scan log found in artifacts"
-              echo "   This may indicate archives were prepared without secrets scanning"
-              echo "   Offline security policy requires secrets verification"
-              echo ""
-            fi
-            
-            # Move archives to repository root
-            mv spel-*.tar.gz ../ 2>/dev/null || true
-            mv spel-offline-*-checksums.txt ../ 2>/dev/null || true
-            mv spel-offline-*-manifest.txt ../ 2>/dev/null || true
-            mv spel-offline-*-clamav-scan.log ../ 2>/dev/null || true
-            mv spel-offline-*-trufflehog-scan.log ../ 2>/dev/null || true
-            cd ..
-          else
-            echo "⚠ No artifacts downloaded - checking for archives in repository..."
-          fi
+          # Find the tarball
+          TARBALL=$(ls ./docker-image/spel-builder-*.tar.gz 2>/dev/null | head -1)
           
-          # Check if archives exist (either downloaded or committed to repo)
-          if ls spel-*.tar.gz 1> /dev/null 2>&1; then
-            echo "✓ Found Offline transfer archives"
-            ls -lh spel-*.tar.gz
-            
-            # Extract archives
+          if [ -z "$TARBALL" ]; then
+            echo "ERROR: No Docker image tarball found in artifact!"
             echo ""
-            echo "Extracting Offline archives..."
-            bash ./scripts/extract-offline-archives.sh
-            
-            # Verify offline mode files exist
+            echo "Expected file: spel-builder-*.tar.gz"
+            echo "Artifact contents:"
+            ls -la ./docker-image/
             echo ""
-            echo "Verifying offline mode setup..."
-            
-            if [ -d "spel/ansible/roles" ] && [ -n "$(ls -A spel/ansible/roles 2>/dev/null)" ]; then
-              echo "✓ Ansible roles extracted successfully"
-              du -sh spel/ansible/roles/
-            else
-              echo "⚠ Ansible roles directory empty or missing"
-            fi
-            
-            if [ -d "tools/python-deps" ] && [ -n "$(ls -A tools/python-deps 2>/dev/null)" ]; then
-              wheel_count=$(find tools/python-deps -name "*.whl" 2>/dev/null | wc -l)
-              if [ "$wheel_count" -gt 0 ]; then
-                echo "✓ Python dependencies extracted successfully (${wheel_count} wheels)"
-                du -sh tools/python-deps/
-              else
-                echo "⚠ Python dependencies directory exists but contains no wheel files"
-                echo "   This means offline-prepare.yml may have been run with download_ansible=false"
-                ls -la tools/python-deps/
-              fi
-            else
-              echo "⚠ Python dependencies directory empty or missing"
-            fi
-            
-            if [ -d "tools/packer/linux_amd64" ] && [ -f "tools/packer/linux_amd64/packer" ]; then
-              echo "✓ Packer binary extracted successfully"
-              tools/packer/linux_amd64/packer version
-            else
-              echo "⚠ Packer binary missing"
-            fi
-            
-            if [ -d "spel/ansible/collections/ansible_collections" ]; then
-              echo "✓ Ansible collections extracted successfully"
-              du -sh spel/ansible/collections/
-            else
-              echo "⚠ Ansible collections directory empty or missing"
-            fi
-            
-            if [ -d "offline-packages" ] && [ -n "$(ls -A offline-packages 2>/dev/null)" ]; then
-              echo "✓ Offline packages extracted successfully"
-              du -sh offline-packages/
-            else
-              echo "⚠ Offline packages directory empty or missing"
-            fi
-            
-            echo ""
-            echo "=== Offline mode setup complete ==="
-          else
-            echo "✗ No Offline archives found!"
-            echo ""
-            echo "To use offline mode, either:"
-            echo "  1. Provide a valid offline_artifact_name from a previous offline-prepare workflow run"
-            echo "  2. Commit the Offline archives to a test branch"
-            echo "  3. Manually upload archives to the repository"
+            echo "Please ensure the offline-prepare.yml workflow completed successfully"
+            echo "and the artifact name '${{ github.event.inputs.docker_image_artifact }}' is correct."
             exit 1
           fi
+          
+          echo "Found tarball: ${TARBALL}"
+          ls -lh "${TARBALL}"
+          
+          # Verify checksum if available
+          CHECKSUM_FILE="${TARBALL}.sha256"
+          if [ -f "$CHECKSUM_FILE" ]; then
+            echo ""
+            echo "Verifying checksum..."
+            if sha256sum -c "$CHECKSUM_FILE"; then
+              echo "✓ Checksum verification passed"
+            else
+              echo "WARNING: Checksum verification failed"
+            fi
+          fi
+          
+          # Import the image
+          echo ""
+          echo "Importing Docker image..."
+          gunzip -c "${TARBALL}" | docker load
+          
+          # Extract the image tag from tarball name
+          IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/spel-builder-//')
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+          
+          echo ""
+          echo "=== Import Complete ==="
+          docker images spel-builder
+
+      - name: Verify Docker image
+        run: |
+          echo "=== Docker Image Verification ==="
+          
+          docker run --rm "spel-builder:${IMAGE_TAG}" packer version
+          docker run --rm "spel-builder:${IMAGE_TAG}" ansible --version | head -3
+          docker run --rm "spel-builder:${IMAGE_TAG}" aws --version
+          
+          echo ""
+          echo "=== Image Details ==="
+          docker inspect "spel-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
+          docker inspect "spel-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
+          docker inspect "spel-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: us-east-1
-          role-to-assume: arn:aws:iam::879381286673:role/Packer_Amazon
+          role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
           role-duration-seconds: 43200
 
       - name: Set up environment
         run: |
-          echo "Setting up environment variables"
-
-          echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
+          echo "=== Setting up Build Environment ==="
           
-          # Detect offline mode (for local testing with network isolation)
-          if [ -f "offline-packages/awscli-exe-linux-x86_64.zip" ] || [ -d "tools/python-deps" ] || [ -d "spel/ansible/collections/ansible_collections" ]; then
-            echo "SPEL_OFFLINE_MODE=true" >> $GITHUB_ENV
-            echo "✓ Detected offline mode - using vendored packages"
-            
-            # Display offline mode info
-            echo ""
-            echo "=== Offline Mode Active ==="
-            echo "Python deps: $(du -sh tools/python-deps 2>/dev/null | awk '{print $1}' || echo 'N/A')"
-            echo "Packer: $(tools/packer/linux_amd64/packer version 2>/dev/null | head -1 || echo 'N/A')"
-            echo "Collections: $(du -sh spel/ansible/collections 2>/dev/null | awk '{print $1}' || echo 'N/A')"
-            echo "Roles: $(du -sh spel/ansible/roles 2>/dev/null | awk '{print $1}' || echo 'N/A')"
-            echo "Packages: $(du -sh offline-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
-            echo "SPEL packages: $(du -sh spel-packages 2>/dev/null | awk '{print $1}' || echo 'N/A')"
-            echo "==========================="
-            echo ""
-            
-            # Override Packer variables to use offline packages uploaded to EC2 instance
-            # Note: A file provisioner in minimal-linux.pkr.hcl uploads offline-packages/
-            # from the GitHub Actions runner to /tmp/offline-packages/ on the EC2 instance.
-            # This allows file:// URLs to work correctly during the build.
-            
-            # EC2 utility packages for EL8 (uploaded to /tmp/offline-packages/ on EC2 instance)
-            # NOTE: ec2-instance-connect and ec2-instance-connect-selinux must be installed together
-            # to satisfy conditional dependency: "ec2-instance-connect-selinux if selinux-policy-targeted"
-            # They are separate array elements but will be installed in one yum transaction by OSpackages.sh
-            echo "PKR_VAR_amigen8_extra_rpms=[\"python39\",\"python39-pip\",\"python39-setuptools\",\"crypto-policies-scripts\",\"file:///tmp/offline-packages/ec2-utils-el8/ec2-hibinit-agent-1.0.9-6.el8.noarch.rpm\",\"file:///tmp/offline-packages/ec2-utils-el8/ec2-instance-connect-1.1.17-1.el8.noarch.rpm\",\"file:///tmp/offline-packages/ec2-utils-el8/ec2-instance-connect-selinux-1.1.17-1.el8.noarch.rpm\",\"file:///tmp/offline-packages/amazon-ssm-agent.rpm\"]" >> $GITHUB_ENV
-            
-            # EC2 utility packages for EL9 (uploaded to /tmp/offline-packages/ on EC2 instance)
-            echo "PKR_VAR_amigen9_extra_rpms=[\"crypto-policies-scripts\",\"file:///tmp/offline-packages/ec2-utils-el9/ec2-hibinit-agent-1.0.9-6.el9.noarch.rpm\",\"file:///tmp/offline-packages/amazon-ssm-agent.rpm\"]" >> $GITHUB_ENV
-            
-            # Disable EPEL repositories for offline builds
-            echo "PKR_VAR_amigen8_repo_names=[]" >> $GITHUB_ENV
-            echo "PKR_VAR_amigen8_repo_sources=[]" >> $GITHUB_ENV
-            echo "PKR_VAR_amigen9_repo_names=[]" >> $GITHUB_ENV
-            echo "PKR_VAR_amigen9_repo_sources=[]" >> $GITHUB_ENV
-          else
-            echo "SPEL_OFFLINE_MODE=false" >> $GITHUB_ENV
-            echo "Online mode - will download packages from internet"
-          fi
-
+          echo "SPEL_IDENTIFIER=spel" >> $GITHUB_ENV
+          echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+          
+          # Build builder list from inputs
           builders=""
           if [[ "${{ github.event.inputs.run_amzn2023 }}" == "true" ]]; then
             builders+="amazon-ebssurrogate.minimal-amzn-2023-hvm,"
@@ -309,8 +184,9 @@ jobs:
             builders+="amazon-ebssurrogate.minimal-rhel-8-hvm,"
           fi
           builders="${builders%,}"
-          echo "SPEL_BUILDERS=$builders" >> $GITHUB_ENV
-
+          echo "SPEL_BUILDERS=${builders}" >> $GITHUB_ENV
+          
+          # Windows builders
           windows_builders=""
           if [[ "${{ github.event.inputs.run_ws2016 }}" == "true" ]]; then
             windows_builders+="amazon-ebs.hardened-windows-2016-hvm,"
@@ -322,205 +198,95 @@ jobs:
             windows_builders+="amazon-ebs.hardened-windows-2022-hvm,"
           fi
           windows_builders="${windows_builders%,}"
-          echo "WINDOWS_BUILDERS=$windows_builders" >> $GITHUB_ENV
-
-          echo "SPEL_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+          echo "WINDOWS_BUILDERS=${windows_builders}" >> $GITHUB_ENV
+          
+          # Packer variables
           echo "PKR_VAR_aws_force_deregister=true" >> $GITHUB_ENV
           echo "PKR_VAR_aws_ami_regions=[\"us-east-1\"]" >> $GITHUB_ENV
-
           echo "PKR_VAR_aws_ami_groups=[\"all\"]" >> $GITHUB_ENV
-
           echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
-          echo "PACKER_GITHUB_API_TOKEN=${{ secrets.PACKER_GITHUB_API_TOKEN }}" >> $GITHUB_ENV
-
-          echo "AWS_COMMERCIAL_ACCESS_KEY_ID=${{ secrets.AWS_COMMERCIAL_ACCESS_KEY_ID }}" >> $GITHUB_ENV
-          echo "AWS_COMMERCIAL_SECRET_ACCESS_KEY=${{ secrets.AWS_COMMERCIAL_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
-          echo "AWS_GOVCLOUD_ACCESS_KEY_ID=${{ secrets.AWS_GOVCLOUD_ACCESS_KEY_ID }}" >> $GITHUB_ENV
-          echo "AWS_GOVCLOUD_SECRET_ACCESS_KEY=${{ secrets.AWS_GOVCLOUD_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
-
-          # Set PUBLIC=true to enable AMI quota management for public AMIs
-          echo "PUBLIC=true" >> $GITHUB_ENV
-
-      - name: Initialize Git Submodules
-        if: github.event.inputs.offline_mode != 'true'
-        run: |
-          git submodule update --init --recursive
-
-      - name: Setup Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-
-      - name: Setup Build Environment
-        run: |
-          bash build/ci-setup.sh
-
-      - name: Configure offline build environment
-        if: env.SPEL_OFFLINE_MODE == 'true'
-        run: |
-          echo "=== Configuring Offline Build Environment ==="
           
-          # Set Packer binary path
-          if [ -f "tools/packer/linux_amd64/packer" ]; then
-            export PATH="${GITHUB_WORKSPACE}/tools/packer/linux_amd64:${PATH}"
-            echo "PATH=${GITHUB_WORKSPACE}/tools/packer/linux_amd64:${PATH}" >> $GITHUB_ENV
-            echo "✓ Packer binary path configured"
-          fi
-          
-          # Set Packer plugin directory
-          if [ -d "tools/packer/plugins" ]; then
-            echo "PACKER_PLUGIN_PATH=${GITHUB_WORKSPACE}/tools/packer/plugins" >> $GITHUB_ENV
-            echo "✓ Packer plugin path configured"
-          fi
-          
-          # Set Ansible roles path
-          if [ -d "spel/ansible/roles" ]; then
-            echo "ANSIBLE_ROLES_PATH=${GITHUB_WORKSPACE}/spel/ansible/roles" >> $GITHUB_ENV
-            echo "✓ Ansible roles path configured"
-          fi
-          
-          # Set Ansible collections path
-          if [ -d "spel/ansible/collections" ]; then
-            echo "ANSIBLE_COLLECTIONS_PATH=${GITHUB_WORKSPACE}/spel/ansible/collections" >> $GITHUB_ENV
-            echo "✓ Ansible collections path configured"
-          fi
-          
-          # Verify Python dependencies for offline Ansible installation
-          wheel_count=$(find tools/python-deps -name "*.whl" 2>/dev/null | wc -l || echo "0")
-          if [ "$wheel_count" -gt 0 ]; then
-            echo "✓ Python wheels available for offline Ansible installation (${wheel_count} wheels)"
-            echo ""
-            echo "Verifying Packer can access wheels from spel/ directory:"
-            ls -lh tools/python-deps/*.whl 2>/dev/null | head -5 || echo "ERROR: Cannot list wheels!"
-            echo ""
-            echo "Testing path resolution from spel/ directory:"
-            (cd spel && ls -lh ../tools/python-deps/*.whl 2>/dev/null | head -5) || echo "ERROR: Path ../tools/python-deps/ not accessible from spel/!"
-          else
-            echo "⚠ WARNING: No Python wheels found in tools/python-deps/"
-            echo "   Ansible will be installed from PyPI (requires internet access)"
-            echo "   To fix: Re-run offline-prepare.yml with download_ansible=true"
-          fi
-          
-          echo "==================================="
+          # Display configuration
+          echo ""
+          echo "Build Configuration:"
+          echo "  SPEL_BUILDERS: ${builders:-none}"
+          echo "  WINDOWS_BUILDERS: ${windows_builders:-none}"
+          echo "  SPEL_VERSION: $(date +%Y.%m).1"
+          echo "  Docker Image: spel-builder:${IMAGE_TAG}"
 
       - name: Build STIGed AMI's
         run: |
-          make -f Makefile.spel build
+          echo "=== Starting SPEL Build ==="
+          echo "Docker Image: spel-builder:${IMAGE_TAG}"
+          echo "Builders: ${SPEL_BUILDERS}"
+          echo "Windows Builders: ${WINDOWS_BUILDERS}"
+          echo ""
+          
+          docker run --rm \
+            -v "$(pwd):/workspace" \
+            -e AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY \
+            -e AWS_SESSION_TOKEN \
+            -e AWS_DEFAULT_REGION=us-east-1 \
+            -e AWS_REGION=us-east-1 \
+            -e AWS_COMMERCIAL_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+            -e AWS_COMMERCIAL_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+            -e AWS_COMMERCIAL_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
+            -e SPEL_IDENTIFIER="${SPEL_IDENTIFIER}" \
+            -e SPEL_VERSION="${SPEL_VERSION}" \
+            -e SPEL_BUILDERS="${SPEL_BUILDERS}" \
+            -e WINDOWS_BUILDERS="${WINDOWS_BUILDERS}" \
+            -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
+            -e PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister}" \
+            -e PKR_VAR_aws_ami_regions="${PKR_VAR_aws_ami_regions}" \
+            -e PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups}" \
+            -e PACKER_LOG=1 \
+            -e CHECKPOINT_DISABLE=1 \
+            "spel-builder:${IMAGE_TAG}" \
+            make -f Makefile.spel build
 
       - name: Create build summary
         if: always()
         run: |
-          echo "## SPEL Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## SPEL Build Summary
           
-          # Add security scan info if in offline mode
-          if [ "${{ github.event.inputs.offline_mode }}" = "true" ]; then
-            echo "### Security Verification" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            
-            if [ -f spel-offline-*-clamav-scan.log ]; then
-              SCAN_LOG=$(ls spel-offline-*-clamav-scan.log | head -1)
-              
-              # Check if scan passed
-              if grep -q "Infected files: 0" "$SCAN_LOG" 2>/dev/null; then
-                echo "- ✅ ClamAV virus scan: **PASSED**" >> $GITHUB_STEP_SUMMARY
-                echo "- All components scanned and verified clean" >> $GITHUB_STEP_SUMMARY
-                
-                # Get scan statistics
-                SCANNED_FILES=$(grep "Scanned files:" "$SCAN_LOG" | awk '{print $3}' || echo "unknown")
-                SCAN_TIME=$(grep "Time:" "$SCAN_LOG" | awk '{print $2, $3, $4}' || echo "unknown")
-                
-                echo "- Files scanned: $SCANNED_FILES" >> $GITHUB_STEP_SUMMARY
-                echo "- Scan duration: $SCAN_TIME" >> $GITHUB_STEP_SUMMARY
-                echo "- Compliant with Offline security requirements" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "- ⚠️ ClamAV scan status: **UNCLEAR**" >> $GITHUB_STEP_SUMMARY
-                echo "- Review scan log for details" >> $GITHUB_STEP_SUMMARY
-              fi
-            else
-              echo "- ⚠️ No ClamAV scan log found" >> $GITHUB_STEP_SUMMARY
-              echo "- Archives may not meet Offline security requirements" >> $GITHUB_STEP_SUMMARY
-            fi
-            
-            # TruffleHog results
-            SECRETS_LOG=$(ls spel-offline-*-trufflehog-scan.log 2>/dev/null | head -1)
-            if [ -n "$SECRETS_LOG" ]; then
-              if grep -q "NO SECRETS DETECTED" "$SECRETS_LOG" 2>/dev/null; then
-                echo "- ✅ TruffleHog secrets scan: **PASSED**" >> $GITHUB_STEP_SUMMARY
-                echo "- No credentials or sensitive data detected" >> $GITHUB_STEP_SUMMARY
-              else
-                echo "- ⚠️ TruffleHog scan status: **UNCLEAR**" >> $GITHUB_STEP_SUMMARY
-                echo "- Review scan log for details" >> $GITHUB_STEP_SUMMARY
-              fi
-            else
-              echo "- ⚠️ No TruffleHog scan log found" >> $GITHUB_STEP_SUMMARY
-              echo "- Archives may not have secrets verification" >> $GITHUB_STEP_SUMMARY
-            fi
-            
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
+          ### Build Configuration
+          | Property | Value |
+          |----------|-------|
+          | Docker Image | \`spel-builder:${IMAGE_TAG}\` |
+          | SPEL Version | \`${SPEL_VERSION}\` |
+          | Build Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
+          | Git Commit | \`${GITHUB_SHA:0:8}\` |
           
-          # Add build mode info
-          echo "### Build Configuration" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.offline_mode }}" = "true" ]; then
-            echo "- **Mode**: Offline (Offline artifacts)" >> $GITHUB_STEP_SUMMARY
-            if [ -n "${{ github.event.inputs.offline_artifact_name }}" ]; then
-              echo "- **Artifact**: \`${{ github.event.inputs.offline_artifact_name }}\`" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "- **Mode**: Online (Internet-connected)" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # List selected builders
-          echo "### Selected Builders" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          ### Selected Builders
+          EOF
           
           if [ "${{ github.event.inputs.run_amzn2023 }}" = "true" ]; then
-            echo "- Amazon Linux 2023" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Amazon Linux 2023" >> $GITHUB_STEP_SUMMARY
           fi
           if [ "${{ github.event.inputs.run_ol9 }}" = "true" ]; then
-            echo "- Oracle Linux 9" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Oracle Linux 9" >> $GITHUB_STEP_SUMMARY
           fi
           if [ "${{ github.event.inputs.run_rhel9 }}" = "true" ]; then
-            echo "- RHEL 9" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ RHEL 9" >> $GITHUB_STEP_SUMMARY
           fi
           if [ "${{ github.event.inputs.run_ol8 }}" = "true" ]; then
-            echo "- Oracle Linux 8" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Oracle Linux 8" >> $GITHUB_STEP_SUMMARY
           fi
           if [ "${{ github.event.inputs.run_rhel8 }}" = "true" ]; then
-            echo "- RHEL 8" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ RHEL 8" >> $GITHUB_STEP_SUMMARY
           fi
           if [ "${{ github.event.inputs.run_ws2016 }}" = "true" ]; then
-            echo "- Windows Server 2016" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Windows Server 2016" >> $GITHUB_STEP_SUMMARY
           fi
           if [ "${{ github.event.inputs.run_ws2019 }}" = "true" ]; then
-            echo "- Windows Server 2019" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Windows Server 2019" >> $GITHUB_STEP_SUMMARY
           fi
           if [ "${{ github.event.inputs.run_ws2022 }}" = "true" ]; then
-            echo "- Windows Server 2022" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Windows Server 2022" >> $GITHUB_STEP_SUMMARY
           fi
-
-      # - name: Copy STIGed AMI's to GovCloud
-      #   if: github.event.inputs.govcloud == 'true'
-      #   run: |
-      #     make -f Makefile.spel copy
-
-      # - name: Check if README.md needs update
-      #   id: check_readme
-      #   run: |
-      #     if grep -q "$(date +%Y.%m)" README.md; then
-      #       echo "update_needed=false" >> $GITHUB_OUTPUT
-      #     else
-      #       echo "update_needed=true" >> $GITHUB_OUTPUT
-      #     fi
-
-      # - name: Update README.md with current month
-      #   if: steps.check_readme.outputs.update_needed == 'true'
-      #   run: |
-      #     sed -i "s/$(date -d 'last month' +%Y.%m)/$(date +%Y.%m)/g" README.md
-      #     git config user.name "github-actions[bot]"
-      #     git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      #     git commit -a -m "Bump version to $(date +%Y.%m).1"
-      #     git push
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifact" >> $GITHUB_STEP_SUMMARY
+          echo "Docker image artifact: \`${{ github.event.inputs.docker_image_artifact }}\`" >> $GITHUB_STEP_SUMMARY

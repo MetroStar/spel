@@ -268,6 +268,30 @@ echo "Python: $(python3 --version)"
 echo ""
 
 # =============================================================================
+# Detect CI Environment and set workspace path accordingly
+# =============================================================================
+CI_ENVIRONMENT="local"
+if [ "${GITHUB_ACTIONS}" = "true" ]; then
+    CI_ENVIRONMENT="GitHub Actions"
+    # GitHub Actions mounts to /github/workspace by default
+    if [ -d "/github/workspace" ] && [ -f "/github/workspace/Makefile.spel" ]; then
+        WORKSPACE="/github/workspace"
+    fi
+elif [ "${GITLAB_CI}" = "true" ]; then
+    CI_ENVIRONMENT="GitLab CI"
+    # GitLab CI uses CI_PROJECT_DIR
+    if [ -n "${CI_PROJECT_DIR}" ] && [ -f "${CI_PROJECT_DIR}/Makefile.spel" ]; then
+        WORKSPACE="${CI_PROJECT_DIR}"
+    fi
+elif [ -n "${JENKINS_URL}" ]; then
+    CI_ENVIRONMENT="Jenkins"
+fi
+
+echo "CI Environment: ${CI_ENVIRONMENT}"
+echo "Workspace: ${WORKSPACE}"
+echo ""
+
+# =============================================================================
 # Set AWS region for Packer
 # Makefile.spel expects PKR_VAR_aws_region or AWS_REGION (not AWS_DEFAULT_REGION)
 # =============================================================================
