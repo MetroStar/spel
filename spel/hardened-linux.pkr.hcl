@@ -90,9 +90,9 @@ variable "aws_source_ami_filter_al2023_hvm" {
     owners = list(string)
   })
   default = {
-    name = "spel-minimal-amzn-2023-hvm-*.x86_64-gp*"
+    name = "spel-*minimal-amzn-2023-hvm-*.x86_64-gp*"
     owners = [
-      "879381286673",
+      "self",
     ]
   }
 }
@@ -104,9 +104,9 @@ variable "aws_source_ami_filter_centos9stream_hvm" {
     owners = list(string)
   })
   default = {
-    name = "spel-minimal-centos-9stream-hvm-*.x86_64-gp*"
+    name = "spel-*minimal-centos-9stream-hvm-*.x86_64-gp*"
     owners = [
-      "879381286673",
+      "self",
     ]
   }
 }
@@ -118,9 +118,9 @@ variable "aws_source_ami_filter_ol8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "spel-minimal-ol-8-hvm-*.x86_64-gp*"
+    name = "spel-*minimal-ol-8-hvm-*.x86_64-gp*"
     owners = [
-      "879381286673",
+      "self",
     ]
   }
 }
@@ -132,9 +132,9 @@ variable "aws_source_ami_filter_ol9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "spel-minimal-ol-9-hvm-*.x86_64-gp*"
+    name = "spel-*minimal-ol-9-hvm-*.x86_64-gp*"
     owners = [
-      "879381286673",
+      "self",
     ]
   }
 }
@@ -146,9 +146,9 @@ variable "aws_source_ami_filter_rhel8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "spel-minimal-rhel-8-hvm-*.x86_64-gp*"
+    name = "spel-*minimal-rhel-8-hvm-*.x86_64-gp*"
     owners = [
-      "879381286673",
+      "self",
     ]
   }
 }
@@ -160,9 +160,9 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "spel-minimal-rhel-9-hvm-*.x86_64-gp*"
+    name = "spel-*minimal-rhel-9-hvm-*.x86_64-gp*"
     owners = [
-      "879381286673",
+      "self",
     ]
   }
 }
