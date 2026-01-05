@@ -1,23 +1,22 @@
 # Dockerfile for SPEL build environment
 # Base: Rocky Linux 8 UBI Micro (minimal image)
-# Uses multi-stage build to keep final image small
+# Uses multi-stage build to keep final image small (~305 MB compressed)
 #
 # Build:
-#   docker build -t spel-builder .
+#   docker build -t spel-builder:$(date +%Y%m%d) .
 #
 # Run with bind-mounted repository:
 #   docker run --rm \
 #     -v $(pwd):/workspace \
 #     -e AWS_ACCESS_KEY_ID \
 #     -e AWS_SECRET_ACCESS_KEY \
+#     -e AWS_SESSION_TOKEN \
 #     -e AWS_DEFAULT_REGION=us-east-1 \
-#     -e AWS_COMMERCIAL_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-#     -e AWS_COMMERCIAL_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
 #     -e SPEL_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \
 #     -e SPEL_VERSION=2025.01.1 \
 #     -e SPEL_IDENTIFIER=spel \
 #     -e WINDOWS_BUILDERS="" \
-#     spel-builder make -f Makefile.spel build
+#     spel-builder:$(date +%Y%m%d) make -f Makefile.spel build
 
 # =============================================================================
 # Stage 1: Builder - Install all dependencies
