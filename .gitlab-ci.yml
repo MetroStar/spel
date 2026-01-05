@@ -18,6 +18,11 @@
 #      - AWS_SESSION_TOKEN (optional, for OIDC/STS credentials)
 #      - DOCKER_IMAGE_PATH (path to spel-builder-*.tar.gz)
 #
+#   4. Public AMI quota must be increased if building multiple AMIs concurrently:
+#        aws service-quotas request-service-quota-increase \
+#          --service-code ec2 --quota-code L-0E3CBAB9 --desired-value 20 \
+#          --region us-gov-east-1
+#
 # PIPELINE STAGES:
 #   1. import - Import Docker image from tarball
 #   2. infra  - Create AWS infrastructure (optional, one-time setup)

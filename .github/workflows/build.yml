@@ -8,6 +8,11 @@
 #   - Run the "Prepare Offline Docker Image" workflow first (offline-prepare.yml)
 #   - Download the spel-builder-YYYYMMDD artifact from that workflow
 #   - Provide the artifact name when running this workflow
+#   - IAM role MaxSessionDuration must be >= 21600 (6 hours):
+#       aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
+#   - Public AMI quota must be increased if building multiple AMIs concurrently:
+#       aws service-quotas request-service-quota-increase \
+#         --service-code ec2 --quota-code L-0E3CBAB9 --desired-value 20 --region us-east-1
 #
 # WORKFLOW:
 #   1. Download Docker image artifact from offline-prepare.yml

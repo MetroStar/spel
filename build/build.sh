@@ -22,10 +22,13 @@ fi
 
 # Function to check and manage AMI quotas in the current region
 # Uses default credentials from environment variables
+# Makes old AMIs private to maintain headroom for concurrent builds
 check_and_manage_ami_quotas() {
     local REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}"
+    local HEADROOM=3  # Keep at least 3 slots available for concurrent builds
     
-    echo "Checking AMI quotas in region $REGION"
+    echo "=== AMI Quota Management ==="
+    echo "Region: $REGION"
 
     # Get the service quota limit for public AMIs
     QUOTA_LIMIT=$(aws service-quotas get-service-quota \
@@ -35,45 +38,76 @@ check_and_manage_ami_quotas() {
         --query 'Quota.Value' \
         --output text 2>/dev/null) || {
         echo "WARNING: Could not retrieve quota limit (may lack servicequotas permissions)"
+        echo "==========================="
         return 0
     }
 
     # Convert QUOTA_LIMIT to an integer
     QUOTA_LIMIT=${QUOTA_LIMIT%.*}
 
-    # Get the current number of public AMIs
-    CURRENT_PUBLIC_AMIS=$(aws ec2 describe-images \
+    # Get the current public AMIs with their creation dates
+    PUBLIC_AMI_INFO=$(aws ec2 describe-images \
         --owners self \
         --filters Name=is-public,Values=true \
         --region "$REGION" \
-        --query 'Images[*].ImageId' \
-        --output text 2>/dev/null | wc -w) || {
-        echo "WARNING: Could not count public AMIs"
+        --query 'Images[*].[ImageId,CreationDate,Name]' \
+        --output text 2>/dev/null) || {
+        echo "WARNING: Could not list public AMIs"
+        echo "==========================="
         return 0
     }
+    
+    CURRENT_PUBLIC_AMIS=$(echo "$PUBLIC_AMI_INFO" | grep -c . || echo "0")
 
-    # Calculate the difference
-    DIFFERENCE=$((QUOTA_LIMIT - CURRENT_PUBLIC_AMIS))
+    # Calculate available slots
+    AVAILABLE_SLOTS=$((QUOTA_LIMIT - CURRENT_PUBLIC_AMIS))
 
-    echo "Quota limit: $QUOTA_LIMIT, Current public AMIs: $CURRENT_PUBLIC_AMIS, Difference: $DIFFERENCE"
+    echo "Quota limit: $QUOTA_LIMIT"
+    echo "Current public AMIs: $CURRENT_PUBLIC_AMIS"
+    echo "Available slots: $AVAILABLE_SLOTS"
+    echo "Required headroom: $HEADROOM"
 
-    # If the difference is less than 5, make the 5 oldest AMIs private
-    if [ "$DIFFERENCE" -lt 5 ]; then
-        echo "Making the 5 oldest AMIs private in region $REGION"
+    # If we don't have enough headroom, make old AMIs private
+    if [ "$AVAILABLE_SLOTS" -lt "$HEADROOM" ]; then
+        # Calculate how many AMIs to make private to restore headroom
+        AMIS_TO_MAKE_PRIVATE=$((HEADROOM - AVAILABLE_SLOTS + 2))  # +2 extra buffer
+        
+        echo ""
+        echo "Insufficient headroom. Making $AMIS_TO_MAKE_PRIVATE oldest AMIs private..."
+        
         OLDEST_AMIS=$(aws ec2 describe-images \
             --owners self \
             --filters Name=is-public,Values=true \
             --region "$REGION" \
-            --query 'Images | sort_by(@, &CreationDate)[:5].ImageId' \
+            --query "Images | sort_by(@, &CreationDate)[:${AMIS_TO_MAKE_PRIVATE}].ImageId" \
             --output text 2>/dev/null)
+        
         for AMI_ID in $OLDEST_AMIS; do
-            echo "Making AMI $AMI_ID private"
-            aws ec2 modify-image-attribute \
+            echo "  Making AMI $AMI_ID private..."
+            if aws ec2 modify-image-attribute \
                 --image-id "$AMI_ID" \
-                --launch-permission "{\"Remove\": [{\"Group\":\"all\"}]}" \
-                --region "$REGION" 2>/dev/null || true
+                --launch-permission '{"Remove": [{"Group":"all"}]}' \
+                --region "$REGION" 2>/dev/null; then
+                echo "  ✓ $AMI_ID is now private"
+            else
+                echo "  ⚠ Failed to modify $AMI_ID"
+            fi
         done
+        
+        # Re-check available slots
+        NEW_PUBLIC_COUNT=$(aws ec2 describe-images \
+            --owners self \
+            --filters Name=is-public,Values=true \
+            --region "$REGION" \
+            --query 'Images[*].ImageId' \
+            --output text 2>/dev/null | wc -w)
+        echo ""
+        echo "After cleanup: $NEW_PUBLIC_COUNT public AMIs, $((QUOTA_LIMIT - NEW_PUBLIC_COUNT)) slots available"
+    else
+        echo "✓ Sufficient headroom available"
     fi
+    
+    echo "==========================="
 }
 
 if [ $PUBLIC = "true" ]; then
