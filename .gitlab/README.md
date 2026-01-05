@@ -2,195 +2,213 @@
 
 This directory contains GitLab CI pipeline configurations for the SPEL project.
 
-## Pipeline Files
+## Pipeline Overview
+
+The GitLab CI pipeline uses a **Docker-based approach** where all build dependencies are
+baked into a container image. This image is built in a connected environment (GitHub Actions)
+and transferred to the air-gapped GitLab environment.
+
+## Pipeline File
 
 ### `.gitlab-ci.yml` (Root)
-**Purpose**: Main Offline build pipeline for air-gapped AWS GovCloud environments.
 
-**When to use**: Automatically triggered when building SPEL images in the Offline environment.
+**Purpose**: Build STIGed AMIs in air-gapped AWS GovCloud environments using Docker.
 
-**Key features**:
-- Extracts and validates offline transfer archives
-- Verifies ClamAV and TruffleHog security scans
-- Creates AWS infrastructure (VPC, security groups, IAM roles)
-- Builds SPEL images for multiple operating systems (RHEL, Oracle Linux, Amazon Linux, Windows)
-- Runs in air-gapped environment with limited internet access
+**Key Features**:
+- Imports pre-built Docker image from tarball
+- Creates AWS infrastructure (VPC, security groups, IAM roles) if needed
+- Builds SPEL images for Linux and Windows operating systems
+- All dependencies are baked into the Docker image (no internet required)
 
 **Stages**:
-1. `extract` - Extract archives and verify security scans
-2. `infra` - Create AWS infrastructure components
-3. `setup` - Install dependencies from offline archives
-4. `validate` - Validate Packer configurations
-5. `build` - Build AMIs for each OS variant
-
-### `ci/offline-prepare.gitlab-ci.yml`
-**Purpose**: Prepare offline transfer archives containing Packer, Ansible, and other dependencies.
-
-**When to use**: Manually triggered when you need to update the offline transfer archives.
-
-**Trigger**: Set the variable `PREPARE_OFFLINE_TRANSFER=true`
-
-**Key features**:
-- Runs in Offline environment with HTTP/HTTPS proxy support
-- Downloads Packer binaries and plugins
-- Downloads Ansible Core, collections, and roles
-- Downloads Python packages
-- Runs ClamAV virus scanning
-- Runs TruffleHog secrets detection
-- Creates two archive variants:
-  - `offline-transfer-base.tar.gz` (~100 MB) - Core dependencies only
-  - `offline-transfer-complete.tar.gz` (~500 MB) - All dependencies including Ansible collections/roles
-
-**Environment requirements**:
-- HTTP_PROXY and HTTPS_PROXY variables configured
-- Access to package repositories via proxy
-- spel-offline-runner tag
+1. `import` - Import Docker image from tarball
+2. `infra` - Create AWS infrastructure (optional, one-time setup)
+3. `build` - Build AMIs using Docker container
 
 ## Workflow Overview
 
 ### Initial Setup (First Time)
-1. Run `offline-prepare.gitlab-ci.yml` to create offline transfer archives
-   - Set `PREPARE_OFFLINE_TRANSFER=true`
-   - Downloads all dependencies with security scanning
-2. Transfer archives to air-gapped Offline environment
-3. Run `.gitlab-ci.yml` to build SPEL images
-   - Extracts archives
-   - Verifies security scans passed
-   - Builds AMIs
 
-### Subsequent Updates
-1. Run `offline-prepare.gitlab-ci.yml` to refresh dependencies
-   - Set `PREPARE_OFFLINE_TRANSFER=true`
-   - Downloads latest versions of Packer, Ansible, etc.
-2. Transfer updated archives to Offline environment
-3. Run `.gitlab-ci.yml` to build with updated dependencies
+1. **Build Docker Image** (in connected environment):
+   ```bash
+   # Run GitHub Actions: offline-prepare.yml
+   # Or build locally:
+   docker build -t spel-builder:$(date +%Y%m%d) .
+   docker save spel-builder:$(date +%Y%m%d) | gzip > spel-builder-$(date +%Y%m%d).tar.gz
+   ```
+
+2. **Transfer to Air-Gapped Environment**:
+   ```bash
+   # Copy to GitLab runner's transfer directory
+   scp spel-builder-*.tar.gz runner:/transfer/
+   # Optional: include checksum
+   sha256sum spel-builder-*.tar.gz > spel-builder-*.tar.gz.sha256
+   scp spel-builder-*.tar.gz.sha256 runner:/transfer/
+   ```
+
+3. **Run Pipeline**:
+   - Trigger `import:docker` job to load the image
+   - Trigger `infra:*` jobs if infrastructure doesn't exist
+   - Trigger `build:*` jobs to create AMIs
+
+### Updating Dependencies
+
+1. Rebuild Docker image with new dependencies (connected environment)
+2. Transfer new tarball to air-gapped environment
+3. Run `import:docker` job to load updated image
+4. Run build jobs as needed
 
 ## Configuration Variables
 
-### Offline Prepare Pipeline
+### Required CI/CD Variables
 
-#### Packer Configuration
-- `PACKER_VERSION`: Packer version to download (default: 1.11.2)
-- `PACKER_PLUGIN_VERSION_AMAZON`: Amazon plugin version (default: 1.3.3)
-- `PACKER_PLUGIN_VERSION_ANSIBLE`: Ansible plugin version (default: 1.1.2)
-- `DOWNLOAD_PACKER`: Download Packer binaries (default: true)
-- `DOWNLOAD_PACKER_PLUGINS`: Download Packer plugins (default: true)
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCESS_KEY_ID` | AWS access key for Packer |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key for Packer |
+| `AWS_SESSION_TOKEN` | Optional: STS session token |
 
-#### Ansible Configuration
-- `ANSIBLE_CORE_MIN`: Minimum Ansible Core version (default: 2.14)
-- `ANSIBLE_CORE_MAX`: Maximum Ansible Core version (default: 2.16)
-- `DOWNLOAD_ANSIBLE_CORE`: Download Ansible Core (default: true)
-- `DOWNLOAD_ANSIBLE_COLLECTIONS`: Download collections from requirements.yml (default: true)
-- `DOWNLOAD_ANSIBLE_ROLES`: Download roles from requirements.yml (default: true)
-- `INCLUDE_COLLECTION_DEPENDENCIES`: Include collection dependencies (default: true)
+### Optional Variables
 
-#### Python Configuration
-- `PYTHON_VERSION`: Python version to use (default: 3.9)
-- `DOWNLOAD_PYTHON_PACKAGES`: Download Python packages (default: true)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DOCKER_IMAGE_PATH` | `/transfer/spel-builder-*.tar.gz` | Path to Docker tarball |
+| `PKR_VAR_aws_region` | `us-gov-east-1` | AWS region for builds |
+| `SPEL_IDENTIFIER` | `spel` | AMI name prefix |
+| `INFRA_PREFIX` | `spel-offline` | Infrastructure resource prefix |
 
-#### Archive Configuration
-- `CREATE_BASE_ARCHIVE`: Create base archive (default: true)
-- `CREATE_COMPLETE_ARCHIVE`: Create complete archive (default: true)
+## Docker Image Contents
 
-#### Security Configuration
-- `RUN_TRUFFLEHOG`: Run TruffleHog secrets scan (default: true)
+The Docker image (~305 MB compressed) includes:
 
-#### Proxy Configuration
-- `HTTP_PROXY`: HTTP proxy URL (required in Offline environment)
-- `HTTPS_PROXY`: HTTPS proxy URL (required in Offline environment)
-- `NO_PROXY`: Comma-separated list of hosts to bypass proxy
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Base Image | Rocky Linux 8 UBI Micro | Minimal footprint |
+| Packer | 1.11.2 | With all required plugins |
+| Ansible | 2.14+ | With collections and roles |
+| Python | 3.9 | With pywinrm for Windows |
+| AWS CLI v2 | Latest | For AWS operations |
+| AMIgen Scripts | Latest | Baked in for offline EC2 |
 
-## Archive Contents
+## Air-Gapped Environment Considerations
 
-### Base Archive (~100 MB)
-- Packer binaries (Linux and Windows)
-- Packer plugins (Amazon, Ansible)
-- Python virtual environment with Ansible Core
-- Installation scripts
-- Security scan results (ClamAV, TruffleHog)
+### Windows Builds - WSUS Required
 
-### Complete Archive (~500 MB)
-- Everything in base archive, plus:
-- Ansible collections from requirements.yml
-- Ansible roles from requirements.yml
-- Additional Python packages
-- Collection dependencies
+Windows builds use the `windows-update` Packer provisioner which by default contacts
+Microsoft Update servers. In air-gapped environments, you **must** configure a local
+WSUS server.
 
-## Security Requirements
+Edit `spel/hardened-linux.pkr.hcl` to enable WSUS:
 
-Both archives include security scan results that must pass before the main build pipeline will proceed:
-
-1. **ClamAV**: Scans all downloaded files for viruses and malware
-   - Results: `security-scans/clamav-scan.log`
-   - Summary: `security-scans/clamav-summary.txt`
-
-2. **TruffleHog**: Scans for exposed secrets, credentials, and API keys
-   - Results: `security-scans/trufflehog-results.json`
-   - Summary: `security-scans/trufflehog-summary.txt`
-
-The main `.gitlab-ci.yml` pipeline verifies these scans passed in the `extract:archives` job before proceeding with the build.
-
-## Installation Scripts
-
-Archives include automated installation scripts:
-
-### `scripts/install-packer.sh`
-Installs Packer binary and plugins.
-```bash
-cd offline-transfer
-bash scripts/install-packer.sh [install_dir]
+```hcl
+provisioner "windows-update" {
+  pause_before = "30s"
+  only = [
+    "amazon-ebs.hardened-windows-2016-hvm",
+    "amazon-ebs.hardened-windows-2019-hvm",
+    "amazon-ebs.hardened-windows-2022-hvm"
+  ]
+  # Uncomment and configure for air-gapped:
+  update_server = "http://wsus.your-domain.mil:8530"
+  search_criteria = "IsInstalled=0"
+}
 ```
 
-### `scripts/install-ansible.sh`
-Creates Python virtual environment and installs Ansible with collections/roles.
-```bash
-cd offline-transfer
-bash scripts/install-ansible.sh [python_version]
-source ansible-venv/bin/activate
-```
+### Linux Builds - Package Mirrors
+
+Linux builds may attempt to install packages from internet repositories.
+Ensure your VPC has access to:
+- Local YUM/DNF mirrors for RHEL, Oracle Linux, Amazon Linux
+- Or configure the EC2 instances to use internal mirrors
+
+The Docker image includes offline packages for:
+- AWS CLI v2
+- CloudFormation Bootstrap (cfn-init)
+- SSM Agent
+
+### Network Requirements
+
+The GitLab Runner needs:
+- Docker installed and running
+- Access to the transfer directory (default: `/transfer/`)
+- Network access to AWS APIs (direct or via proxy)
+- SSH access to EC2 instances (for Packer provisioners)
+
+The EC2 build instances need:
+- Outbound access to AWS APIs (S3, EC2, etc.)
+- Access to package mirrors (internal or via NAT/proxy)
+- For Windows: Access to WSUS server
 
 ## Runner Requirements
 
-### spel-offline-runner
-Required tags for GitLab runners in Offline environment:
+### Required Tags
 - `spel-offline-runner`
 
-Runner must have:
-- Docker or Podman for container execution
-- HTTP/HTTPS proxy configuration
-- Access to Fedora container images
-- Sufficient disk space (~10 GB for complete builds)
+### Runner Configuration
+- Docker executor or shell executor with Docker installed
+- Sufficient disk space (~5 GB for image import)
+- AWS credentials configured via CI/CD variables
+
+## Build Jobs
+
+### Linux Builders
+- `build:amzn2023` - Amazon Linux 2023
+- `build:rhel9` - RHEL 9
+- `build:ol9` - Oracle Linux 9
+- `build:rhel8` - RHEL 8
+- `build:ol8` - Oracle Linux 8
+
+### Windows Builders
+- `build:windows2016` - Windows Server 2016
+- `build:windows2019` - Windows Server 2019
+- `build:windows2022` - Windows Server 2022
+
+### Full Build
+- `build:all` - All Linux and Windows builders (triggered on tags)
 
 ## Troubleshooting
 
-### Proxy Issues
-If downloads fail with connection errors:
-1. Verify `HTTP_PROXY` and `HTTPS_PROXY` are set correctly
-2. Check `NO_PROXY` excludes internal hosts
-3. Test proxy with: `curl -I https://releases.hashicorp.com`
+### Docker Import Fails
 
-### ClamAV Update Failures
-If freshclam fails to update:
-- Check proxy configuration in `/etc/freshclam.conf`
-- Verify `HTTPProxyServer` and `HTTPProxyPort` are correct
-- Pipeline will continue with existing definitions (warning only)
+```
+ERROR: No Docker image tarball found!
+```
 
-### Security Scan Failures
-If ClamAV or TruffleHog detects issues:
-1. Review scan logs in `offline-transfer/security-scans/`
-2. Identify flagged files
-3. Investigate false positives or legitimate threats
-4. Update exclusions or remediate issues before proceeding
+**Solution**: Transfer the Docker image tarball to the path specified by `DOCKER_IMAGE_PATH`:
+```bash
+scp spel-builder-*.tar.gz runner:/transfer/
+```
 
-### Archive Size Issues
-If archives are larger than expected:
-- Disable collection dependencies: `INCLUDE_COLLECTION_DEPENDENCIES=false`
-- Use base archive only: `CREATE_COMPLETE_ARCHIVE=false`
-- Review downloaded collections in requirements.yml
+### AWS Credential Issues
+
+```
+Error loading credentials
+```
+
+**Solution**: Verify CI/CD variables are set:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN` (if using STS)
+
+### Windows Update Timeout
+
+```
+windows-update: timeout waiting for updates
+```
+
+**Solution**: Configure WSUS server in the Packer template (see above).
+
+### Build Timeout (6 hours)
+
+Long builds may timeout. Common causes:
+- Slow network to AWS
+- Large Windows updates
+- AMI copy to multiple regions
+
+**Solution**: Increase job timeout or split builders into separate jobs.
 
 ## References
 
-- [Packer Documentation](https://www.packer.io/docs)
-- [Ansible Documentation](https://docs.ansible.com/)
-- [ClamAV Documentation](https://docs.clamav.net/)
-- [TruffleHog Documentation](https://github.com/trufflesecurity/trufflehog)
+- [CI-CD-Setup.md](../docs/CI-CD-Setup.md) - Complete CI/CD documentation
+- [Storage-Optimization.md](../docs/Storage-Optimization.md) - Storage requirements
+- [QUICK-REFERENCE-Optimization.md](../docs/QUICK-REFERENCE-Optimization.md) - Quick reference
