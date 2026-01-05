@@ -335,37 +335,41 @@ images.
 
 ### CI/CD Deployment Modes
 
-The SPEL build system supports three deployment modes to accommodate different AWS environments and network configurations:
+The SPEL build system uses a **Docker-based approach** where all dependencies are baked into a portable container image. This provides consistent, reproducible builds across different environments.
 
-#### 1. GitHub Actions (Dual-Environment)
-**Use case**: Building for both AWS Commercial and GovCloud from internet-connected systems
+#### Docker-Based Build System
 
-- **Credentials**: Requires both `AWS_COMMERCIAL_*` and `AWS_GOVCLOUD_*` environment variables
-- **Regions**: Builds AMIs in commercial (us-east-1, us-east-2, us-west-1, us-west-2) and GovCloud (us-gov-east-1, us-gov-west-1) regions
-- **AMI Quota Management**: Automatically manages public AMI quotas across all regions
-- **Network**: Full internet access for downloading dependencies
-- **Configuration**: See `.github/workflows/build.yml`
+The build system consists of:
 
-#### 2. GitLab CI (Offline Single-Environment)
-**Use case**: Building in air-gapped Offline environment with only GovCloud access
+1. **Docker Image**: `spel-builder:YYYYMMDD` (~305 MB gzipped, ~834 MB uncompressed)
+   - Based on Rocky Linux 8
+   - Includes: Packer, Ansible, AWS CLI, all plugins, roles, and collections
+   - Portable: Can be transferred to air-gapped environments
 
-- **Credentials**: Uses only `AWS_GOVCLOUD_*` environment variables  
-- **Regions**: Builds only in us-gov-east-1 (or configured Offline region)
-- **Offline Mode**: All dependencies pre-vendored in transfer archives (~1 GB: Packer, Python packages, Ansible collections, AWS utilities)
-- **Network**: Air-gapped with AWS GovCloud RHUI repository access
-- **Configuration**: See `.gitlab-ci.yml` and `docs/CI-CD-Setup.md`
+2. **GitHub Actions Workflows**:
+   - `offline-prepare.yml`: Builds Docker image, exports as tarball artifact
+   - `build.yml`: Downloads artifact, runs builds inside container
 
-#### 3. Local Development (Flexible)
-**Use case**: Testing and development on local workstations
+3. **GitLab CI** (for air-gapped environments):
+   - Import Docker tarball, run builds in container
+   - No internet access required during builds
 
-- **Credentials**: Automatically detects available credentials (commercial, GovCloud, or both)
-- **Regions**: Configurable via Packer variables
-- **Network**: Can work online or offline (when `SPEL_OFFLINE_MODE=true`)
-- **Script**: `build/build.sh` automatically configures AWS CLI profiles based on detected credentials
+#### Deployment Environments
 
-**Key Feature**: The `build/build.sh` script intelligently detects which AWS credentials are available and configures only the necessary profiles, making it compatible with single-environment (Offline) or dual-environment (GitHub Actions) deployments without code changes.
+| Environment | Workflow | Credentials | Use Case |
+|-------------|----------|-------------|----------|
+| GitHub Actions | `offline-prepare.yml` → `build.yml` | OIDC role assumption | Online builds for Commercial AWS |
+| GitLab CI | `.gitlab-ci.yml` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Air-gapped GovCloud builds |
+| Local | Docker + `make` | Standard AWS env vars or profiles | Development and testing |
 
-For detailed Offline/GitLab CI setup instructions, see [`docs/CI-CD-Setup.md`](docs/CI-CD-Setup.md).
+#### Prerequisites
+
+Before running CI/CD builds, ensure:
+
+1. **IAM Role Session Duration**: Must be ≥ 21600 seconds (6 hours) for long builds
+2. **Public AMI Quota**: Increase if making AMIs public (default limit is 5)
+
+See [`docs/CI-CD-Setup.md`](docs/CI-CD-Setup.md) for detailed setup instructions.
 
 ### Local Build Prerequisites
 

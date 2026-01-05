@@ -1,498 +1,153 @@
-# Storage Optimization Guide for Offline Transfers
+# Storage Requirements Guide
 
-This guide provides strategies to minimize storage requirements and transfer sizes for SPEL Offline deployments.
+This guide covers storage requirements for the Docker-based SPEL build system.
 
-**Note**: Offline builds use RHUI repositories available within the Offline AWS GovCloud environment, eliminating the need for local YUM/DNF mirrors.
+## Docker Image Size
 
-## Quick Reference
+The SPEL builder Docker image contains all dependencies baked in:
 
-| Component | Default | Optimized | Savings |
-|-----------|---------|-----------|---------||
-| Ansible Roles | 300 MB | 4 MB | **99%** |
-| Ansible Collections | 20 MB | 3.5 MB | **83%** |
-| Offline Packages | 100 MB | 86 MB | **14%** |
-| Python Deps | 100 MB | 16 MB | **84%** |
-| Packer Binaries | 500 MB | 97 MB | **81%** |
-| Packer Plugins | 80 MB | 241 MB | **-201%** |
-| SPEL Packages | 20 MB | 56 KB | **99.7%** |
-| ClamAV DB (temporary) | 0 MB | 300 MB | **N/A** |
-| **TOTAL** | **1120 MB** | **447 MB** | **60%** |
+| Format | Size |
+|--------|------|
+| Gzipped tarball | ~305 MB |
+| Uncompressed image | ~834 MB |
 
-**Compressed Transfer**: 447 MB → **1.1 GB** (118 MB base + 289 MB tools + 694 MB complete)
-**Security Artifacts**: Checksums + manifest + ClamAV scan log (~50 KB total)
+### What's Included
 
-## Automated Optimization Workflow
+The Docker image contains:
 
-### On Internet-Connected System
+| Component | Approximate Size |
+|-----------|------------------|
+| Rocky Linux 8 base | ~200 MB |
+| Packer 1.12.0 | ~95 MB |
+| AWS CLI v2 | ~150 MB |
+| Ansible Core | ~50 MB |
+| Packer plugins (Amazon, Ansible, etc.) | ~250 MB |
+| Ansible roles and collections | ~20 MB |
+| Python packages and dependencies | ~50 MB |
+| AMIgen scripts (vendor/amigen8, vendor/amigen9) | ~5 MB |
+| Other tools and utilities | ~14 MB |
+| **Total** | **~834 MB** |
+
+## Storage by Environment
+
+### GitHub Actions Runner
+
+The GitHub Actions workflows automatically manage storage:
+
+| Workflow Step | Storage Used |
+|---------------|--------------|
+| Repository checkout | ~100 MB |
+| Docker build cache | ~1-2 GB |
+| Final Docker image | ~834 MB |
+| Gzipped tarball | ~305 MB |
+| Artifact upload | 0 (uses GitHub storage) |
+| **Peak Usage** | **~3 GB** |
+
+The runner is ephemeral, so storage is released after workflow completion.
+
+### GitLab Runner (Air-Gapped)
+
+For GitLab CI builds, plan for the following storage:
+
+| Component | Size |
+|-----------|------|
+| Docker image tarball | ~305 MB |
+| Imported Docker image | ~834 MB |
+| Repository checkout | ~100 MB |
+| Build workspace per job | 10-20 GB |
+| Packer cache | 5-10 GB |
+| **Single Build Total** | **~15-25 GB** |
+| **Per Additional Concurrent Build** | **+10-20 GB** |
+
+**Recommendation**: Maintain at least 50 GB free space for builds.
+
+### Local Development
+
+For local Docker-based builds:
+
+| Component | Size |
+|-----------|------|
+| Docker image | ~834 MB |
+| Repository clone | ~100 MB |
+| Build workspace | 10-20 GB |
+| Packer cache | 5-10 GB |
+| **Total** | **~15-25 GB** |
+
+## Transfer Considerations
+
+When transferring the Docker image tarball to air-gapped environments:
+
+| Transfer Medium | Considerations |
+|-----------------|----------------|
+| USB drive | Minimum 512 MB capacity |
+| CD/DVD | Single CD is sufficient |
+| Network transfer | ~305 MB transfer |
+| Secure file share | ~305 MB upload |
+
+### Transfer Artifacts
+
+Each Docker image build produces:
+
+```
+spel-builder-YYYYMMDD/
+├── spel-builder-YYYYMMDD.tar.gz       # ~305 MB - Docker image
+├── spel-builder-YYYYMMDD.tar.gz.sha256 # <1 KB - Checksum
+└── spel-builder-YYYYMMDD-manifest.txt  # <2 KB - Build details
+```
+
+**Total transfer size**: ~305 MB
+
+## Optimization Tips
+
+### Clean Up Old Images
 
 ```bash
-# 1. Clone repository with submodules
-git clone --recurse-submodules https://github.com/MetroStar/spel.git
-cd spel/
+# List spel-builder images
+docker images spel-builder
 
-# 2. Vendor Ansible roles (saves 80%)
-SPEL_ROLES_REMOVE_GIT=true \
-SPEL_ROLES_COMPRESS=true \
-./scripts/vendor-ansible-roles.sh
+# Remove old images
+docker rmi spel-builder:old_tag
 
-# 3. Vendor Ansible collections (saves 75%)
-./scripts/vendor-ansible-collections.sh
-
-# 4. Download offline packages (saves 25%)
-SPEL_OFFLINE_COMPRESS=true \
-./scripts/download-offline-packages.sh
-
-# 5. Create optimized transfer archives
-./scripts/create-transfer-archive.sh
-
-# 6. Verify and prepare for transfer
-sha256sum -c spel-offline-*-checksums.txt
-ls -lh spel-*.tar.gz
+# Remove unused Docker resources
+docker system prune
 ```
 
-### On Offline System
+### Clean Up Packer Cache
 
 ```bash
-# 1. Verify checksums after transfer
-sha256sum -c spel-offline-YYYYMMDD-checksums.txt
-
-# 2. Extract all archives
-./scripts/extract-offline-archives.sh
-
-# 3. Initialize environment (uses RHUI repos)
-./build/ci-setup.sh
+# Remove Packer temporary files
+rm -rf ~/.cache/packer/*
+rm -rf ~/.packer.d/tmp/*
 ```
 
-## Optimization Strategies by Component
+### Minimize Concurrent Builds
 
-### 1. Ansible Roles (300 MB → 4 MB)
+Each concurrent build requires additional storage. Run builds sequentially when storage is limited.
 
-#### Strategy A: Shallow Clone (Saves 50%)
+## Artifact Retention
 
-```bash
-# Automatically done by vendor-ansible-roles.sh
-git clone --depth 1 <repo>
-```
+| Platform | Retention | Notes |
+|----------|-----------|-------|
+| GitHub Actions | 30 days | Configurable in workflow |
+| GitLab CI | 7 days (jobs), 90 days (infra.env) | Configurable in .gitlab-ci.yml |
 
-**Result:** No git history, only latest snapshot
+Adjust retention periods based on your needs and storage constraints.
 
-#### Strategy B: Remove .git Directories (Saves Additional 30%)
+## Comparison: Docker vs. Old Archive Approach
 
-```bash
-SPEL_ROLES_REMOVE_GIT=true \
-./scripts/vendor-ansible-roles.sh
-```
+The Docker-based approach simplifies storage management:
 
-**Result:**
-- Removes all git metadata
-- Role remains fully functional
-- Cannot `git pull` updates (re-vendor instead)
+| Aspect | Docker Approach | Old Archive Approach |
+|--------|-----------------|---------------------|
+| Transfer size | ~305 MB | ~1.1 GB |
+| Number of files | 3 | 7+ |
+| Extraction needed | `docker load` | Multiple extractions |
+| Verification | Single checksum | Multiple checksums |
+| Dependencies | Self-contained | Scattered directories |
 
-#### Strategy C: Specific Version Tags
-
-```bash
-SPEL_ROLES_TAG=v1.2.3 \
-./scripts/vendor-ansible-roles.sh
-```
-
-**Result:**
-- Locks to specific tested version
-- Recommended for production Offline environments
-
-### 2. Ansible Collections (20 MB → 5 MB)
-
-#### Strategy: Tarball Format (Saves 75%)
-
-```bash
-# Automatically done by vendor-ansible-collections.sh
-ansible-galaxy collection download ansible.windows:1.14.0
-# Creates ansible-windows-1.14.0.tar.gz
-```
-
-**Result:**
-- Collections stored as compressed tarballs (~5 MB total)
-- Installed to `~/.ansible/collections/` during build setup
-- Compatible with Ansible Core 2.15.13
-
-**Collections vendored:**
-- `ansible.windows:1.14.0` - Windows automation modules (500 KB)
-- `community.windows:1.13.0` - Additional Windows modules (800 KB)
-- `community.general:7.5.0` - General-purpose modules (4 MB)
-
-**Total**: ~5.3 MB (vs 20 MB if extracted)
-
-### 3. Offline AWS Packages (100 MB → 86 MB)
-
-#### Strategy: Single SSM Agent for Both EL8/EL9
-
-```bash
-./scripts/download-offline-packages.sh
-```
-
-**Optimization:**
-- SSM Agent RPM is compatible with both EL8 and EL9
-- No need for separate versions
-- Saves 25 MB
-
-### 4. Build Tools (400 MB)
-
-#### Strategy A: Selective Python Packages
-
-```bash
-# Download only required dependencies
-pip download ansible-core --no-deps --dest tools/python-deps/
-# Then manually add only required transitive dependencies
-```
-
-#### Strategy B: Single Packer Binary
-
-```bash
-# Download only Linux x86_64 binary
-# Skip unnecessary platforms (macOS, Windows, ARM)
-wget https://releases.hashicorp.com/packer/1.11.2/packer_1.11.2_linux_amd64.zip
-```
-
-**Note**: Offline builds use Packer v1.11.2 for compatibility with vendored plugins.
-
-## Transfer Archive Strategies
-
-## Transfer Archive Strategies
-
-## Transfer Archive Strategies
-
-### Option 1: Combined Archive
-
-**Best for:** Initial deployment, small networks
-
-```bash
-# Creates single archive
-SPEL_ARCHIVE_COMBINED=true \
-SPEL_ARCHIVE_SEPARATE=false \
-./scripts/create-transfer-archive.sh
-
-# Result: spel-offline-complete-YYYYMMDD.tar.gz (1.1 GB)
-```
-
-### Option 2: Separate Component Archives (Optional)
-
-**Best for:** Incremental updates when base components don't change
-
-```bash
-# Creates separate archives (opt-in)
-SPEL_ARCHIVE_SEPARATE=true ./scripts/create-transfer-archive.sh
-
-# Results:
-# - spel-base-YYYYMMDD.tar.gz (118 MB)
-# - spel-tools-YYYYMMDD.tar.gz (~400 MB)
-# - spel-offline-complete-YYYYMMDD.tar.gz (694 MB)
-```
-
-**Benefits:**
-- Transfer only what changed between releases
-- Parallel transfers possible
-- Faster verification for incremental updates
-
-**Note:** Most users should use Option 1 (single complete archive) unless doing frequent incremental updates.
-
-## Storage Requirement Summary
-
-### Internet-Connected System (Preparation)
-
-```
-Workspace:
-  ├── Code/Scripts         ~100 MB
-  ├── Ansible roles        4 MB (optimized)
-  ├── Ansible collections  3.5 MB (tarballs)
-  ├── Python dependencies  16 MB
-  ├── Offline packages     86 MB
-  ├── Packer binaries      97 MB
-  ├── Packer plugins       241 MB
-  ├── SPEL packages        56 KB
-  ├── ClamAV virus DB      ~300 MB (temporary, for scanning)
-  └── Transfer archives    1.1 GB
-Total working space: 2-3.4 GB
-Note: ClamAV DB downloaded during scan, not included in transfer
-```
-
-### Transfer Media
-
-```
-Standard (single complete archive):
-  ├── spel-offline-complete-*.tar.gz  694 MB
-  ├── checksums.txt            ~2 KB
-  ├── manifest.txt             ~5 KB
-  └── clamav-scan.log          ~50 KB (security audit trail)
-  Total: ~694 MB
-
-With separate archives (opt-in via SPEL_ARCHIVE_SEPARATE=true):
-  ├── spel-base-*.tar.gz       118 MB
-  ├── spel-tools-*.tar.gz      289 MB
-  ├── spel-offline-complete-*.tar.gz  694 MB
-  ├── checksums.txt            ~2 KB
-  ├── manifest.txt             ~5 KB
-  └── clamav-scan.log          ~50 KB (security audit trail)
-  Total: 1.1 GB
-```
-
-### Offline System (Deployed)
-
-```
-Deployed workspace:
-  ├── Code/Scripts         ~100 MB
-  ├── Ansible roles        4 MB
-  ├── Ansible collections  3.5 MB (tarballs, installed to ~/.ansible/collections/)
-  ├── Python dependencies  16 MB
-  ├── Offline packages     86 MB
-  ├── Packer binaries      97 MB
-  ├── Packer plugins       241 MB
-  ├── SPEL packages        56 KB
-  ├── Vendor submodules    ~100 MB
-  └── Build workspace      ~10-15 GB (per concurrent build)
-  
-Minimum: 1.1 GB
-Recommended: 20-35 GB (allows 1-2 concurrent builds)
-```
-
-**Note**: Offline builds use RHUI repositories within AWS GovCloud, so no local mirrors are needed.
-
-## Configuration Variables Reference
-
-### Ansible Roles (`vendor-ansible-roles.sh`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SPEL_ROLES_REMOVE_GIT` | `true` | Remove .git directories |
-| `SPEL_ROLES_COMPRESS` | `true` | Create compressed archive |
-| `SPEL_ROLES_TAG` | (empty) | Specific git tag to checkout |
-
-### Offline Packages (`download-offline-packages.sh`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SPEL_OFFLINE_COMPRESS` | `true` | Create compressed archive |
-| `SPEL_OFFLINE_VERIFY` | `true` | Verify downloads |
-
-### Transfer Archives (`create-transfer-archive.sh`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SPEL_ARCHIVE_SEPARATE` | `false` | Create separate component archives (opt-in) |
-| `SPEL_ARCHIVE_COMBINED` | `true` | Create combined complete archive |
-| `SPEL_ARCHIVE_OUTPUT` | `$PWD` | Output directory for archives |
-
-### Offline Extraction (`extract-offline-archives.sh`)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SPEL_ARCHIVE_DIR` | `$PWD` | Directory containing archives |
-| `SPEL_VERIFY_CHECKSUMS` | `true` | Verify SHA256 checksums |
-| `SPEL_CLEANUP_ARCHIVES` | `false` | Remove archives after extraction |
-
-## Pipeline Integration
-
-### GitLab CI Storage Analysis by Stage
-
-The GitLab CI pipeline manages storage efficiently across multiple stages:
-
-#### Stage 1: Extract (2-3 minutes)
-
-**Storage Impact**: +1 GB (one-time)
-
-```
-Input: Archives in repository (1.1 GB compressed)
-Process: Extract to working directories
-Output: ~1 GB extracted files + scan log
-```
-
-**Storage breakdown**:
-- SPEL packages: 56 KB → `spel/`
-- Ansible roles: 4 MB → `vendor/ansible-roles/`
-- Ansible collections: 3.5 MB → `vendor/ansible-collections/`
-- Offline packages: 86 MB → `offline-packages/`
-- Packer binaries: 97 MB → `tools/packer-linux/`, `tools/packer-windows/`
-- Packer plugins: 241 MB → `tools/packer-plugins/`
-- Python packages: 16 MB → `tools/python-deps/`
-- ClamAV scan log: ~50 KB → `spel-offline-YYYYMMDD-clamav-scan.log`
-
-**Security Artifacts**:
-- Checksums file: ~2 KB
-- Manifest file: ~5 KB
-- ClamAV scan log: ~50 KB (includes complete scan results, virus DB version, scan metrics)
-
-**Artifacts**: Retained for 90 days, used by all subsequent stages
-
-#### Stage 2: Infrastructure (2-3 minutes, one-time)
-
-**Storage Impact**: Minimal (~10 KB artifacts)
-
-```
-Process: Creates AWS resources via API calls
-Output: infra.env, iam.env configuration files
-```
-
-**Resources created**:
-- VPC, Internet Gateway, Subnet, Route Table (no local storage)
-- Security Group (no local storage)
-- IAM Role, Policy, Instance Profile (no local storage)
-
-**Artifacts**: Configuration files retained for 90 days
-
-#### Stage 3: Setup (4-5 minutes)
-
-**Storage Impact**: +500 MB (temporary)
-
-**Job: verify:resources**
-- No storage impact (checks only)
-- Verifies 50+ GB free disk space
-- Verifies 2+ GB free memory
-
-**Job: aws:verify**
-- No storage impact (API calls only)
-- Tests AWS credentials
-- Verifies VPC/subnet configuration
-
-**Job: setup**
-- Initializes git submodules: vendor/amigen8 (~2 MB), vendor/amigen9 (~2 MB)
-- Detects offline Packer installation
-- No additional storage (uses extracted files)
-
-**Job: python:setup**
-- Creates virtual environment: `.venv/` (~200 MB)
-- Installs from offline wheels in `tools/python-deps/`
-- Temporary: Cleaned between builds or retained for reuse
-
-**Job: packer:init**
-- Initializes Packer plugin cache: `~/.packer.d/` (~300 MB)
-- Uses plugins from `tools/packer-plugins/` (offline mode)
-- Persistent cache: Reused across builds
-
-**Job: verify:dependencies**
-- No storage impact (verification only)
-- Checks submodule content
-
-**Total setup stage storage**: ~500 MB (venv + plugin cache)
-
-#### Stage 4: Validate (1 minute)
-
-**Storage Impact**: Minimal
-
-```
-Process: Runs packer validate on all templates
-Output: Validation results (text logs only)
-```
-
-No additional storage required (uses setup artifacts)
-
-#### Stage 5: Build (2-5 hours per OS)
-
-**Storage Impact**: +15-30 GB per concurrent build
-
-**Per build job storage breakdown**:
-- Packer working directory: 2-5 GB
-  - Source AMI snapshot downloads
-  - Ansible playbook execution
-  - STIG content and scripts
-- Packer cache (`~/.packer.d/tmp/`): 5-10 GB
-  - AMI creation temporary files
-  - Instance volume snapshots
-- Build logs: 10-50 MB
-  - Ansible output
-  - Packer progress logs
-  - Error debugging information
-
-**Concurrent builds**:
-- 1 OS build: ~17 GB total workspace
-- 2 concurrent builds: ~32 GB total workspace
-- 3 concurrent builds: ~47 GB total workspace
-- Full parallel (8 OS): ~120+ GB total workspace
-
-**Cleanup**: Packer automatically cleans working directory after successful build, but cache persists
-
-### Total System Requirements
-
-**Minimum for single OS build**:
-- Extracted archives: 1 GB
-- Python venv: 200 MB
-- Packer plugin cache: 300 MB
-- Build workspace: 15-20 GB
-- **Total**: 17-22 GB free space
-
-**Recommended for monthly builds** (2-3 OS concurrently):
-- Base: 1.5 GB (archives + setup)
-- Build workspaces: 45-60 GB (3 × 15-20 GB)
-- **Total**: 50+ GB free space (verified by `verify:resources` job)
-
-**Required for full release** (8 OS builds in parallel):
-- Base: 1.5 GB
-- Build workspaces: 120-160 GB (8 × 15-20 GB)
-- **Total**: 130+ GB free space
-
-### Storage Optimization Tips for Pipeline
-
-1. **Clean Packer cache periodically**:
-   ```bash
-   rm -rf ~/.packer.d/tmp/*
-   # Saves 5-10 GB per previous build
-   ```
-
-2. **Reuse Python venv**:
-   - Keep `.venv/` between builds (saves 4-5 min setup time)
-   - Recreate monthly when archives update
-
-3. **Run builds serially for limited disk**:
-   - Set only one `RUN_<OS>=true` at a time
-   - Reduces peak storage to ~20 GB vs 120+ GB
-
-4. **Archive rotation**:
-   - Keep only current month's archives in repository
-   - Delete previous month after successful extraction
-   - Saves 1 GB per old archive set
-
-5. **Artifact cleanup**:
-   - GitLab automatically deletes artifacts after 90 days
-   - Manually delete old pipeline artifacts if storage constrained
-   - infra.env/iam.env are tiny (<10 KB), keep for infrastructure reuse
-
-### Pipeline Storage Best Practices
-
-1. **Initial setup**: Run extract and infrastructure stages once, artifacts last 90 days
-2. **Monthly builds**: Only re-extract if archives updated, reuse infrastructure
-3. **Concurrent limits**: Don't exceed (available_space - 2GB) / 20GB concurrent builds
-4. **Monitor usage**: Check `df -h` before starting builds (verified automatically)
-5. **Clean between releases**: Remove Packer cache and old venv before major releases
-
-## Troubleshooting
-
-### Issue: Transfer archive too large for media
-
-**Solution:**
-```bash
-# Use separate archives, transfer individually
-SPEL_ARCHIVE_COMBINED=false \
-./scripts/create-transfer-archive.sh
-```
-
-### Issue: Slow extraction in Offline
-
-**Solution:**
-```bash
-# Extract directly without intermediate storage
-tar xzf archive.tar.gz -C /final/destination/
-# Rather than extracting then moving
-```
-
-## Best Practices
-
-1. **Always verify checksums** after transfer
-2. **Test extraction** before deleting transfer media
-3. **Document versions** in transfer package (use VERSIONS.txt files)
-4. **Keep one previous version** in Offline for rollback
-5. **Update monthly** for security patches (Ansible roles and collections)
-6. **Use separate archives** for updates (don't re-transfer everything)
-7. **Compress before transfer** (default in scripts)
+The Docker approach reduces transfer size by ~70% and simplifies the workflow significantly.
 
 ## See Also
 
-- `docs/Offline-Setup.md` - Complete Offline setup guide
-- `offline-packages/README.md` - AWS utilities documentation
-- `tools/README.md` - Build tools documentation
+- [CI-CD-Setup.md](CI-CD-Setup.md) - Full CI/CD documentation
+- [QUICK-REFERENCE-Optimization.md](QUICK-REFERENCE-Optimization.md) - Quick reference guide
