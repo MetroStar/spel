@@ -59,9 +59,6 @@ on:
         default: false
         type: boolean
 
-  schedule:
-    - cron: '0 9 1 * *'
-
 permissions:
   id-token: write
   contents: write
