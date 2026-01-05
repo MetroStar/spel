@@ -209,6 +209,18 @@ variable "aws_source_ami_filter_windows2022_hvm" {
   }
 }
 
+variable "windows_update_server" {
+  description = "WSUS server URL for Windows updates in air-gapped environments. Leave empty to use Microsoft Update (requires internet). Example: http://wsus.internal.mil:8530"
+  type        = string
+  default     = ""
+}
+
+variable "windows_update_search_criteria" {
+  description = "Search criteria for Windows updates. Only used when windows_update_server is set."
+  type        = string
+  default     = "IsInstalled=0"
+}
+
 variable "aws_ssh_interface" {
   description = "Specifies method used to select the value for the host in the SSH connection"
   type        = string
@@ -831,9 +843,10 @@ build {
       "amazon-ebs.hardened-windows-2019-hvm",
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
-    # Point to internal WSUS server instead of Microsoft
-    # update_server = "http://wsus.internal.offline.mil:8530"
-    # search_criteria = "IsInstalled=0"
+    # For air-gapped environments, set windows_update_server to your WSUS URL
+    # Example: PKR_VAR_windows_update_server="http://wsus.internal.mil:8530"
+    update_server   = var.windows_update_server != "" ? var.windows_update_server : null
+    search_criteria = var.windows_update_server != "" ? var.windows_update_search_criteria : null
   }
 
   provisioner "ansible" {
