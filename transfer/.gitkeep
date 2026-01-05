@@ -1,0 +1,12 @@
+# This directory is for Docker image tarballs transferred from connected environments
+# 
+# The GitLab CI pipeline expects Docker image tarballs at:
+#   /transfer/spel-builder-*.tar.gz
+#
+# To prepare the tarball:
+#   1. Run the offline-prepare.yml workflow in GitHub Actions
+#   2. Download the spel-builder-YYYYMMDD artifact
+#   3. Transfer spel-builder-*.tar.gz to this directory
+#
+# Optional: Include a checksum file for verification:
+#   sha256sum spel-builder-YYYYMMDD.tar.gz > spel-builder-YYYYMMDD.tar.gz.sha256
