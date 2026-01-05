@@ -5,145 +5,73 @@ set -u -o pipefail
 # Default PUBLIC to true if not set (used for AMI quota management)
 PUBLIC="${PUBLIC:-true}"
 
-# Detect which AWS environments are configured
-HAS_COMMERCIAL=false
-HAS_GOVCLOUD=false
-
-if [[ -n "${AWS_COMMERCIAL_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_COMMERCIAL_SECRET_ACCESS_KEY:-}" ]]; then
-    HAS_COMMERCIAL=true
-fi
-
-if [[ -n "${AWS_GOVCLOUD_ACCESS_KEY_ID:-}" ]] && [[ -n "${AWS_GOVCLOUD_SECRET_ACCESS_KEY:-}" ]]; then
-    HAS_GOVCLOUD=true
-fi
-
-# Require at least one environment
-if [[ "$HAS_COMMERCIAL" == "false" ]] && [[ "$HAS_GOVCLOUD" == "false" ]]; then
-    echo "ERROR: At least one set of AWS credentials must be provided"
-    echo "  Required: AWS_COMMERCIAL_* OR AWS_GOVCLOUD_*"
+# Verify AWS credentials are available (via environment variables)
+# AWS SDK automatically uses AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN
+if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]] || [[ -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+    echo "ERROR: AWS credentials must be provided via environment variables"
+    echo "  Required: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY"
+    echo "  Optional: AWS_SESSION_TOKEN (for OIDC/STS credentials)"
     exit 1
 fi
 
-# Create AWS CLI configuration files
-mkdir -p ~/.aws
-
-# Build credentials file dynamically
-cat > ~/.aws/credentials <<EOL
-EOL
-
-if [[ "$HAS_COMMERCIAL" == "true" ]]; then
-    cat >> ~/.aws/credentials <<EOL
-[commercial]
-aws_access_key_id = ${AWS_COMMERCIAL_ACCESS_KEY_ID}
-aws_secret_access_key = ${AWS_COMMERCIAL_SECRET_ACCESS_KEY}
-EOL
-    # Add session token if available (for OIDC/STS credentials)
-    if [[ -n "${AWS_COMMERCIAL_SESSION_TOKEN:-}" ]]; then
-        cat >> ~/.aws/credentials <<EOL
-aws_session_token = ${AWS_COMMERCIAL_SESSION_TOKEN}
-EOL
-    fi
-    echo "" >> ~/.aws/credentials
+# Determine AWS region (default based on partition detection)
+if [[ -z "${AWS_DEFAULT_REGION:-}" ]] && [[ -z "${AWS_REGION:-}" ]]; then
+    echo "WARNING: No AWS region set, defaulting to us-east-1"
+    export AWS_DEFAULT_REGION="us-east-1"
 fi
 
-if [[ "$HAS_GOVCLOUD" == "true" ]]; then
-    cat >> ~/.aws/credentials <<EOL
-[govcloud]
-aws_access_key_id = ${AWS_GOVCLOUD_ACCESS_KEY_ID}
-aws_secret_access_key = ${AWS_GOVCLOUD_SECRET_ACCESS_KEY}
-EOL
-    # Add session token if available (for OIDC/STS credentials)
-    if [[ -n "${AWS_GOVCLOUD_SESSION_TOKEN:-}" ]]; then
-        cat >> ~/.aws/credentials <<EOL
-aws_session_token = ${AWS_GOVCLOUD_SESSION_TOKEN}
-EOL
-    fi
-    echo "" >> ~/.aws/credentials
-fi
-
-# Build config file dynamically
-cat > ~/.aws/config <<EOL
-EOL
-
-if [[ "$HAS_COMMERCIAL" == "true" ]]; then
-    cat >> ~/.aws/config <<EOL
-[profile commercial]
-region = us-east-1
-
-EOL
-fi
-
-if [[ "$HAS_GOVCLOUD" == "true" ]]; then
-    cat >> ~/.aws/config <<EOL
-[profile govcloud]
-region = us-gov-east-1
-
-EOL
-fi
-
-# Function to check and manage AMI quotas
+# Function to check and manage AMI quotas in the current region
+# Uses default credentials from environment variables
 check_and_manage_ami_quotas() {
-    if [[ "$HAS_COMMERCIAL" == "true" ]]; then
-        REGIONS=("us-east-1" "us-east-2" "us-west-1" "us-west-2")
+    local REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}"
+    
+    echo "Checking AMI quotas in region $REGION"
 
-        for REGION in "${REGIONS[@]}"; do
-        echo "Checking AMI quotas in region $REGION"
+    # Get the service quota limit for public AMIs
+    QUOTA_LIMIT=$(aws service-quotas get-service-quota \
+        --service-code ec2 \
+        --quota-code L-0E3CBAB9 \
+        --region "$REGION" \
+        --query 'Quota.Value' \
+        --output text 2>/dev/null) || {
+        echo "WARNING: Could not retrieve quota limit (may lack servicequotas permissions)"
+        return 0
+    }
 
-        # Get the service quota limit for public AMIs
-        QUOTA_LIMIT=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-0E3CBAB9 --region "$REGION" --query 'Quota.Value' --output text --profile commercial)
+    # Convert QUOTA_LIMIT to an integer
+    QUOTA_LIMIT=${QUOTA_LIMIT%.*}
 
-        # Convert QUOTA_LIMIT to an integer
-        QUOTA_LIMIT=${QUOTA_LIMIT%.*}
+    # Get the current number of public AMIs
+    CURRENT_PUBLIC_AMIS=$(aws ec2 describe-images \
+        --owners self \
+        --filters Name=is-public,Values=true \
+        --region "$REGION" \
+        --query 'Images[*].ImageId' \
+        --output text 2>/dev/null | wc -w) || {
+        echo "WARNING: Could not count public AMIs"
+        return 0
+    }
 
-        # Get the current number of public AMIs
-        CURRENT_PUBLIC_AMIS=$(aws ec2 describe-images --owners self --filters Name=is-public,Values=true --region "$REGION" --query 'Images[*].ImageId' --output text --profile commercial | wc -w)
+    # Calculate the difference
+    DIFFERENCE=$((QUOTA_LIMIT - CURRENT_PUBLIC_AMIS))
 
-        # Calculate the difference
-        DIFFERENCE=$((QUOTA_LIMIT - CURRENT_PUBLIC_AMIS))
+    echo "Quota limit: $QUOTA_LIMIT, Current public AMIs: $CURRENT_PUBLIC_AMIS, Difference: $DIFFERENCE"
 
-        echo "Quota limit: $QUOTA_LIMIT, Current public AMIs: $CURRENT_PUBLIC_AMIS, Difference: $DIFFERENCE"
-
-        # If the difference is less than 5, make the 5 oldest AMIs private
-        if [ "$DIFFERENCE" -lt 5 ]; then
-            echo "Making the 5 oldest AMIs private in region $REGION"
-            OLDEST_AMIS=$(aws ec2 describe-images --owners self --filters Name=is-public,Values=true --region "$REGION" --query 'Images | sort_by(@, &CreationDate)[:5].ImageId' --output text  --profile commercial)
-            for AMI_ID in $OLDEST_AMIS; do
-                echo "Making AMI $AMI_ID private"
-                aws ec2 modify-image-attribute --image-id "$AMI_ID" --launch-permission "{\"Remove\": [{\"Group\":\"all\"}]}" --region "$REGION" --profile commercial
-            done
-        fi
-        done
-    fi
-
-    if [[ "$HAS_GOVCLOUD" == "true" ]]; then
-        REGIONS=("us-gov-east-1" "us-gov-west-1")
-
-        for REGION in "${REGIONS[@]}"; do
-        echo "Checking AMI quotas in region $REGION"
-
-        # Get the service quota limit for public AMIs
-        QUOTA_LIMIT=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-0E3CBAB9 --region "$REGION" --query 'Quota.Value' --output text --profile govcloud)
-
-        # Convert QUOTA_LIMIT to an integer
-        QUOTA_LIMIT=${QUOTA_LIMIT%.*}
-
-        # Get the current number of public AMIs
-        CURRENT_PUBLIC_AMIS=$(aws ec2 describe-images --owners self --filters Name=is-public,Values=true --region "$REGION" --query 'Images[*].ImageId' --output text --profile govcloud | wc -w)
-
-        # Calculate the difference
-        DIFFERENCE=$((QUOTA_LIMIT - CURRENT_PUBLIC_AMIS))
-
-        echo "Quota limit: $QUOTA_LIMIT, Current public AMIs: $CURRENT_PUBLIC_AMIS, Difference: $DIFFERENCE"
-
-        # If the difference is less than 5, make the 5 oldest AMIs private
-        if [ "$DIFFERENCE" -lt 5 ]; then
-            echo "Making the 5 oldest AMIs private in region $REGION"
-            OLDEST_AMIS=$(aws ec2 describe-images --owners self --filters Name=is-public,Values=true --region "$REGION" --query 'Images | sort_by(@, &CreationDate)[:5].ImageId' --output text --profile govcloud)
-            for AMI_ID in $OLDEST_AMIS; do
-                echo "Making AMI $AMI_ID private"
-                aws ec2 modify-image-attribute --image-id "$AMI_ID" --launch-permission "{\"Remove\": [{\"Group\":\"all\"}]}" --region "$REGION" --profile govcloud
-            done
-        fi
+    # If the difference is less than 5, make the 5 oldest AMIs private
+    if [ "$DIFFERENCE" -lt 5 ]; then
+        echo "Making the 5 oldest AMIs private in region $REGION"
+        OLDEST_AMIS=$(aws ec2 describe-images \
+            --owners self \
+            --filters Name=is-public,Values=true \
+            --region "$REGION" \
+            --query 'Images | sort_by(@, &CreationDate)[:5].ImageId' \
+            --output text 2>/dev/null)
+        for AMI_ID in $OLDEST_AMIS; do
+            echo "Making AMI $AMI_ID private"
+            aws ec2 modify-image-attribute \
+                --image-id "$AMI_ID" \
+                --launch-permission "{\"Remove\": [{\"Group\":\"all\"}]}" \
+                --region "$REGION" 2>/dev/null || true
         done
     fi
 }
@@ -151,14 +79,6 @@ check_and_manage_ami_quotas() {
 if [ $PUBLIC = "true" ]; then
   # Check and manage AMI quotas before starting the build
   check_and_manage_ami_quotas
-fi
-
-# Determine which profile to use for AMI lookups
-# Prefer commercial if available, otherwise use govcloud
-if [[ "$HAS_COMMERCIAL" == "true" ]]; then
-    AWS_PROFILE="commercial"
-else
-    AWS_PROFILE="govcloud"
 fi
 
 echo "==========STARTING BUILD=========="
@@ -193,7 +113,7 @@ if [[ -n "$SPEL_BUILDERS" ]]; then
             BUILD_NAME="${BUILDER//*./}"
             AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
             BUILDER_ENV="${BUILDER//[.-]/_}"
-            BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile $AWS_PROFILE)
+            BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text)
             if [[ "$BUILDER_AMI" == "None" ]]
             then
                 FAILED_BUILDS+=("$BUILDER")

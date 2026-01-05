@@ -13,8 +13,9 @@
 #   2. GitLab Runner must have Docker installed and running
 #
 #   3. CI/CD Variables required:
-#      - AWS_GOVCLOUD_ACCESS_KEY_ID
-#      - AWS_GOVCLOUD_SECRET_ACCESS_KEY
+#      - AWS_ACCESS_KEY_ID
+#      - AWS_SECRET_ACCESS_KEY
+#      - AWS_SESSION_TOKEN (optional, for OIDC/STS credentials)
 #      - DOCKER_IMAGE_PATH (path to spel-builder-*.tar.gz)
 #
 # PIPELINE STAGES:
@@ -147,8 +148,6 @@ infra:network:
   stage: infra
   script:
     - echo "Setting up AWS network infrastructure..."
-    - export AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
-    - export AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
     - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
     
     # Check if VPC already exists
@@ -223,8 +222,6 @@ infra:security_group:
   needs: ["infra:network"]
   script:
     - echo "Creating security group for Packer builders..."
-    - export AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
-    - export AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
     - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
     
     - |
@@ -271,8 +268,6 @@ infra:iam:
   stage: infra
   script:
     - echo "Creating IAM role and instance profile for Packer..."
-    - export AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}"
-    - export AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}"
     - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
     
     # Create IAM role
@@ -301,9 +296,10 @@ infra:iam:
         aws iam create-role \
           --role-name "${ROLE_NAME}" \
           --assume-role-policy-document file://trust-policy.json \
-          --description "Role for SPEL Packer builders"
+          --description "Role for SPEL Packer builders" \
+          --max-session-duration 21600
         
-        echo "✓ Created IAM role: ${ROLE_NAME}"
+        echo "✓ Created IAM role: ${ROLE_NAME} (max session: 6 hours)"
       fi
     
     # Create instance profile
@@ -395,8 +391,9 @@ infra:iam:
     - |
       docker run --rm \
         -v "${CI_PROJECT_DIR}:/workspace" \
-        -e AWS_ACCESS_KEY_ID="${AWS_GOVCLOUD_ACCESS_KEY_ID}" \
-        -e AWS_SECRET_ACCESS_KEY="${AWS_GOVCLOUD_SECRET_ACCESS_KEY}" \
+        -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+        -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+        -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN:-}" \
         -e AWS_DEFAULT_REGION="${PKR_VAR_aws_region}" \
         -e AWS_REGION="${PKR_VAR_aws_region}" \
         -e SPEL_IDENTIFIER="${SPEL_IDENTIFIER}" \
