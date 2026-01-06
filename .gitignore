@@ -66,3 +66,10 @@ go.*
 tardigrade-ci
 .tardigrade-ci
 *.pem
+
+# =========================
+# Transfer directory (Docker tarballs for air-gapped environments)
+# =========================
+# Keep the .gitkeep but ignore actual tarballs and manifests
+transfer/*
+!transfer/.gitkeep
