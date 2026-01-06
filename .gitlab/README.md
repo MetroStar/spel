@@ -68,6 +68,10 @@ and transferred to the air-gapped GitLab environment.
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key for Packer |
 | `AWS_SESSION_TOKEN` | Optional: STS session token |
 
+> **Important**: The IAM user/role providing these credentials needs extensive EC2 permissions
+> to create AMIs, launch instances, manage snapshots, etc. See [CI-CD-Setup.md](../docs/CI-CD-Setup.md#3-packer-execution-iam-permissions)
+> for the full policy.
+
 ### Optional Variables
 
 | Variable | Default | Description |

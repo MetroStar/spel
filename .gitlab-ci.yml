@@ -314,6 +314,97 @@ infra:iam:
         echo "✓ Created IAM role: ${ROLE_NAME} (max session: 6 hours)"
       fi
     
+    # Create and attach IAM policy for Packer EC2 instance
+    - |
+      POLICY_NAME="${INFRA_PREFIX}-packer-builder-policy"
+      ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      
+      # Check if policy already exists
+      EXISTING_POLICY=$(aws iam list-policies --scope Local \
+        --query "Policies[?PolicyName=='${POLICY_NAME}'].Arn" --output text 2>/dev/null)
+      
+      if [ -n "$EXISTING_POLICY" ] && [ "$EXISTING_POLICY" != "None" ]; then
+        echo "✓ IAM policy already exists: ${POLICY_NAME}"
+        POLICY_ARN="$EXISTING_POLICY"
+      else
+        echo "Creating IAM policy..."
+        
+        # Policy for EC2 instance role (what the Packer-launched instance needs)
+        # This is minimal - the instance just needs to communicate with SSM/S3
+        cat > packer-policy.json <<EOF
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "SSMAccess",
+            "Effect": "Allow",
+            "Action": [
+              "ssm:UpdateInstanceInformation",
+              "ssmmessages:CreateControlChannel",
+              "ssmmessages:CreateDataChannel",
+              "ssmmessages:OpenControlChannel",
+              "ssmmessages:OpenDataChannel",
+              "ec2messages:AcknowledgeMessage",
+              "ec2messages:DeleteMessage",
+              "ec2messages:FailMessage",
+              "ec2messages:GetEndpoint",
+              "ec2messages:GetMessages",
+              "ec2messages:SendReply"
+            ],
+            "Resource": "*"
+          },
+          {
+            "Sid": "S3Access",
+            "Effect": "Allow",
+            "Action": [
+              "s3:GetObject",
+              "s3:ListBucket"
+            ],
+            "Resource": [
+              "arn:*:s3:::aws-ssm-${PKR_VAR_aws_region}/*",
+              "arn:*:s3:::aws-ssm-${PKR_VAR_aws_region}",
+              "arn:*:s3:::amazon-ssm-${PKR_VAR_aws_region}/*",
+              "arn:*:s3:::amazon-ssm-${PKR_VAR_aws_region}",
+              "arn:*:s3:::${PKR_VAR_aws_region}-birdwatcher-prod/*",
+              "arn:*:s3:::${PKR_VAR_aws_region}-birdwatcher-prod"
+            ]
+          },
+          {
+            "Sid": "CloudWatchLogs",
+            "Effect": "Allow",
+            "Action": [
+              "logs:CreateLogStream",
+              "logs:PutLogEvents",
+              "logs:DescribeLogGroups",
+              "logs:DescribeLogStreams"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+      EOF
+        
+        POLICY_ARN=$(aws iam create-policy \
+          --policy-name "${POLICY_NAME}" \
+          --policy-document file://packer-policy.json \
+          --description "Policy for SPEL Packer builder EC2 instances" \
+          --query 'Policy.Arn' --output text)
+        
+        echo "✓ Created IAM policy: ${POLICY_NAME}"
+      fi
+      
+      # Attach policy to role
+      if aws iam list-attached-role-policies --role-name "${ROLE_NAME}" \
+          --query "AttachedPolicies[?PolicyArn=='${POLICY_ARN}']" --output text | grep -q .; then
+        echo "✓ Policy already attached to role"
+      else
+        echo "Attaching policy to role..."
+        aws iam attach-role-policy \
+          --role-name "${ROLE_NAME}" \
+          --policy-arn "${POLICY_ARN}"
+        echo "✓ Attached policy to role"
+      fi
+    
     # Create instance profile
     - |
       PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"

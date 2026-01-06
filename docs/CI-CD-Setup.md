@@ -151,6 +151,88 @@ For GovCloud regions, use `us-gov-east-1` or `us-gov-west-1`.
 
 > **Note**: Quota increases typically take 1-3 business days for approval.
 
+#### 3. Packer Execution IAM Permissions
+
+The IAM role or user that **runs Packer** (the credentials passed to the Docker container) needs extensive EC2 and AMI permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PackerEC2",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AttachVolume",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:CopyImage",
+        "ec2:CreateImage",
+        "ec2:CreateKeypair",
+        "ec2:CreateSecurityGroup",
+        "ec2:CreateSnapshot",
+        "ec2:CreateTags",
+        "ec2:CreateVolume",
+        "ec2:DeleteKeyPair",
+        "ec2:DeleteSecurityGroup",
+        "ec2:DeleteSnapshot",
+        "ec2:DeleteVolume",
+        "ec2:DeregisterImage",
+        "ec2:DescribeImageAttribute",
+        "ec2:DescribeImages",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus",
+        "ec2:DescribeRegions",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSnapshots",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeTags",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeVpcs",
+        "ec2:DetachVolume",
+        "ec2:GetPasswordData",
+        "ec2:ModifyImageAttribute",
+        "ec2:ModifyInstanceAttribute",
+        "ec2:ModifySnapshotAttribute",
+        "ec2:RegisterImage",
+        "ec2:RunInstances",
+        "ec2:StopInstances",
+        "ec2:TerminateInstances"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PackerIAM",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetInstanceProfile",
+        "iam:PassRole"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PackerServiceQuotas",
+      "Effect": "Allow",
+      "Action": [
+        "servicequotas:GetServiceQuota"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+> **Note**: This policy is for the credentials that **execute Packer**, not the EC2 instance profile. The instance profile permissions are created by the `infra:iam` job in GitLab CI.
+
+#### 4. EC2 Instance Profile Permissions (Created by Pipeline)
+
+The GitLab CI `infra:iam` job creates an instance profile with minimal permissions for the Packer-launched EC2 instances:
+
+- **SSM Access**: For Session Manager connectivity (if using SSH via SSM)
+- **S3 Access**: To SSM buckets for agent operation
+- **CloudWatch Logs**: For optional logging
+
+These are created automatically when you run the `infra:iam` job.
+
 ### GitHub Actions Prerequisites
 
 1. **OIDC Provider**: Configure AWS to trust GitHub Actions OIDC tokens
