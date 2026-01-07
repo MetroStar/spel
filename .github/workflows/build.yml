@@ -220,10 +220,10 @@ jobs:
           echo "WINDOWS_BUILDERS=${windows_builders}" >> $GITHUB_ENV
           
           # Packer variables
+          echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
           echo "PKR_VAR_aws_force_deregister=true" >> $GITHUB_ENV
           echo "PKR_VAR_aws_ami_regions=[\"us-east-1\"]" >> $GITHUB_ENV
           echo "PKR_VAR_aws_ami_groups=[\"all\"]" >> $GITHUB_ENV
-          echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
           
           # Display configuration
           echo ""
@@ -247,14 +247,13 @@ jobs:
             -e AWS_SECRET_ACCESS_KEY \
             -e AWS_SESSION_TOKEN \
             -e AWS_DEFAULT_REGION=us-east-1 \
-            -e AWS_REGION=us-east-1 \
             -e SPEL_IDENTIFIER="${SPEL_IDENTIFIER}" \
             -e SPEL_VERSION="${SPEL_VERSION}" \
             -e SPEL_BUILDERS="${SPEL_BUILDERS}" \
             -e WINDOWS_BUILDERS="${WINDOWS_BUILDERS}" \
             -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
             -e PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister}" \
-            -e PKR_VAR_aws_ami_regions="${PKR_VAR_aws_ami_regions}" \
+            -e PKR_VAR_aws_ami_regions="${PKR_VAR_aws_ami_regions:-[\"${PKR_VAR_aws_region}\"]}" \
             -e PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups}" \
             -e PACKER_LOG=1 \
             -e CHECKPOINT_DISABLE=1 \

@@ -83,6 +83,7 @@ and transferred to the air-gapped GitLab environment.
 |----------|---------|-------------|
 | `DOCKER_IMAGE_PATH` | `/transfer/spel-builder-*.tar.gz` | Path to Docker tarball |
 | `PKR_VAR_aws_region` | `us-gov-east-1` | AWS region for builds |
+| `PKR_VAR_aws_ami_regions` | `["${PKR_VAR_aws_region}"]` | Regions to copy AMI to (defaults to build region) |
 | `SPEL_IDENTIFIER` | `spel` | AMI name prefix |
 | `INFRA_PREFIX` | `spel-offline` | Infrastructure resource prefix |
 

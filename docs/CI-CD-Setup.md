@@ -559,10 +559,14 @@ build:rhel9:
         -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
         -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
         -e AWS_DEFAULT_REGION="${PKR_VAR_aws_region}" \
+        -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
         -e SPEL_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
         "spel-builder:${DOCKER_IMAGE_TAG}" \
         make -f Makefile.spel build
 ```
+
+> **Note**: The workflow automatically sets `PKR_VAR_aws_ami_regions` to include the build region.
+> Set it explicitly to copy AMIs to multiple regions (e.g., `["us-gov-east-1","us-gov-west-1"]`).
 
 ## Troubleshooting
 
