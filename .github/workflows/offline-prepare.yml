@@ -128,13 +128,27 @@ jobs:
           # Save and compress
           docker save "spel-builder:${IMAGE_TAG}" | gzip > "${TARBALL_NAME}"
           
-          # Generate checksum
+          # Generate checksum for binary tarball
           sha256sum "${TARBALL_NAME}" > "${TARBALL_NAME}.sha256"
+          
+          # Base64 encode for SharePoint transfer compatibility
+          echo ""
+          echo "=== Base64 encoding for SharePoint transfer ==="
+          base64 "${TARBALL_NAME}" > "${TARBALL_NAME}.b64"
+          
+          # Generate checksum for base64 file
+          sha256sum "${TARBALL_NAME}.b64" > "${TARBALL_NAME}.b64.sha256"
           
           echo ""
           echo "=== Export Complete ==="
+          echo "Binary tarball (direct transfer):"
           ls -lh "${TARBALL_NAME}"*
+          echo ""
+          echo "Base64 encoded (SharePoint transfer):"
+          ls -lh "${TARBALL_NAME}.b64"*
+          echo ""
           cat "${TARBALL_NAME}.sha256"
+          cat "${TARBALL_NAME}.b64.sha256"
 
       - name: Generate manifest
         run: |
@@ -193,9 +207,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: spel-builder-${{ env.IMAGE_TAG }}
+          # Both formats included for different transfer scenarios:
+          # - .tar.gz: Direct transfers (GitHub→local, USB, SCP) - smaller, faster
+          # - .tar.gz.b64: SharePoint transfers (avoids binary corruption) - larger, safer
           path: |
             spel-builder-${{ env.IMAGE_TAG }}.tar.gz
             spel-builder-${{ env.IMAGE_TAG }}.tar.gz.sha256
+            spel-builder-${{ env.IMAGE_TAG }}.tar.gz.b64
+            spel-builder-${{ env.IMAGE_TAG }}.tar.gz.b64.sha256
             spel-builder-${{ env.IMAGE_TAG }}-manifest.txt
           retention-days: 30
           compression-level: 0  # Already gzipped

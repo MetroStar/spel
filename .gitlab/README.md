@@ -39,8 +39,13 @@ and transferred to the air-gapped GitLab environment.
 
 2. **Transfer to Air-Gapped Environment**:
    ```bash
-   # Copy to GitLab runner's transfer directory
+   # Binary format (direct transfer - smaller, faster):
    scp spel-builder-*.tar.gz runner:/transfer/
+   
+   # Base64 format (SharePoint - avoids corruption):
+   # Upload .tar.gz.b64 to SharePoint, download in air-gap, then:
+   scp spel-builder-*.tar.gz.b64 runner:/transfer/
+   
    # Optional: include checksum
    sha256sum spel-builder-*.tar.gz > spel-builder-*.tar.gz.sha256
    scp spel-builder-*.tar.gz.sha256 runner:/transfer/

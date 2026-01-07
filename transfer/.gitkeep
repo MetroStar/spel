@@ -1,12 +1,23 @@
 # This directory is for Docker image tarballs transferred from connected environments
 # 
 # The GitLab CI pipeline expects Docker image tarballs at:
-#   /transfer/spel-builder-*.tar.gz
+#   /transfer/spel-builder-*.tar.gz (or .tar.gz.b64 if using SharePoint)
 #
 # To prepare the tarball:
 #   1. Run the offline-prepare.yml workflow in GitHub Actions
 #   2. Download the spel-builder-YYYYMMDD artifact
-#   3. Transfer spel-builder-*.tar.gz to this directory
+#   3. Choose the appropriate format for your transfer method:
 #
-# Optional: Include a checksum file for verification:
+# BINARY FORMAT (recommended for most transfers):
+#   - File: spel-builder-YYYYMMDD.tar.gz (~305 MB)
+#   - Use for: Direct downloads, USB drives, DVDs, SCP, SFTP
+#   - Transfer to: this directory
+#
+# BASE64 FORMAT (required for SharePoint):
+#   - File: spel-builder-YYYYMMDD.tar.gz.b64 (~407 MB)
+#   - Use for: SharePoint transfers (avoids binary corruption)
+#   - Transfer to: this directory
+#   - Note: GitLab CI automatically decodes .b64 files before import
+#
+# Optional: Include checksum file for verification:
 #   sha256sum spel-builder-YYYYMMDD.tar.gz > spel-builder-YYYYMMDD.tar.gz.sha256

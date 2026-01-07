@@ -68,40 +68,83 @@ import:docker:
     - echo "=== Importing Docker Image ==="
     - echo ""
     
-    # Find the Docker image tarball
+    # Find the Docker image file (tarball or base64)
     - |
-      TARBALL=$(ls -t ${DOCKER_IMAGE_PATH} 2>/dev/null | head -1)
+      # Check for base64 encoded file first (SharePoint transfer)
+      BASE64_FILE=$(ls -t ${DOCKER_IMAGE_PATH%.tar.gz}.tar.gz.b64 2>/dev/null | head -1)
       
-      if [ -z "$TARBALL" ]; then
-        echo "ERROR: No Docker image tarball found!"
-        echo ""
-        echo "Expected location: ${DOCKER_IMAGE_PATH}"
-        echo ""
-        echo "To resolve:"
-        echo "  1. Run the offline-prepare.yml workflow in GitHub Actions"
-        echo "  2. Download the spel-builder-YYYYMMDD artifact"
-        echo "  3. Transfer spel-builder-*.tar.gz to: ${DOCKER_IMAGE_PATH}"
-        echo ""
-        exit 1
+      if [ -n "$BASE64_FILE" ]; then
+        echo "Found base64 encoded file (SharePoint transfer): ${BASE64_FILE}"
+        
+        # Verify base64 checksum
+        BASE64_CHECKSUM="${BASE64_FILE}.sha256"
+        if [ -f "$BASE64_CHECKSUM" ]; then
+          echo "Verifying base64 checksum..."
+          BASE64_DIR=$(dirname "${BASE64_FILE}")
+          BASE64_NAME=$(basename "${BASE64_FILE}")
+          pushd "${BASE64_DIR}" > /dev/null
+          if sha256sum -c "${BASE64_NAME}.sha256"; then
+            echo "✓ Base64 file checksum verified"
+          else
+            echo "ERROR: Base64 checksum verification failed!"
+            exit 1
+          fi
+          popd > /dev/null
+        fi
+        
+        # Decode base64 to tarball
+        echo "Decoding base64..."
+        TARBALL="${BASE64_FILE%.b64}"
+        base64 -d "${BASE64_FILE}" > "${TARBALL}"
+        echo "✓ Decoded to ${TARBALL}"
+        ls -lh "${TARBALL}"
+      else
+        # Look for regular tarball (direct transfer)
+        TARBALL=$(ls -t ${DOCKER_IMAGE_PATH} 2>/dev/null | head -1)
+        
+        if [ -z "$TARBALL" ]; then
+          echo "ERROR: No Docker image tarball or base64 file found!"
+          echo ""
+          echo "Expected location: ${DOCKER_IMAGE_PATH}"
+          echo ""
+          echo "To resolve:"
+          echo "  1. Run the offline-prepare.yml workflow in GitHub Actions"
+          echo "  2. Download the spel-builder-YYYYMMDD artifact"
+          echo "  3. Transfer files to: /transfer/"
+          echo ""
+          echo "For SharePoint transfer (recommended):"
+          echo "  - Transfer spel-builder-*.tar.gz.b64 (base64 encoded)"
+          echo "  - Transfer spel-builder-*.tar.gz.b64.sha256 (checksum)"
+          echo ""
+          echo "For direct transfer (SCP/USB/S3):"
+          echo "  - Transfer spel-builder-*.tar.gz (binary)"
+          echo "  - Transfer spel-builder-*.tar.gz.sha256 (checksum)"
+          echo ""
+          exit 1
+        fi
+        
+        echo "Found tarball: ${TARBALL}"
+        ls -lh "${TARBALL}"
       fi
-      
-      echo "Found tarball: ${TARBALL}"
-      ls -lh "${TARBALL}"
     
-    # Verify checksum if available
+    # Verify tarball checksum if available
     - |
       CHECKSUM_FILE="${TARBALL}.sha256"
       if [ -f "$CHECKSUM_FILE" ]; then
         echo ""
-        echo "Verifying checksum..."
+        echo "Verifying tarball checksum..."
         # Run checksum from the directory containing the tarball
         TARBALL_DIR=$(dirname "${TARBALL}")
         TARBALL_NAME=$(basename "${TARBALL}")
         pushd "${TARBALL_DIR}" > /dev/null
         if sha256sum -c "${TARBALL_NAME}.sha256"; then
-          echo "✓ Checksum verification passed"
+          echo "✓ Tarball checksum verification passed"
         else
-          echo "⚠ Checksum verification failed - continuing anyway"
+          echo "ERROR: Tarball checksum verification failed!"
+          echo ""
+          echo "The file was corrupted during transfer."
+          echo "If you used SharePoint, transfer the .b64 file instead."
+          exit 1
         fi
         popd > /dev/null
       fi
@@ -125,7 +168,7 @@ import:docker:
       echo ""
       echo "=== Verifying Docker Image ==="
       docker run --rm "spel-builder:${IMAGE_TAG}" packer version
-      docker run --rm "spel-builder:${IMAGE_TAG}" ansible --version | head -3
+      docker run --rm "spel-builder:${IMAGE_TAG}" ansible --version
       docker run --rm "spel-builder:${IMAGE_TAG}" aws --version
     
     # Show image details (for version tracking)

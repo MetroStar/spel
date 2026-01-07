@@ -100,6 +100,15 @@ jobs:
         run: |
           echo "=== Importing Docker Image ==="
           
+          # Decode base64 file if present
+          B64_FILE=$(ls ./docker-image/spel-builder-*.tar.gz.b64 2>/dev/null | head -1)
+          if [ -n "$B64_FILE" ]; then
+            echo "Found base64-encoded file: ${B64_FILE}"
+            echo "Decoding base64 tarball..."
+            base64 -d "${B64_FILE}" > "${B64_FILE%.b64}"
+            echo "Decoded to: ${B64_FILE%.b64}"
+          fi
+          
           # Find the tarball
           TARBALL=$(ls ./docker-image/spel-builder-*.tar.gz 2>/dev/null | head -1)
           
