@@ -298,6 +298,12 @@ variable "aws_temporary_security_group_source_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "amigen_repo_mirror_baseurl" {
+  description = "Base URL for air-gapped yum repository mirrors. When set, disables RHUI repos and configures local mirrors. Example: http://mirror.internal.mil"
+  type        = string
+  default     = ""
+}
+
 ###
 # Variables used by all AMIGEN platforms
 ###
@@ -834,6 +840,58 @@ build {
       owners      = local.effective_windows2022_owners
       most_recent = true
     }
+  }
+
+  # Configure air-gapped repositories for Linux builds (runs before STIG hardening)
+  provisioner "shell" {
+    environment_vars = [
+      "REPO_MIRROR_BASEURL=${var.amigen_repo_mirror_baseurl}",
+    ]
+    execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
+    inline = [
+      "if [ -n \"$REPO_MIRROR_BASEURL\" ]; then",
+      "  echo 'Configuring air-gapped repositories...'",
+      "  ",
+      "  # Detect OS version",
+      "  OS_VERSION=$(rpm -E %{rhel})",
+      "  ",
+      "  # Disable Red Hat RHUI repositories",
+      "  if ls /etc/yum.repos.d/redhat-rhui*.repo 1>/dev/null 2>&1; then",
+      "    echo 'Disabling RHUI repositories...'",
+      "    for repo in /etc/yum.repos.d/redhat-rhui*.repo; do",
+      "      mv \"$repo\" \"${repo}.disabled\"",
+      "    done",
+      "  fi",
+      "  ",
+      "  # Create local mirror repo config",
+      "  cat << EOF > /etc/yum.repos.d/rhel-local.repo",
+      "[rhel-${OS_VERSION}-baseos]",
+      "name=RHEL ${OS_VERSION} BaseOS (Local Mirror)",
+      "baseurl=${REPO_MIRROR_BASEURL}/rhel\${OS_VERSION}/baseos",
+      "enabled=1",
+      "gpgcheck=0",
+      "",
+      "[rhel-${OS_VERSION}-appstream]",
+      "name=RHEL ${OS_VERSION} AppStream (Local Mirror)",
+      "baseurl=${REPO_MIRROR_BASEURL}/rhel\${OS_VERSION}/appstream",
+      "enabled=1",
+      "gpgcheck=0",
+      "EOF",
+      "  ",
+      "  yum clean all",
+      "  yum repolist",
+      "  echo 'Air-gapped repositories configured successfully'",
+      "else",
+      "  echo 'REPO_MIRROR_BASEURL not set, using default repositories'",
+      "fi"
+    ]
+    only = [
+      "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-centos-9stream-hvm",
+      "amazon-ebs.hardened-ol-9-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
+    ]
   }
 
   provisioner "windows-update" {

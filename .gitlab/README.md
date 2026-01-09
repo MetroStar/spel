@@ -84,6 +84,8 @@ and transferred to the air-gapped GitLab environment.
 | `DOCKER_IMAGE_PATH` | `/transfer/spel-builder-*.tar.gz` | Path to Docker tarball |
 | `PKR_VAR_aws_region` | `us-gov-east-1` | AWS region for builds |
 | `PKR_VAR_aws_ami_regions` | `["${PKR_VAR_aws_region}"]` | Regions to copy AMI to (defaults to build region) |
+| `REPO_MIRROR_BASEURL` | (empty) | Local yum mirror URL for air-gapped Linux builds (e.g., `http://mirror.internal.mil`) |
+| `PKR_VAR_windows_update_server` | (empty) | WSUS URL for air-gapped Windows builds (e.g., `http://wsus.internal.mil:8530`) |
 | `SPEL_IDENTIFIER` | `spel` | AMI name prefix |
 | `INFRA_PREFIX` | `spel-offline` | Infrastructure resource prefix |
 

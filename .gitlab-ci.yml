@@ -46,6 +46,10 @@ variables:
   # Set this to your internal WSUS URL, e.g., http://wsus.internal.mil:8530
   # Leave empty to use Microsoft Update (requires internet access)
   PKR_VAR_windows_update_server: ""
+  # Local yum repository mirror for air-gapped Linux builds
+  # Set this to your internal mirror URL, e.g., http://mirror.internal.mil
+  # Leave empty to use default RHUI/public repositories (requires internet access)
+  REPO_MIRROR_BASEURL: ""
 
 stages:
   - import       # Import Docker image from tarball
@@ -553,6 +557,7 @@ infra:iam:
         -e PKR_VAR_aws_subnet_id="${PKR_VAR_aws_subnet_id:-}" \
         -e PKR_VAR_iam_instance_profile="${PKR_VAR_iam_instance_profile:-}" \
         -e PKR_VAR_windows_update_server="${PKR_VAR_windows_update_server:-}" \
+        -e PKR_VAR_amigen_repo_mirror_baseurl="${REPO_MIRROR_BASEURL:-}" \
         -e PACKER_LOG=1 \
         -e CHECKPOINT_DISABLE=1 \
         "spel-builder:${IMAGE_TAG}" \
