@@ -278,6 +278,12 @@ variable "aws_temporary_security_group_source_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "aws_kms_key_id" {
+  description = "ARN of the Customer Managed Key (CMK) to use for EBS volume encryption. When set, all EBS volumes will be encrypted using this key. Leave empty for no encryption or to use the default AWS-managed key"
+  type        = string
+  default     = ""
+}
+
 ###
 # Variables for Azure builders
 ###
@@ -770,6 +776,8 @@ source "amazon-ebssurrogate" "base" {
     device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
     volume_size           = var.spel_root_volume_size
     volume_type           = "gp3"
+    encrypted             = var.aws_kms_key_id != "" ? true : null
+    kms_key_id            = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   }
   ami_groups                  = var.aws_ami_groups
   ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
@@ -787,12 +795,16 @@ source "amazon-ebssurrogate" "base" {
     device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
     volume_size           = var.spel_root_volume_size
     volume_type           = "gp3"
+    encrypted             = var.aws_kms_key_id != "" ? true : null
+    kms_key_id            = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   }
   launch_block_device_mappings {
     delete_on_termination = true
     device_name           = "/dev/xvdf"
     volume_size           = var.spel_root_volume_size
     volume_type           = "gp3"
+    encrypted             = var.aws_kms_key_id != "" ? true : null
+    kms_key_id            = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   }
   max_retries   = 20
   region        = var.aws_region

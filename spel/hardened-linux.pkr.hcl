@@ -304,6 +304,12 @@ variable "amigen_repo_mirror_baseurl" {
   default     = ""
 }
 
+variable "aws_kms_key_id" {
+  description = "ARN of the Customer Managed Key (CMK) to use for EBS volume encryption. When set, all EBS volumes will be encrypted using this key. Leave empty for no encryption or to use the default AWS-managed key"
+  type        = string
+  default     = ""
+}
+
 ###
 # Variables used by all AMIGEN platforms
 ###
@@ -598,6 +604,8 @@ source "amazon-ebs" "base" {
   communicator                = "ssh"
   deprecate_at                = local.aws_ami_deprecate_at
   ena_support                 = true
+  encrypt_boot                = var.aws_kms_key_id != "" ? true : null
+  kms_key_id                  = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   force_deregister            = var.aws_force_deregister
   instance_type               = var.aws_instance_type
   max_retries                 = 20
@@ -634,6 +642,8 @@ source "amazon-ebs" "windows-base" {
   communicator                = "winrm"
   deprecate_at                = local.aws_ami_deprecate_at
   ena_support                 = true
+  encrypt_boot                = var.aws_kms_key_id != "" ? true : null
+  kms_key_id                  = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   force_deregister            = true
   instance_type               = var.aws_instance_type
   max_retries                 = 20
@@ -655,6 +665,8 @@ source "amazon-ebs" "windows-base" {
     device_name = "/dev/sda1"
     volume_type = "gp3"
     delete_on_termination = true
+    encrypted   = var.aws_kms_key_id != "" ? true : null
+    kms_key_id  = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   }
 }
 

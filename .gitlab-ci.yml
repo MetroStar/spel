@@ -50,6 +50,10 @@ variables:
   # Set this to your internal mirror URL, e.g., http://mirror.internal.mil
   # Leave empty to use default RHUI/public repositories (requires internet access)
   REPO_MIRROR_BASEURL: ""
+  # Customer Managed Key (CMK) for EBS volume encryption
+  # Set this to your KMS key ARN for encrypted AMIs, e.g., arn:aws-us-gov:kms:us-gov-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+  # Leave empty to disable encryption or use default AWS-managed key
+  PKR_VAR_aws_kms_key_id: ""
 
 stages:
   - import       # Import Docker image from tarball
@@ -558,6 +562,7 @@ infra:iam:
         -e PKR_VAR_iam_instance_profile="${PKR_VAR_iam_instance_profile:-}" \
         -e PKR_VAR_windows_update_server="${PKR_VAR_windows_update_server:-}" \
         -e PKR_VAR_amigen_repo_mirror_baseurl="${REPO_MIRROR_BASEURL:-}" \
+        -e PKR_VAR_aws_kms_key_id="${PKR_VAR_aws_kms_key_id:-}" \
         -e PACKER_LOG=1 \
         -e CHECKPOINT_DISABLE=1 \
         "spel-builder:${IMAGE_TAG}" \
