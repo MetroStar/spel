@@ -496,6 +496,12 @@ variable "amigen_cross_distro" {
   default     = false
 }
 
+variable "amigen_repo_nosignature" {
+  description = "Skip RPM signature check when installing repo source RPMs. Required for unsigned RPMs in air-gapped environments."
+  type        = bool
+  default     = false
+}
+
 ###
 # Variables used by amigen8
 ###
@@ -1273,6 +1279,7 @@ build {
       "SPEL_AMIGENBRANCH=${var.amigen8_source_branch}",
       "SPEL_AMIGENCHROOT=/mnt/ec2-root",
       "SPEL_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
+      "SPEL_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
       "SPEL_AMIGENMANFST=${var.amigen8_package_manifest}",
       "SPEL_AMIGENPKGGRP=${local.amigen8_package_groups}",
       "SPEL_AMIGENREPOS=${local.amigen8_repo_names}",
@@ -1312,6 +1319,7 @@ build {
       "SPEL_AMIGENBRANCH=${var.amigen9_source_branch}",
       "SPEL_AMIGENCHROOT=/mnt/ec2-root",
       "SPEL_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
+      "SPEL_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
       "SPEL_AMIGENMANFST=${var.amigen9_package_manifest}",
       "SPEL_AMIGENMANFSTAL2023=${var.amigen9_package_manifest_al2023}",
       "SPEL_AMIGENPKGGRP=${local.amigen9_package_groups}",

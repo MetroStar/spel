@@ -11,6 +11,7 @@ AMIGENBOOTLABL="${SPEL_AMIGENBOOTDEVLBL:-boot_disk}"
 AMIGENBRANCH="${SPEL_AMIGENBRANCH:-main}"
 AMIGENCHROOT="${SPEL_AMIGENCHROOT:-/mnt/ec2-root}"
 AMIGENCROSSDISTRO="${SPEL_AMIGENCROSSDISTRO:-false}"
+AMIGENNOSIGNATURE="${SPEL_AMIGENNOSIGNATURE:-false}"
 AMIGENFSTYPE="${SPEL_AMIGENFSTYPE:-xfs}"
 AMIGENICNCTURL="${SPEL_AMIGENICNCTURL}"
 AMIGENMANFST="${SPEL_AMIGENMANFST}"
@@ -148,6 +149,11 @@ then
 fi
 
 export FIPSDISABLE
+
+# Export NOSIGNATURE for unsigned repo RPMs in air-gapped environments
+if [[ "${AMIGENNOSIGNATURE}" == "true" ]]; then
+    export NOSIGNATURE="true"
+fi
 
 
 retry()
@@ -704,6 +710,13 @@ if [[ "${AMIGENSOURCE}" == file://* ]]; then
         err_exit "Failed copying build-tools from local source"
 else
     git clone --branch "${AMIGENBRANCH}" "${AMIGENSOURCE}" "${ELBUILD}"
+fi
+
+# Patch OSpackages.sh to support unsigned repo RPMs (air-gapped environments)
+if [[ "${AMIGENNOSIGNATURE}" == "true" ]]; then
+    err_exit "Patching OSpackages.sh for unsigned RPM support..." NONE
+    sed -i 's/rpm --force --root "${CHROOTMNT}" -ivh --nodeps --nopre \/tmp\/\*\.rpm/rpm --force --root "${CHROOTMNT}" -ivh --nodeps --nopre --nosignature \/tmp\/*.rpm/' "${ELBUILD}/OSpackages.sh" || \
+        err_exit "Failed patching OSpackages.sh"
 fi
 
 # Execute build-tools
