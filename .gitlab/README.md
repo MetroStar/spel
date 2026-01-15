@@ -86,8 +86,28 @@ and transferred to the air-gapped GitLab environment.
 | `PKR_VAR_aws_ami_regions` | `["${PKR_VAR_aws_region}"]` | Regions to copy AMI to (defaults to build region) |
 | `REPO_MIRROR_BASEURL` | (empty) | Local yum mirror URL for air-gapped Linux builds (e.g., `http://mirror.internal.mil`) |
 | `PKR_VAR_windows_update_server` | (empty) | WSUS URL for air-gapped Windows builds (e.g., `http://wsus.internal.mil:8530`) |
+| `PKR_VAR_aws_kms_key_id` | (empty) | KMS key ARN for CMK-encrypted AMIs (e.g., `arn:aws-us-gov:kms:...`) |
 | `SPEL_IDENTIFIER` | `spel` | AMI name prefix |
 | `INFRA_PREFIX` | `spel-offline` | Infrastructure resource prefix |
+
+### Air-Gapped Linux Build Variables
+
+These variables are required when building Linux AMIs using local repository mirrors instead of RHUI:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AMIGEN_CROSS_DISTRO` | `false` | Set to `true` to skip RHUI package auto-detection (prevents rh-amazon-rhui-client install) |
+| `AMIGEN_USE_DEFAULT_REPOS` | `true` | Set to `false` to disable default RHUI repositories |
+| `AMIGEN_REPO_NOSIGNATURE` | `false` | Set to `true` to skip RPM signature check for unsigned repo RPMs |
+| `AMIGEN8_REPO_NAMES` | (empty) | JSON array of repo names for EL8 (e.g., `["rhel-8-baseos","rhel-8-appstream"]`) |
+| `AMIGEN9_REPO_NAMES` | (empty) | JSON array of repo names for EL9 (e.g., `["rhel-9-baseos","rhel-9-appstream"]`) |
+| `AMIGEN8_EXTRA_RPMS` | (empty) | JSON array of extra RPMs for EL8 (overrides defaults to exclude RHUI packages) |
+| `AMIGEN9_EXTRA_RPMS` | (empty) | JSON array of extra RPMs for EL9 (overrides defaults to exclude RHUI packages) |
+| `PKR_VAR_amigen8_repo_sources` | (empty) | JSON array of repo source RPM URLs for EL8 chroot |
+| `PKR_VAR_amigen9_repo_sources` | (empty) | JSON array of repo source RPM URLs for EL9 chroot |
+
+> **Note**: For air-gapped builds, you must create a repo RPM that installs your mirror configuration
+> into `/etc/yum.repos.d/` in the chroot. See [Air-Gapped Linux Builds](#air-gapped-linux-builds) below.
 
 ## Docker Image Contents
 
@@ -108,23 +128,77 @@ The Docker image (~305 MB compressed) includes:
 
 Windows builds use the `windows-update` Packer provisioner which by default contacts
 Microsoft Update servers. In air-gapped environments, you **must** configure a local
-WSUS server.
+WSUS server by setting the `PKR_VAR_windows_update_server` variable.
 
-Edit `spel/hardened-linux.pkr.hcl` to enable WSUS:
+### Air-Gapped Linux Builds
 
-```hcl
-provisioner "windows-update" {
-  pause_before = "30s"
-  only = [
-    "amazon-ebs.hardened-windows-2016-hvm",
-    "amazon-ebs.hardened-windows-2019-hvm",
-    "amazon-ebs.hardened-windows-2022-hvm"
-  ]
-  # Uncomment and configure for air-gapped:
-  update_server = "http://wsus.your-domain.mil:8530"
-  search_criteria = "IsInstalled=0"
-}
+Linux AMI builds install packages into a chroot environment. In air-gapped environments,
+you need to:
+
+1. **Create a repo RPM** that installs your mirror configuration into the chroot
+2. **Set CI/CD variables** to use your repos instead of RHUI
+
+#### Step 1: Create a Repo Configuration RPM
+
+Create an unsigned RPM that installs your repo files:
+
+```bash
+# Create RPM build structure
+mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
+
+# Create spec file (example for EL8)
+cat > ~/rpmbuild/SPECS/myorg-release-el8.spec << 'EOF'
+Name:           myorg-release
+Version:        1.0
+Release:        1.el8
+Summary:        Organization Repository Configuration
+License:        MIT
+BuildArch:      noarch
+
+%description
+Repository configuration for internal RHEL 8 mirrors.
+
+%install
+mkdir -p %{buildroot}/etc/yum.repos.d
+
+cat > %{buildroot}/etc/yum.repos.d/myorg-rhel.repo << 'REPO'
+[myorg-rhel8-baseos]
+name=MyOrg RHEL 8 BaseOS Mirror
+baseurl=http://mirror.internal.mil/rhel8/baseos
+enabled=1
+gpgcheck=0
+
+[myorg-rhel8-appstream]
+name=MyOrg RHEL 8 AppStream Mirror
+baseurl=http://mirror.internal.mil/rhel8/appstream
+enabled=1
+gpgcheck=0
+REPO
+
+%files
+/etc/yum.repos.d/myorg-rhel.repo
+EOF
+
+# Build unsigned RPM
+rpmbuild -bb ~/rpmbuild/SPECS/myorg-release-el8.spec
+
+# Upload to your mirror
+cp ~/rpmbuild/RPMS/noarch/myorg-release-1.0-1.el8.noarch.rpm /path/to/mirror/repos/
 ```
+
+#### Step 2: Configure GitLab CI/CD Variables
+
+Set these variables in your GitLab CI/CD settings:
+
+| Variable | Value |
+|----------|-------|
+| `AMIGEN_CROSS_DISTRO` | `true` |
+| `AMIGEN_USE_DEFAULT_REPOS` | `false` |
+| `AMIGEN_REPO_NOSIGNATURE` | `true` |
+| `AMIGEN8_REPO_NAMES` | `["myorg-rhel8-baseos","myorg-rhel8-appstream"]` |
+| `PKR_VAR_amigen8_repo_sources` | `["http://mirror.internal.mil/repos/myorg-release-1.0-1.el8.noarch.rpm"]` |
+
+For EL9 builds, also set `AMIGEN9_REPO_NAMES` and `PKR_VAR_amigen9_repo_sources`.
 
 ### Linux Builds - Package Mirrors
 

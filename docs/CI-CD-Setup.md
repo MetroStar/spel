@@ -459,12 +459,33 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | `PKR_VAR_aws_region` | AWS region | `us-gov-east-1` |
 | `PKR_VAR_aws_vpc_id` | VPC ID for builds | (auto-create) |
 | `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (auto-create) |
+| `PKR_VAR_aws_kms_key_id` | KMS key ARN for CMK-encrypted AMIs | (none) |
 | `INFRA_PREFIX` | Prefix for created resources | `spel-offline` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
 | `RUN_RHEL8` | Build RHEL 8 | `false` |
 | `RUN_OL9` | Build Oracle Linux 9 | `false` |
 | `RUN_OL8` | Build Oracle Linux 8 | `false` |
 | `RUN_AMZN2023` | Build Amazon Linux 2023 | `false` |
+
+#### Air-Gapped Linux Build Variables
+
+These variables configure Linux builds to use local repository mirrors instead of RHUI:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REPO_MIRROR_BASEURL` | Local yum mirror base URL | (none) |
+| `AMIGEN_CROSS_DISTRO` | Skip RHUI package auto-detection | `false` |
+| `AMIGEN_USE_DEFAULT_REPOS` | Use default RHUI repositories | `true` |
+| `AMIGEN_REPO_NOSIGNATURE` | Skip RPM signature check for repo RPMs | `false` |
+| `AMIGEN8_REPO_NAMES` | JSON array of EL8 repo names | (none) |
+| `AMIGEN9_REPO_NAMES` | JSON array of EL9 repo names | (none) |
+| `AMIGEN8_EXTRA_RPMS` | JSON array of extra RPMs for EL8 | (none) |
+| `AMIGEN9_EXTRA_RPMS` | JSON array of extra RPMs for EL9 | (none) |
+| `PKR_VAR_amigen8_repo_sources` | JSON array of EL8 repo source RPM URLs | (none) |
+| `PKR_VAR_amigen9_repo_sources` | JSON array of EL9 repo source RPM URLs | (none) |
+
+> **Important**: For air-gapped Linux builds, you must create a repo configuration RPM
+> that installs your mirror settings into the chroot. See [Air-Gapped Linux Builds](#air-gapped-linux-builds).
 
 ### Usage Workflows
 
@@ -740,6 +761,120 @@ cat packer.log
 2. **Document versions**: Keep manifest files for audit trail
 3. **Test imports**: Verify Docker image imports correctly before builds
 4. **Backup tarballs**: Keep copies of working Docker image tarballs
+
+## Air-Gapped Linux Builds
+
+In air-gapped environments, Linux AMI builds cannot access RHUI (Red Hat Update Infrastructure)
+or public package repositories. You must configure local repository mirrors and create a repo
+configuration RPM.
+
+### Understanding the Build Process
+
+The SPEL build creates a chroot environment at `/mnt/ec2-root` where the AMI filesystem is built.
+This chroot is completely separate from the builder host and does **not** inherit repository
+configurations. The `OSpackages.sh` script:
+
+1. Auto-detects packages from the builder host's `/etc/yum.repos.d/` (including RHUI clients)
+2. Installs repo configuration RPMs into the chroot (via `-r` flag)
+3. Uses those repos to install the base system
+
+In air-gapped environments, step 1 fails because it tries to install `rh-amazon-rhui-client` which
+requires RHUI access. The solution is to skip auto-detection and provide your own repo configuration.
+
+### Step 1: Create a Repository Configuration RPM
+
+Create an unsigned RPM that installs your mirror configuration:
+
+```bash
+# Create RPM build structure
+mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
+
+# Create spec file for RHEL 8
+cat > ~/rpmbuild/SPECS/myorg-release-el8.spec << 'EOF'
+Name:           myorg-release
+Version:        1.0
+Release:        1.el8
+Summary:        Organization Repository Configuration
+License:        MIT
+BuildArch:      noarch
+
+%description
+Repository configuration for internal RHEL 8 mirrors.
+
+%install
+mkdir -p %{buildroot}/etc/yum.repos.d
+
+cat > %{buildroot}/etc/yum.repos.d/myorg-rhel.repo << 'REPO'
+[myorg-rhel8-baseos]
+name=MyOrg RHEL 8 BaseOS Mirror
+baseurl=http://mirror.internal.mil/rhel8/baseos
+enabled=1
+gpgcheck=0
+
+[myorg-rhel8-appstream]
+name=MyOrg RHEL 8 AppStream Mirror
+baseurl=http://mirror.internal.mil/rhel8/appstream
+enabled=1
+gpgcheck=0
+
+[myorg-rhel8-epel]
+name=MyOrg EPEL 8 Mirror
+baseurl=http://mirror.internal.mil/epel8
+enabled=1
+gpgcheck=0
+REPO
+
+%files
+/etc/yum.repos.d/myorg-rhel.repo
+EOF
+
+# Build unsigned RPM (no GPG signing required)
+rpmbuild -bb ~/rpmbuild/SPECS/myorg-release-el8.spec
+
+# Result: ~/rpmbuild/RPMS/noarch/myorg-release-1.0-1.el8.noarch.rpm
+```
+
+Create a similar spec file for RHEL 9 with `Release: 1.el9` and appropriate repo URLs.
+
+### Step 2: Host the RPM on Your Mirror
+
+Upload the repo configuration RPM to your internal mirror:
+
+```bash
+cp ~/rpmbuild/RPMS/noarch/myorg-release-1.0-1.el8.noarch.rpm /path/to/mirror/repos/
+cp ~/rpmbuild/RPMS/noarch/myorg-release-1.0-1.el9.noarch.rpm /path/to/mirror/repos/
+```
+
+### Step 3: Configure GitLab CI/CD Variables
+
+Set these variables in **Settings** → **CI/CD** → **Variables**:
+
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `AMIGEN_CROSS_DISTRO` | `true` | Skips RHUI package auto-detection |
+| `AMIGEN_USE_DEFAULT_REPOS` | `false` | Disables default RHUI repositories |
+| `AMIGEN_REPO_NOSIGNATURE` | `true` | Allows unsigned repo RPMs |
+| `AMIGEN8_REPO_NAMES` | `["myorg-rhel8-baseos","myorg-rhel8-appstream"]` | Your EL8 repo names |
+| `AMIGEN9_REPO_NAMES` | `["myorg-rhel9-baseos","myorg-rhel9-appstream"]` | Your EL9 repo names |
+| `PKR_VAR_amigen8_repo_sources` | `["http://mirror.internal.mil/repos/myorg-release-1.0-1.el8.noarch.rpm"]` | EL8 repo RPM URL |
+| `PKR_VAR_amigen9_repo_sources` | `["http://mirror.internal.mil/repos/myorg-release-1.0-1.el9.noarch.rpm"]` | EL9 repo RPM URL |
+
+### Troubleshooting Air-Gapped Linux Builds
+
+**Error: "No package artifactory-rhel8 available"**
+
+This means cross-distro mode is not enabled. The build is trying to install packages auto-detected
+from the builder host. Verify `AMIGEN_CROSS_DISTRO=true` is set.
+
+**Error: "Failed installing staged RPMs" with signature error**
+
+The repo RPM is unsigned. Set `AMIGEN_REPO_NOSIGNATURE=true` to skip signature verification.
+
+**Debug output shows `AMIGENCROSSDISTRO=false`**
+
+The environment variable is not reaching the build script. Check that:
+1. `AMIGEN_CROSS_DISTRO` is set in GitLab CI/CD Variables
+2. The variable is not marked as "Protected" if running on unprotected branches
 
 ## Performance Metrics
 
