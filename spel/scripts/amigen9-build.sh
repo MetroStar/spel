@@ -10,6 +10,7 @@ AMIGENBOOTSIZE="${SPEL_AMIGENBOOTDEVSZ:-768}"
 AMIGENBOOTLABL="${SPEL_AMIGENBOOTDEVLBL:-boot_disk}"
 AMIGENBRANCH="${SPEL_AMIGENBRANCH:-main}"
 AMIGENCHROOT="${SPEL_AMIGENCHROOT:-/mnt/ec2-root}"
+AMIGENCROSSDISTRO="${SPEL_AMIGENCROSSDISTRO:-false}"
 AMIGENFSTYPE="${SPEL_AMIGENFSTYPE:-xfs}"
 AMIGENICNCTURL="${SPEL_AMIGENICNCTURL}"
 AMIGENMANFST="${SPEL_AMIGENMANFST}"
@@ -576,6 +577,12 @@ function ComposeOSpkgString {
 
         # DNF hack
         OSPACKAGESTRING+="--setup-dnf ociregion=,ocidomain=oracle.com "
+    fi
+
+    # Use cross-distro mode to skip RHUI package auto-detection (for air-gapped builds)
+    if [[ ${AMIGENCROSSDISTRO} == "true" ]]
+    then
+        OSPACKAGESTRING+="-X "
     fi
 
     # Return command-string for OS-script

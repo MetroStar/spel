@@ -490,6 +490,12 @@ variable "amigen_use_default_repos" {
   default     = true
 }
 
+variable "amigen_cross_distro" {
+  description = "Use cross-distro build mode. When true, skips auto-detection of RHUI packages from the build host. Required for air-gapped builds using local mirrors."
+  type        = bool
+  default     = false
+}
+
 ###
 # Variables used by amigen8
 ###
@@ -1266,6 +1272,7 @@ build {
       "SPEL_AMIGENBOOTSIZE=17m",
       "SPEL_AMIGENBRANCH=${var.amigen8_source_branch}",
       "SPEL_AMIGENCHROOT=/mnt/ec2-root",
+      "SPEL_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
       "SPEL_AMIGENMANFST=${var.amigen8_package_manifest}",
       "SPEL_AMIGENPKGGRP=${local.amigen8_package_groups}",
       "SPEL_AMIGENREPOS=${local.amigen8_repo_names}",
@@ -1304,6 +1311,7 @@ build {
       "SPEL_AMIGENBOOTDEVSZMLT=${var.amigen9_boot_dev_size_mult}",
       "SPEL_AMIGENBRANCH=${var.amigen9_source_branch}",
       "SPEL_AMIGENCHROOT=/mnt/ec2-root",
+      "SPEL_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
       "SPEL_AMIGENMANFST=${var.amigen9_package_manifest}",
       "SPEL_AMIGENMANFSTAL2023=${var.amigen9_package_manifest_al2023}",
       "SPEL_AMIGENPKGGRP=${local.amigen9_package_groups}",
