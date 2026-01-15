@@ -41,6 +41,17 @@ USEROOTDEVICE="${SPEL_USEROOTDEVICE:-true}"
 
 ELBUILD="/tmp/el-build"
 
+# Debug: Show air-gapped build configuration
+echo "=== Air-Gapped Build Configuration ==="
+echo "SPEL_AMIGENCROSSDISTRO=${SPEL_AMIGENCROSSDISTRO:-not set}"
+echo "AMIGENCROSSDISTRO=${AMIGENCROSSDISTRO}"
+echo "SPEL_AMIGENNOSIGNATURE=${SPEL_AMIGENNOSIGNATURE:-not set}"
+echo "AMIGENNOSIGNATURE=${AMIGENNOSIGNATURE}"
+echo "SPEL_USEDEFAULTREPOS=${SPEL_USEDEFAULTREPOS:-not set}"
+echo "SPEL_AMIGENREPOSRC=${SPEL_AMIGENREPOSRC:-not set}"
+echo "SPEL_AMIGENREPOS=${SPEL_AMIGENREPOS:-not set}"
+echo "======================================="
+
 # Make interactive-execution more-verbose unless explicitly told not to
 if [[ $( tty -s ) -eq 0 ]] && [[ -z ${DEBUG:-} ]]
 then
@@ -589,7 +600,13 @@ function ComposeOSpkgString {
     if [[ ${AMIGENCROSSDISTRO} == "true" ]]
     then
         OSPACKAGESTRING+="-X "
+        echo "DEBUG: Cross-distro mode ENABLED (-X flag added)" >&2
+    else
+        echo "DEBUG: Cross-distro mode DISABLED (AMIGENCROSSDISTRO=${AMIGENCROSSDISTRO})" >&2
     fi
+
+    # Debug: Show the full command string
+    echo "DEBUG: Full OSpackages command: ${OSPACKAGESTRING}" >&2
 
     # Return command-string for OS-script
     echo "${OSPACKAGESTRING}"
