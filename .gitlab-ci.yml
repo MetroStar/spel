@@ -54,6 +54,22 @@ variables:
   # Set to "true" to skip RHUI package auto-detection (prevents rh-amazon-rhui-client install)
   # Required when using local repo mirrors instead of RHUI
   AMIGEN_CROSS_DISTRO: "false"
+  # Disable default RHUI repositories for air-gapped builds
+  # Set to "false" to use only custom repos specified below
+  AMIGEN_USE_DEFAULT_REPOS: "true"
+  # Custom repository names for air-gapped builds (JSON array format)
+  # For RHEL8: '["rhel-8-baseos","rhel-8-appstream"]'
+  # For RHEL9: '["rhel-9-baseos","rhel-9-appstream"]'
+  # Leave empty to use defaults (requires RHUI or internet access)
+  AMIGEN8_REPO_NAMES: ""
+  AMIGEN9_REPO_NAMES: ""
+  # Extra RPMs for air-gapped builds (JSON array format)
+  # These override defaults to exclude RHUI-dependent packages like rh-amazon-rhui-client
+  # RHEL8 default: '["python39","python39-pip","python39-setuptools","crypto-policies-scripts","ec2-hibinit-agent","ec2-instance-connect","ec2-instance-connect-selinux","ec2-utils"]'
+  # RHEL9 default: '["crypto-policies-scripts","ec2-hibinit-agent","ec2-utils"]'
+  # Leave empty to use upstream defaults (which include rh-amazon-rhui-client)
+  AMIGEN8_EXTRA_RPMS: ""
+  AMIGEN9_EXTRA_RPMS: ""
   # Customer Managed Key (CMK) for EBS volume encryption
   # Set this to your KMS key ARN for encrypted AMIs, e.g., arn:aws-us-gov:kms:us-gov-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
   # Leave empty to disable encryption or use default AWS-managed key
@@ -567,6 +583,11 @@ infra:iam:
         -e PKR_VAR_windows_update_server="${PKR_VAR_windows_update_server:-}" \
         -e PKR_VAR_amigen_repo_mirror_baseurl="${REPO_MIRROR_BASEURL:-}" \
         -e PKR_VAR_amigen_cross_distro="${AMIGEN_CROSS_DISTRO:-false}" \
+        -e PKR_VAR_amigen_use_default_repos="${AMIGEN_USE_DEFAULT_REPOS:-true}" \
+        -e PKR_VAR_amigen8_repo_names="${AMIGEN8_REPO_NAMES:-}" \
+        -e PKR_VAR_amigen9_repo_names="${AMIGEN9_REPO_NAMES:-}" \
+        -e PKR_VAR_amigen8_extra_rpms="${AMIGEN8_EXTRA_RPMS:-}" \
+        -e PKR_VAR_amigen9_extra_rpms="${AMIGEN9_EXTRA_RPMS:-}" \
         -e PKR_VAR_aws_kms_key_id="${PKR_VAR_aws_kms_key_id:-}" \
         -e PACKER_LOG=1 \
         -e CHECKPOINT_DISABLE=1 \
