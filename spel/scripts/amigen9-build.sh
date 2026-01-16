@@ -736,5 +736,58 @@ if [[ "${AMIGENNOSIGNATURE}" == "true" ]]; then
         err_exit "Failed patching OSpackages.sh"
 fi
 
+# Patch OSpackages.sh to copy CA certificates into chroot before package downloads
+# This is required for air-gapped environments with HTTPS mirrors using internal CAs
+err_exit "Patching OSpackages.sh to copy CA certificates into chroot..." NONE
+
+# Create a helper script that copies CA certs from builder host to chroot
+cat > "${ELBUILD}/copy-ca-certs.sh" << 'CACERTEOF'
+#!/bin/bash
+# Copy CA certificates from builder host to chroot for HTTPS mirror support
+copy_ca_certs_to_chroot() {
+    local CHROOT_DIR="$1"
+    if [[ -z "${CHROOT_DIR}" ]] || [[ ! -d "${CHROOT_DIR}" ]]; then
+        echo "Warning: Chroot directory not found, skipping CA cert copy"
+        return 0
+    fi
+    
+    echo "Copying CA certificates into chroot ${CHROOT_DIR}..."
+    
+    # Create target directories
+    mkdir -p "${CHROOT_DIR}/etc/pki/ca-trust/extracted/pem"
+    mkdir -p "${CHROOT_DIR}/etc/pki/ca-trust/extracted/openssl"
+    mkdir -p "${CHROOT_DIR}/etc/pki/ca-trust/source/anchors"
+    mkdir -p "${CHROOT_DIR}/etc/pki/tls/certs"
+    mkdir -p "${CHROOT_DIR}/etc/ssl/certs"
+    
+    # Copy CA bundles from builder host
+    if [[ -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
+        cp -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem "${CHROOT_DIR}/etc/pki/ca-trust/extracted/pem/"
+    fi
+    if [[ -f /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt ]]; then
+        cp -f /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt "${CHROOT_DIR}/etc/pki/ca-trust/extracted/openssl/"
+    fi
+    if [[ -f /etc/pki/tls/certs/ca-bundle.crt ]]; then
+        cp -f /etc/pki/tls/certs/ca-bundle.crt "${CHROOT_DIR}/etc/pki/tls/certs/"
+        cp -f /etc/pki/tls/certs/ca-bundle.crt "${CHROOT_DIR}/etc/ssl/certs/ca-bundle.crt"
+    fi
+    if [[ -d /etc/pki/ca-trust/source/anchors/ ]]; then
+        cp -rf /etc/pki/ca-trust/source/anchors/* "${CHROOT_DIR}/etc/pki/ca-trust/source/anchors/" 2>/dev/null || true
+    fi
+    
+    echo "CA certificates copied to chroot successfully"
+}
+CACERTEOF
+chmod +x "${ELBUILD}/copy-ca-certs.sh"
+
+# Inject the CA cert copy into OSpackages.sh after chroot directory is created
+# Find the line that initializes RPM db and insert CA cert copy before it
+sed -i '/rpm --root "${CHROOTMNT}" --initdb/i\
+# Copy CA certificates for HTTPS mirror support (air-gapped environments)\
+source "'"${ELBUILD}"'/copy-ca-certs.sh"\
+copy_ca_certs_to_chroot "${CHROOTMNT}"\
+' "${ELBUILD}/OSpackages.sh" || \
+    err_exit "Failed patching OSpackages.sh for CA certificates"
+
 # Execute build-tools
 BuildChroot
