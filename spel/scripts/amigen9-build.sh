@@ -246,6 +246,15 @@ function BuildChroot {
     bash -euxo pipefail "${ELBUILD}"/$( ComposeOSpkgString ) || \
         err_exit "Failure encountered with OSpackages.sh"
 
+    # Run skipped scriptlets: update CA trust bundle
+    # (required since we used tsflags=noscripts during package install)
+    if chroot "${AMIGENCHROOT}" command -v update-ca-trust > /dev/null 2>&1
+    then
+        err_exit "Running update-ca-trust in chroot..." NONE
+        chroot "${AMIGENCHROOT}" /usr/bin/update-ca-trust extract || \
+            err_exit "Warning: update-ca-trust failed (non-fatal)" NONE
+    fi
+
     # Invoke CSP-specific utilities scripts
     case "${CLOUDPROVIDER}" in
         # Invoke AWSutils installer
@@ -788,6 +797,17 @@ source "'"${ELBUILD}"'/copy-ca-certs.sh"\
 copy_ca_certs_to_chroot "${CHROOTMNT}"\
 ' "${ELBUILD}/OSpackages.sh" || \
     err_exit "Failed patching OSpackages.sh for CA certificates"
+
+# Patch yum/dnf commands in chroot to skip scriptlets (fixes ca-certificates failures)
+# The ca-certificates package has post-install scripts that can fail in chroot
+err_exit "Patching OSpackages.sh to skip scriptlets in chroot installs..." NONE
+sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}".*--installroot="${CHROOTMNT}" -y reinstall/yum --nogpgcheck --setopt=tsflags=noscripts --disablerepo="*" --enablerepo="${OSREPOS}" --installroot="${CHROOTMNT}" -y reinstall/g' "${ELBUILD}/OSpackages.sh" || \
+    err_exit "Failed patching yum reinstall command"
+sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}".*--installroot="${CHROOTMNT}" -y install/yum --nogpgcheck --setopt=tsflags=noscripts --disablerepo="*" --enablerepo="${OSREPOS}" --installroot="${CHROOTMNT}" -y install/g' "${ELBUILD}/OSpackages.sh" || \
+    err_exit "Failed patching yum install command"
+# Patch the MainInstall YUMCMD to also skip scriptlets
+sed -i 's/YUMCMD="yum --nogpgcheck --installroot=${CHROOTMNT} "/YUMCMD="yum --nogpgcheck --setopt=tsflags=noscripts --installroot=${CHROOTMNT} "/g' "${ELBUILD}/OSpackages.sh" || \
+    err_exit "Failed patching MainInstall YUMCMD"
 
 # Execute build-tools
 BuildChroot
