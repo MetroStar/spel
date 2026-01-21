@@ -891,14 +891,18 @@ copy_ca_certs_to_chroot "${CHROOTMNT}"\
 # The ca-certificates package has post-install scripts that can fail in chroot
 err_exit "Patching OSpackages.sh to add --nogpgcheck and --setopt=tsflags=noscripts..." NONE
 
-# Insert --nogpgcheck --setopt=tsflags=noscripts after 'yum' for any yum command with --installroot
-# This handles various flag orderings like: yum '--disablerepo=*' --enablerepo=... --installroot=...
-sed -i 's/^\([[:space:]]*\)yum \(.*--installroot\)/\1yum --nogpgcheck --setopt=tsflags=noscripts \2/g' "${ELBUILD}/OSpackages.sh" || \
+# Patch the yum reinstall command in PrepChroot function
+sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}"/yum --nogpgcheck --setopt=tsflags=noscripts --disablerepo="*" --enablerepo="${OSREPOS}"/g' "${ELBUILD}/OSpackages.sh" || \
     err_exit "Failed patching yum commands"
 
 # Also patch the YUMCMD variable definition to include the flags
 sed -i 's/YUMCMD="yum --nogpgcheck/YUMCMD="yum --nogpgcheck --setopt=tsflags=noscripts/g' "${ELBUILD}/OSpackages.sh" || \
     err_exit "Failed patching MainInstall YUMCMD"
+
+# Debug: Show the patched yum commands to verify sed worked
+err_exit "DEBUG: Verifying OSpackages.sh patches applied..." NONE
+grep -n "yum.*disablerepo" "${ELBUILD}/OSpackages.sh" || true
+grep -n "YUMCMD=" "${ELBUILD}/OSpackages.sh" || true
 
 # Execute build-tools
 BuildChroot
