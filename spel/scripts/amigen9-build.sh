@@ -800,13 +800,15 @@ copy_ca_certs_to_chroot "${CHROOTMNT}"\
 
 # Patch yum/dnf commands in chroot to skip scriptlets (fixes ca-certificates failures)
 # The ca-certificates package has post-install scripts that can fail in chroot
-err_exit "Patching OSpackages.sh to skip scriptlets in chroot installs..." NONE
-sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}".*--installroot="${CHROOTMNT}" -y reinstall/yum --nogpgcheck --setopt=tsflags=noscripts --disablerepo="*" --enablerepo="${OSREPOS}" --installroot="${CHROOTMNT}" -y reinstall/g' "${ELBUILD}/OSpackages.sh" || \
-    err_exit "Failed patching yum reinstall command"
-sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}".*--installroot="${CHROOTMNT}" -y install/yum --nogpgcheck --setopt=tsflags=noscripts --disablerepo="*" --enablerepo="${OSREPOS}" --installroot="${CHROOTMNT}" -y install/g' "${ELBUILD}/OSpackages.sh" || \
-    err_exit "Failed patching yum install command"
-# Patch the MainInstall YUMCMD to also skip scriptlets
-sed -i 's/YUMCMD="yum --nogpgcheck --installroot=${CHROOTMNT} "/YUMCMD="yum --nogpgcheck --setopt=tsflags=noscripts --installroot=${CHROOTMNT} "/g' "${ELBUILD}/OSpackages.sh" || \
+err_exit "Patching OSpackages.sh to add --nogpgcheck and --setopt=tsflags=noscripts..." NONE
+
+# Insert --nogpgcheck --setopt=tsflags=noscripts after 'yum' for any yum command with --installroot
+# This handles various flag orderings like: yum '--disablerepo=*' --enablerepo=... --installroot=...
+sed -i 's/^\([[:space:]]*\)yum \(.*--installroot\)/\1yum --nogpgcheck --setopt=tsflags=noscripts \2/g' "${ELBUILD}/OSpackages.sh" || \
+    err_exit "Failed patching yum commands"
+
+# Also patch the YUMCMD variable definition to include the flags
+sed -i 's/YUMCMD="yum --nogpgcheck/YUMCMD="yum --nogpgcheck --setopt=tsflags=noscripts/g' "${ELBUILD}/OSpackages.sh" || \
     err_exit "Failed patching MainInstall YUMCMD"
 
 # Execute build-tools
