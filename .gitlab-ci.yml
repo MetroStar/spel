@@ -63,6 +63,12 @@ variables:
   # Leave empty to use defaults (requires RHUI or internet access)
   AMIGEN8_REPO_NAMES: ""
   AMIGEN9_REPO_NAMES: ""
+  # Repository source RPMs for air-gapped builds (JSON array format)
+  # These are RPMs that install yum repo configuration files into /etc/yum.repos.d/
+  # Example: '["http://mirror.internal.mil/repos/myorg-release-1.0-1.el8.noarch.rpm"]'
+  # Leave empty if repo files are already present or using RHUI (requires internet access)
+  AMIGEN8_REPO_SOURCES: ""
+  AMIGEN9_REPO_SOURCES: ""
   # Extra RPMs for air-gapped builds (JSON array format)
   # These override defaults to exclude RHUI-dependent packages like rh-amazon-rhui-client
   # RHEL8 default: '["python39","python39-pip","python39-setuptools","crypto-policies-scripts","ec2-hibinit-agent","ec2-instance-connect","ec2-instance-connect-selinux","ec2-utils"]'
@@ -589,6 +595,8 @@ infra:iam:
         -e PKR_VAR_amigen_use_default_repos="${AMIGEN_USE_DEFAULT_REPOS:-true}" \
         -e PKR_VAR_amigen8_repo_names="${AMIGEN8_REPO_NAMES:-}" \
         -e PKR_VAR_amigen9_repo_names="${AMIGEN9_REPO_NAMES:-}" \
+        -e PKR_VAR_amigen8_repo_sources="${AMIGEN8_REPO_SOURCES:-}" \
+        -e PKR_VAR_amigen9_repo_sources="${AMIGEN9_REPO_SOURCES:-}" \
         -e PKR_VAR_amigen8_extra_rpms="${AMIGEN8_EXTRA_RPMS:-}" \
         -e PKR_VAR_amigen9_extra_rpms="${AMIGEN9_EXTRA_RPMS:-}" \
         -e PKR_VAR_amigen_repo_nosignature="${AMIGEN_REPO_NOSIGNATURE:-false}" \
