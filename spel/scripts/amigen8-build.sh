@@ -151,6 +151,13 @@ if [[ "${AMIGENNOSIGNATURE}" == "true" ]]; then
     export NOSIGNATURE="true"
 fi
 
+# Export ISCROSSDISTRO for OSpackages.sh to skip auto-detecting RHUI packages
+# from the builder host's /etc/yum.repos.d/* (required for air-gapped builds)
+if [[ "${AMIGENCROSSDISTRO}" == "true" ]]; then
+    export ISCROSSDISTRO="TRUE"
+    echo "ISCROSSDISTRO exported as TRUE - will skip RHUI package auto-detection"
+fi
+
 
 retry()
 {
