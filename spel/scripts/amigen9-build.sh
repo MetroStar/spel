@@ -253,15 +253,6 @@ function BuildChroot {
     bash -euxo pipefail "${ELBUILD}"/$( ComposeOSpkgString ) || \
         err_exit "Failure encountered with OSpackages.sh"
 
-    # Run skipped scriptlets: update CA trust bundle
-    # (required since we used tsflags=noscripts during package install)
-    if chroot "${AMIGENCHROOT}" command -v update-ca-trust > /dev/null 2>&1
-    then
-        err_exit "Running update-ca-trust in chroot..." NONE
-        chroot "${AMIGENCHROOT}" /usr/bin/update-ca-trust extract || \
-            err_exit "Warning: update-ca-trust failed (non-fatal)" NONE
-    fi
-
     # Invoke CSP-specific utilities scripts
     case "${CLOUDPROVIDER}" in
         # Invoke AWSutils installer
@@ -752,75 +743,25 @@ if [[ "${AMIGENNOSIGNATURE}" == "true" ]]; then
         err_exit "Failed patching OSpackages.sh"
 fi
 
-# Patch OSpackages.sh to copy CA certificates into chroot before package downloads
-# This is required for air-gapped environments with HTTPS mirrors using internal CAs
-err_exit "Patching OSpackages.sh to copy CA certificates into chroot..." NONE
+# Patch OSpackages.sh to use insecure curl for HTTPS mirrors (air-gapped environments)
+# This avoids creating directories that conflict with ca-certificates/filesystem packages
+# The curl --insecure flag skips SSL verification, which is acceptable in air-gapped
+# environments where the mirror is on a trusted internal network
+err_exit "Patching OSpackages.sh to use insecure curl for air-gapped HTTPS mirrors..." NONE
+sed -i 's/curl --connect-timeout 15 -O  -sL/curl --insecure --connect-timeout 15 -O -sL/g' "${ELBUILD}/OSpackages.sh" || \
+    err_exit "Failed patching curl command"
 
-# Create a helper script that copies CA certs from builder host to chroot
-cat > "${ELBUILD}/copy-ca-certs.sh" << 'CACERTEOF'
-#!/bin/bash
-# Copy CA certificates from builder host to chroot for HTTPS mirror support
-copy_ca_certs_to_chroot() {
-    local CHROOT_DIR="$1"
-    if [[ -z "${CHROOT_DIR}" ]] || [[ ! -d "${CHROOT_DIR}" ]]; then
-        echo "Warning: Chroot directory not found, skipping CA cert copy"
-        return 0
-    fi
-    
-    echo "Copying CA certificates into chroot ${CHROOT_DIR}..."
-    
-    # Create target directories
-    mkdir -p "${CHROOT_DIR}/etc/pki/ca-trust/extracted/pem"
-    mkdir -p "${CHROOT_DIR}/etc/pki/ca-trust/extracted/openssl"
-    mkdir -p "${CHROOT_DIR}/etc/pki/ca-trust/source/anchors"
-    mkdir -p "${CHROOT_DIR}/etc/pki/tls/certs"
-    mkdir -p "${CHROOT_DIR}/etc/ssl/certs"
-    
-    # Copy CA bundles from builder host
-    if [[ -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]]; then
-        cp -f /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem "${CHROOT_DIR}/etc/pki/ca-trust/extracted/pem/"
-    fi
-    if [[ -f /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt ]]; then
-        cp -f /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt "${CHROOT_DIR}/etc/pki/ca-trust/extracted/openssl/"
-    fi
-    if [[ -f /etc/pki/tls/certs/ca-bundle.crt ]]; then
-        cp -f /etc/pki/tls/certs/ca-bundle.crt "${CHROOT_DIR}/etc/pki/tls/certs/"
-        cp -f /etc/pki/tls/certs/ca-bundle.crt "${CHROOT_DIR}/etc/ssl/certs/ca-bundle.crt"
-    fi
-    if [[ -d /etc/pki/ca-trust/source/anchors/ ]]; then
-        cp -rf /etc/pki/ca-trust/source/anchors/* "${CHROOT_DIR}/etc/pki/ca-trust/source/anchors/" 2>/dev/null || true
-    fi
-    
-    echo "CA certificates copied to chroot successfully"
-}
-CACERTEOF
-chmod +x "${ELBUILD}/copy-ca-certs.sh"
+# Patch yum/dnf commands in chroot to add --nogpgcheck for air-gapped environments
+err_exit "Patching OSpackages.sh to add --nogpgcheck to yum commands..." NONE
 
-# Inject the CA cert copy into OSpackages.sh after chroot directory is created
-# Find the line that initializes RPM db and insert CA cert copy before it
-sed -i '/rpm --root "${CHROOTMNT}" --initdb/i\
-# Copy CA certificates for HTTPS mirror support (air-gapped environments)\
-source "'"${ELBUILD}"'/copy-ca-certs.sh"\
-copy_ca_certs_to_chroot "${CHROOTMNT}"\
-' "${ELBUILD}/OSpackages.sh" || \
-    err_exit "Failed patching OSpackages.sh for CA certificates"
-
-# Patch yum/dnf commands in chroot to skip scriptlets (fixes ca-certificates failures)
-# The ca-certificates package has post-install scripts that can fail in chroot
-err_exit "Patching OSpackages.sh to add --nogpgcheck and --setopt=tsflags=noscripts..." NONE
-
-# Patch the yum reinstall command in PrepChroot function
-sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}"/yum --nogpgcheck --setopt=tsflags=noscripts --disablerepo="*" --enablerepo="${OSREPOS}"/g' "${ELBUILD}/OSpackages.sh" || \
+# Patch the yum commands in PrepChroot function to add --nogpgcheck
+sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}"/yum --nogpgcheck --disablerepo="*" --enablerepo="${OSREPOS}"/g' "${ELBUILD}/OSpackages.sh" || \
     err_exit "Failed patching yum commands"
-
-# Also patch the YUMCMD variable definition to include the flags
-sed -i 's/YUMCMD="yum --nogpgcheck/YUMCMD="yum --nogpgcheck --setopt=tsflags=noscripts/g' "${ELBUILD}/OSpackages.sh" || \
-    err_exit "Failed patching MainInstall YUMCMD"
 
 # Debug: Show the patched yum commands to verify sed worked
 err_exit "DEBUG: Verifying OSpackages.sh patches applied..." NONE
-grep -n "yum.*disablerepo" "${ELBUILD}/OSpackages.sh" || true
-grep -n "YUMCMD=" "${ELBUILD}/OSpackages.sh" || true
+grep -n "curl.*insecure" "${ELBUILD}/OSpackages.sh" || true
+grep -n "yum.*nogpgcheck.*disablerepo" "${ELBUILD}/OSpackages.sh" || true
 
 # Execute build-tools
 BuildChroot
