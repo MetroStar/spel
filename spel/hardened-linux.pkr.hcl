@@ -583,6 +583,12 @@ variable "spel_root_volume_size" {
   default     = 20
 }
 
+variable "spel_goss_binary_url" {
+  description = "URL for the Goss binary used by STIG audit. For air-gapped environments, host Goss on your internal mirror or S3. Example: https://mirror.internal.mil/tools/goss-linux-AMD64"
+  type        = string
+  default     = ""
+}
+
 variable "spel_version" {
   description = "Version appended to the name of the built images"
   type        = string
@@ -1060,6 +1066,9 @@ build {
       "amazon-ebs.hardened-ol-9-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
+    environment_vars = [
+      "GOSS_BINARY_URL=${var.spel_goss_binary_url}",
+    ]
     inline = [
       "echo 'Running Ansible Lockdown'",
       "echo 'Ensuring Python 3.9 is available...'",
@@ -1073,7 +1082,10 @@ build {
       "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL9-STIG $HOME/.ansible/roles/",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false}'",
+      "EXTRA_VARS='{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false}'",
+      "if [ -n \"$GOSS_BINARY_URL\" ]; then echo \"Using custom Goss binary URL: $GOSS_BINARY_URL\"; EXTRA_VARS=$(echo $EXTRA_VARS | sed \"s/}$/,\\\"audit_binary\\\": \\\"$GOSS_BINARY_URL\\\"}/\"); fi",
+      "echo \"EXTRA_VARS: $EXTRA_VARS\"",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e \"$EXTRA_VARS\"",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
       "rm -rf /var/lib/cloud/data",
@@ -1107,6 +1119,9 @@ build {
       "amazon-ebs.hardened-rhel-8-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
+    environment_vars = [
+      "GOSS_BINARY_URL=${var.spel_goss_binary_url}",
+    ]
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
@@ -1127,7 +1142,10 @@ build {
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "echo 'Running RHEL8-STIG playbook with Python 3.6 (for SELinux module support)...'",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
+      "EXTRA_VARS='{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
+      "if [ -n \"$GOSS_BINARY_URL\" ]; then echo \"Using custom Goss binary URL: $GOSS_BINARY_URL\"; EXTRA_VARS=$(echo $EXTRA_VARS | sed \"s/}$/,\\\"audit_binary\\\": \\\"$GOSS_BINARY_URL\\\"}/\"); fi",
+      "echo \"EXTRA_VARS: $EXTRA_VARS\"",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e \"$EXTRA_VARS\"",
       "bash /tmp/boot-fips-wrapper.sh post",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
@@ -1142,6 +1160,9 @@ build {
     start_retry_timeout = "5m"
     only = ["amazon-ebs.hardened-ol-8-hvm"]
     execute_command = "sudo -E bash '{{.Path}}'"
+    environment_vars = [
+      "GOSS_BINARY_URL=${var.spel_goss_binary_url}",
+    ]
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
@@ -1162,7 +1183,10 @@ build {
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "echo 'Running RHEL8-STIG playbook with Python 3.6 (for SELinux module support)...'",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
+      "EXTRA_VARS='{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false}'",
+      "if [ -n \"$GOSS_BINARY_URL\" ]; then echo \"Using custom Goss binary URL: $GOSS_BINARY_URL\"; EXTRA_VARS=$(echo $EXTRA_VARS | sed \"s/}$/,\\\"audit_binary\\\": \\\"$GOSS_BINARY_URL\\\"}/\"); fi",
+      "echo \"EXTRA_VARS: $EXTRA_VARS\"",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e \"$EXTRA_VARS\"",
       "bash /tmp/boot-fips-wrapper.sh post",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
