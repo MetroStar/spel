@@ -854,6 +854,32 @@ build {
     }
   }
 
+  # Remove sslverify=0 from repo files that was added during minimal build
+  # This restores proper SSL verification for the hardened AMI
+  provisioner "shell" {
+    execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
+    inline = [
+      "echo 'Removing sslverify=0 from yum repo files (restoring SSL verification)...'",
+      "for REPOFILE in /etc/yum.repos.d/*.repo; do",
+      "  if [[ -f \"$REPOFILE\" ]]; then",
+      "    if grep -q 'sslverify=0' \"$REPOFILE\"; then",
+      "      echo \"  Removing sslverify=0 from $REPOFILE\"",
+      "      sed -i '/^sslverify=0$/d' \"$REPOFILE\"",
+      "    fi",
+      "  fi",
+      "done",
+      "echo 'SSL verification restored for all repo files'",
+    ]
+    only = [
+      "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-centos-9stream-hvm",
+      "amazon-ebs.hardened-ol-9-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
+      "amazon-ebs.hardened-amzn-2023-hvm",
+    ]
+  }
+
   # Configure air-gapped repositories for Linux builds (runs before STIG hardening)
   provisioner "shell" {
     environment_vars = [
