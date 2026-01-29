@@ -128,6 +128,18 @@ jobs:
           else
             echo "❌ Instance Profile: Not found"
           fi
+          
+          # Check KMS Key
+          KMS_ALIAS="${INFRA_PREFIX}-ebs-key"
+          KEY_ID=$(aws kms list-aliases \
+            --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
+            --output text 2>/dev/null || echo "")
+          if [ -n "$KEY_ID" ] && [ "$KEY_ID" != "None" ]; then
+            KMS_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
+            echo "✅ KMS Key: ${KMS_ARN}"
+          else
+            echo "❌ KMS Key: Not found (alias/${KMS_ALIAS})"
+          fi
 
       - name: Create infrastructure
         if: github.event.inputs.action == 'create'
@@ -396,6 +408,94 @@ jobs:
           fi
           echo "instance_profile=${PROFILE_NAME}" >> $GITHUB_OUTPUT
           
+          # Create KMS Key for EBS encryption
+          KMS_ALIAS="${INFRA_PREFIX}-ebs-key"
+          EXISTING_KEY=$(aws kms list-aliases \
+            --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$EXISTING_KEY" ] && [ "$EXISTING_KEY" != "None" ]; then
+            echo "✓ KMS key already exists: ${EXISTING_KEY}"
+            KEY_ID="${EXISTING_KEY}"
+          else
+            echo "Creating KMS key for EBS encryption..."
+            
+            # Determine partition for GovCloud support
+            PARTITION="aws"
+            [[ "${AWS_REGION}" == us-gov-* ]] && PARTITION="aws-us-gov"
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            
+            # Create key policy allowing EC2, Packer role, and instance profile
+            cat > /tmp/kms-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Id": "${KMS_ALIAS}-policy",
+            "Statement": [
+              {
+                "Sid": "EnableRootPermissions",
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:root"},
+                "Action": "kms:*",
+                "Resource": "*"
+              },
+              {
+                "Sid": "AllowEC2ForEBS",
+                "Effect": "Allow",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Action": [
+                  "kms:Encrypt",
+                  "kms:Decrypt",
+                  "kms:ReEncrypt*",
+                  "kms:GenerateDataKey*",
+                  "kms:DescribeKey",
+                  "kms:CreateGrant"
+                ],
+                "Resource": "*",
+                "Condition": {
+                  "StringEquals": {
+                    "kms:CallerAccount": "${ACCOUNT_ID}",
+                    "kms:ViaService": "ec2.${AWS_REGION}.amazonaws.com"
+                  }
+                }
+              },
+              {
+                "Sid": "AllowPackerRole",
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"},
+                "Action": [
+                  "kms:Encrypt",
+                  "kms:Decrypt",
+                  "kms:ReEncrypt*",
+                  "kms:GenerateDataKey*",
+                  "kms:DescribeKey",
+                  "kms:CreateGrant",
+                  "kms:ListGrants",
+                  "kms:RevokeGrant"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+          EOF
+            
+            KEY_ID=$(aws kms create-key \
+              --description "SPEL EBS encryption key for Packer builds" \
+              --policy file:///tmp/kms-policy.json \
+              --tags TagKey=Name,TagValue="${KMS_ALIAS}" TagKey=Project,TagValue=SPEL TagKey=Environment,TagValue=Offline \
+              --query 'KeyMetadata.KeyId' --output text)
+            
+            # Create alias for easy identification
+            aws kms create-alias --alias-name "alias/${KMS_ALIAS}" --target-key-id "${KEY_ID}"
+            
+            # Enable automatic annual key rotation
+            aws kms enable-key-rotation --key-id "${KEY_ID}"
+            
+            echo "✓ Created KMS key: ${KEY_ID} with automatic rotation enabled"
+          fi
+          
+          KMS_KEY_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
+          echo "kms_key_id=${KMS_KEY_ARN}" >> $GITHUB_OUTPUT
+          
           echo ""
           echo "=== Infrastructure Created ==="
 
@@ -408,6 +508,20 @@ jobs:
           echo ""
           
           INFRA_PREFIX="${{ github.event.inputs.infra_prefix }}"
+          
+          # Schedule KMS Key for deletion
+          KMS_ALIAS="${INFRA_PREFIX}-ebs-key"
+          KEY_ID=$(aws kms list-aliases \
+            --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$KEY_ID" ] && [ "$KEY_ID" != "None" ]; then
+            echo "Deleting KMS alias: alias/${KMS_ALIAS}"
+            aws kms delete-alias --alias-name "alias/${KMS_ALIAS}" 2>/dev/null || true
+            echo "Scheduling KMS key deletion (30 days): ${KEY_ID}"
+            aws kms schedule-key-deletion --key-id "${KEY_ID}" --pending-window-in-days 30
+            echo "✓ KMS key scheduled for deletion in 30 days"
+          fi
           
           # Delete Instance Profile
           PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
@@ -520,7 +634,6 @@ jobs:
           | Input | Value |
           |-------|-------|
           | aws_vpc_id | \`${{ steps.create.outputs.vpc_id }}\` |
-          | aws_subnet_id | \`${{ steps.create.outputs.subnet_id }}\` |
-          | (optional) iam_instance_profile | \`${{ steps.create.outputs.instance_profile }}\` |
+          | aws_subnet_id | \`${{ steps.create.outputs.subnet_id }}\` |          | aws_kms_key_id | \`${{ steps.create.outputs.kms_key_id }}\` |          | (optional) iam_instance_profile | \`${{ steps.create.outputs.instance_profile }}\` |
           EOF
           fi

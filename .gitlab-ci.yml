@@ -505,6 +505,109 @@ infra:iam:
     - if: '$CREATE_INFRASTRUCTURE == "true"'
       when: manual
 
+# Create KMS Key for EBS encryption
+infra:kms:
+  stage: infra
+  script:
+    - echo "Creating KMS key for EBS encryption..."
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+    
+    - |
+      KMS_ALIAS="${INFRA_PREFIX}-ebs-key"
+      EXISTING_KEY=$(aws kms list-aliases \
+        --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
+        --output text 2>/dev/null || echo "")
+      
+      if [ -n "$EXISTING_KEY" ] && [ "$EXISTING_KEY" != "None" ]; then
+        echo "✓ KMS key already exists: ${EXISTING_KEY}"
+        KEY_ID="${EXISTING_KEY}"
+      else
+        echo "Creating KMS key..."
+        
+        # Determine partition for GovCloud
+        PARTITION="aws"
+        [[ "${PKR_VAR_aws_region}" == us-gov-* ]] && PARTITION="aws-us-gov"
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
+        
+        # Create key policy
+        cat > /tmp/kms-policy.json <<EOF
+      {
+        "Version": "2012-10-17",
+        "Id": "${KMS_ALIAS}-policy",
+        "Statement": [
+          {
+            "Sid": "EnableRootPermissions",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:root"},
+            "Action": "kms:*",
+            "Resource": "*"
+          },
+          {
+            "Sid": "AllowEC2ForEBS",
+            "Effect": "Allow",
+            "Principal": {"Service": "ec2.amazonaws.com"},
+            "Action": [
+              "kms:Encrypt",
+              "kms:Decrypt",
+              "kms:ReEncrypt*",
+              "kms:GenerateDataKey*",
+              "kms:DescribeKey",
+              "kms:CreateGrant"
+            ],
+            "Resource": "*",
+            "Condition": {
+              "StringEquals": {
+                "kms:CallerAccount": "${ACCOUNT_ID}",
+                "kms:ViaService": "ec2.${PKR_VAR_aws_region}.amazonaws.com"
+              }
+            }
+          },
+          {
+            "Sid": "AllowPackerRole",
+            "Effect": "Allow",
+            "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"},
+            "Action": [
+              "kms:Encrypt",
+              "kms:Decrypt",
+              "kms:ReEncrypt*",
+              "kms:GenerateDataKey*",
+              "kms:DescribeKey",
+              "kms:CreateGrant",
+              "kms:ListGrants",
+              "kms:RevokeGrant"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+      EOF
+        
+        KEY_ID=$(aws kms create-key \
+          --description "SPEL EBS encryption key for Packer builds" \
+          --policy file:///tmp/kms-policy.json \
+          --tags TagKey=Name,TagValue="${KMS_ALIAS}" TagKey=Project,TagValue=SPEL TagKey=Environment,TagValue=Offline \
+          --query 'KeyMetadata.KeyId' --output text)
+        
+        aws kms create-alias --alias-name "alias/${KMS_ALIAS}" --target-key-id "${KEY_ID}"
+        aws kms enable-key-rotation --key-id "${KEY_ID}"
+        
+        echo "✓ Created KMS key: ${KEY_ID} with automatic rotation enabled"
+      fi
+      
+      KMS_KEY_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
+      echo "PKR_VAR_aws_kms_key_id=${KMS_KEY_ARN}" > kms.env
+      echo "✓ KMS Key ARN: ${KMS_KEY_ARN}"
+  artifacts:
+    reports:
+      dotenv: kms.env
+    expire_in: 90 days
+  tags:
+    - spel-offline-runner
+  rules:
+    - if: '$CREATE_INFRASTRUCTURE == "true"'
+      when: manual
+
 #############################################################################
 # Build Stage - Build AMIs using Docker Container
 #############################################################################
@@ -541,7 +644,7 @@ infra:iam:
     
     # Load infrastructure config if available
     - |
-      for envfile in network.env sg.env iam.env; do
+      for envfile in network.env sg.env iam.env kms.env; do
         if [ -f "$envfile" ]; then
           echo "Loading ${envfile}..."
           source "$envfile"
