@@ -1,0 +1,526 @@
+# =============================================================================
+# Infrastructure Setup for Air-Gapped SPEL Builds
+# =============================================================================
+# This workflow creates AWS infrastructure required for air-gapped Packer builds.
+# Run this ONCE to set up VPC, subnet, security group, and IAM resources.
+#
+# RESOURCES CREATED:
+#   - VPC with DNS support/hostnames enabled
+#   - Subnet with auto-assign public IP (or private if using VPC endpoints)
+#   - Security group allowing SSH from VPC CIDR
+#   - IAM role and instance profile for Packer-launched instances
+#
+# PREREQUISITES:
+#   - AWS credentials with permissions to create VPC, EC2, and IAM resources
+#   - For GovCloud: Use appropriate partition (aws-us-gov)
+#
+# USAGE:
+#   1. Run this workflow with action="create"
+#   2. Note the output values (VPC ID, Subnet ID, etc.)
+#   3. Use those values as inputs to the build.yml workflow
+#   4. Run action="destroy" when infrastructure is no longer needed
+# =============================================================================
+
+name: Infrastructure Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        type: choice
+        options:
+          - create
+          - destroy
+          - status
+        default: status
+      aws_region:
+        description: "AWS region (e.g., us-east-1, us-gov-east-1)"
+        required: true
+        type: string
+        default: "us-east-1"
+      infra_prefix:
+        description: "Prefix for resource names"
+        required: false
+        type: string
+        default: "spel-offline"
+      vpc_cidr:
+        description: "VPC CIDR block"
+        required: false
+        type: string
+        default: "10.0.0.0/16"
+      subnet_cidr:
+        description: "Subnet CIDR block"
+        required: false
+        type: string
+        default: "10.0.1.0/24"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  infrastructure:
+    name: ${{ github.event.inputs.action }} Infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ github.event.inputs.aws_region }}
+          role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
+          role-duration-seconds: 3600
+
+      - name: Check infrastructure status
+        if: github.event.inputs.action == 'status'
+        run: |
+          echo "=== Infrastructure Status ==="
+          echo ""
+          
+          INFRA_PREFIX="${{ github.event.inputs.infra_prefix }}"
+          VPC_NAME="${INFRA_PREFIX}-vpc"
+          
+          # Check VPC
+          VPC_ID=$(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${VPC_NAME}" \
+            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$VPC_ID" != "None" ] && [ -n "$VPC_ID" ]; then
+            echo "✅ VPC: ${VPC_ID} (${VPC_NAME})"
+            
+            # Check Subnet
+            SUBNET_ID=$(aws ec2 describe-subnets \
+              --filters "Name=tag:Name,Values=${INFRA_PREFIX}-subnet" "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "None")
+            if [ "$SUBNET_ID" != "None" ] && [ -n "$SUBNET_ID" ]; then
+              echo "✅ Subnet: ${SUBNET_ID}"
+            else
+              echo "❌ Subnet: Not found"
+            fi
+            
+            # Check Security Group
+            SG_ID=$(aws ec2 describe-security-groups \
+              --filters "Name=group-name,Values=${INFRA_PREFIX}-packer-sg" "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
+            if [ "$SG_ID" != "None" ] && [ -n "$SG_ID" ]; then
+              echo "✅ Security Group: ${SG_ID}"
+            else
+              echo "❌ Security Group: Not found"
+            fi
+          else
+            echo "❌ VPC: Not found (${VPC_NAME})"
+          fi
+          
+          # Check IAM
+          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
+          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null; then
+            echo "✅ IAM Role: ${ROLE_NAME}"
+          else
+            echo "❌ IAM Role: Not found"
+          fi
+          
+          PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
+          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
+            echo "✅ Instance Profile: ${PROFILE_NAME}"
+          else
+            echo "❌ Instance Profile: Not found"
+          fi
+
+      - name: Create infrastructure
+        if: github.event.inputs.action == 'create'
+        id: create
+        run: |
+          echo "=== Creating Infrastructure ==="
+          echo ""
+          
+          INFRA_PREFIX="${{ github.event.inputs.infra_prefix }}"
+          VPC_CIDR="${{ github.event.inputs.vpc_cidr }}"
+          SUBNET_CIDR="${{ github.event.inputs.subnet_cidr }}"
+          AWS_REGION="${{ github.event.inputs.aws_region }}"
+          
+          # Create VPC
+          VPC_NAME="${INFRA_PREFIX}-vpc"
+          EXISTING_VPC=$(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${VPC_NAME}" \
+            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$EXISTING_VPC" != "None" ] && [ -n "$EXISTING_VPC" ]; then
+            echo "✓ VPC already exists: ${EXISTING_VPC}"
+            VPC_ID="${EXISTING_VPC}"
+          else
+            echo "Creating VPC..."
+            VPC_ID=$(aws ec2 create-vpc \
+              --cidr-block "${VPC_CIDR}" \
+              --query 'Vpc.VpcId' --output text)
+            
+            aws ec2 create-tags --resources "${VPC_ID}" \
+              --tags Key=Name,Value="${VPC_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
+            
+            aws ec2 modify-vpc-attribute --vpc-id "${VPC_ID}" --enable-dns-hostnames
+            aws ec2 modify-vpc-attribute --vpc-id "${VPC_ID}" --enable-dns-support
+            
+            echo "✓ Created VPC: ${VPC_ID}"
+          fi
+          echo "vpc_id=${VPC_ID}" >> $GITHUB_OUTPUT
+          
+          # Create Subnet
+          SUBNET_NAME="${INFRA_PREFIX}-subnet"
+          EXISTING_SUBNET=$(aws ec2 describe-subnets \
+            --filters "Name=tag:Name,Values=${SUBNET_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
+            --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$EXISTING_SUBNET" != "None" ] && [ -n "$EXISTING_SUBNET" ]; then
+            echo "✓ Subnet already exists: ${EXISTING_SUBNET}"
+            SUBNET_ID="${EXISTING_SUBNET}"
+          else
+            echo "Creating subnet..."
+            AZ=$(aws ec2 describe-availability-zones --query 'AvailabilityZones[0].ZoneName' --output text)
+            SUBNET_ID=$(aws ec2 create-subnet \
+              --vpc-id "${VPC_ID}" \
+              --cidr-block "${SUBNET_CIDR}" \
+              --availability-zone "${AZ}" \
+              --query 'Subnet.SubnetId' --output text)
+            
+            aws ec2 create-tags --resources "${SUBNET_ID}" \
+              --tags Key=Name,Value="${SUBNET_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
+            
+            aws ec2 modify-subnet-attribute --subnet-id "${SUBNET_ID}" --map-public-ip-on-launch
+            
+            echo "✓ Created subnet: ${SUBNET_ID}"
+          fi
+          echo "subnet_id=${SUBNET_ID}" >> $GITHUB_OUTPUT
+          
+          # Create Internet Gateway (needed for public IP connectivity)
+          IGW_NAME="${INFRA_PREFIX}-igw"
+          EXISTING_IGW=$(aws ec2 describe-internet-gateways \
+            --filters "Name=tag:Name,Values=${IGW_NAME}" \
+            --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$EXISTING_IGW" != "None" ] && [ -n "$EXISTING_IGW" ]; then
+            echo "✓ Internet Gateway already exists: ${EXISTING_IGW}"
+            IGW_ID="${EXISTING_IGW}"
+          else
+            echo "Creating Internet Gateway..."
+            IGW_ID=$(aws ec2 create-internet-gateway \
+              --query 'InternetGateway.InternetGatewayId' --output text)
+            
+            aws ec2 create-tags --resources "${IGW_ID}" \
+              --tags Key=Name,Value="${IGW_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
+            
+            aws ec2 attach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${VPC_ID}"
+            
+            echo "✓ Created and attached Internet Gateway: ${IGW_ID}"
+          fi
+          
+          # Create/Update Route Table
+          RT_ID=$(aws ec2 describe-route-tables \
+            --filters "Name=vpc-id,Values=${VPC_ID}" "Name=association.main,Values=true" \
+            --query 'RouteTables[0].RouteTableId' --output text)
+          
+          # Check if default route exists
+          EXISTING_ROUTE=$(aws ec2 describe-route-tables \
+            --route-table-ids "${RT_ID}" \
+            --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0'].GatewayId" --output text || echo "")
+          
+          if [ -z "$EXISTING_ROUTE" ] || [ "$EXISTING_ROUTE" == "None" ]; then
+            echo "Adding default route to Internet Gateway..."
+            aws ec2 create-route \
+              --route-table-id "${RT_ID}" \
+              --destination-cidr-block "0.0.0.0/0" \
+              --gateway-id "${IGW_ID}" || true
+            echo "✓ Added default route"
+          else
+            echo "✓ Default route already exists"
+          fi
+          
+          # Create Security Group
+          SG_NAME="${INFRA_PREFIX}-packer-sg"
+          EXISTING_SG=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=${SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
+            --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$EXISTING_SG" != "None" ] && [ -n "$EXISTING_SG" ]; then
+            echo "✓ Security group already exists: ${EXISTING_SG}"
+            SG_ID="${EXISTING_SG}"
+          else
+            echo "Creating security group..."
+            SG_ID=$(aws ec2 create-security-group \
+              --group-name "${SG_NAME}" \
+              --description "Security group for SPEL Packer builders" \
+              --vpc-id "${VPC_ID}" \
+              --query 'GroupId' --output text)
+            
+            aws ec2 create-tags --resources "${SG_ID}" \
+              --tags Key=Name,Value="${SG_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
+            
+            # Allow SSH from VPC CIDR
+            aws ec2 authorize-security-group-ingress \
+              --group-id "${SG_ID}" \
+              --protocol tcp --port 22 \
+              --cidr "${VPC_CIDR}"
+            
+            echo "✓ Created security group: ${SG_ID}"
+          fi
+          echo "security_group_id=${SG_ID}" >> $GITHUB_OUTPUT
+          
+          # Create IAM Role
+          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
+          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null; then
+            echo "✓ IAM role already exists: ${ROLE_NAME}"
+          else
+            echo "Creating IAM role..."
+            cat > /tmp/trust-policy.json <<'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+          EOF
+            
+            aws iam create-role \
+              --role-name "${ROLE_NAME}" \
+              --assume-role-policy-document file:///tmp/trust-policy.json \
+              --description "Role for SPEL Packer builders" \
+              --max-session-duration 21600
+            
+            echo "✓ Created IAM role: ${ROLE_NAME}"
+          fi
+          
+          # Create IAM Policy
+          POLICY_NAME="${INFRA_PREFIX}-packer-builder-policy"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          
+          EXISTING_POLICY=$(aws iam list-policies --scope Local \
+            --query "Policies[?PolicyName=='${POLICY_NAME}'].Arn" --output text 2>/dev/null)
+          
+          if [ -n "$EXISTING_POLICY" ] && [ "$EXISTING_POLICY" != "None" ]; then
+            echo "✓ IAM policy already exists: ${POLICY_NAME}"
+            POLICY_ARN="$EXISTING_POLICY"
+          else
+            echo "Creating IAM policy..."
+            cat > /tmp/packer-policy.json <<EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "SSMAccess",
+                "Effect": "Allow",
+                "Action": [
+                  "ssm:UpdateInstanceInformation",
+                  "ssmmessages:CreateControlChannel",
+                  "ssmmessages:CreateDataChannel",
+                  "ssmmessages:OpenControlChannel",
+                  "ssmmessages:OpenDataChannel",
+                  "ec2messages:AcknowledgeMessage",
+                  "ec2messages:DeleteMessage",
+                  "ec2messages:FailMessage",
+                  "ec2messages:GetEndpoint",
+                  "ec2messages:GetMessages",
+                  "ec2messages:SendReply"
+                ],
+                "Resource": "*"
+              },
+              {
+                "Sid": "S3Access",
+                "Effect": "Allow",
+                "Action": [
+                  "s3:GetObject",
+                  "s3:ListBucket"
+                ],
+                "Resource": [
+                  "arn:*:s3:::aws-ssm-${AWS_REGION}/*",
+                  "arn:*:s3:::aws-ssm-${AWS_REGION}",
+                  "arn:*:s3:::amazon-ssm-${AWS_REGION}/*",
+                  "arn:*:s3:::amazon-ssm-${AWS_REGION}"
+                ]
+              },
+              {
+                "Sid": "CloudWatchLogs",
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents",
+                  "logs:DescribeLogGroups",
+                  "logs:DescribeLogStreams"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+          EOF
+            
+            POLICY_ARN=$(aws iam create-policy \
+              --policy-name "${POLICY_NAME}" \
+              --policy-document file:///tmp/packer-policy.json \
+              --description "Policy for SPEL Packer builder EC2 instances" \
+              --query 'Policy.Arn' --output text)
+            
+            echo "✓ Created IAM policy: ${POLICY_NAME}"
+          fi
+          
+          # Attach policy to role
+          if aws iam list-attached-role-policies --role-name "${ROLE_NAME}" \
+              --query "AttachedPolicies[?PolicyArn=='${POLICY_ARN}']" --output text | grep -q .; then
+            echo "✓ Policy already attached to role"
+          else
+            echo "Attaching policy to role..."
+            aws iam attach-role-policy \
+              --role-name "${ROLE_NAME}" \
+              --policy-arn "${POLICY_ARN}"
+            echo "✓ Attached policy to role"
+          fi
+          
+          # Create Instance Profile
+          PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
+          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
+            echo "✓ Instance profile already exists: ${PROFILE_NAME}"
+          else
+            echo "Creating instance profile..."
+            aws iam create-instance-profile --instance-profile-name "${PROFILE_NAME}"
+            aws iam add-role-to-instance-profile \
+              --instance-profile-name "${PROFILE_NAME}" \
+              --role-name "${ROLE_NAME}"
+            
+            sleep 10  # Wait for propagation
+            echo "✓ Created instance profile: ${PROFILE_NAME}"
+          fi
+          echo "instance_profile=${PROFILE_NAME}" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "=== Infrastructure Created ==="
+
+      - name: Destroy infrastructure
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          echo "=== Destroying Infrastructure ==="
+          echo ""
+          echo "⚠️  This will delete all SPEL infrastructure resources!"
+          echo ""
+          
+          INFRA_PREFIX="${{ github.event.inputs.infra_prefix }}"
+          
+          # Delete Instance Profile
+          PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
+          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
+          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
+            echo "Removing role from instance profile..."
+            aws iam remove-role-from-instance-profile \
+              --instance-profile-name "${PROFILE_NAME}" \
+              --role-name "${ROLE_NAME}" 2>/dev/null || true
+            echo "Deleting instance profile: ${PROFILE_NAME}"
+            aws iam delete-instance-profile --instance-profile-name "${PROFILE_NAME}"
+            echo "✓ Deleted instance profile"
+          fi
+          
+          # Delete IAM Policy and Role
+          POLICY_NAME="${INFRA_PREFIX}-packer-builder-policy"
+          POLICY_ARN=$(aws iam list-policies --scope Local \
+            --query "Policies[?PolicyName=='${POLICY_NAME}'].Arn" --output text 2>/dev/null)
+          
+          if [ -n "$POLICY_ARN" ] && [ "$POLICY_ARN" != "None" ]; then
+            echo "Detaching policy from role..."
+            aws iam detach-role-policy \
+              --role-name "${ROLE_NAME}" \
+              --policy-arn "${POLICY_ARN}" 2>/dev/null || true
+            echo "Deleting policy: ${POLICY_NAME}"
+            aws iam delete-policy --policy-arn "${POLICY_ARN}"
+            echo "✓ Deleted IAM policy"
+          fi
+          
+          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null; then
+            echo "Deleting IAM role: ${ROLE_NAME}"
+            aws iam delete-role --role-name "${ROLE_NAME}"
+            echo "✓ Deleted IAM role"
+          fi
+          
+          # Get VPC ID
+          VPC_NAME="${INFRA_PREFIX}-vpc"
+          VPC_ID=$(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${VPC_NAME}" \
+            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$VPC_ID" != "None" ] && [ -n "$VPC_ID" ]; then
+            # Delete Security Group
+            SG_ID=$(aws ec2 describe-security-groups \
+              --filters "Name=group-name,Values=${INFRA_PREFIX}-packer-sg" "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
+            
+            if [ "$SG_ID" != "None" ] && [ -n "$SG_ID" ]; then
+              echo "Deleting security group: ${SG_ID}"
+              aws ec2 delete-security-group --group-id "${SG_ID}"
+              echo "✓ Deleted security group"
+            fi
+            
+            # Delete Subnet
+            SUBNET_ID=$(aws ec2 describe-subnets \
+              --filters "Name=tag:Name,Values=${INFRA_PREFIX}-subnet" "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "None")
+            
+            if [ "$SUBNET_ID" != "None" ] && [ -n "$SUBNET_ID" ]; then
+              echo "Deleting subnet: ${SUBNET_ID}"
+              aws ec2 delete-subnet --subnet-id "${SUBNET_ID}"
+              echo "✓ Deleted subnet"
+            fi
+            
+            # Detach and delete Internet Gateway
+            IGW_ID=$(aws ec2 describe-internet-gateways \
+              --filters "Name=tag:Name,Values=${INFRA_PREFIX}-igw" \
+              --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || echo "None")
+            
+            if [ "$IGW_ID" != "None" ] && [ -n "$IGW_ID" ]; then
+              echo "Detaching Internet Gateway: ${IGW_ID}"
+              aws ec2 detach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${VPC_ID}" 2>/dev/null || true
+              echo "Deleting Internet Gateway: ${IGW_ID}"
+              aws ec2 delete-internet-gateway --internet-gateway-id "${IGW_ID}"
+              echo "✓ Deleted Internet Gateway"
+            fi
+            
+            # Delete VPC
+            echo "Deleting VPC: ${VPC_ID}"
+            aws ec2 delete-vpc --vpc-id "${VPC_ID}"
+            echo "✓ Deleted VPC"
+          else
+            echo "No VPC found with name: ${VPC_NAME}"
+          fi
+          
+          echo ""
+          echo "=== Infrastructure Destroyed ==="
+
+      - name: Create summary
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## Infrastructure Setup Summary
+          
+          | Property | Value |
+          |----------|-------|
+          | Action | \`${{ github.event.inputs.action }}\` |
+          | Region | \`${{ github.event.inputs.aws_region }}\` |
+          | Prefix | \`${{ github.event.inputs.infra_prefix }}\` |
+          | Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
+          EOF
+          
+          if [ "${{ github.event.inputs.action }}" = "create" ]; then
+            cat >> $GITHUB_STEP_SUMMARY << EOF
+          
+          ### Created Resources
+          
+          Use these values in the build.yml workflow:
+          
+          | Input | Value |
+          |-------|-------|
+          | aws_vpc_id | \`${{ steps.create.outputs.vpc_id }}\` |
+          | aws_subnet_id | \`${{ steps.create.outputs.subnet_id }}\` |
+          | (optional) iam_instance_profile | \`${{ steps.create.outputs.instance_profile }}\` |
+          EOF
+          fi
