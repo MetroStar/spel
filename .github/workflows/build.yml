@@ -318,35 +318,47 @@ jobs:
           echo "Windows Builders: ${WINDOWS_BUILDERS}"
           echo ""
           
+          # Build docker run command with conditional environment variables
+          # List-type PKR_VAR variables must not be set to empty string (Packer HCL parsing fails)
+          DOCKER_ENV_ARGS=(
+            -e AWS_ACCESS_KEY_ID
+            -e AWS_SECRET_ACCESS_KEY
+            -e AWS_SESSION_TOKEN
+            -e AWS_DEFAULT_REGION=us-east-1
+            -e SPEL_IDENTIFIER="${SPEL_IDENTIFIER}"
+            -e SPEL_VERSION="${SPEL_VERSION}"
+            -e SPEL_BUILDERS="${SPEL_BUILDERS}"
+            -e WINDOWS_BUILDERS="${WINDOWS_BUILDERS}"
+            -e PKR_VAR_aws_region="${PKR_VAR_aws_region}"
+            -e PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister}"
+            -e PKR_VAR_aws_ami_regions="${PKR_VAR_aws_ami_regions:-[\"${PKR_VAR_aws_region}\"]}"
+            -e PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups}"
+            -e PACKER_LOG=1
+            -e CHECKPOINT_DISABLE=1
+          )
+          
+          # Add optional string variables (empty string is valid for these)
+          [[ -n "${{ github.event.inputs.aws_vpc_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_vpc_id="${{ github.event.inputs.aws_vpc_id }}")
+          [[ -n "${{ github.event.inputs.aws_subnet_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_subnet_id="${{ github.event.inputs.aws_subnet_id }}")
+          [[ -n "${{ github.event.inputs.aws_kms_key_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_kms_key_id="${{ github.event.inputs.aws_kms_key_id }}")
+          [[ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_mirror_baseurl="${{ github.event.inputs.repo_mirror_baseurl }}")
+          
+          # Add boolean variables
+          [[ "${{ github.event.inputs.amigen_cross_distro }}" == "true" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_cross_distro=true)
+          [[ "${{ github.event.inputs.amigen_use_default_repos }}" == "false" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_use_default_repos=false)
+          [[ "${{ github.event.inputs.amigen_repo_nosignature }}" == "true" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_nosignature=true)
+          
+          # Add list variables only if non-empty (empty string causes Packer HCL parse error)
+          [[ -n "${{ github.event.inputs.amigen8_repo_names }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_repo_names=${{ github.event.inputs.amigen8_repo_names }}")
+          [[ -n "${{ github.event.inputs.amigen9_repo_names }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_repo_names=${{ github.event.inputs.amigen9_repo_names }}")
+          [[ -n "${{ github.event.inputs.amigen8_repo_sources }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_repo_sources=${{ github.event.inputs.amigen8_repo_sources }}")
+          [[ -n "${{ github.event.inputs.amigen9_repo_sources }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_repo_sources=${{ github.event.inputs.amigen9_repo_sources }}")
+          [[ -n "${{ github.event.inputs.amigen8_extra_rpms }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_extra_rpms=${{ github.event.inputs.amigen8_extra_rpms }}")
+          [[ -n "${{ github.event.inputs.amigen9_extra_rpms }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_extra_rpms=${{ github.event.inputs.amigen9_extra_rpms }}")
+          
           docker run --rm \
             -v "$(pwd):/workspace" \
-            -e AWS_ACCESS_KEY_ID \
-            -e AWS_SECRET_ACCESS_KEY \
-            -e AWS_SESSION_TOKEN \
-            -e AWS_DEFAULT_REGION=us-east-1 \
-            -e SPEL_IDENTIFIER="${SPEL_IDENTIFIER}" \
-            -e SPEL_VERSION="${SPEL_VERSION}" \
-            -e SPEL_BUILDERS="${SPEL_BUILDERS}" \
-            -e WINDOWS_BUILDERS="${WINDOWS_BUILDERS}" \
-            -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
-            -e PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister}" \
-            -e PKR_VAR_aws_ami_regions="${PKR_VAR_aws_ami_regions:-[\"${PKR_VAR_aws_region}\"]}" \
-            -e PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups}" \
-            -e PKR_VAR_aws_vpc_id="${{ github.event.inputs.aws_vpc_id }}" \
-            -e PKR_VAR_aws_subnet_id="${{ github.event.inputs.aws_subnet_id }}" \
-            -e PKR_VAR_aws_kms_key_id="${{ github.event.inputs.aws_kms_key_id }}" \
-            -e PKR_VAR_amigen_repo_mirror_baseurl="${{ github.event.inputs.repo_mirror_baseurl }}" \
-            -e PKR_VAR_amigen_cross_distro="${{ github.event.inputs.amigen_cross_distro }}" \
-            -e PKR_VAR_amigen_use_default_repos="${{ github.event.inputs.amigen_use_default_repos }}" \
-            -e PKR_VAR_amigen8_repo_names='${{ github.event.inputs.amigen8_repo_names }}' \
-            -e PKR_VAR_amigen9_repo_names='${{ github.event.inputs.amigen9_repo_names }}' \
-            -e PKR_VAR_amigen8_repo_sources='${{ github.event.inputs.amigen8_repo_sources }}' \
-            -e PKR_VAR_amigen9_repo_sources='${{ github.event.inputs.amigen9_repo_sources }}' \
-            -e PKR_VAR_amigen8_extra_rpms='${{ github.event.inputs.amigen8_extra_rpms }}' \
-            -e PKR_VAR_amigen9_extra_rpms='${{ github.event.inputs.amigen9_extra_rpms }}' \
-            -e PKR_VAR_amigen_repo_nosignature="${{ github.event.inputs.amigen_repo_nosignature }}" \
-            -e PACKER_LOG=1 \
-            -e CHECKPOINT_DISABLE=1 \
+            "${DOCKER_ENV_ARGS[@]}" \
             "spel-builder:${IMAGE_TAG}" \
             make -f Makefile.spel build
 
