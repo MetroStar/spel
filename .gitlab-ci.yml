@@ -666,37 +666,59 @@ infra:kms:
       echo ""
     
     # Run build in Docker container
+    # Build Docker environment arguments - list-type PKR_VAR variables must only be
+    # set when non-empty, otherwise Packer fails with "Missing expression" error
     - |
+      DOCKER_ENV_ARGS=(
+        -e "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}"
+        -e "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"
+        -e "AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}"
+        -e "AWS_DEFAULT_REGION=${PKR_VAR_aws_region}"
+        -e "SPEL_IDENTIFIER=${SPEL_IDENTIFIER}"
+        -e "SPEL_VERSION=${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
+        -e "SPEL_BUILDERS=${SPEL_BUILDERS:-}"
+        -e "WINDOWS_BUILDERS=${WINDOWS_BUILDERS:-}"
+        -e "PKR_VAR_aws_region=${PKR_VAR_aws_region}"
+        -e "PKR_VAR_aws_force_deregister=${PKR_VAR_aws_force_deregister:-true}"
+        -e "PKR_VAR_aws_ami_regions=${PKR_VAR_aws_ami_regions:-[\"${PKR_VAR_aws_region}\"]}"
+        -e "PKR_VAR_aws_ami_groups=${PKR_VAR_aws_ami_groups:-[\"all\"]}"
+        -e "PKR_VAR_aws_vpc_id=${PKR_VAR_aws_vpc_id:-}"
+        -e "PKR_VAR_aws_subnet_id=${PKR_VAR_aws_subnet_id:-}"
+        -e "PKR_VAR_iam_instance_profile=${PKR_VAR_iam_instance_profile:-}"
+        -e "PKR_VAR_amigen_repo_mirror_baseurl=${REPO_MIRROR_BASEURL:-}"
+        -e "PACKER_LOG=1"
+        -e "CHECKPOINT_DISABLE=1"
+      )
+      
+      # Add boolean variables only when non-default
+      [[ "${AMIGEN_CROSS_DISTRO:-false}" != "false" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen_cross_distro=${AMIGEN_CROSS_DISTRO}")
+      [[ "${AMIGEN_USE_DEFAULT_REPOS:-true}" != "true" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen_use_default_repos=${AMIGEN_USE_DEFAULT_REPOS}")
+      [[ "${AMIGEN_REPO_NOSIGNATURE:-false}" != "false" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen_repo_nosignature=${AMIGEN_REPO_NOSIGNATURE}")
+      
+      # Add list-type variables only when non-empty (empty strings cause Packer HCL parse errors)
+      [[ -n "${AMIGEN8_REPO_NAMES:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_repo_names=${AMIGEN8_REPO_NAMES}")
+      [[ -n "${AMIGEN9_REPO_NAMES:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_repo_names=${AMIGEN9_REPO_NAMES}")
+      [[ -n "${AMIGEN8_REPO_SOURCES:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_repo_sources=${AMIGEN8_REPO_SOURCES}")
+      [[ -n "${AMIGEN9_REPO_SOURCES:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_repo_sources=${AMIGEN9_REPO_SOURCES}")
+      [[ -n "${AMIGEN8_EXTRA_RPMS:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_extra_rpms=${AMIGEN8_EXTRA_RPMS}")
+      [[ -n "${AMIGEN9_EXTRA_RPMS:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_extra_rpms=${AMIGEN9_EXTRA_RPMS}")
+      
+      # Add KMS key if set
+      [[ -n "${PKR_VAR_aws_kms_key_id:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_aws_kms_key_id=${PKR_VAR_aws_kms_key_id}")
+      
       docker run --rm \
         -v "${CI_PROJECT_DIR}:/workspace" \
-        -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-        -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-        -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN:-}" \
-        -e AWS_DEFAULT_REGION="${PKR_VAR_aws_region}" \
-        -e SPEL_IDENTIFIER="${SPEL_IDENTIFIER}" \
-        -e SPEL_VERSION="${CI_COMMIT_TAG:-$(date +%Y.%m).1}" \
-        -e SPEL_BUILDERS="${SPEL_BUILDERS:-}" \
-        -e WINDOWS_BUILDERS="${WINDOWS_BUILDERS:-}" \
-        -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
-        -e PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister:-true}" \
-        -e PKR_VAR_aws_ami_regions="${PKR_VAR_aws_ami_regions:-[\"${PKR_VAR_aws_region}\"]}" \
-        -e PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups:-[\"all\"]}" \
-        -e PKR_VAR_aws_vpc_id="${PKR_VAR_aws_vpc_id:-}" \
-        -e PKR_VAR_aws_subnet_id="${PKR_VAR_aws_subnet_id:-}" \
-        -e PKR_VAR_iam_instance_profile="${PKR_VAR_iam_instance_profile:-}" \
-        -e PKR_VAR_amigen_repo_mirror_baseurl="${REPO_MIRROR_BASEURL:-}" \
-        -e PKR_VAR_amigen_cross_distro="${AMIGEN_CROSS_DISTRO:-false}" \
-        -e PKR_VAR_amigen_use_default_repos="${AMIGEN_USE_DEFAULT_REPOS:-true}" \
-        -e PKR_VAR_amigen8_repo_names="${AMIGEN8_REPO_NAMES:-}" \
-        -e PKR_VAR_amigen9_repo_names="${AMIGEN9_REPO_NAMES:-}" \
-        -e PKR_VAR_amigen8_repo_sources="${AMIGEN8_REPO_SOURCES:-}" \
-        -e PKR_VAR_amigen9_repo_sources="${AMIGEN9_REPO_SOURCES:-}" \
-        -e PKR_VAR_amigen8_extra_rpms="${AMIGEN8_EXTRA_RPMS:-}" \
-        -e PKR_VAR_amigen9_extra_rpms="${AMIGEN9_EXTRA_RPMS:-}" \
-        -e PKR_VAR_amigen_repo_nosignature="${AMIGEN_REPO_NOSIGNATURE:-false}" \
-        -e PKR_VAR_aws_kms_key_id="${PKR_VAR_aws_kms_key_id:-}" \
-        -e PACKER_LOG=1 \
-        -e CHECKPOINT_DISABLE=1 \
+        "${DOCKER_ENV_ARGS[@]}" \
         "spel-builder:${IMAGE_TAG}" \
         make -f Makefile.spel build
   artifacts:
