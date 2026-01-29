@@ -5,14 +5,25 @@
 # that contains all dependencies baked in.
 #
 # PREREQUISITES:
-#   - Run the "Prepare Offline Docker Image" workflow first (offline-prepare.yml)
-#   - Download the spel-builder-YYYYMMDD artifact from that workflow
-#   - Provide the artifact name when running this workflow
-#   - IAM role MaxSessionDuration must be >= 21600 (6 hours):
-#       aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
-#   - Public AMI quota must be increased if building multiple AMIs concurrently:
-#       aws service-quotas request-service-quota-increase \
-#         --service-code ec2 --quota-code L-0E3CBAB9 --desired-value 20 --region us-east-1
+#   1. Run the "Prepare Offline Docker Image" workflow first (offline-prepare.yml)
+#   2. Download the spel-builder-YYYYMMDD artifact from that workflow
+#   3. Provide the artifact name when running this workflow
+#   4. IAM role MaxSessionDuration must be >= 21600 (6 hours):
+#        aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
+#   5. Public AMI quota must be increased if building multiple AMIs concurrently:
+#        aws service-quotas request-service-quota-increase \
+#          --service-code ec2 --quota-code L-0E3CBAB9 --desired-value 20 --region us-east-1
+#
+# AIR-GAPPED BUILDS:
+#   For fully air-gapped GovCloud builds, configure the following inputs:
+#   - repo_mirror_baseurl: Internal YUM mirror URL
+#   - amigen_cross_distro: true (skip RHUI auto-detection)
+#   - amigen_use_default_repos: false (disable default repos)
+#   - amigen*_repo_names: Custom repository names
+#   - amigen*_repo_sources: RPMs that install repo config files
+#   - amigen*_extra_rpms: Extra RPMs (exclude RHUI packages)
+#   - aws_vpc_id/aws_subnet_id: Pre-configured VPC/subnet
+#   - aws_kms_key_id: CMK for EBS encryption
 #
 # WORKFLOW:
 #   1. Download Docker image artifact from offline-prepare.yml
@@ -69,6 +80,72 @@ on:
         required: false
         default: false
         type: boolean
+      # Air-gapped build configuration
+      repo_mirror_baseurl:
+        description: "Local YUM mirror URL for air-gapped builds (e.g., http://mirror.internal.mil)"
+        required: false
+        type: string
+        default: ""
+      amigen_cross_distro:
+        description: "Skip RHUI auto-detection (set true for air-gapped builds)"
+        required: false
+        type: boolean
+        default: false
+      amigen_use_default_repos:
+        description: "Use default RHUI repositories (set false for air-gapped builds)"
+        required: false
+        type: boolean
+        default: true
+      amigen8_repo_names:
+        description: "Custom repo names for EL8 (JSON array, e.g., [\"rhel-8-baseos\",\"rhel-8-appstream\"])"
+        required: false
+        type: string
+        default: ""
+      amigen9_repo_names:
+        description: "Custom repo names for EL9 (JSON array, e.g., [\"rhel-9-baseos\",\"rhel-9-appstream\"])"
+        required: false
+        type: string
+        default: ""
+      amigen8_repo_sources:
+        description: "Repo source RPMs for EL8 (JSON array of URLs)"
+        required: false
+        type: string
+        default: ""
+      amigen9_repo_sources:
+        description: "Repo source RPMs for EL9 (JSON array of URLs)"
+        required: false
+        type: string
+        default: ""
+      amigen8_extra_rpms:
+        description: "Extra RPMs for EL8 (JSON array, exclude RHUI packages)"
+        required: false
+        type: string
+        default: ""
+      amigen9_extra_rpms:
+        description: "Extra RPMs for EL9 (JSON array, exclude RHUI packages)"
+        required: false
+        type: string
+        default: ""
+      amigen_repo_nosignature:
+        description: "Skip RPM signature check for unsigned repos"
+        required: false
+        type: boolean
+        default: false
+      aws_vpc_id:
+        description: "VPC ID for Packer builds (required for air-gapped)"
+        required: false
+        type: string
+        default: ""
+      aws_subnet_id:
+        description: "Subnet ID for Packer builds (required for air-gapped)"
+        required: false
+        type: string
+        default: ""
+      aws_kms_key_id:
+        description: "KMS Key ARN for EBS encryption (optional)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   id-token: write
@@ -255,6 +332,19 @@ jobs:
             -e PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister}" \
             -e PKR_VAR_aws_ami_regions="${PKR_VAR_aws_ami_regions:-[\"${PKR_VAR_aws_region}\"]}" \
             -e PKR_VAR_aws_ami_groups="${PKR_VAR_aws_ami_groups}" \
+            -e PKR_VAR_aws_vpc_id="${{ github.event.inputs.aws_vpc_id }}" \
+            -e PKR_VAR_aws_subnet_id="${{ github.event.inputs.aws_subnet_id }}" \
+            -e PKR_VAR_aws_kms_key_id="${{ github.event.inputs.aws_kms_key_id }}" \
+            -e PKR_VAR_amigen_repo_mirror_baseurl="${{ github.event.inputs.repo_mirror_baseurl }}" \
+            -e PKR_VAR_amigen_cross_distro="${{ github.event.inputs.amigen_cross_distro }}" \
+            -e PKR_VAR_amigen_use_default_repos="${{ github.event.inputs.amigen_use_default_repos }}" \
+            -e PKR_VAR_amigen8_repo_names='${{ github.event.inputs.amigen8_repo_names }}' \
+            -e PKR_VAR_amigen9_repo_names='${{ github.event.inputs.amigen9_repo_names }}' \
+            -e PKR_VAR_amigen8_repo_sources='${{ github.event.inputs.amigen8_repo_sources }}' \
+            -e PKR_VAR_amigen9_repo_sources='${{ github.event.inputs.amigen9_repo_sources }}' \
+            -e PKR_VAR_amigen8_extra_rpms='${{ github.event.inputs.amigen8_extra_rpms }}' \
+            -e PKR_VAR_amigen9_extra_rpms='${{ github.event.inputs.amigen9_extra_rpms }}' \
+            -e PKR_VAR_amigen_repo_nosignature="${{ github.event.inputs.amigen_repo_nosignature }}" \
             -e PACKER_LOG=1 \
             -e CHECKPOINT_DISABLE=1 \
             "spel-builder:${IMAGE_TAG}" \
@@ -305,3 +395,33 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Artifact" >> $GITHUB_STEP_SUMMARY
           echo "Docker image artifact: \`${{ github.event.inputs.docker_image_artifact }}\`" >> $GITHUB_STEP_SUMMARY
+          
+          # Air-gapped configuration (if any configured)
+          if [ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ] || \
+             [ "${{ github.event.inputs.amigen_cross_distro }}" = "true" ] || \
+             [ -n "${{ github.event.inputs.aws_vpc_id }}" ]; then
+            cat >> $GITHUB_STEP_SUMMARY << 'AIRGAP'
+          
+          ### Air-Gapped Configuration
+          | Setting | Value |
+          |---------|-------|
+          AIRGAP
+            if [ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ]; then
+              echo "| Repo Mirror | \`${{ github.event.inputs.repo_mirror_baseurl }}\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ "${{ github.event.inputs.amigen_cross_distro }}" = "true" ]; then
+              echo "| Cross-Distro Mode | ✅ Enabled |" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ "${{ github.event.inputs.amigen_use_default_repos }}" = "false" ]; then
+              echo "| Default Repos | ❌ Disabled |" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ -n "${{ github.event.inputs.aws_vpc_id }}" ]; then
+              echo "| VPC ID | \`${{ github.event.inputs.aws_vpc_id }}\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ -n "${{ github.event.inputs.aws_subnet_id }}" ]; then
+              echo "| Subnet ID | \`${{ github.event.inputs.aws_subnet_id }}\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [ -n "${{ github.event.inputs.aws_kms_key_id }}" ]; then
+              echo "| KMS Key | \`${{ github.event.inputs.aws_kms_key_id }}\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
