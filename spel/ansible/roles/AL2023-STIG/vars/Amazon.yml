@@ -1,0 +1,31 @@
+# =============================================================================
+# AL2023-STIG: Amazon Linux 2023 Specific Variables
+# =============================================================================
+# This file contains OS-specific overrides for Amazon Linux 2023.
+# AL2023 is EL9-compatible, so most RHEL 9 settings apply directly.
+#
+# This file is loaded when ansible_distribution == 'Amazon'
+# =============================================================================
+
+# Amazon Linux 2023 uses these package names (same as RHEL 9)
+# No overrides needed for most packages
+
+# Firewall service name (AL2023 uses firewalld like RHEL 9)
+rhel9stig_firewall_service: firewalld
+
+# AIDE package name
+rhel9stig_aide_package: aide
+
+# OpenSCAP packages (for future use when DISA publishes AL2023 STIG)
+# rhel9stig_oscap_packages:
+#   - openscap-scanner
+#   - scap-security-guide
+
+# EC2-specific settings (AL2023 is always on EC2)
+system_is_ec2: true
+
+# Disable audit by default (no AL2023 STIG benchmark for oscap)
+run_audit: false
+
+# AL2023 uses amazon-linux-extras for some packages - not applicable to AL2023
+# (amazon-linux-extras was AL2, not AL2023)

@@ -890,8 +890,8 @@ build {
       "if [ -n \"$REPO_MIRROR_BASEURL\" ]; then",
       "  echo 'Configuring air-gapped repositories...'",
       "  ",
-      "  # Detect OS version",
-      "  OS_VERSION=$(rpm -E %{rhel})",
+      "  # Detect OS version (escape %% for Packer template)",
+      "  OS_VERSION=$(rpm -E %%{rhel})",
       "  ",
       "  # Disable Red Hat RHUI repositories",
       "  if ls /etc/yum.repos.d/redhat-rhui*.repo 1>/dev/null 2>&1; then",
@@ -903,15 +903,15 @@ build {
       "  ",
       "  # Create local mirror repo config",
       "  cat << EOF > /etc/yum.repos.d/rhel-local.repo",
-      "[rhel-${OS_VERSION}-baseos]",
-      "name=RHEL ${OS_VERSION} BaseOS (Local Mirror)",
-      "baseurl=${REPO_MIRROR_BASEURL}/rhel\${OS_VERSION}/baseos",
+      "[rhel-$${OS_VERSION}-baseos]",
+      "name=RHEL $${OS_VERSION} BaseOS (Local Mirror)",
+      "baseurl=$${REPO_MIRROR_BASEURL}/rhel$${OS_VERSION}/baseos",
       "enabled=1",
       "gpgcheck=0",
       "",
-      "[rhel-${OS_VERSION}-appstream]",
-      "name=RHEL ${OS_VERSION} AppStream (Local Mirror)",
-      "baseurl=${REPO_MIRROR_BASEURL}/rhel\${OS_VERSION}/appstream",
+      "[rhel-$${OS_VERSION}-appstream]",
+      "name=RHEL $${OS_VERSION} AppStream (Local Mirror)",
+      "baseurl=$${REPO_MIRROR_BASEURL}/rhel$${OS_VERSION}/appstream",
       "enabled=1",
       "gpgcheck=0",
       "EOF",
@@ -1003,12 +1003,33 @@ build {
     destination = "/tmp/ansible-collections"
   }
 
+  # =============================================================================
+  # Amazon Linux 2023 STIG Hardening
+  # =============================================================================
+  # Uses AWS STIG Script (officially maintained by AWS) as primary option.
+  # Falls back to AL2023-STIG Ansible role (RHEL9-STIG fork) if AWS script
+  # doesn't support AL2023.
+  #
+  # NOTE: OpenSCAP scan is SKIPPED for AL2023 because:
+  # - DISA has not published an official STIG benchmark for Amazon Linux 2023
+  # - ssg-al2023-ds.xml only contains CIS profiles, not STIG
+  # - Once DISA publishes AL2023 STIG, add OpenSCAP scan using that benchmark
+  # =============================================================================
+
   provisioner "file" {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
     ]
-    source      = "${path.root}/ansible/roles/AMAZON2023-CIS"
-    destination = "/tmp/AMAZON2023-CIS"
+    source      = "${path.root}/../offline-packages/LinuxAWSConfigureSTIG.tgz"
+    destination = "/tmp/LinuxAWSConfigureSTIG.tgz"
+  }
+
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-amzn-2023-hvm",
+    ]
+    source      = "${path.root}/ansible/roles/AL2023-STIG"
+    destination = "/tmp/AL2023-STIG"
   }
 
   provisioner "shell" {
@@ -1019,20 +1040,47 @@ build {
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
-      "echo 'Running Ansible Lockdown'",
-      "echo 'Ensuring Python 3.9 is available...'",
-      "if ! command -v python3.9 &>/dev/null; then yum install -y python3.9 python3.9-pip; fi",
-      "python3.9 --version",
-      "echo 'Checking for offline Python wheels...'",
-      "if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
-      "if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3.9 -m pip install --no-index --ignore-installed --no-warn-conflicts /tmp/python-deps/*.whl; else echo 'Installing Ansible from PyPI...'; python3.9 -m pip install ansible-core; fi",
-      "export PATH=/usr/local/bin:$PATH",
-      "echo 'Installing Ansible collections...'",
-      "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
-      "yum install -y aide rsyslog",
-      "mkdir -p $HOME/.ansible/roles",
-      "cp -r /tmp/AMAZON2023-CIS $HOME/.ansible/roles/",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/AMAZON2023-CIS/site.yml -e '{\"amzn2023cis_rule_4_6_6\": false, \"amzn2023cis_rule_3_4_1_1\": false, \"amzn2023cis_rule_3_4_1_2\": false, \"amzn2023cis_rule_3_4_2_1\": false, \"amzn2023cis_rule_3_4_2_2\": false, \"amzn2023cis_rule_3_4_2_3\": false, \"amzn2023cis_rule_3_4_2_4\": false, \"amzn2023cis_rule_3_4_2_5\": false, \"amzn2023cis_rule_3_4_2_6\": false, \"amzn2023cis_rule_3_4_2_7\": false}'",
+      "echo '=== Amazon Linux 2023 STIG Hardening ===' ",
+      "echo 'Using AWS STIG Script (officially maintained by AWS)...'",
+      "",
+      "# AWS STIG Script (supports AL2023 via linux_stigs/functions/amzn/al2023_stig.sh)",
+      "AWS_STIG_SUCCESS=false",
+      "if [ -f '/tmp/LinuxAWSConfigureSTIG.tgz' ]; then",
+      "  echo 'Extracting AWS STIG Script...'",
+      "  cd /tmp && tar xzf LinuxAWSConfigureSTIG.tgz",
+      "  if [ -d '/tmp/linux_stigs' ] && [ -f '/tmp/linux_stigs/main.sh' ]; then",
+      "    echo 'AWS STIG Script found, running STIG hardening...'",
+      "    chmod +x /tmp/linux_stigs/main.sh",
+      "    # Run with: -d <workdir> -l <level> -h yes (install packages) -s yes (legal banner)",
+      "    /tmp/linux_stigs/main.sh -d /tmp/linux_stigs/ -l High -h yes -s yes && AWS_STIG_SUCCESS=true",
+      "  else",
+      "    echo 'ERROR: AWS STIG Script not found in tarball'",
+      "    ls -la /tmp/linux_stigs/ 2>/dev/null || echo 'linux_stigs directory not found'",
+      "  fi",
+      "  rm -rf /tmp/linux_stigs /tmp/LinuxAWSConfigureSTIG.tgz",
+      "fi",
+      "",
+      "# Fallback to AL2023-STIG Ansible role (RHEL9-STIG fork) if AWS script fails",
+      "if [ \"$AWS_STIG_SUCCESS\" != 'true' ]; then",
+      "  echo 'AWS STIG failed, falling back to AL2023-STIG Ansible role...'",
+      "  echo 'Ensuring Python 3.9 is available...'",
+      "  if ! command -v python3.9 &>/dev/null; then yum install -y python3.9 python3.9-pip; fi",
+      "  python3.9 --version",
+      "  echo 'Checking for offline Python wheels...'",
+      "  if [ -d '/tmp/python-deps' ]; then echo '  /tmp/python-deps directory exists'; ls -lh /tmp/python-deps/ | head -5; else echo '  /tmp/python-deps directory NOT found'; fi",
+      "  if [ -d '/tmp/python-deps' ] && [ \"$(ls -A /tmp/python-deps 2>/dev/null)\" ]; then echo 'Installing Ansible from offline wheels...'; python3.9 -m pip install --no-index --ignore-installed --no-warn-conflicts /tmp/python-deps/*.whl; else echo 'Installing Ansible from PyPI...'; python3.9 -m pip install ansible-core; fi",
+      "  export PATH=/usr/local/bin:$PATH",
+      "  echo 'Installing Ansible collections...'",
+      "  if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
+      "  mkdir -p $HOME/.ansible/roles",
+      "  cp -r /tmp/AL2023-STIG $HOME/.ansible/roles/",
+      "  ansible-playbook -i localhost, -c local $HOME/.ansible/roles/AL2023-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false}'",
+      "fi",
+      "",
+      "# NOTE: OpenSCAP scan skipped - no official DISA STIG benchmark for AL2023",
+      "# Once DISA publishes AL2023 STIG, add: oscap xccdf eval --profile stig ...",
+      "echo 'STIG hardening complete. OpenSCAP scan skipped (no DISA AL2023 STIG benchmark).'",
+      "",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
       "rm -rf /var/lib/cloud/data",

@@ -1,0 +1,16 @@
+---
+# =============================================================================
+# AL2023-STIG: Amazon Linux 2023 STIG Hardening
+# =============================================================================
+# Fork of ansible-lockdown/RHEL9-STIG with patches for Amazon Linux 2023.
+# Uses RHEL 9 STIG controls as baseline (no DISA AL2023 STIG published).
+#
+# Usage:
+#   ansible-playbook -i localhost, -c local site.yml -e '{"system_is_ec2": true}'
+# =============================================================================
+
+- name: Apply AL2023 STIG hardening (based on RHEL9 STIG)
+  hosts: "{{ hosts | default('all') }}"
+  become: true
+  roles:
+    - role: "{{ playbook_dir }}"

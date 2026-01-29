@@ -198,6 +198,19 @@ RUN mkdir -p ${SPEL_OFFLINE_PACKAGES} \
     && du -sh ${SPEL_OFFLINE_PACKAGES}
 
 # =============================================================================
+# Copy AWS STIG Script for Amazon Linux 2023 (requires pre-download)
+# =============================================================================
+# The AWS STIG Script is not publicly accessible via HTTP - requires AWS CLI.
+# Pre-download before Docker build:
+#   aws s3 cp s3://aws-windows-downloads-us-east-1/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz \
+#     offline-packages/LinuxAWSConfigureSTIG.tgz
+#
+# If the file doesn't exist, the COPY will fail. For builds without AL2023,
+# create an empty placeholder: touch offline-packages/LinuxAWSConfigureSTIG.tgz
+# =============================================================================
+COPY offline-packages/LinuxAWSConfigureSTIG.tgz ${SPEL_OFFLINE_PACKAGES}/LinuxAWSConfigureSTIG.tgz
+
+# =============================================================================
 # Download Python wheels for EC2 offline Ansible installation
 # These wheels are uploaded to the EC2 instance and installed there
 # (for STIG playbooks that run locally on the EC2 instance)
