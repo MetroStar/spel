@@ -104,10 +104,6 @@ packer {
       version = ">= 1.1.1"
       source  = "github.com/hashicorp/virtualbox"
     }
-    windows-update = {
-      version = ">= 0.17.1"
-      source  = "github.com/rgl/windows-update"
-    }
   }
 }
 EOF

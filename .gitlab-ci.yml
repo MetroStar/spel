@@ -18,10 +18,7 @@
 #      - AWS_SESSION_TOKEN (optional, for OIDC/STS credentials)
 #      - DOCKER_IMAGE_PATH (path to spel-builder-*.tar.gz)
 #
-#   4. For Windows builds in air-gapped environments:
-#      - PKR_VAR_windows_update_server (WSUS URL, e.g., http://wsus.internal.mil:8530)
-#
-#   5. Public AMI quota must be increased if building multiple AMIs concurrently:
+#   4. Public AMI quota must be increased if building multiple AMIs concurrently:
 #        aws service-quotas request-service-quota-increase \
 #          --service-code ec2 --quota-code L-0E3CBAB9 --desired-value 20 \
 #          --region us-gov-east-1
@@ -33,7 +30,6 @@
 # =============================================================================
 
 variables:
-  SPEL_OFFLINE_MODE: "true"
   SPEL_IDENTIFIER: "spel"
   PKR_VAR_aws_region: "us-gov-east-1"
   PACKER_LOG: "1"
@@ -42,10 +38,6 @@ variables:
   INFRA_PREFIX: "spel-offline"
   # Docker image location (must be transferred to this path)
   DOCKER_IMAGE_PATH: "/transfer/spel-builder-*.tar.gz"
-  # Windows Update Server (WSUS) for air-gapped Windows builds
-  # Set this to your internal WSUS URL, e.g., http://wsus.internal.mil:8530
-  # Leave empty to use Microsoft Update (requires internet access)
-  PKR_VAR_windows_update_server: ""
   # Local yum repository mirror for air-gapped Linux builds
   # Set this to your internal mirror URL, e.g., http://mirror.internal.mil
   # Leave empty to use default RHUI/public repositories (requires internet access)
@@ -589,7 +581,6 @@ infra:iam:
         -e PKR_VAR_aws_vpc_id="${PKR_VAR_aws_vpc_id:-}" \
         -e PKR_VAR_aws_subnet_id="${PKR_VAR_aws_subnet_id:-}" \
         -e PKR_VAR_iam_instance_profile="${PKR_VAR_iam_instance_profile:-}" \
-        -e PKR_VAR_windows_update_server="${PKR_VAR_windows_update_server:-}" \
         -e PKR_VAR_amigen_repo_mirror_baseurl="${REPO_MIRROR_BASEURL:-}" \
         -e PKR_VAR_amigen_cross_distro="${AMIGEN_CROSS_DISTRO:-false}" \
         -e PKR_VAR_amigen_use_default_repos="${AMIGEN_USE_DEFAULT_REPOS:-true}" \
