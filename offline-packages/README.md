@@ -3,23 +3,7 @@
 > **Note**: This directory contains ONLY AWS-specific utilities (AWS CLI, SSM Agent, CFN Bootstrap).  
 > YUM/DNF repository mirrors are NOT synced for Offline - the Offline environment has its own RPM repositories available.
 
-## Quick Download (Optimized)
-
-Use the automated download script:
-
-```bash
-# Download all packages with compression and version tracking
-./scripts/download-offline-packages.sh
-
-# This creates:
-# - offline-packages/awscli-exe-linux-x86_64.zip
-# - offline-packages/aws-cfn-bootstrap-py3-latest.tar.gz
-# - offline-packages/amazon-ssm-agent.rpm (single version for EL8/EL9)
-# - offline-packages/VERSIONS.txt (version tracking)
-# - offline-packages.tar.gz (compressed archive)
-```
-
-## Manual Download
+## Downloads
 
 If you prefer to download manually:
 
