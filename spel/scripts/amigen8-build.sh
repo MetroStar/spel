@@ -847,23 +847,7 @@ err_exit "Patching OSpackages.sh to add --nogpgcheck to yum commands..." NONE
 sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}"/yum --nogpgcheck --disablerepo="*" --enablerepo="${OSREPOS}"/g' "${ELBUILD}/OSpackages.sh" || \
     err_exit "Failed patching yum commands"
 
-# Patch OSpackages.sh to disable SSL verification for yum repos in the chroot
-# This is needed because the chroot doesn't have the internal CA certificates
-# The patch injects code after repo RPMs are installed to add sslverify=0 to all repo files
-err_exit "Patching OSpackages.sh to disable SSL verification for yum repos..." NONE
-sed -i '/rpm --force --root "${CHROOTMNT}" -ivh/a\
-\
-    # Disable SSL verification for air-gapped HTTPS mirrors\
-    err_exit "Adding sslverify=0 to repo files in chroot..." NONE\
-    for REPOFILE in "${CHROOTMNT}"/etc/yum.repos.d/*.repo; do\
-        if [[ -f "${REPOFILE}" ]]; then\
-            sed -i "/^\\[/a sslverify=0" "${REPOFILE}"\
-        fi\
-    done' "${ELBUILD}/OSpackages.sh" || \
-    err_exit "Failed patching SSL verification"
 
-# Debug: Show the patched yum commands to verify sed worked
-err_exit "DEBUG: Verifying OSpackages.sh patches applied..." NONE
 grep -n "curl.*insecure" "${ELBUILD}/OSpackages.sh" || true
 grep -n "yum.*nogpgcheck.*disablerepo" "${ELBUILD}/OSpackages.sh" || true
 
