@@ -189,22 +189,16 @@ RUN mkdir -p ${SPEL_OFFLINE_PACKAGES} \
     && curl -fsSL -o amazon-ssm-agent.rpm \
         "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm" \
     && echo "Downloaded SSM Agent" \
+    # AWS STIG Script for Amazon Linux 2023 (HTTPS equivalent of S3 bucket)
+    && curl -fsSL -o LinuxAWSConfigureSTIG.tgz \
+        "https://aws-windows-downloads-us-east-1.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz" \
+    && echo "Downloaded AWS STIG Script" \
+    # Verify AWS STIG tarball integrity
+    && gzip -t LinuxAWSConfigureSTIG.tgz \
+    && echo "AWS STIG tarball integrity verified" \
     && echo "Offline packages:" \
     && ls -lh ${SPEL_OFFLINE_PACKAGES} \
     && du -sh ${SPEL_OFFLINE_PACKAGES}
-
-# =============================================================================
-# Copy AWS STIG Script for Amazon Linux 2023 (requires pre-download)
-# =============================================================================
-# The AWS STIG Script is not publicly accessible via HTTP - requires AWS CLI.
-# Pre-download before Docker build:
-#   aws s3 cp s3://aws-windows-downloads-us-east-1/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz \
-#     offline-packages/LinuxAWSConfigureSTIG.tgz
-#
-# If the file doesn't exist, the COPY will fail. For builds without AL2023,
-# create an empty placeholder: touch offline-packages/LinuxAWSConfigureSTIG.tgz
-# =============================================================================
-COPY offline-packages/LinuxAWSConfigureSTIG.tgz ${SPEL_OFFLINE_PACKAGES}/LinuxAWSConfigureSTIG.tgz
 
 # =============================================================================
 # Download Python wheels for EC2 offline Ansible installation
