@@ -16,6 +16,12 @@ rhel9stig_firewall_service: firewalld
 # AIDE package name
 rhel9stig_aide_package: aide
 
+# GPG key package - AL2023 doesn't have a separate gpg-keys package
+# The keys are bundled in system-release, so we skip updating by using
+# an empty/dummy value that the prelim task will handle
+# Set to system-release which is always installed and contains the keys
+gpg_key_package: system-release
+
 # OpenSCAP packages (for future use when DISA publishes AL2023 STIG)
 # rhel9stig_oscap_packages:
 #   - openscap-scanner
