@@ -157,9 +157,6 @@ RUN mkdir -p ${ANSIBLE_ROLES_PATH} \
     # RHEL 9 STIG
     && git clone --depth 1 https://github.com/ansible-lockdown/RHEL9-STIG.git \
     && rm -rf RHEL9-STIG/.git \
-    # Amazon Linux 2023 CIS
-    && git clone --depth 1 https://github.com/ansible-lockdown/AMAZON2023-CIS.git \
-    && rm -rf AMAZON2023-CIS/.git \
     # Windows Server STIG roles
     && git clone --depth 1 https://github.com/ansible-lockdown/Windows-2016-STIG.git \
     && rm -rf Windows-2016-STIG/.git \
