@@ -1117,7 +1117,7 @@ build {
       "  if ls /etc/yum.repos.d/redhat-rhui*.repo 1>/dev/null 2>&1; then",
       "    echo 'Disabling RHUI repositories...'",
       "    for repo in /etc/yum.repos.d/redhat-rhui*.repo; do",
-      "      mv \"$repo\" \"${repo}.disabled\"",
+      "      mv \"$$repo\" \"$${repo}.disabled\"",
       "    done",
       "  fi",
       "  ",
