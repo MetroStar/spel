@@ -137,7 +137,7 @@ on:
         type: boolean
         default: false
       amigen_stig_script_source:
-        description: "AWS STIG Script source URL (HTTPS or S3 URI for GovCloud/air-gapped)"
+        description: "AWS STIG Script source: 'auto' (default, detects region), HTTPS URL, S3 URI, or empty (skip)"
         required: false
         type: string
         default: ""

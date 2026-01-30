@@ -335,9 +335,9 @@ variable "amigen_grub_timeout" {
 }
 
 variable "amigen_stig_script_source" {
-  description = "Source for AWS STIG Script tarball. Supports HTTPS URL or S3 URI. For GovCloud/air-gapped, use S3 URI pointing to your mirrored copy (e.g., s3://my-bucket/LinuxAWSConfigureSTIG.tgz). Leave empty to skip AWS STIG Script download."
+  description = "Source for AWS STIG Script tarball. Use 'auto' (default) to auto-detect region from EC2 IMDS and construct S3 URL. Use full HTTPS URL or S3 URI for custom sources. Leave empty to skip download."
   type        = string
-  default     = "https://aws-windows-downloads-us-east-1.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz"
+  default     = "auto"
 }
 
 variable "amigen_use_default_repos" {
@@ -994,7 +994,7 @@ build {
   # =============================================================================
 
   # Download AWS STIG Script directly to EC2 instance
-  # Supports HTTPS URLs (public) or S3 URIs (for GovCloud/air-gapped mirrors)
+  # Supports: 'auto' (detect region from IMDS), HTTPS URL, S3 URI, or empty (skip)
   provisioner "shell" {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
@@ -1004,9 +1004,45 @@ build {
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
+      "# Skip if empty",
       "if [ -z \"$STIG_SCRIPT_SOURCE\" ]; then",
       "  echo 'STIG_SCRIPT_SOURCE not set, skipping AWS STIG Script download'",
       "  exit 0",
+      "fi",
+      "",
+      "# Auto-detect region and construct S3 URL",
+      "if [ \"$STIG_SCRIPT_SOURCE\" = 'auto' ]; then",
+      "  echo 'Auto-detecting region from EC2 IMDS...'",
+      "  ",
+      "  # Get IMDS token (IMDSv2)",
+      "  TOKEN=$(curl -sX PUT 'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null) || true",
+      "  ",
+      "  # Get region from IMDS",
+      "  if [ -n \"$TOKEN\" ]; then",
+      "    REGION=$(curl -sH \"X-aws-ec2-metadata-token: $TOKEN\" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)",
+      "  else",
+      "    # Fallback to IMDSv1",
+      "    REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)",
+      "  fi",
+      "  ",
+      "  if [ -z \"$REGION\" ]; then",
+      "    echo 'ERROR: Could not detect region from IMDS'",
+      "    exit 1",
+      "  fi",
+      "  ",
+      "  echo \"Detected region: $REGION\"",
+      "  ",
+      "  # Construct S3 URL based on partition",
+      "  # Commercial: aws-windows-downloads-{region}.s3.amazonaws.com",
+      "  # GovCloud: aws-windows-downloads-{region}.s3.{region}.amazonaws.com (or s3-us-gov-west-1)",
+      "  if [[ \"$REGION\" =~ ^us-gov- ]]; then",
+      "    S3_URL=\"https://aws-windows-downloads-${REGION}.s3.${REGION}.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz\"",
+      "  else",
+      "    S3_URL=\"https://aws-windows-downloads-${REGION}.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz\"",
+      "  fi",
+      "  ",
+      "  echo \"Constructed S3 URL: $S3_URL\"",
+      "  STIG_SCRIPT_SOURCE=\"$S3_URL\"",
       "fi",
       "",
       "echo \"Downloading AWS STIG Script from: $STIG_SCRIPT_SOURCE\"",
@@ -1019,7 +1055,7 @@ build {
       "  echo 'Using curl for HTTPS download...'",
       "  curl -fsSL -o /tmp/LinuxAWSConfigureSTIG.tgz \"$STIG_SCRIPT_SOURCE\"",
       "else",
-      "  echo \"ERROR: Unsupported source type. Must be https:// or s3:// URL\"",
+      "  echo \"ERROR: Unsupported source type. Must be 'auto', https://, or s3:// URL\"",
       "  exit 1",
       "fi",
       "",

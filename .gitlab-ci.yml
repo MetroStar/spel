@@ -75,8 +75,8 @@ variables:
   # Set to "true" when using internal mirrors with self-signed certificates
   AMIGEN_SSLVERIFY_DISABLE: "false"
   # AWS STIG Script source (for AL2023 hardening)
-  # Default: https://aws-windows-downloads-us-east-1.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz
-  # For GovCloud/air-gapped: use S3 URI pointing to your mirrored copy (e.g., s3://my-bucket/LinuxAWSConfigureSTIG.tgz)
+  # Default 'auto': auto-detects region from EC2 IMDS and constructs S3 URL
+  # For custom mirrors: use full HTTPS URL or S3 URI (e.g., s3://my-bucket/LinuxAWSConfigureSTIG.tgz)
   # Leave empty to skip AWS STIG Script download
   AMIGEN_STIG_SCRIPT_SOURCE: ""
   # Customer Managed Key (CMK) for EBS volume encryption
