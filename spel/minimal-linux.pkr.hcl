@@ -502,6 +502,12 @@ variable "amigen_repo_nosignature" {
   default     = false
 }
 
+variable "amigen_sslverify_disable" {
+  description = "Disable SSL certificate verification for yum/dnf. Required for air-gapped environments using internal mirrors with self-signed certificates."
+  type        = bool
+  default     = false
+}
+
 ###
 # Variables used by amigen8
 ###
@@ -1278,6 +1284,7 @@ build {
       "SPEL_AMIGENCHROOT=/mnt/ec2-root",
       "SPEL_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
       "SPEL_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
+      "SPEL_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
       "SPEL_AMIGENMANFST=${var.amigen8_package_manifest}",
       "SPEL_AMIGENPKGGRP=${local.amigen8_package_groups}",
       "SPEL_AMIGENREPOS=${local.amigen8_repo_names}",
@@ -1318,6 +1325,7 @@ build {
       "SPEL_AMIGENCHROOT=/mnt/ec2-root",
       "SPEL_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
       "SPEL_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
+      "SPEL_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
       "SPEL_AMIGENMANFST=${var.amigen9_package_manifest}",
       "SPEL_AMIGENMANFSTAL2023=${var.amigen9_package_manifest_al2023}",
       "SPEL_AMIGENPKGGRP=${local.amigen9_package_groups}",

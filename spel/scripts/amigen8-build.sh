@@ -37,6 +37,7 @@ GRUBTMOUT="${SPEL_GRUBTMOUT:-5}"
 HTTP_PROXY="${SPEL_HTTP_PROXY}"
 USEDEFAULTREPOS="${SPEL_USEDEFAULTREPOS:-true}"
 USEROOTDEVICE="${SPEL_USEROOTDEVICE:-true}"
+AMIGENSSLVERIFY="${SPEL_AMIGENSSLVERIFY:-true}"
 
 
 read -r -a BUILDDEPS <<< "${SPEL_BUILDDEPS:-lvm2 yum-utils unzip git}"
@@ -52,6 +53,8 @@ echo "AMIGENNOSIGNATURE=${AMIGENNOSIGNATURE}"
 echo "SPEL_USEDEFAULTREPOS=${SPEL_USEDEFAULTREPOS:-not set}"
 echo "SPEL_AMIGENREPOSRC=${SPEL_AMIGENREPOSRC:-not set}"
 echo "SPEL_AMIGENREPOS=${SPEL_AMIGENREPOS:-not set}"
+echo "SPEL_AMIGENSSLVERIFY=${SPEL_AMIGENSSLVERIFY:-not set}"
+echo "AMIGENSSLVERIFY=${AMIGENSSLVERIFY}"
 echo "======================================="
 
 # Make interactive-execution more-verbose unless explicitly told not to
@@ -219,6 +222,31 @@ function BuildChroot {
     # Invoke chroot-env disk-mounter
     bash -euxo pipefail "${ELBUILD}"/$( ComposeChrootMountString ) || \
         err_exit "Failure encountered with MkChrootTree.sh"
+
+    # Disable SSL verification in chroot for air-gapped builds with self-signed certs
+    if [[ "${AMIGENSSLVERIFY}" == "false" ]]
+    then
+        echo "Disabling SSL verification in chroot for air-gapped builds..."
+        # Configure yum.conf/dnf.conf in chroot
+        for CONFFILE in "${AMIGENCHROOT}/etc/yum.conf" "${AMIGENCHROOT}/etc/dnf/dnf.conf"
+        do
+            if [[ -f "${CONFFILE}" ]] && ! grep -q "^sslverify" "${CONFFILE}"
+            then
+                echo "sslverify=0" >> "${CONFFILE}"
+                echo "Added sslverify=0 to ${CONFFILE}"
+            fi
+        done
+        # Also set for any repo files that might exist
+        for REPOFILE in "${AMIGENCHROOT}"/etc/yum.repos.d/*.repo
+        do
+            if [[ -f "${REPOFILE}" ]] && ! grep -q "^sslverify" "${REPOFILE}"
+            then
+                # Add sslverify=0 after each [reponame] section
+                sed -i '/^\[.*\]$/a sslverify=0' "${REPOFILE}"
+                echo "Added sslverify=0 to ${REPOFILE}"
+            fi
+        done
+    fi
 
     # Bind-mount offline-packages into chroot for offline/air-gapped builds
     if [[ -d /tmp/offline-packages ]]

@@ -131,6 +131,11 @@ on:
         required: false
         type: boolean
         default: false
+      amigen_sslverify_disable:
+        description: "Disable SSL verification for yum/dnf (air-gapped with self-signed certs)"
+        required: false
+        type: boolean
+        default: false
       aws_vpc_id:
         description: "VPC ID for Packer builds (required for air-gapped)"
         required: false
@@ -347,6 +352,7 @@ jobs:
           [[ "${{ github.event.inputs.amigen_cross_distro }}" == "true" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_cross_distro=true)
           [[ "${{ github.event.inputs.amigen_use_default_repos }}" == "false" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_use_default_repos=false)
           [[ "${{ github.event.inputs.amigen_repo_nosignature }}" == "true" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_nosignature=true)
+          [[ "${{ github.event.inputs.amigen_sslverify_disable }}" == "true" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_sslverify_disable=true)
           
           # Add list variables only if non-empty (empty string causes Packer HCL parse error)
           [[ -n "${{ github.event.inputs.amigen8_repo_names }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_repo_names=${{ github.event.inputs.amigen8_repo_names }}")
