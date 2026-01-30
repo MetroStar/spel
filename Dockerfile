@@ -189,13 +189,8 @@ RUN mkdir -p ${SPEL_OFFLINE_PACKAGES} \
     && curl -fsSL -o amazon-ssm-agent.rpm \
         "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm" \
     && echo "Downloaded SSM Agent" \
-    # AWS STIG Script for Amazon Linux 2023 (HTTPS equivalent of S3 bucket)
-    && curl -fsSL -o LinuxAWSConfigureSTIG.tgz \
-        "https://aws-windows-downloads-us-east-1.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz" \
-    && echo "Downloaded AWS STIG Script" \
-    # Verify AWS STIG tarball integrity
-    && gzip -t LinuxAWSConfigureSTIG.tgz \
-    && echo "AWS STIG tarball integrity verified" \
+    # NOTE: AWS STIG Script is downloaded directly to EC2 during hardened build
+    # via amigen_stig_script_source variable (supports HTTPS or S3 for GovCloud)
     && echo "Offline packages:" \
     && ls -lh ${SPEL_OFFLINE_PACKAGES} \
     && du -sh ${SPEL_OFFLINE_PACKAGES}

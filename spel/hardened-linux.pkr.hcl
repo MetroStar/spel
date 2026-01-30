@@ -334,6 +334,12 @@ variable "amigen_grub_timeout" {
   default     = 1
 }
 
+variable "amigen_stig_script_source" {
+  description = "Source for AWS STIG Script tarball. Supports HTTPS URL or S3 URI. For GovCloud/air-gapped, use S3 URI pointing to your mirrored copy (e.g., s3://my-bucket/LinuxAWSConfigureSTIG.tgz). Leave empty to skip AWS STIG Script download."
+  type        = string
+  default     = "https://aws-windows-downloads-us-east-1.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz"
+}
+
 variable "amigen_use_default_repos" {
   description = "Modifies the behavior of `amigen_repo_names`. When true, `amigen_repo_names` are appended to the enabled repos. When false, `amigen_repo_names` are used exclusively"
   type        = bool
@@ -987,15 +993,36 @@ build {
   # - Once DISA publishes AL2023 STIG, add OpenSCAP scan using that benchmark
   # =============================================================================
 
-  # Download AWS STIG Script directly to EC2 instance (avoids local file corruption issues)
+  # Download AWS STIG Script directly to EC2 instance
+  # Supports HTTPS URLs (public) or S3 URIs (for GovCloud/air-gapped mirrors)
   provisioner "shell" {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
     ]
+    environment_vars = [
+      "STIG_SCRIPT_SOURCE=${var.amigen_stig_script_source}",
+    ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
-      "echo 'Downloading AWS STIG Script from S3...'",
-      "curl -fsSL -o /tmp/LinuxAWSConfigureSTIG.tgz 'https://aws-windows-downloads-us-east-1.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz'",
+      "if [ -z \"$STIG_SCRIPT_SOURCE\" ]; then",
+      "  echo 'STIG_SCRIPT_SOURCE not set, skipping AWS STIG Script download'",
+      "  exit 0",
+      "fi",
+      "",
+      "echo \"Downloading AWS STIG Script from: $STIG_SCRIPT_SOURCE\"",
+      "",
+      "# Detect source type and download accordingly",
+      "if [[ \"$STIG_SCRIPT_SOURCE\" =~ ^s3:// ]]; then",
+      "  echo 'Using AWS CLI for S3 download...'",
+      "  aws s3 cp \"$STIG_SCRIPT_SOURCE\" /tmp/LinuxAWSConfigureSTIG.tgz",
+      "elif [[ \"$STIG_SCRIPT_SOURCE\" =~ ^https?:// ]]; then",
+      "  echo 'Using curl for HTTPS download...'",
+      "  curl -fsSL -o /tmp/LinuxAWSConfigureSTIG.tgz \"$STIG_SCRIPT_SOURCE\"",
+      "else",
+      "  echo \"ERROR: Unsupported source type. Must be https:// or s3:// URL\"",
+      "  exit 1",
+      "fi",
+      "",
       "echo 'Download complete. Size:' $(stat -c%s /tmp/LinuxAWSConfigureSTIG.tgz) 'bytes'",
     ]
   }
