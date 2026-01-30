@@ -987,46 +987,27 @@ build {
   # - Once DISA publishes AL2023 STIG, add OpenSCAP scan using that benchmark
   # =============================================================================
 
-  # Download AWS STIG Script directly to EC2 instance
-  # Auto-detects region from IMDS and constructs the correct S3 URL
+  # Upload base64-encoded AWS STIG Script from Docker container
+  # The tarball is baked into the Docker image and base64-encoded for reliable transfer
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-amzn-2023-hvm",
+    ]
+    source      = "/opt/offline-packages/LinuxAWSConfigureSTIG.tgz.b64"
+    destination = "/tmp/LinuxAWSConfigureSTIG.tgz.b64"
+  }
+
+  # Decode the base64-encoded AWS STIG Script
   provisioner "shell" {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     inline = [
-      "echo 'Downloading AWS STIG Script (auto-detecting region)...'",
-      "",
-      "# Get IMDS token (IMDSv2)",
-      "TOKEN=$(curl -sX PUT 'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null) || true",
-      "",
-      "# Get region from IMDS",
-      "if [ -n \"$TOKEN\" ]; then",
-      "  REGION=$(curl -sH \"X-aws-ec2-metadata-token: $TOKEN\" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)",
-      "else",
-      "  # Fallback to IMDSv1",
-      "  REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)",
-      "fi",
-      "",
-      "if [ -z \"$REGION\" ]; then",
-      "  echo 'ERROR: Could not detect region from IMDS'",
-      "  exit 1",
-      "fi",
-      "",
-      "echo \"Detected region: $REGION\"",
-      "",
-      "# Construct S3 URL based on partition",
-      "# Commercial: aws-windows-downloads-{region}.s3.amazonaws.com",
-      "# GovCloud: aws-windows-downloads-{region}.s3.{region}.amazonaws.com",
-      "if [[ \"$REGION\" =~ ^us-gov- ]]; then",
-      "  S3_URL=\"https://aws-windows-downloads-$${REGION}.s3.$${REGION}.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz\"",
-      "else",
-      "  S3_URL=\"https://aws-windows-downloads-$${REGION}.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz\"",
-      "fi",
-      "",
-      "echo \"Downloading from: $S3_URL\"",
-      "curl -fsSL -o /tmp/LinuxAWSConfigureSTIG.tgz \"$S3_URL\"",
-      "echo 'Download complete. Size:' $(stat -c%s /tmp/LinuxAWSConfigureSTIG.tgz) 'bytes'",
+      "echo 'Decoding AWS STIG Script...'",
+      "base64 -d /tmp/LinuxAWSConfigureSTIG.tgz.b64 > /tmp/LinuxAWSConfigureSTIG.tgz",
+      "rm /tmp/LinuxAWSConfigureSTIG.tgz.b64",
+      "echo 'Decoded successfully. Size:' $(stat -c%s /tmp/LinuxAWSConfigureSTIG.tgz) 'bytes'",
     ]
   }
 
