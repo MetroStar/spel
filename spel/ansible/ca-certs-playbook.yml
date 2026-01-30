@@ -37,12 +37,14 @@
     
     - name: Copy certificates to Windows
       win_copy:
-        src: "{{ item }}"
+        src: ca-certs/
         dest: C:\temp\ca_certs\
-      with_fileglob:
-        - ca-certs/*.cer
-        - ca-certs/*.crt
-        - ca-certs/*.pem
+      when: ansible_os_family == "Windows"
+    
+    # Reset WinRM connection to avoid Windows Server 2016 WinRM stability issues
+    # after copying many files
+    - name: Reset WinRM connection
+      meta: reset_connection
       when: ansible_os_family == "Windows"
     
     - name: Import certificates to Windows trust store
