@@ -1,5 +1,5 @@
 # Dockerfile for SPEL build environment
-# Base: Rocky Linux 8 UBI Micro (minimal image)
+# Base: Rocky Linux 9 Iron Bank (hardened, minimal image)
 # Uses multi-stage build to keep final image small (~305 MB compressed)
 #
 # Build:
@@ -21,7 +21,7 @@
 # =============================================================================
 # Stage 1: Builder - Install all dependencies
 # =============================================================================
-FROM rockylinux/rockylinux:8 AS builder
+FROM registry1.dso.mil/ironbank/opensource/rockylinux/rockylinux9:9.7 AS builder
 
 # Build arguments
 ARG PACKER_VERSION=1.11.2
@@ -49,16 +49,15 @@ RUN dnf install -y \
         findutils \
         which \
         jq \
-        python39 \
-        python39-pip \
+        python3 \
+        python3-pip \
         openssh-clients \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
-# Set Python 3.9 as default
-RUN alternatives --set python3 /usr/bin/python3.9 \
-    && ln -sf /usr/bin/python3.9 /usr/bin/python \
-    && python3.9 -m pip install --upgrade pip setuptools wheel
+# Set Python 3 as default (EL9 has python3.9 as system python)
+RUN ln -sf /usr/bin/python3 /usr/bin/python \
+    && python3 -m pip install --upgrade pip setuptools wheel
 
 # =============================================================================
 # Install Packer
@@ -119,7 +118,7 @@ RUN echo "=== Installing Packer plugins ===" \
 # Install Ansible and Python dependencies
 # =============================================================================
 RUN echo "=== Installing Ansible and dependencies ===" \
-    && python3.9 -m pip install --no-cache-dir \
+    && python3 -m pip install --no-cache-dir \
         "ansible-core${ANSIBLE_VERSION}" \
         pywinrm \
         requests \
@@ -210,7 +209,7 @@ RUN mkdir -p ${SPEL_OFFLINE_PACKAGES} \
 ENV PYTHON_DEPS_PATH=/opt/python-deps
 RUN mkdir -p ${PYTHON_DEPS_PATH} \
     && echo "=== Downloading Python wheels for EC2 offline installation ===" \
-    && python3.9 -m pip download \
+    && python3 -m pip download \
         --dest ${PYTHON_DEPS_PATH} \
         --platform manylinux2014_x86_64 \
         --python-version 3.9 \
@@ -465,9 +464,9 @@ EOF
 RUN chmod +x /opt/entrypoint.sh
 
 # =============================================================================
-# Stage 2: Final image - Rocky Linux 8 UBI Micro
+# Stage 2: Final image - Rocky Linux 9 Iron Bank (minimal)
 # =============================================================================
-FROM rockylinux/rockylinux:8-ubi-micro
+FROM registry1.dso.mil/ironbank/opensource/rockylinux/rockylinux9-minimal:9.7-minimal
 
 # Environment variables
 ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
@@ -492,7 +491,7 @@ COPY --from=builder /opt/aws-cli /opt/aws-cli
 COPY --from=builder /opt/packer/plugins /opt/packer/plugins
 
 # Copy Python 3.9 installation and site-packages
-COPY --from=builder /usr/bin/python3.9 /usr/bin/python3.9
+COPY --from=builder /usr/bin/python3 /usr/bin/python3
 COPY --from=builder /usr/lib64/python3.9 /usr/lib64/python3.9
 COPY --from=builder /usr/lib/python3.9 /usr/lib/python3.9
 COPY --from=builder /usr/local/lib/python3.9 /usr/local/lib/python3.9
@@ -592,8 +591,7 @@ COPY --from=builder /etc/pki/ca-trust /etc/pki/ca-trust
 COPY --from=builder /etc/ssl/certs /etc/ssl/certs
 
 # Create symlinks
-RUN ln -sf /usr/bin/python3.9 /usr/bin/python3 \
-    && ln -sf /usr/bin/python3.9 /usr/bin/python \
+RUN ln -sf /usr/bin/python3 /usr/bin/python \
     && ln -sf /opt/aws-cli/v2/current/bin/aws /usr/local/bin/aws \
     && ln -sf /opt/aws-cli/v2/current/bin/aws_completer /usr/local/bin/aws_completer
 

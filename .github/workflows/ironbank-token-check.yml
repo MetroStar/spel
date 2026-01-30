@@ -1,0 +1,106 @@
+# =============================================================================
+# Iron Bank Token Validity Check
+# =============================================================================
+# Monthly scheduled workflow to verify Iron Bank credentials are still valid.
+# Alerts on failure to provide early warning before token expiration.
+#
+# Iron Bank CLI tokens expire every 6 months. This workflow runs monthly to
+# ensure tokens are renewed before expiration.
+#
+# RENEWAL PROCESS:
+#   1. Navigate to https://registry1.dso.mil
+#   2. Log in with your CAC or credentials
+#   3. Go to User Profile → CLI Token → Regenerate
+#   4. Update the IRONBANK_PASSWORD secret in GitHub repository settings
+#
+# SECRETS REQUIRED:
+#   - IRONBANK_USERNAME: Robot account username
+#   - IRONBANK_PASSWORD: CLI token
+# =============================================================================
+
+name: Iron Bank Token Check
+
+on:
+  schedule:
+    # Run at 9 AM UTC on the 1st of each month
+    - cron: '0 9 1 * *'
+  workflow_dispatch:
+    # Manual trigger for testing
+
+permissions:
+  contents: read
+
+jobs:
+  check-token:
+    name: Verify Iron Bank Credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Login to Iron Bank
+        id: login
+        uses: docker/login-action@v3
+        with:
+          registry: registry1.dso.mil
+          username: ${{ secrets.IRONBANK_USERNAME }}
+          password: ${{ secrets.IRONBANK_PASSWORD }}
+
+      - name: Verify token by pulling image manifest
+        run: |
+          echo "=== Verifying Iron Bank Token ==="
+          
+          # Pull just the manifest (not the full image) to verify token works
+          # This is faster and uses less bandwidth than pulling the full image
+          docker manifest inspect registry1.dso.mil/ironbank/opensource/rockylinux/rockylinux9-minimal:9.7-minimal > /dev/null
+          
+          echo "✓ Iron Bank token is valid"
+          echo "✓ Successfully authenticated to registry1.dso.mil"
+
+      - name: Token status summary
+        if: success()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ✅ Iron Bank Token Check Passed
+          
+          | Property | Status |
+          |----------|--------|
+          | Registry | registry1.dso.mil |
+          | Authentication | Success |
+          | Token Valid | Yes |
+          | Check Date | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
+          
+          ### Next Steps
+          - Token appears to be valid
+          - Next scheduled check: 1st of next month
+          - Tokens expire every 6 months - plan renewal accordingly
+          EOF
+
+      - name: Token failure alert
+        if: failure()
+        run: |
+          echo "::error::Iron Bank token may be expired or invalid!"
+          echo ""
+          echo "=== RENEWAL INSTRUCTIONS ==="
+          echo "1. Navigate to https://registry1.dso.mil"
+          echo "2. Log in with your CAC or credentials"
+          echo "3. Go to User Profile → CLI Token → Regenerate"
+          echo "4. Update the IRONBANK_PASSWORD secret in GitHub repository settings:"
+          echo "   Settings → Secrets and variables → Actions → IRONBANK_PASSWORD → Update"
+          echo ""
+          
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ❌ Iron Bank Token Check Failed
+          
+          The Iron Bank token may be expired or invalid. Docker builds will fail until renewed.
+          
+          ### Renewal Instructions
+          1. Navigate to [registry1.dso.mil](https://registry1.dso.mil)
+          2. Log in with your CAC or credentials
+          3. Go to **User Profile** → **CLI Token** → **Regenerate**
+          4. Update the \`IRONBANK_PASSWORD\` secret in this repository:
+             - Settings → Secrets and variables → Actions → IRONBANK_PASSWORD → Update
+          
+          ### Token Information
+          - Iron Bank tokens expire every **6 months**
+          - Check date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF

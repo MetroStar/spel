@@ -7,6 +7,10 @@
 # PREREQUISITES:
 #   - Dockerfile must exist in repository root
 #   - vendor/amigen8 and vendor/amigen9 submodules must be present
+#   - Iron Bank credentials configured as GitHub secrets:
+#     - IRONBANK_USERNAME: Robot account username
+#     - IRONBANK_PASSWORD: CLI token (expires every 6 months)
+#     - Renewal: https://registry1.dso.mil → User Profile → CLI Token → Regenerate
 #
 # OUTPUTS:
 #   - Docker image tarball: spel-builder-YYYYMMDD.tar.gz
@@ -83,6 +87,13 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Login to Iron Bank
+        uses: docker/login-action@v3
+        with:
+          registry: registry1.dso.mil
+          username: ${{ secrets.IRONBANK_USERNAME }}
+          password: ${{ secrets.IRONBANK_PASSWORD }}
 
       - name: Build Docker image
         run: |
