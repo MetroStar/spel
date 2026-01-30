@@ -987,12 +987,17 @@ build {
   # - Once DISA publishes AL2023 STIG, add OpenSCAP scan using that benchmark
   # =============================================================================
 
-  provisioner "file" {
+  # Download AWS STIG Script directly to EC2 instance (avoids local file corruption issues)
+  provisioner "shell" {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
     ]
-    source      = "${path.root}/../offline-packages/LinuxAWSConfigureSTIG.tgz"
-    destination = "/tmp/LinuxAWSConfigureSTIG.tgz"
+    execute_command = "sudo -E bash '{{.Path}}'"
+    inline = [
+      "echo 'Downloading AWS STIG Script from S3...'",
+      "curl -fsSL -o /tmp/LinuxAWSConfigureSTIG.tgz 'https://aws-windows-downloads-us-east-1.s3.amazonaws.com/STIG/Linux/Latest/LinuxAWSConfigureSTIG.tgz'",
+      "echo 'Download complete. Size:' $(stat -c%s /tmp/LinuxAWSConfigureSTIG.tgz) 'bytes'",
+    ]
   }
 
   provisioner "file" {

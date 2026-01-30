@@ -9,6 +9,7 @@ rhel9stig_min_supported_os_ver:
   Rocky: "9.2"
   AlmaLinux: "9.2"
   OracleLinux: "9.2"
+  Amazon: "2023"
 
 # Set dynamically if discovered to be non UEFI boot
 rhel9stig_legacy_boot: false
