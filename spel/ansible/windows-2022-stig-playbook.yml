@@ -5,10 +5,55 @@
   roles:
     - role: Windows-2022-STIG
 
-  # Restore WinRM after STIG hardening to allow remaining Packer provisioners to run
-  # Uses external script file to avoid Jinja2 parsing issues with curly braces
+  # ALL post-STIG work must be done here within Ansible's existing WinRM session
+  # because STIG hardening breaks WinRM and Packer cannot reconnect after Ansible exits
   post_tasks:
-    - name: Restore WinRM connectivity for Packer
+    # Step 1: Restore WinRM connectivity (keeps current session alive)
+    - name: Restore WinRM connectivity
       script: files/restore-winrm.ps1
       args:
         executable: powershell.exe
+
+    # Step 2: Restore EC2 networking
+    - name: Restore EC2 network functionality
+      script: files/restore-ec2-network.ps1
+      args:
+        executable: powershell.exe
+
+    # Step 3: Copy cleanup-sysprep.ps1 script
+    - name: Copy cleanup-sysprep.ps1 to Windows
+      win_copy:
+        src: ../scripts/cleanup-sysprep.ps1
+        dest: C:\Windows\Temp\cleanup-sysprep.ps1
+
+    # Step 4: Run cleanup-sysprep.ps1 (skip sysprep - we'll do it separately)
+    - name: Run cleanup-sysprep.ps1
+      win_shell: |
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+        & 'C:\Windows\Temp\cleanup-sysprep.ps1' -SkipSysprep -Verbose
+      args:
+        executable: powershell.exe
+      async: 1800
+      poll: 30
+
+    # Step 5: Create SetupComplete scripts directory
+    - name: Ensure SetupComplete scripts directory exists
+      win_file:
+        path: C:\Windows\Setup\Scripts
+        state: directory
+
+    # Step 6: Copy SetupComplete.cmd
+    - name: Copy SetupComplete.cmd to Windows
+      win_copy:
+        src: ../scripts/SetupComplete.cmd
+        dest: C:\Windows\Setup\Scripts\SetupComplete.cmd
+
+    # Step 7: Run EC2Launch sysprep (this is the LAST step - it will shutdown the instance)
+    - name: Run EC2Launch sysprep
+      win_shell: |
+        & 'C:\Program Files\Amazon\EC2Launch\ec2launch' reset --block
+        & 'C:\Program Files\Amazon\EC2Launch\ec2launch' sysprep --shutdown --block
+      args:
+        executable: powershell.exe
+      async: 600
+      poll: 0  # Fire and forget - sysprep will shutdown the instance

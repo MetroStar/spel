@@ -1253,7 +1253,7 @@ build {
 
   provisioner "ansible" {
     pause_before         = "30s"
-    timeout              = "30m"
+    timeout              = "60m"
     only                 = ["amazon-ebs.hardened-windows-2016-hvm"]
     roles_path           = "${path.root}/ansible/roles"
     playbook_file        = "${path.root}/ansible/windows-2016-stig-playbook.yml"
@@ -1261,13 +1261,13 @@ build {
     user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16_so_000010': false, 'wn16_so_000020': false, 'wn16_so_000030': false, 'wn16_00_000450': false, 'wn16_cc_000010': false, 'wn16_cc_000020': false, 'wn16stig_newadministratorname': 'maintuser'}"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 120, 'ansible_winrm_read_timeout_sec': 180, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16_so_000010': false, 'wn16_so_000020': false, 'wn16_so_000030': false, 'wn16_00_000450': false, 'wn16_cc_000010': false, 'wn16_cc_000020': false, 'wn16stig_newadministratorname': 'maintuser'}"
     ]
   }
 
   provisioner "ansible" {
     pause_before = "30s"
-    timeout      = "30m"
+    timeout      = "60m"
     only = ["amazon-ebs.hardened-windows-2019-hvm"]
     roles_path = "${path.root}/ansible/roles"
     playbook_file = "${path.root}/ansible/windows-2019-stig-playbook.yml"
@@ -1275,13 +1275,13 @@ build {
     user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19_so_000010': false, 'wn19_so_000020': false, 'wn19_so_000030': false, 'wn19_00_000450': false, 'wn19_cc_000010': false, 'wn19_cc_000020': false, 'wn19stig_newadministratorname': 'maintuser'}"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 120, 'ansible_winrm_read_timeout_sec': 180, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19_so_000010': false, 'wn19_so_000020': false, 'wn19_so_000030': false, 'wn19_00_000450': false, 'wn19_cc_000010': false, 'wn19_cc_000020': false, 'wn19stig_newadministratorname': 'maintuser'}"
     ]
   }
 
   provisioner "ansible" {
     pause_before = "30s"
-    timeout      = "30m"
+    timeout      = "60m"
     only = ["amazon-ebs.hardened-windows-2022-hvm"]
     roles_path = "${path.root}/ansible/roles"
     playbook_file = "${path.root}/ansible/windows-2022-stig-playbook.yml"
@@ -1289,147 +1289,16 @@ build {
     user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn22_ac_000010': false, 'wn22_cc_000470': false, 'wn22_cc_000500': false, 'wn22_so_000010': false, 'wn22_so_000020': false, 'wn22_so_000030': false, 'wn22_00_000450': false, 'wn22_cc_000010': false, 'wn22_cc_000020': false, 'wn22stig_newadministratorname': 'maintuser'}"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 120, 'ansible_winrm_read_timeout_sec': 180, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn22_ac_000010': false, 'wn22_cc_000470': false, 'wn22_cc_000500': false, 'wn22_so_000010': false, 'wn22_so_000020': false, 'wn22_so_000030': false, 'wn22_00_000450': false, 'wn22_cc_000010': false, 'wn22_cc_000020': false, 'wn22stig_newadministratorname': 'maintuser'}"
     ]
   }
 
-  # Fix EC2 networking after STIG hardening
-  provisioner "powershell" {
-    pause_before = "10s"
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    inline = [
-      "Write-Host 'Restoring EC2 network functionality after STIG hardening...'",
-      "",
-      "# Ensure Windows Firewall allows IMDS access (169.254.169.254)",
-      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Outbound' -Direction Outbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
-      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Inbound' -Direction Inbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
-      "",
-      "# Allow link-local addresses for DHCP and routing",
-      "New-NetFirewallRule -DisplayName 'Allow Link-Local Outbound' -Direction Outbound -RemoteAddress 169.254.0.0/16 -Action Allow -ErrorAction SilentlyContinue",
-      "",
-      "# Ensure DHCP client service is running",
-      "Set-Service -Name 'Dhcp' -StartupType Automatic -ErrorAction SilentlyContinue",
-      "Start-Service -Name 'Dhcp' -ErrorAction SilentlyContinue",
-      "",
-      "# Ensure network adapters have DHCP enabled",
-      "Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | ForEach-Object {",
-      "    Set-NetIPInterface -InterfaceIndex $_.ifIndex -Dhcp Enabled -ErrorAction SilentlyContinue",
-      "}",
-      "",
-      "# Ensure EC2Config/EC2Launch services are set to start",
-      "$ec2Services = @('AmazonSSMAgent', 'EC2Config', 'EC2Launch', 'AmazonCloudWatchAgent')",
-      "foreach ($svc in $ec2Services) {",
-      "    if (Get-Service -Name $svc -ErrorAction SilentlyContinue) {",
-      "        Set-Service -Name $svc -StartupType Automatic -ErrorAction SilentlyContinue",
-      "    }",
-      "}",
-      "",
-      "# Reset Windows Firewall to allow basic networking while maintaining security",
-      "# Allow outbound DNS",
-      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound' -Direction Outbound -Protocol UDP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
-      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound TCP' -Direction Outbound -Protocol TCP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
-      "",
-      "# Allow outbound HTTPS for AWS APIs",
-      "New-NetFirewallRule -DisplayName 'Allow HTTPS Outbound' -Direction Outbound -Protocol TCP -RemotePort 443 -Action Allow -ErrorAction SilentlyContinue",
-      "",
-      "# Allow outbound HTTP for metadata and updates",
-      "New-NetFirewallRule -DisplayName 'Allow HTTP Outbound' -Direction Outbound -Protocol TCP -RemotePort 80 -Action Allow -ErrorAction SilentlyContinue",
-      "",
-      "# Restore WinRM connectivity for remaining Packer provisioners",
-      "Write-Host 'Restoring WinRM service...'",
-      "Set-Service -Name 'WinRM' -StartupType Automatic -ErrorAction SilentlyContinue",
-      "Start-Service -Name 'WinRM' -ErrorAction SilentlyContinue",
-      "",
-      "# Allow WinRM inbound (port 5985/5986)",
-      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTP' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -ErrorAction SilentlyContinue",
-      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -ErrorAction SilentlyContinue",
-      "",
-      "# Ensure WinRM listener exists and is configured",
-      "$httpsListener = Get-ChildItem -Path WSMan:\\localhost\\Listener | Where-Object { $_.Keys -contains 'Transport=HTTPS' }",
-      "if (-not $httpsListener) {",
-      "    Write-Host 'Creating WinRM HTTPS listener...'",
-      "    $cert = Get-ChildItem -Path Cert:\\LocalMachine\\My | Where-Object { $_.Subject -match $env:COMPUTERNAME } | Select-Object -First 1",
-      "    if ($cert) {",
-      "        New-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force -ErrorAction SilentlyContinue",
-      "    }",
-      "}",
-      "",
-      "# Configure WinRM to allow unencrypted for Packer (will be re-secured at sysprep)",
-      "winrm set winrm/config/service '@{AllowUnencrypted=\"true\"}' 2>$null",
-      "winrm set winrm/config/service/auth '@{Basic=\"true\"}' 2>$null",
-      "winrm set winrm/config/client '@{AllowUnencrypted=\"true\"}' 2>$null",
-      "",
-      "# Delete any blocking rules for WinRM",
-      "netsh advfirewall firewall delete rule name='WinRM HTTPS Inbound (Packer)' 2>$null",
-      "netsh advfirewall firewall delete rule name='WinRM HTTP Inbound (Packer)' 2>$null",
-      "netsh advfirewall firewall add rule name='WinRM HTTPS Inbound (Packer)' dir=in action=allow protocol=tcp localport=5986",
-      "netsh advfirewall firewall add rule name='WinRM HTTP Inbound (Packer)' dir=in action=allow protocol=tcp localport=5985",
-      "",
-      "# Enable built-in Windows Remote Management rules",
-      "netsh advfirewall firewall set rule name='Windows Remote Management (HTTP-In)' new enable=yes 2>$null",
-      "",
-      "# DO NOT restart WinRM - it would drop the current Packer connection",
-      "# The firewall rules take effect immediately without a restart",
-      "",
-      "Write-Host 'EC2 network and WinRM restoration complete.'"
-    ]
-  }
-
-  provisioner "file" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    source      = "${path.root}/scripts/cleanup-sysprep.ps1"
-    destination = "C:/Windows/Temp/cleanup-sysprep.ps1"
-  }
-
-  provisioner "powershell" {
-    pause_before = "30s"
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    inline = [
-      "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
-      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose"
-    ]
-  }
-
-  provisioner "file" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    source      = "${path.root}/scripts/SetupComplete.cmd"
-    destination = "C:/Windows/Setup/Scripts/SetupComplete.cmd"
-  }
-
-  provisioner "powershell" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
-    ]
-    inline = [
-      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
-      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown"
-    ]
-  }
-
-  provisioner "powershell" {
-    only = [
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    inline = [
-      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' reset --block",
-      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' sysprep --shutdown --block"
-    ]
-  }
+  # NOTE: All post-STIG Windows provisioners have been moved into the Ansible playbooks
+  # because STIG hardening breaks WinRM and Packer cannot reconnect after Ansible exits.
+  # The Ansible playbooks now handle:
+  # - WinRM restoration
+  # - EC2 network restoration  
+  # - cleanup-sysprep.ps1 execution
+  # - SetupComplete.cmd deployment
+  # - EC2Launch sysprep execution
 }
