@@ -645,6 +645,11 @@ source "amazon-ebs" "windows-base" {
   winrm_username              = "TempPackerUser"
   winrm_password              = "ComplexP@ssw0rd123!"
 
+  # Wait for sysprep-initiated shutdown instead of Packer stopping the instance
+  # The Ansible playbook triggers sysprep which shuts down the instance
+  disable_stop_instance       = true
+  shutdown_timeout            = "15m"
+
   launch_block_device_mappings {
     device_name = "/dev/sda1"
     volume_type = "gp3"

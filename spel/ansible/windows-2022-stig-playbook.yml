@@ -28,8 +28,25 @@
     # It will continue running even if the WinRM connection drops
     - name: Run post-STIG cleanup and sysprep (fire-and-forget)
       win_shell: |
-        Start-Process -FilePath 'powershell.exe' -ArgumentList '-ExecutionPolicy Bypass -File C:\Windows\Temp\post-stig-cleanup.ps1' -WindowStyle Hidden
+        # Start the cleanup script as a detached background job
+        $scriptPath = 'C:\Windows\Temp\post-stig-cleanup.ps1'
+        $logFile = 'C:\Windows\Temp\post-stig-launch.log'
+        "$(Get-Date) - Launching post-stig-cleanup.ps1" | Out-File -FilePath $logFile
+        
+        # Use Start-Process to spawn detached process
+        Start-Process -FilePath 'powershell.exe' -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`"" -WindowStyle Hidden
+        
+        # Wait a moment to ensure process starts
+        Start-Sleep -Seconds 3
+        
+        # Verify process started
+        $proc = Get-Process -Name powershell -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*post-stig*' }
+        if ($proc) {
+            "$(Get-Date) - Process started successfully, PID: $($proc.Id)" | Out-File -Append -FilePath $logFile
+        } else {
+            "$(Get-Date) - Warning: Could not verify process started" | Out-File -Append -FilePath $logFile
+        }
+        
+        "$(Get-Date) - Ansible task completing, script will continue in background" | Out-File -Append -FilePath $logFile
       args:
         executable: powershell.exe
-      async: 60
-      poll: 0
