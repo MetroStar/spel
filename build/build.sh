@@ -2,8 +2,8 @@
 # Do not use `set -e`, as we handle the errexit in the script
 set -u -o pipefail
 
-# Default PUBLIC to true if not set (used for AMI quota management)
-PUBLIC="${PUBLIC:-true}"
+# Default PUBLIC to false - AMIs are private by default
+PUBLIC="${PUBLIC:-false}"
 
 # Verify AWS credentials are available (via environment variables)
 # AWS SDK automatically uses AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN
