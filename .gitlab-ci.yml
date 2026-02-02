@@ -684,7 +684,7 @@ infra:kms:
         -e "PKR_VAR_aws_region=${PKR_VAR_aws_region}"
         -e "PKR_VAR_aws_force_deregister=${PKR_VAR_aws_force_deregister:-true}"
         -e "PKR_VAR_aws_ami_regions=${PKR_VAR_aws_ami_regions:-[\"${PKR_VAR_aws_region}\"]}"
-        -e "PKR_VAR_aws_ami_groups=${PKR_VAR_aws_ami_groups:-[\"all\"]}"
+        -e "PKR_VAR_aws_ami_groups=${PKR_VAR_aws_ami_groups:-[]}"
         -e "PKR_VAR_aws_vpc_id=${PKR_VAR_aws_vpc_id:-}"
         -e "PKR_VAR_aws_subnet_id=${PKR_VAR_aws_subnet_id:-}"
         -e "PKR_VAR_iam_instance_profile=${PKR_VAR_iam_instance_profile:-}"

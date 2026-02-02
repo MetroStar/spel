@@ -305,7 +305,8 @@ jobs:
           echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
           echo "PKR_VAR_aws_force_deregister=true" >> $GITHUB_ENV
           echo "PKR_VAR_aws_ami_regions=[\"us-east-1\"]" >> $GITHUB_ENV
-          echo "PKR_VAR_aws_ami_groups=[\"all\"]" >> $GITHUB_ENV
+          # AMIs are private by default - set PKR_VAR_aws_ami_groups='["all"]' to make public
+          echo "PKR_VAR_aws_ami_groups=[]" >> $GITHUB_ENV
           
           # Display configuration
           echo ""
