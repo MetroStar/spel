@@ -1372,24 +1372,10 @@ build {
       "# Enable built-in Windows Remote Management rules",
       "netsh advfirewall firewall set rule name='Windows Remote Management (HTTP-In)' new enable=yes 2>$null",
       "",
-      "# Restart WinRM to apply all changes",
-      "Restart-Service WinRM -Force",
-      "Start-Sleep -Seconds 5",
+      "# DO NOT restart WinRM - it would drop the current Packer connection",
+      "# The firewall rules take effect immediately without a restart",
       "",
       "Write-Host 'EC2 network and WinRM restoration complete.'"
-    ]
-  }
-
-  # Pause to allow WinRM to stabilize after restart
-  provisioner "powershell" {
-    pause_before = "30s"
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    inline = [
-      "Write-Host 'WinRM connectivity verified after STIG hardening'"
     ]
   }
 
