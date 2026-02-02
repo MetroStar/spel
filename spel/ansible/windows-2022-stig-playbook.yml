@@ -10,15 +10,11 @@
   post_tasks:
     # Step 1: Restore WinRM connectivity (keeps current session alive)
     - name: Restore WinRM connectivity
-      script: files/restore-winrm.ps1
-      args:
-        executable: powershell.exe
+      ansible.windows.win_script: files/restore-winrm.ps1
 
     # Step 2: Restore EC2 networking
     - name: Restore EC2 network functionality
-      script: files/restore-ec2-network.ps1
-      args:
-        executable: powershell.exe
+      ansible.windows.win_script: files/restore-ec2-network.ps1
 
     # Step 3: Copy cleanup-sysprep.ps1 script
     - name: Copy cleanup-sysprep.ps1 to Windows
