@@ -1361,8 +1361,35 @@ build {
       "# Configure WinRM to allow unencrypted for Packer (will be re-secured at sysprep)",
       "winrm set winrm/config/service '@{AllowUnencrypted=\"true\"}' 2>$null",
       "winrm set winrm/config/service/auth '@{Basic=\"true\"}' 2>$null",
+      "winrm set winrm/config/client '@{AllowUnencrypted=\"true\"}' 2>$null",
+      "",
+      "# Delete any blocking rules for WinRM",
+      "netsh advfirewall firewall delete rule name='WinRM HTTPS Inbound (Packer)' 2>$null",
+      "netsh advfirewall firewall delete rule name='WinRM HTTP Inbound (Packer)' 2>$null",
+      "netsh advfirewall firewall add rule name='WinRM HTTPS Inbound (Packer)' dir=in action=allow protocol=tcp localport=5986",
+      "netsh advfirewall firewall add rule name='WinRM HTTP Inbound (Packer)' dir=in action=allow protocol=tcp localport=5985",
+      "",
+      "# Enable built-in Windows Remote Management rules",
+      "netsh advfirewall firewall set rule name='Windows Remote Management (HTTP-In)' new enable=yes 2>$null",
+      "",
+      "# Restart WinRM to apply all changes",
+      "Restart-Service WinRM -Force",
+      "Start-Sleep -Seconds 5",
       "",
       "Write-Host 'EC2 network and WinRM restoration complete.'"
+    ]
+  }
+
+  # Pause to allow WinRM to stabilize after restart
+  provisioner "powershell" {
+    pause_before = "30s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "Write-Host 'WinRM connectivity verified after STIG hardening'"
     ]
   }
 
