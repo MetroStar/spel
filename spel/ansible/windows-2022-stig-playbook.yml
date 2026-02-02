@@ -4,3 +4,51 @@
   gather_facts: false
   roles:
     - role: Windows-2022-STIG
+
+  # Restore WinRM after STIG hardening to allow remaining Packer provisioners to run
+  post_tasks:
+    - name: Ensure WinRM service is running
+      win_service:
+        name: WinRM
+        start_mode: auto
+        state: started
+
+    - name: Allow WinRM HTTPS inbound (port 5986)
+      win_firewall_rule:
+        name: "WinRM HTTPS Inbound (Packer)"
+        localport: 5986
+        action: allow
+        direction: in
+        protocol: tcp
+        state: present
+        enabled: yes
+
+    - name: Allow WinRM HTTP inbound (port 5985)
+      win_firewall_rule:
+        name: "WinRM HTTP Inbound (Packer)"
+        localport: 5985
+        action: allow
+        direction: in
+        protocol: tcp
+        state: present
+        enabled: yes
+
+    - name: Configure WinRM for Packer connectivity
+      win_shell: |
+        # Re-enable WinRM settings that STIG may have disabled
+        winrm set winrm/config/service '@{AllowUnencrypted="true"}'
+        winrm set winrm/config/service/auth '@{Basic="true"}'
+        
+        # Ensure HTTPS listener exists
+        $httpsListener = Get-ChildItem -Path WSMan:\localhost\Listener | Where-Object { $_.Keys -contains 'Transport=HTTPS' }
+        if (-not $httpsListener) {
+            $cert = Get-ChildItem -Path Cert:\LocalMachine\My | Where-Object { $_.Subject -match $env:COMPUTERNAME } | Select-Object -First 1
+            if ($cert) {
+                New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force
+            }
+        }
+        
+        # Restart WinRM to apply changes
+        Restart-Service WinRM -Force
+      args:
+        executable: powershell.exe
