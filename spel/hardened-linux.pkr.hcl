@@ -1324,33 +1324,36 @@ build {
   # No WinRM restoration needed - inline PowerShell reuses existing session
   # File uploads were done BEFORE STIG hardening
   # =============================================================================
+  # CRITICAL: All post-STIG operations MUST be in a SINGLE provisioner per OS
+  # Packer uploads each inline script via WinRM, which fails after STIG
+  # Only the FIRST provisioner after STIG works (reuses existing session)
+  # =============================================================================
+
+  # Windows 2016/2019: EC2Launch v1 + all post-STIG operations in ONE provisioner
   provisioner "powershell" {
     pause_before = "10s"
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
+      "amazon-ebs.hardened-windows-2019-hvm"
     ]
     inline = [
-      "Write-Host 'Restoring EC2 network functionality after STIG hardening...'",
+      "Write-Host '=== POST-STIG: EC2 Network, Cleanup, and Sysprep (SINGLE PROVISIONER) ==='",
       "",
-      "# Ensure Windows Firewall allows IMDS access (169.254.169.254)",
-      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Outbound' -Direction Outbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
-      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Inbound' -Direction Inbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
+      "# ----- STEP 1: Restore EC2 Network Functionality -----",
+      "Write-Host 'Step 1: Restoring EC2 network functionality...'",
       "",
-      "# Allow link-local addresses for DHCP and routing",
-      "New-NetFirewallRule -DisplayName 'Allow Link-Local Outbound' -Direction Outbound -RemoteAddress 169.254.0.0/16 -Action Allow -ErrorAction SilentlyContinue",
+      "# Suppress firewall rule output",
+      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Outbound' -Direction Outbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Inbound' -Direction Inbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow Link-Local Outbound' -Direction Outbound -RemoteAddress 169.254.0.0/16 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
       "",
-      "# Ensure DHCP client service is running",
       "Set-Service -Name 'Dhcp' -StartupType Automatic -ErrorAction SilentlyContinue",
       "Start-Service -Name 'Dhcp' -ErrorAction SilentlyContinue",
       "",
-      "# Ensure network adapters have DHCP enabled",
       "Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | ForEach-Object {",
       "    Set-NetIPInterface -InterfaceIndex $_.ifIndex -Dhcp Enabled -ErrorAction SilentlyContinue",
       "}",
       "",
-      "# Ensure EC2Config/EC2Launch services are set to start",
       "$ec2Services = @('AmazonSSMAgent', 'EC2Config', 'EC2Launch', 'AmazonCloudWatchAgent')",
       "foreach ($svc in $ec2Services) {",
       "    if (Get-Service -Name $svc -ErrorAction SilentlyContinue) {",
@@ -1358,63 +1361,82 @@ build {
       "    }",
       "}",
       "",
-      "# Allow outbound DNS",
-      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound' -Direction Outbound -Protocol UDP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
-      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound TCP' -Direction Outbound -Protocol TCP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
+      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound' -Direction Outbound -Protocol UDP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound TCP' -Direction Outbound -Protocol TCP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow HTTPS Outbound' -Direction Outbound -Protocol TCP -RemotePort 443 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow HTTP Outbound' -Direction Outbound -Protocol TCP -RemotePort 80 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
       "",
-      "# Allow outbound HTTPS for AWS APIs",
-      "New-NetFirewallRule -DisplayName 'Allow HTTPS Outbound' -Direction Outbound -Protocol TCP -RemotePort 443 -Action Allow -ErrorAction SilentlyContinue",
+      "Write-Host 'EC2 network restoration complete.'",
       "",
-      "# Allow outbound HTTP for metadata and updates",
-      "New-NetFirewallRule -DisplayName 'Allow HTTP Outbound' -Direction Outbound -Protocol TCP -RemotePort 80 -Action Allow -ErrorAction SilentlyContinue",
-      "",
-      "Write-Host 'EC2 network restoration complete.'"
-    ]
-  }
-
-  # Run cleanup script (file was uploaded BEFORE STIG hardening)
-  provisioner "powershell" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    inline = [
+      "# ----- STEP 2: Run Cleanup Script -----",
+      "Write-Host 'Step 2: Running cleanup script...'",
       "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
-      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose"
-    ]
-  }
-
-  # Move SetupComplete.cmd to final location (file was uploaded to Temp BEFORE STIG)
-  provisioner "powershell" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    inline = [
+      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose",
+      "",
+      "# ----- STEP 3: Move SetupComplete.cmd -----",
+      "Write-Host 'Step 3: Moving SetupComplete.cmd to final location...'",
       "New-Item -Path 'C:/Windows/Setup/Scripts' -ItemType Directory -Force | Out-Null",
       "Move-Item -Path 'C:/Windows/Temp/SetupComplete.cmd' -Destination 'C:/Windows/Setup/Scripts/SetupComplete.cmd' -Force",
-      "Write-Host 'SetupComplete.cmd moved to C:/Windows/Setup/Scripts/'"
-    ]
-  }
-
-  provisioner "powershell" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
-    ]
-    inline = [
+      "Write-Host 'SetupComplete.cmd moved to C:/Windows/Setup/Scripts/'",
+      "",
+      "# ----- STEP 4: Initialize and Sysprep (EC2Launch v1) -----",
+      "Write-Host 'Step 4: Running EC2Launch v1 InitializeInstance and Sysprep...'",
       "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
       "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown"
     ]
   }
 
+  # Windows 2022: EC2Launch v2 + all post-STIG operations in ONE provisioner
   provisioner "powershell" {
+    pause_before = "10s"
     only = [
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
     inline = [
+      "Write-Host '=== POST-STIG: EC2 Network, Cleanup, and Sysprep (SINGLE PROVISIONER) ==='",
+      "",
+      "# ----- STEP 1: Restore EC2 Network Functionality -----",
+      "Write-Host 'Step 1: Restoring EC2 network functionality...'",
+      "",
+      "# Suppress firewall rule output",
+      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Outbound' -Direction Outbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Inbound' -Direction Inbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow Link-Local Outbound' -Direction Outbound -RemoteAddress 169.254.0.0/16 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "",
+      "Set-Service -Name 'Dhcp' -StartupType Automatic -ErrorAction SilentlyContinue",
+      "Start-Service -Name 'Dhcp' -ErrorAction SilentlyContinue",
+      "",
+      "Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | ForEach-Object {",
+      "    Set-NetIPInterface -InterfaceIndex $_.ifIndex -Dhcp Enabled -ErrorAction SilentlyContinue",
+      "}",
+      "",
+      "$ec2Services = @('AmazonSSMAgent', 'EC2Config', 'EC2Launch', 'AmazonCloudWatchAgent')",
+      "foreach ($svc in $ec2Services) {",
+      "    if (Get-Service -Name $svc -ErrorAction SilentlyContinue) {",
+      "        Set-Service -Name $svc -StartupType Automatic -ErrorAction SilentlyContinue",
+      "    }",
+      "}",
+      "",
+      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound' -Direction Outbound -Protocol UDP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound TCP' -Direction Outbound -Protocol TCP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow HTTPS Outbound' -Direction Outbound -Protocol TCP -RemotePort 443 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow HTTP Outbound' -Direction Outbound -Protocol TCP -RemotePort 80 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "",
+      "Write-Host 'EC2 network restoration complete.'",
+      "",
+      "# ----- STEP 2: Run Cleanup Script -----",
+      "Write-Host 'Step 2: Running cleanup script...'",
+      "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
+      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose",
+      "",
+      "# ----- STEP 3: Move SetupComplete.cmd -----",
+      "Write-Host 'Step 3: Moving SetupComplete.cmd to final location...'",
+      "New-Item -Path 'C:/Windows/Setup/Scripts' -ItemType Directory -Force | Out-Null",
+      "Move-Item -Path 'C:/Windows/Temp/SetupComplete.cmd' -Destination 'C:/Windows/Setup/Scripts/SetupComplete.cmd' -Force",
+      "Write-Host 'SetupComplete.cmd moved to C:/Windows/Setup/Scripts/'",
+      "",
+      "# ----- STEP 4: Reset and Sysprep (EC2Launch v2) -----",
+      "Write-Host 'Step 4: Running EC2Launch v2 reset and sysprep...'",
       "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' reset --block",
       "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' sysprep --shutdown --block"
     ]
