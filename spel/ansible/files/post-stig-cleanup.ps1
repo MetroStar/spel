@@ -141,29 +141,46 @@ $ec2LaunchV1 = "$env:ProgramData\Amazon\EC2-Windows\Launch\Scripts\SysprepInstan
 Write-Log "Checking for EC2Launch..."
 
 if (Test-Path $ec2LaunchV2) {
-    Write-Log "Found EC2Launch v2, running sysprep..."
+    Write-Log "Found EC2Launch v2, running sysprep with shutdown..."
     try {
-        # EC2Launch v2 (Windows 2022)
-        Start-Process -FilePath $ec2LaunchV2 -ArgumentList "sysprep" -NoNewWindow -Wait:$false
-        Write-Log "EC2Launch v2 sysprep initiated"
+        # EC2Launch v2 (Windows 2022) - must use --shutdown to shutdown after sysprep
+        # Run synchronously since we want the shutdown to happen
+        & $ec2LaunchV2 sysprep --shutdown 2>&1 | ForEach-Object { Write-Log "ec2launch: $_" }
+        Write-Log "EC2Launch v2 sysprep completed (shutdown should be imminent)"
     } catch {
-        Write-Log "Error starting EC2Launch v2 sysprep: $_"
+        Write-Log "Error during EC2Launch v2 sysprep: $_"
+        # Fallback: try to shutdown manually
+        Write-Log "Attempting manual shutdown..."
+        Stop-Computer -Force
     }
 } elseif (Test-Path $ec2LaunchV1) {
     Write-Log "Found EC2Launch v1, running sysprep..."
     try {
-        # EC2Launch v1 (Windows 2016/2019)
-        Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -File `"$ec2LaunchV1`"" -NoNewWindow -Wait:$false
-        Write-Log "EC2Launch v1 sysprep initiated"
+        # EC2Launch v1 (Windows 2016/2019) - SysprepInstance.ps1 should shutdown by default
+        # Run synchronously to ensure it completes
+        & powershell.exe -ExecutionPolicy Bypass -File $ec2LaunchV1 2>&1 | ForEach-Object { Write-Log "ec2launch: $_" }
+        Write-Log "EC2Launch v1 sysprep completed (shutdown should be imminent)"
     } catch {
-        Write-Log "Error starting EC2Launch v1 sysprep: $_"
+        Write-Log "Error during EC2Launch v1 sysprep: $_"
+        # Fallback: try to shutdown manually
+        Write-Log "Attempting manual shutdown..."
+        Stop-Computer -Force
     }
 } else {
-    Write-Log "ERROR: No EC2Launch found! Sysprep will not run."
+    Write-Log "ERROR: No EC2Launch found! Attempting direct sysprep..."
     Write-Log "Checked paths:"
     Write-Log "  - $ec2LaunchV2"
     Write-Log "  - $ec2LaunchV1"
+    # Last resort: run sysprep directly
+    try {
+        & C:\Windows\System32\Sysprep\sysprep.exe /oobe /generalize /shutdown /quiet
+        Write-Log "Direct sysprep initiated"
+    } catch {
+        Write-Log "Direct sysprep failed: $_"
+        Stop-Computer -Force
+    }
 }
 
 Write-Log "Post-STIG cleanup script completed. Sysprep should be running."
+Write-Log "The system will shut down shortly for image capture."
 Write-Log "The system will shut down shortly for image capture."
