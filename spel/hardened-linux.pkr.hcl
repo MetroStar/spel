@@ -975,6 +975,23 @@ build {
 
   provisioner "file" {
     only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
+    source      = "${path.root}/scripts/post-stig-2016-2019.ps1"
+    destination = "C:/Windows/Temp/post-stig.ps1"
+  }
+
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    source      = "${path.root}/scripts/post-stig-2022.ps1"
+    destination = "C:/Windows/Temp/post-stig.ps1"
+  }
+
+  provisioner "file" {
+    only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
       "amazon-ebs.hardened-rhel-9-hvm",
       "amazon-ebs.hardened-centos-9stream-hvm",
@@ -1329,7 +1346,7 @@ build {
   # Only the FIRST provisioner after STIG works (reuses existing session)
   # =============================================================================
 
-  # Windows 2016/2019: EC2Launch v1 + all post-STIG operations in ONE provisioner
+  # Windows 2016/2019: Run post-STIG script via scheduled task to survive WinRM death
   provisioner "powershell" {
     pause_before = "10s"
     only = [
@@ -1338,39 +1355,25 @@ build {
     ]
     inline = [
       "$ErrorActionPreference = 'Continue'",
+      "Write-Host 'Creating scheduled task for post-STIG script...'",
       "",
-      "# Disable firewall to ensure WinRM works",
-      "Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False -ErrorAction SilentlyContinue",
+      "# Create scheduled task to run immediately - survives WinRM disconnection",
+      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
+      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
+      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
+      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
+      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
+      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
       "",
-      "Write-Host '=== POST-STIG: EC2 Network, Cleanup, and Sysprep ==='",
-      "",
-      "# STEP 1: Restore EC2 Network Functionality",
-      "Write-Host 'Step 1: Restoring EC2 network functionality...'",
-      "Set-Service -Name 'Dhcp' -StartupType Automatic -ErrorAction SilentlyContinue",
-      "Start-Service -Name 'Dhcp' -ErrorAction SilentlyContinue",
-      "Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | ForEach-Object { Set-NetIPInterface -InterfaceIndex $_.ifIndex -Dhcp Enabled -ErrorAction SilentlyContinue }",
-      "@('AmazonSSMAgent', 'EC2Config', 'EC2Launch', 'AmazonCloudWatchAgent') | ForEach-Object { if (Get-Service -Name $_ -ErrorAction SilentlyContinue) { Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue } }",
-      "",
-      "# STEP 2: Run Cleanup Script",
-      "Write-Host 'Step 2: Running cleanup script...'",
-      "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
-      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose",
-      "",
-      "# STEP 3: EC2Launch v1 Sysprep Prep",
-      "Write-Host 'Step 3: Running EC2Launch v1 sysprep prep...'",
-      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
-      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown",
-      "",
-      "# STEP 4: Copy SetupComplete.cmd",
-      "Write-Host 'Step 4: Installing SetupComplete.cmd...'",
-      "New-Item -Path 'C:\\Windows\\Setup\\Scripts' -ItemType Directory -Force | Out-Null",
-      "Copy-Item -Path 'C:\\Windows\\Temp\\SetupComplete.cmd' -Destination 'C:\\Windows\\Setup\\Scripts\\SetupComplete.cmd' -Force",
-      "",
+      "Write-Host 'Scheduled task created. Script will run in 10 seconds.'",
+      "Write-Host 'Waiting 60 seconds for post-STIG script to complete...'",
+      "Start-Sleep -Seconds 60",
       "Write-Host 'Post-STIG provisioning complete. Packer will stop the instance.'"
     ]
   }
 
-  # Windows 2022: EC2Launch v2 + all post-STIG operations in ONE provisioner
+  # Windows 2022: Run post-STIG script via scheduled task to survive WinRM death
+  # Note: post-stig-2022.ps1 includes Sysprep execution, which will shutdown the instance
   provisioner "powershell" {
     pause_before = "10s"
     only = [
@@ -1378,37 +1381,20 @@ build {
     ]
     inline = [
       "$ErrorActionPreference = 'Continue'",
+      "Write-Host 'Creating scheduled task for post-STIG script...'",
       "",
-      "# Disable firewall to ensure WinRM works",
-      "Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False -ErrorAction SilentlyContinue",
+      "# Create scheduled task to run immediately - survives WinRM disconnection",
+      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
+      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
+      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
+      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
+      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
+      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
       "",
-      "Write-Host '=== POST-STIG: EC2 Network, Cleanup, and Sysprep ==='",
-      "",
-      "# STEP 1: Restore EC2 Network Functionality",
-      "Write-Host 'Step 1: Restoring EC2 network functionality...'",
-      "Set-Service -Name 'Dhcp' -StartupType Automatic -ErrorAction SilentlyContinue",
-      "Start-Service -Name 'Dhcp' -ErrorAction SilentlyContinue",
-      "Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | ForEach-Object { Set-NetIPInterface -InterfaceIndex $_.ifIndex -Dhcp Enabled -ErrorAction SilentlyContinue }",
-      "@('AmazonSSMAgent', 'EC2Config', 'EC2Launch', 'AmazonCloudWatchAgent') | ForEach-Object { if (Get-Service -Name $_ -ErrorAction SilentlyContinue) { Set-Service -Name $_ -StartupType Automatic -ErrorAction SilentlyContinue } }",
-      "",
-      "# STEP 2: Run Cleanup Script",
-      "Write-Host 'Step 2: Running cleanup script...'",
-      "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
-      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose",
-      "",
-      "# STEP 3: EC2Launch v2 Reset",
-      "Write-Host 'Step 3: Running EC2Launch v2 reset...'",
-      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' reset --block",
-      "",
-      "# STEP 4: Copy SetupComplete.cmd",
-      "Write-Host 'Step 4: Installing SetupComplete.cmd...'",
-      "New-Item -Path 'C:\\Windows\\Setup\\Scripts' -ItemType Directory -Force | Out-Null",
-      "Copy-Item -Path 'C:\\Windows\\Temp\\SetupComplete.cmd' -Destination 'C:\\Windows\\Setup\\Scripts\\SetupComplete.cmd' -Force",
-      "",
-      "# STEP 5: Run Sysprep directly",
-      "Write-Host 'Step 5: Running Sysprep (instance will shutdown)...'",
-      "$sysprepPath = \"$env:SystemRoot\\System32\\Sysprep\\Sysprep.exe\"",
-      "Start-Process -FilePath $sysprepPath -ArgumentList '/generalize /oobe /shutdown /quiet' -Wait -NoNewWindow"
+      "Write-Host 'Scheduled task created. Script will run in 10 seconds.'",
+      "Write-Host 'Post-STIG script includes Sysprep - instance will shutdown.'",
+      "Write-Host 'Waiting 120 seconds for post-STIG script and Sysprep to complete...'",
+      "Start-Sleep -Seconds 120"
     ]
   }
 }
