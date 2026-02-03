@@ -645,10 +645,6 @@ source "amazon-ebs" "windows-base" {
   winrm_username              = "TempPackerUser"
   winrm_password              = "ComplexP@ssw0rd123!"
 
-  # Wait for sysprep-initiated shutdown instead of Packer stopping the instance
-  # The Ansible playbook triggers sysprep which shuts down the instance
-  disable_stop_instance       = true
-
   launch_block_device_mappings {
     device_name = "/dev/sda1"
     volume_type = "gp3"
@@ -1257,7 +1253,7 @@ build {
 
   provisioner "ansible" {
     pause_before         = "30s"
-    timeout              = "60m"
+    timeout              = "30m"
     only                 = ["amazon-ebs.hardened-windows-2016-hvm"]
     roles_path           = "${path.root}/ansible/roles"
     playbook_file        = "${path.root}/ansible/windows-2016-stig-playbook.yml"
@@ -1265,13 +1261,13 @@ build {
     user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 120, 'ansible_winrm_read_timeout_sec': 180, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16_so_000010': false, 'wn16_so_000020': false, 'wn16_so_000030': false, 'wn16_00_000450': false, 'wn16_cc_000010': false, 'wn16_cc_000020': false, 'wn16stig_newadministratorname': 'maintuser'}"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16_so_000010': false, 'wn16_so_000020': false, 'wn16_so_000030': false, 'wn16_00_000450': false, 'wn16_cc_000010': false, 'wn16_cc_000020': false, 'wn16stig_newadministratorname': 'maintuser'}"
     ]
   }
 
   provisioner "ansible" {
     pause_before = "30s"
-    timeout      = "60m"
+    timeout      = "30m"
     only = ["amazon-ebs.hardened-windows-2019-hvm"]
     roles_path = "${path.root}/ansible/roles"
     playbook_file = "${path.root}/ansible/windows-2019-stig-playbook.yml"
@@ -1279,13 +1275,13 @@ build {
     user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 120, 'ansible_winrm_read_timeout_sec': 180, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19_so_000010': false, 'wn19_so_000020': false, 'wn19_so_000030': false, 'wn19_00_000450': false, 'wn19_cc_000010': false, 'wn19_cc_000020': false, 'wn19stig_newadministratorname': 'maintuser'}"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19_so_000010': false, 'wn19_so_000020': false, 'wn19_so_000030': false, 'wn19_00_000450': false, 'wn19_cc_000010': false, 'wn19_cc_000020': false, 'wn19stig_newadministratorname': 'maintuser'}"
     ]
   }
 
   provisioner "ansible" {
     pause_before = "30s"
-    timeout      = "60m"
+    timeout      = "30m"
     only = ["amazon-ebs.hardened-windows-2022-hvm"]
     roles_path = "${path.root}/ansible/roles"
     playbook_file = "${path.root}/ansible/windows-2022-stig-playbook.yml"
@@ -1293,16 +1289,112 @@ build {
     user = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 120, 'ansible_winrm_read_timeout_sec': 180, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn22_ac_000010': false, 'wn22_cc_000470': false, 'wn22_cc_000500': false, 'wn22_so_000010': false, 'wn22_so_000020': false, 'wn22_so_000030': false, 'wn22_00_000450': false, 'wn22_cc_000010': false, 'wn22_cc_000020': false, 'wn22stig_newadministratorname': 'maintuser'}"
+      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn22_ac_000010': false, 'wn22_cc_000470': false, 'wn22_cc_000500': false, 'wn22_so_000010': false, 'wn22_so_000020': false, 'wn22_so_000030': false, 'wn22_00_000450': false, 'wn22_cc_000010': false, 'wn22_cc_000020': false, 'wn22stig_newadministratorname': 'maintuser'}"
     ]
   }
 
-  # NOTE: All post-STIG Windows provisioners have been moved into the Ansible playbooks
-  # because STIG hardening breaks WinRM and Packer cannot reconnect after Ansible exits.
-  # The Ansible playbooks now handle:
-  # - WinRM restoration
-  # - EC2 network restoration  
-  # - cleanup-sysprep.ps1 execution
-  # - SetupComplete.cmd deployment
-  # - EC2Launch sysprep execution
+
+  # Fix EC2 networking after STIG hardening
+  provisioner "powershell" {
+    pause_before = "10s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "Write-Host 'Restoring EC2 network functionality after STIG hardening...'",
+      "",
+      "# Ensure Windows Firewall allows IMDS access (169.254.169.254)",
+      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Outbound' -Direction Outbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
+      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Inbound' -Direction Inbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Allow link-local addresses for DHCP and routing",
+      "New-NetFirewallRule -DisplayName 'Allow Link-Local Outbound' -Direction Outbound -RemoteAddress 169.254.0.0/16 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Ensure DHCP client service is running",
+      "Set-Service -Name 'Dhcp' -StartupType Automatic -ErrorAction SilentlyContinue",
+      "Start-Service -Name 'Dhcp' -ErrorAction SilentlyContinue",
+      "",
+      "# Ensure network adapters have DHCP enabled",
+      "Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | ForEach-Object {",
+      "    Set-NetIPInterface -InterfaceIndex $_.ifIndex -Dhcp Enabled -ErrorAction SilentlyContinue",
+      "}",
+      "",
+      "# Ensure EC2Config/EC2Launch services are set to start",
+      "$ec2Services = @('AmazonSSMAgent', 'EC2Config', 'EC2Launch', 'AmazonCloudWatchAgent')",
+      "foreach ($svc in $ec2Services) {",
+      "    if (Get-Service -Name $svc -ErrorAction SilentlyContinue) {",
+      "        Set-Service -Name $svc -StartupType Automatic -ErrorAction SilentlyContinue",
+      "    }",
+      "}",
+      "",
+      "# Reset Windows Firewall to allow basic networking while maintaining security",
+      "# Allow outbound DNS",
+      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound' -Direction Outbound -Protocol UDP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
+      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound TCP' -Direction Outbound -Protocol TCP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Allow outbound HTTPS for AWS APIs",
+      "New-NetFirewallRule -DisplayName 'Allow HTTPS Outbound' -Direction Outbound -Protocol TCP -RemotePort 443 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Allow outbound HTTP for metadata and updates",
+      "New-NetFirewallRule -DisplayName 'Allow HTTP Outbound' -Direction Outbound -Protocol TCP -RemotePort 80 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "Write-Host 'EC2 network restoration complete.'"
+    ]
+  }
+
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    source      = "${path.root}/scripts/cleanup-sysprep.ps1"
+    destination = "C:/Windows/Temp/cleanup-sysprep.ps1"
+  }
+
+  provisioner "powershell" {
+    pause_before = "30s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
+      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose"
+    ]
+  }
+
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    source      = "${path.root}/scripts/SetupComplete.cmd"
+    destination = "C:/Windows/Setup/Scripts/SetupComplete.cmd"
+  }
+
+  provisioner "powershell" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm"
+    ]
+    inline = [
+      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
+      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown"
+    ]
+  }
+
+  provisioner "powershell" {
+    only = [
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' reset --block",
+      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' sysprep --shutdown --block"
+    ]
+  }
 }
