@@ -113,4 +113,9 @@ try {
 # Remove the scheduled task if it exists
 Unregister-ScheduledTask -TaskName "PostSTIG" -Confirm:$false -ErrorAction SilentlyContinue
 
+# Create marker file to signal completion to Packer
+$markerFile = 'C:\Windows\Temp\post-stig-complete.marker'
+New-Item -Path $markerFile -ItemType File -Force | Out-Null
+Write-Log "Created completion marker: $markerFile"
+
 Write-Log "Script completed successfully."

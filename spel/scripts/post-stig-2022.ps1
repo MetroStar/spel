@@ -104,6 +104,11 @@ try {
 
     Write-Log "=== POST-STIG: Complete. Running Sysprep... ==="
 
+    # Create marker file to signal completion to Packer (before Sysprep shuts down)
+    $markerFile = 'C:\Windows\Temp\post-stig-complete.marker'
+    New-Item -Path $markerFile -ItemType File -Force | Out-Null
+    Write-Log "Created completion marker: $markerFile"
+
     # STEP 6: Run Sysprep (Windows 2022 with EC2Launch v2)
     Write-Log "Step 6: Running Sysprep..."
     
