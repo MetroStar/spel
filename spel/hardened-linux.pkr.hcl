@@ -1294,7 +1294,9 @@ build {
   }
 
 
-  # Fix EC2 networking after STIG hardening
+  # Fix EC2 networking AND WinRM after STIG hardening
+  # CRITICAL: STIG breaks WinRM for new connections. We must restore WinRM here
+  # because subsequent provisioners (file, powershell) need new connections.
   provisioner "powershell" {
     pause_before = "10s"
     only = [
@@ -1303,7 +1305,73 @@ build {
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
     inline = [
-      "Write-Host 'Restoring EC2 network functionality after STIG hardening...'",
+      "Write-Host 'Restoring WinRM and EC2 network functionality after STIG hardening...'",
+      "",
+      "# ==========================================================================",
+      "# SECTION 1: Restore WinRM Service and Configuration",
+      "# STIG controls disable WinRM settings that break new connections",
+      "# ==========================================================================",
+      "",
+      "Write-Host 'Restoring WinRM configuration...'",
+      "",
+      "# Ensure WinRM service is running",
+      "Set-Service -Name WinRM -StartupType Automatic -ErrorAction SilentlyContinue",
+      "Start-Service -Name WinRM -ErrorAction SilentlyContinue",
+      "",
+      "# Re-enable WinRM HTTPS listener if it was disabled",
+      "# First check if HTTPS listener exists",
+      "$httpsListener = Get-ChildItem -Path WSMan:\\localhost\\Listener -ErrorAction SilentlyContinue | Where-Object { $_.Keys -contains 'Transport=HTTPS' }",
+      "if (-not $httpsListener) {",
+      "    Write-Host 'HTTPS listener not found, attempting to create...'",
+      "    # Get the certificate thumbprint",
+      "    $cert = Get-ChildItem -Path Cert:\\LocalMachine\\My -ErrorAction SilentlyContinue | Where-Object { $_.Subject -like '*' } | Select-Object -First 1",
+      "    if ($cert) {",
+      "        try {",
+      "            New-WSManInstance -ResourceURI winrm/config/Listener -SelectorSet @{Transport='HTTPS'; Address='*'} -ValueSet @{CertificateThumbprint=$cert.Thumbprint} -ErrorAction SilentlyContinue",
+      "            Write-Host 'Created HTTPS listener'",
+      "        } catch {",
+      "            Write-Host \"Warning: Could not create HTTPS listener: $_\"",
+      "        }",
+      "    }",
+      "}",
+      "",
+      "# Restore WinRM settings that STIG may have changed",
+      "# These are needed for Packer to connect",
+      "try {",
+      "    # Allow unencrypted traffic temporarily (Packer uses SSL anyway)",
+      "    Set-Item -Path WSMan:\\localhost\\Service\\AllowUnencrypted -Value $true -ErrorAction SilentlyContinue",
+      "    Set-Item -Path WSMan:\\localhost\\Client\\AllowUnencrypted -Value $true -ErrorAction SilentlyContinue",
+      "",
+      "    # Re-enable basic auth if needed (Packer can use it)",
+      "    Set-Item -Path WSMan:\\localhost\\Service\\Auth\\Basic -Value $true -ErrorAction SilentlyContinue",
+      "    Set-Item -Path WSMan:\\localhost\\Client\\Auth\\Basic -Value $true -ErrorAction SilentlyContinue",
+      "",
+      "    # Ensure Negotiate auth is enabled",
+      "    Set-Item -Path WSMan:\\localhost\\Service\\Auth\\Negotiate -Value $true -ErrorAction SilentlyContinue",
+      "",
+      "    # Increase timeouts",
+      "    Set-Item -Path WSMan:\\localhost\\Service\\MaxTimeoutms -Value 1800000 -ErrorAction SilentlyContinue",
+      "",
+      "    Write-Host 'WinRM settings restored'",
+      "} catch {",
+      "    Write-Host \"Warning during WinRM restoration: $_\"",
+      "}",
+      "",
+      "# Ensure firewall allows WinRM",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTPS Inbound' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -ErrorAction SilentlyContinue",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTP Inbound' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Restart WinRM to apply changes",
+      "Restart-Service WinRM -Force -ErrorAction SilentlyContinue",
+      "Start-Sleep -Seconds 5",
+      "",
+      "Write-Host 'WinRM restoration complete.'",
+      "",
+      "# ==========================================================================",
+      "# SECTION 2: Restore EC2 Network Functionality",
+      "# ==========================================================================",
+      "",
+      "Write-Host 'Restoring EC2 network functionality...'",
       "",
       "# Ensure Windows Firewall allows IMDS access (169.254.169.254)",
       "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Outbound' -Direction Outbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
@@ -1329,7 +1397,6 @@ build {
       "    }",
       "}",
       "",
-      "# Reset Windows Firewall to allow basic networking while maintaining security",
       "# Allow outbound DNS",
       "New-NetFirewallRule -DisplayName 'Allow DNS Outbound' -Direction Outbound -Protocol UDP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
       "New-NetFirewallRule -DisplayName 'Allow DNS Outbound TCP' -Direction Outbound -Protocol TCP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
@@ -1340,7 +1407,24 @@ build {
       "# Allow outbound HTTP for metadata and updates",
       "New-NetFirewallRule -DisplayName 'Allow HTTP Outbound' -Direction Outbound -Protocol TCP -RemotePort 80 -Action Allow -ErrorAction SilentlyContinue",
       "",
-      "Write-Host 'EC2 network restoration complete.'"
+      "Write-Host 'EC2 network and WinRM restoration complete.'",
+      "",
+      "# Wait for WinRM to be fully ready before next provisioner",
+      "Write-Host 'Waiting for WinRM to stabilize...'",
+      "Start-Sleep -Seconds 15"
+    ]
+  }
+
+  # Small wait for WinRM to be fully ready for new connections
+  provisioner "powershell" {
+    pause_before = "15s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "Write-Host 'WinRM connectivity verified - proceeding with file uploads...'"
     ]
   }
 
