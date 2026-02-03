@@ -1335,99 +1335,107 @@ build {
     ]
   }
 
-
-  # =============================================================================
-  # POST-STIG: EC2 Network Restoration Only
-  # No WinRM restoration needed - inline PowerShell reuses existing session
-  # File uploads were done BEFORE STIG hardening
-  # =============================================================================
-  # CRITICAL: All post-STIG operations MUST be in a SINGLE provisioner per OS
-  # Packer uploads each inline script via WinRM, which fails after STIG
-  # Only the FIRST provisioner after STIG works (reuses existing session)
-  # =============================================================================
-
-  # Windows 2016/2019: Run post-STIG script via scheduled task to survive WinRM death
+  # Fix EC2 networking after STIG hardening
   provisioner "powershell" {
     pause_before = "10s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "Write-Host 'Restoring EC2 network functionality after STIG hardening...'",
+      "",
+      "# Ensure Windows Firewall allows IMDS access (169.254.169.254)",
+      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Outbound' -Direction Outbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
+      "New-NetFirewallRule -DisplayName 'Allow EC2 IMDS Inbound' -Direction Inbound -RemoteAddress 169.254.169.254 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Allow link-local addresses for DHCP and routing",
+      "New-NetFirewallRule -DisplayName 'Allow Link-Local Outbound' -Direction Outbound -RemoteAddress 169.254.0.0/16 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Ensure DHCP client service is running",
+      "Set-Service -Name 'Dhcp' -StartupType Automatic -ErrorAction SilentlyContinue",
+      "Start-Service -Name 'Dhcp' -ErrorAction SilentlyContinue",
+      "",
+      "# Ensure network adapters have DHCP enabled",
+      "Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | ForEach-Object {",
+      "    Set-NetIPInterface -InterfaceIndex $_.ifIndex -Dhcp Enabled -ErrorAction SilentlyContinue",
+      "}",
+      "",
+      "# Ensure EC2Config/EC2Launch services are set to start",
+      "$ec2Services = @('AmazonSSMAgent', 'EC2Config', 'EC2Launch', 'AmazonCloudWatchAgent')",
+      "foreach ($svc in $ec2Services) {",
+      "    if (Get-Service -Name $svc -ErrorAction SilentlyContinue) {",
+      "        Set-Service -Name $svc -StartupType Automatic -ErrorAction SilentlyContinue",
+      "    }",
+      "}",
+      "",
+      "# Reset Windows Firewall to allow basic networking while maintaining security",
+      "# Allow outbound DNS",
+      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound' -Direction Outbound -Protocol UDP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
+      "New-NetFirewallRule -DisplayName 'Allow DNS Outbound TCP' -Direction Outbound -Protocol TCP -RemotePort 53 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Allow outbound HTTPS for AWS APIs",
+      "New-NetFirewallRule -DisplayName 'Allow HTTPS Outbound' -Direction Outbound -Protocol TCP -RemotePort 443 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "# Allow outbound HTTP for metadata and updates",
+      "New-NetFirewallRule -DisplayName 'Allow HTTP Outbound' -Direction Outbound -Protocol TCP -RemotePort 80 -Action Allow -ErrorAction SilentlyContinue",
+      "",
+      "Write-Host 'EC2 network restoration complete.'"
+    ]
+  }
+
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    source      = "${path.root}/scripts/cleanup-sysprep.ps1"
+    destination = "C:/Windows/Temp/cleanup-sysprep.ps1"
+  }
+
+  provisioner "powershell" {
+    pause_before = "30s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
+      "& 'C:/Windows/Temp/cleanup-sysprep.ps1' -SkipSysprep -Verbose"
+    ]
+  }
+
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    source      = "${path.root}/scripts/SetupComplete.cmd"
+    destination = "C:/Windows/Setup/Scripts/SetupComplete.cmd"
+  }
+
+  provisioner "powershell" {
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm"
     ]
     inline = [
-      "$ErrorActionPreference = 'Continue'",
-      "Write-Host 'Creating scheduled task for post-STIG script...'",
-      "",
-      "# Create scheduled task to run immediately - survives WinRM disconnection",
-      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
-      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
-      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
-      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
-      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
-      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
-      "",
-      "Write-Host 'Scheduled task created. Script will run in 10 seconds.'",
-      "Write-Host 'Waiting for post-STIG script to complete (polling every 30s, max 5 min)...'",
-      "",
-      "# Poll for completion marker file",
-      "$maxWait = 300",
-      "$waited = 0",
-      "$markerFile = 'C:\\Windows\\Temp\\post-stig-complete.marker'",
-      "while ($waited -lt $maxWait) {",
-      "    Start-Sleep -Seconds 30",
-      "    $waited += 30",
-      "    if (Test-Path $markerFile) {",
-      "        Write-Host \"Post-STIG script completed after $waited seconds.\"",
-      "        break",
-      "    }",
-      "    Write-Host \"Still waiting... ($waited seconds elapsed)\"",
-      "}",
-      "if (-not (Test-Path $markerFile)) {",
-      "    Write-Host 'WARNING: Marker file not found after 5 minutes. Proceeding anyway.'",
-      "}",
-      "Write-Host 'Post-STIG provisioning complete. Packer will stop the instance.'"
+      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\InitializeInstance.ps1 -Schedule",
+      "& $env:ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown"
     ]
   }
 
-  # Windows 2022: Run post-STIG script via scheduled task to survive WinRM death
-  # Note: post-stig-2022.ps1 includes Sysprep execution, which will shutdown the instance
   provisioner "powershell" {
-    pause_before = "10s"
     only = [
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
     inline = [
-      "$ErrorActionPreference = 'Continue'",
-      "Write-Host 'Creating scheduled task for post-STIG script...'",
-      "",
-      "# Create scheduled task to run immediately - survives WinRM disconnection",
-      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
-      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
-      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
-      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
-      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
-      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
-      "",
-      "Write-Host 'Scheduled task created. Script will run in 10 seconds.'",
-      "Write-Host 'Post-STIG script includes Sysprep which will shutdown the instance.'",
-      "Write-Host 'Waiting for post-STIG script to complete (polling every 30s, max 10 min)...'",
-      "",
-      "# Poll for completion marker file (longer timeout for Sysprep)",
-      "$maxWait = 600",
-      "$waited = 0",
-      "$markerFile = 'C:\\Windows\\Temp\\post-stig-complete.marker'",
-      "while ($waited -lt $maxWait) {",
-      "    Start-Sleep -Seconds 30",
-      "    $waited += 30",
-      "    if (Test-Path $markerFile) {",
-      "        Write-Host \"Post-STIG script completed after $waited seconds.\"",
-      "        break",
-      "    }",
-      "    Write-Host \"Still waiting... ($waited seconds elapsed)\"",
-      "}",
-      "if (-not (Test-Path $markerFile)) {",
-      "    Write-Host 'WARNING: Marker file not found after 10 minutes. Instance may have shutdown from Sysprep.'",
-      "}",
-      "Write-Host 'Post-STIG provisioning complete.'"
+      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' reset --block",
+      "& 'C:/Program Files/Amazon/EC2Launch/ec2launch' sysprep --shutdown --block"
     ]
   }
 }
