@@ -1337,6 +1337,13 @@ build {
       "amazon-ebs.hardened-windows-2019-hvm"
     ]
     inline = [
+      "# CRITICAL: Add WinRM firewall rules FIRST to ensure output flows back to Packer",
+      "# STIG may have enabled outbound filtering that blocks WinRM responses",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTPS Inbound' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTP Inbound' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTPS Outbound' -Direction Outbound -Protocol TCP -LocalPort 5986 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTP Outbound' -Direction Outbound -Protocol TCP -LocalPort 5985 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "",
       "Write-Host '=== POST-STIG: EC2 Network, Cleanup, and Sysprep (SINGLE PROVISIONER) ==='",
       "",
       "# ----- STEP 1: Restore EC2 Network Functionality -----",
@@ -1423,6 +1430,13 @@ build {
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
     inline = [
+      "# CRITICAL: Add WinRM firewall rules FIRST to ensure output flows back to Packer",
+      "# STIG may have enabled outbound filtering that blocks WinRM responses",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTPS Inbound' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTP Inbound' -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTPS Outbound' -Direction Outbound -Protocol TCP -LocalPort 5986 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "New-NetFirewallRule -DisplayName 'Allow WinRM HTTP Outbound' -Direction Outbound -Protocol TCP -LocalPort 5985 -Action Allow -ErrorAction SilentlyContinue | Out-Null",
+      "",
       "Write-Host '=== POST-STIG: EC2 Network, Cleanup, and Sysprep (SINGLE PROVISIONER) ==='",
       "",
       "# ----- STEP 1: Restore EC2 Network Functionality -----",
