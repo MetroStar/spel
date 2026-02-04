@@ -1398,7 +1398,7 @@ build {
 
   # Wait on the Packer HOST machine for post-STIG script to complete
   # This runs locally on the build machine, NOT over WinRM, so it works even after WinRM dies
-  # 15 minutes allows time for: DISM cleanup (~5-10 min) + EC2Launch + SetupComplete copy
+  # 60 minutes allows time for: DISM cleanup (~20-30 min) + EC2Launch + Sysprep (~10-15 min)
   provisioner "shell-local" {
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
@@ -1406,9 +1406,9 @@ build {
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
     inline = [
-      "echo 'Waiting 15 minutes for post-STIG script to complete on Windows instance...'",
+      "echo 'Waiting 60 minutes for post-STIG script to complete on Windows instance...'",
       "echo 'This includes DISM cleanup, EC2Launch sysprep prep, and SetupComplete.cmd installation.'",
-      "for i in $(seq 1 15); do echo \"Minute $i of 15...\"; sleep 60; done",
+      "for i in $(seq 1 60); do echo \"Minute $i of 60...\"; sleep 60; done",
       "echo 'Wait complete. Packer will now stop the instance and create the AMI.'"
     ]
   }
