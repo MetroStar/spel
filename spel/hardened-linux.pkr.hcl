@@ -1293,6 +1293,32 @@ build {
     direction   = "download"
   }
 
+  # =============================================================================
+  # WINDOWS PRE-STIG CLEANUP
+  # Run cleanup-sysprep.ps1 BEFORE STIG hardening since it takes 5+ minutes
+  # and would cause post-STIG timeout issues
+  # =============================================================================
+  provisioner "powershell" {
+    pause_before = "10s"
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "$ErrorActionPreference = 'Continue'",
+      "Write-Host '=== PRE-STIG: Running cleanup-sysprep.ps1 ==='",
+      "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force",
+      "if (Test-Path 'C:\\Windows\\Temp\\cleanup-sysprep.ps1') {",
+      "    & 'C:\\Windows\\Temp\\cleanup-sysprep.ps1' -SkipSysprep -Verbose",
+      "    Write-Host 'Cleanup script completed successfully.'",
+      "} else {",
+      "    Write-Host 'WARNING: cleanup-sysprep.ps1 not found'",
+      "}",
+      "Write-Host '=== PRE-STIG: Cleanup complete ==='"
+    ]
+  }
+
   provisioner "ansible" {
     pause_before         = "30s"
     timeout              = "30m"
