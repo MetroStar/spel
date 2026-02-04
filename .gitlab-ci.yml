@@ -852,6 +852,9 @@ infra:kms:
         else
           echo "Creating shared KMS key for temp builds..."
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          CALLER_ARN=$(aws sts get-caller-identity --query Arn --output text)
+          # Extract the role name from the caller ARN (handles assumed-role format)
+          CALLER_ROLE_ARN=$(echo "${CALLER_ARN}" | sed 's|:assumed-role/|:role/|; s|/[^/]*$||')
           PARTITION="aws"
           [[ "${PKR_VAR_aws_region}" == us-gov-* ]] && PARTITION="aws-us-gov"
           
@@ -865,6 +868,33 @@ infra:kms:
               "Effect": "Allow",
               "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:root"},
               "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowCallerRole",
+              "Effect": "Allow",
+              "Principal": {"AWS": "${CALLER_ROLE_ARN}"},
+              "Action": [
+                "kms:Create*",
+                "kms:Describe*",
+                "kms:Enable*",
+                "kms:List*",
+                "kms:Put*",
+                "kms:Update*",
+                "kms:Revoke*",
+                "kms:Disable*",
+                "kms:Get*",
+                "kms:Delete*",
+                "kms:TagResource",
+                "kms:UntagResource",
+                "kms:ScheduleKeyDeletion",
+                "kms:CancelKeyDeletion",
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:CreateGrant"
+              ],
               "Resource": "*"
             },
             {

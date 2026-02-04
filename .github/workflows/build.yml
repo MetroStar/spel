@@ -504,6 +504,7 @@ jobs:
           else
             echo "Creating shared KMS key for temp builds..."
             ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            CALLER_ARN=$(aws sts get-caller-identity --query Arn --output text)
             PARTITION="aws"
             
             cat > /tmp/kms-policy.json <<KMSEOF
@@ -519,12 +520,39 @@ jobs:
                 "Resource": "*"
               },
               {
+                "Sid": "AllowCallerRole",
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:role/Packer_Amazon"},
+                "Action": [
+                  "kms:Create*",
+                  "kms:Describe*",
+                  "kms:Enable*",
+                  "kms:List*",
+                  "kms:Put*",
+                  "kms:Update*",
+                  "kms:Revoke*",
+                  "kms:Disable*",
+                  "kms:Get*",
+                  "kms:Delete*",
+                  "kms:TagResource",
+                  "kms:UntagResource",
+                  "kms:ScheduleKeyDeletion",
+                  "kms:CancelKeyDeletion",
+                  "kms:Encrypt",
+                  "kms:Decrypt",
+                  "kms:ReEncrypt*",
+                  "kms:GenerateDataKey*",
+                  "kms:CreateGrant"
+                ],
+                "Resource": "*"
+              },
+              {
                 "Sid": "AllowEC2ForEBS",
                 "Effect": "Allow",
                 "Principal": {"Service": "ec2.amazonaws.com"},
                 "Action": ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey", "kms:CreateGrant"],
                 "Resource": "*",
-                "Condition": {"StringEquals": {"kms:CallerAccount": "${ACCOUNT_ID}", "kms:ViaService": "ec2.${AWS_REGION}.amazonaws.com"}}
+                "Condition": {"StringEquals": {"kms:CallerAccount": "${ACCOUNT_ID}", "kms:ViaService": "ec2.us-east-1.amazonaws.com"}}
               }
             ]
           }
