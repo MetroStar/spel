@@ -1413,13 +1413,34 @@ build {
     ]
   }
 
-  # Windows 2022: Wait 60 minutes (includes DISM + Sysprep)
+  # Windows 2022: Poll instance state until stopped (Sysprep shuts down the instance)
+  # This is more reliable than a fixed wait - we know Sysprep completed when instance stops
   provisioner "shell-local" {
     only = ["amazon-ebs.hardened-windows-2022-hvm"]
+    environment_vars = [
+      "INSTANCE_ID=${build.ID}",
+      "AWS_REGION=${var.aws_region}"
+    ]
     inline = [
-      "echo 'Waiting 60 minutes for Windows 2022 post-STIG script (includes Sysprep)...'",
-      "for i in $(seq 1 60); do echo \"Minute $i of 60...\"; sleep 60; done",
-      "echo 'Wait complete.'"
+      "echo 'Waiting for Windows 2022 Sysprep to complete (instance will stop)...'",
+      "echo \"Instance ID: $INSTANCE_ID\"",
+      "TIMEOUT=90",
+      "ELAPSED=0",
+      "while [ $ELAPSED -lt $TIMEOUT ]; do",
+      "  STATE=$(aws ec2 describe-instances --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo 'unknown')",
+      "  echo \"Minute $ELAPSED: Instance state = $STATE\"",
+      "  if [ \"$STATE\" = \"stopped\" ]; then",
+      "    echo 'SUCCESS: Instance stopped - Sysprep completed successfully!'",
+      "    exit 0",
+      "  fi",
+      "  if [ \"$STATE\" = \"stopping\" ]; then",
+      "    echo 'Instance is stopping - Sysprep initiated shutdown, waiting for full stop...'",
+      "  fi",
+      "  sleep 60",
+      "  ELAPSED=$((ELAPSED + 1))",
+      "done",
+      "echo 'WARNING: Timeout reached after 90 minutes. Proceeding anyway.'",
+      "echo 'If AMI shows IMAGE_STATE_UNDEPLOYABLE, Sysprep may not have completed.'"
     ]
   }
 }
