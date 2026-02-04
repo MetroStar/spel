@@ -1337,79 +1337,46 @@ build {
 
 
   # =============================================================================
-  # POST-STIG: EC2 Network Restoration Only
-  # No WinRM restoration needed - inline PowerShell reuses existing session
+  # POST-STIG: Run post-STIG operations directly via PowerShell
+  # WinRM survives STIG hardening because WinRM-related STIG controls are disabled
   # File uploads were done BEFORE STIG hardening
   # =============================================================================
-  # CRITICAL: All post-STIG operations MUST be in a SINGLE provisioner per OS
-  # Packer uploads each inline script via WinRM, which fails after STIG
-  # Only the FIRST provisioner after STIG works (reuses existing session)
-  # =============================================================================
 
-  # Windows 2016/2019: Run post-STIG script via scheduled task to survive WinRM death
-  # Windows 2016/2019: Create scheduled task for post-STIG script
-  # The scheduled task runs as SYSTEM and survives WinRM disconnection
+  # Windows 2016/2019: Run post-STIG script directly
+  # Script handles: firewall disable, network restore, DISM cleanup, EC2Launch sysprep, SetupComplete.cmd
   provisioner "powershell" {
-    pause_before = "10s"
+    pause_before = "30s"
+    timeout      = "90m"
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm"
     ]
     inline = [
       "$ErrorActionPreference = 'Continue'",
-      "Write-Host 'Creating scheduled task for post-STIG script...'",
-      "",
-      "# Create scheduled task to run immediately - survives WinRM disconnection",
-      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
-      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
-      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
-      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
-      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
-      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
-      "",
-      "Write-Host 'Scheduled task created. Script will run in 10 seconds.'",
-      "Write-Host 'Packer will now wait on the host machine for the script to complete.'"
+      "Write-Host '============================================='",
+      "Write-Host 'Running post-STIG script directly via WinRM'",
+      "Write-Host '============================================='",
+      "& 'C:\\Windows\\Temp\\post-stig.ps1'",
+      "Write-Host 'Post-STIG script completed successfully.'"
     ]
   }
 
-  # Windows 2022: Create scheduled task for post-STIG script (includes Sysprep)
+  # Windows 2022: Run post-STIG script directly (includes Sysprep)
+  # Script handles: firewall disable, network restore, DISM cleanup, EC2Launch v2 reset, Sysprep, SetupComplete.cmd
+  # Note: Sysprep will shutdown the instance, Packer will then create the AMI
   provisioner "powershell" {
-    pause_before = "10s"
+    pause_before = "30s"
+    timeout      = "90m"
     only = [
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
     inline = [
       "$ErrorActionPreference = 'Continue'",
-      "Write-Host 'Creating scheduled task for post-STIG script...'",
-      "",
-      "# Create scheduled task to run immediately - survives WinRM disconnection",
-      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
-      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
-      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
-      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
-      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
-      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
-      "",
-      "Write-Host 'Scheduled task created. Script will run in 10 seconds.'",
-      "Write-Host 'Post-STIG script includes Sysprep which will shutdown the instance.'",
-      "Write-Host 'Packer will now wait on the host machine for the script to complete.'"
-    ]
-  }
-
-  # Wait on the Packer HOST machine for post-STIG script to complete
-  # This runs locally on the build machine, NOT over WinRM, so it works even after WinRM dies
-  # 60 minutes allows time for: DISM cleanup (~20-30 min) + EC2Launch + Sysprep (~10-15 min)
-  provisioner "shell-local" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    inline = [
-      "echo 'Waiting 60 minutes for post-STIG script to complete on Windows instance...'",
-      "echo 'This includes DISM cleanup, EC2Launch sysprep prep, and SetupComplete.cmd installation.'",
-      "for i in $(seq 1 60); do echo \"Minute $i of 60...\"; sleep 60; done",
-      "echo 'Wait complete. Packer will now stop the instance and create the AMI.'"
+      "Write-Host '============================================='",
+      "Write-Host 'Running post-STIG script directly via WinRM'",
+      "Write-Host '============================================='",
+      "& 'C:\\Windows\\Temp\\post-stig.ps1'",
+      "Write-Host 'Post-STIG script completed (Sysprep may have shut down the instance).'"
     ]
   }
 }
