@@ -1393,23 +1393,75 @@ build {
     ]
   }
 
-  # Windows 2016: Wait 55 minutes (actual runtime ~50 min)
+  # Windows 2016: Poll SSM for completion marker (actual runtime ~50 min)
+  # The post-STIG script creates C:\Windows\Temp\post-stig-complete.marker when done
   provisioner "shell-local" {
     only = ["amazon-ebs.hardened-windows-2016-hvm"]
+    environment_vars = [
+      "INSTANCE_ID=${build.ID}",
+      "AWS_REGION=${var.aws_region}"
+    ]
     inline = [
-      "echo 'Waiting 55 minutes for Windows 2016 post-STIG script...'",
-      "for i in $(seq 1 55); do echo \"Minute $i of 55...\"; sleep 60; done",
-      "echo 'Wait complete.'"
+      "echo 'Polling SSM for Windows 2016 post-STIG completion...'",
+      "echo \"Instance ID: $INSTANCE_ID\"",
+      "TIMEOUT=70",
+      "ELAPSED=0",
+      "MARKER='C:\\Windows\\Temp\\post-stig-complete.marker'",
+      "while [ $ELAPSED -lt $TIMEOUT ]; do",
+      "  RESULT=$(aws ssm send-command --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --document-name 'AWS-RunPowerShellScript' --parameters \"commands=[\\\"if (Test-Path '$MARKER') { Write-Output 'MARKER_FOUND' } else { Write-Output 'MARKER_NOT_FOUND' }\\\"]\" --query 'Command.CommandId' --output text 2>/dev/null || echo 'SSM_FAILED')",
+      "  if [ \"$RESULT\" = 'SSM_FAILED' ]; then",
+      "    echo \"Minute $ELAPSED: SSM not available yet, waiting...\"",
+      "    sleep 60",
+      "    ELAPSED=$((ELAPSED + 1))",
+      "    continue",
+      "  fi",
+      "  sleep 5",
+      "  OUTPUT=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$RESULT\" --instance-id \"$INSTANCE_ID\" --query 'StandardOutputContent' --output text 2>/dev/null || echo 'PENDING')",
+      "  echo \"Minute $ELAPSED: SSM check result = $OUTPUT\"",
+      "  if echo \"$OUTPUT\" | grep -q 'MARKER_FOUND'; then",
+      "    echo 'SUCCESS: Post-STIG script completed!'",
+      "    exit 0",
+      "  fi",
+      "  sleep 55",
+      "  ELAPSED=$((ELAPSED + 1))",
+      "done",
+      "echo 'WARNING: Timeout reached after 70 minutes. Proceeding anyway.'"
     ]
   }
 
-  # Windows 2019: Wait 30 minutes (actual runtime ~23 min)
+  # Windows 2019: Poll SSM for completion marker (actual runtime ~23 min)
+  # The post-STIG script creates C:\Windows\Temp\post-stig-complete.marker when done
   provisioner "shell-local" {
     only = ["amazon-ebs.hardened-windows-2019-hvm"]
+    environment_vars = [
+      "INSTANCE_ID=${build.ID}",
+      "AWS_REGION=${var.aws_region}"
+    ]
     inline = [
-      "echo 'Waiting 30 minutes for Windows 2019 post-STIG script...'",
-      "for i in $(seq 1 30); do echo \"Minute $i of 30...\"; sleep 60; done",
-      "echo 'Wait complete.'"
+      "echo 'Polling SSM for Windows 2019 post-STIG completion...'",
+      "echo \"Instance ID: $INSTANCE_ID\"",
+      "TIMEOUT=45",
+      "ELAPSED=0",
+      "MARKER='C:\\Windows\\Temp\\post-stig-complete.marker'",
+      "while [ $ELAPSED -lt $TIMEOUT ]; do",
+      "  RESULT=$(aws ssm send-command --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --document-name 'AWS-RunPowerShellScript' --parameters \"commands=[\\\"if (Test-Path '$MARKER') { Write-Output 'MARKER_FOUND' } else { Write-Output 'MARKER_NOT_FOUND' }\\\"]\" --query 'Command.CommandId' --output text 2>/dev/null || echo 'SSM_FAILED')",
+      "  if [ \"$RESULT\" = 'SSM_FAILED' ]; then",
+      "    echo \"Minute $ELAPSED: SSM not available yet, waiting...\"",
+      "    sleep 60",
+      "    ELAPSED=$((ELAPSED + 1))",
+      "    continue",
+      "  fi",
+      "  sleep 5",
+      "  OUTPUT=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$RESULT\" --instance-id \"$INSTANCE_ID\" --query 'StandardOutputContent' --output text 2>/dev/null || echo 'PENDING')",
+      "  echo \"Minute $ELAPSED: SSM check result = $OUTPUT\"",
+      "  if echo \"$OUTPUT\" | grep -q 'MARKER_FOUND'; then",
+      "    echo 'SUCCESS: Post-STIG script completed!'",
+      "    exit 0",
+      "  fi",
+      "  sleep 55",
+      "  ELAPSED=$((ELAPSED + 1))",
+      "done",
+      "echo 'WARNING: Timeout reached after 45 minutes. Proceeding anyway.'"
     ]
   }
 
