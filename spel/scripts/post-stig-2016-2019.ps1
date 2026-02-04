@@ -64,13 +64,18 @@ try {
         } 
     }
 
-    # NOTE: cleanup-sysprep.ps1 is intentionally NOT called here.
-    # It contains DISM operations that take 5+ minutes and would cause
-    # Packer to stop the instance before this script completes.
-    # Cleanup can be done before STIG hardening if needed.
+    # STEP 3: Run Cleanup Script (with -SkipDism to avoid 5+ minute DISM operations)
+    Write-Log "Step 3: Running cleanup script (fast mode, skipping DISM)..."
+    if (Test-Path 'C:\Windows\Temp\cleanup-sysprep.ps1') {
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+        & 'C:\Windows\Temp\cleanup-sysprep.ps1' -SkipSysprep -SkipDism 2>&1 | ForEach-Object { Write-Log "  $_" }
+        Write-Log "  Cleanup script completed"
+    } else {
+        Write-Log "  WARNING: cleanup-sysprep.ps1 not found"
+    }
 
-    # STEP 3: EC2Launch v1 Sysprep Prep
-    Write-Log "Step 3: Running EC2Launch v1 sysprep prep..."
+    # STEP 4: EC2Launch v1 Sysprep Prep
+    Write-Log "Step 4: Running EC2Launch v1 sysprep prep..."
     $ec2LaunchPath = "$env:ProgramData\Amazon\EC2-Windows\Launch\Scripts"
     if (Test-Path "$ec2LaunchPath\InitializeInstance.ps1") {
         & "$ec2LaunchPath\InitializeInstance.ps1" -Schedule 2>&1 | ForEach-Object { Write-Log "  $_" }
@@ -81,8 +86,8 @@ try {
         Write-Log "  SysprepInstance.ps1 completed"
     }
 
-    # STEP 4: Copy SetupComplete.cmd (AFTER EC2Launch runs to avoid it being overwritten)
-    Write-Log "Step 4: Installing SetupComplete.cmd..."
+    # STEP 5: Copy SetupComplete.cmd (AFTER EC2Launch runs to avoid it being overwritten)
+    Write-Log "Step 5: Installing SetupComplete.cmd..."
     New-Item -Path 'C:\Windows\Setup\Scripts' -ItemType Directory -Force | Out-Null
     if (Test-Path 'C:\Windows\Temp\SetupComplete.cmd') {
         Copy-Item -Path 'C:\Windows\Temp\SetupComplete.cmd' -Destination 'C:\Windows\Setup\Scripts\SetupComplete.cmd' -Force

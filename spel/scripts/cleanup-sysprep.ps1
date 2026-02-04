@@ -12,7 +12,10 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [switch]$SkipSysprep
+    [switch]$SkipSysprep,
+    
+    [Parameter()]
+    [switch]$SkipDism  # Skip slow DISM/WinSxS operations (for post-STIG cleanup)
 )
 
 Set-StrictMode -Version Latest
@@ -432,6 +435,10 @@ try {
 ## Section 5: System Optimization (WinSxS & Features)
 # -------------------------------------------------------------------
 
+if ($SkipDism) {
+    Write-Output 'Skipping WinSxS/DISM cleanup (SkipDism flag set)...'
+} else {
+
 Write-Output 'Cleaning up the WinSxS Component Store...'
 try {
     Write-Output "Running DISM cleanup operations..."
@@ -496,6 +503,8 @@ try {
 
 Write-Output 'Analyzing WinSxS folder post-cleanup...'
 dism.exe /Online /Cleanup-Image /AnalyzeComponentStore
+
+} # End of SkipDism conditional
 
 # -------------------------------------------------------------------
 ## Section 6: Security and Privacy Cleanup

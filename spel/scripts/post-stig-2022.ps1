@@ -65,13 +65,18 @@ try {
         } 
     }
 
-    # NOTE: cleanup-sysprep.ps1 is intentionally NOT called here.
-    # It contains DISM operations that take 5+ minutes and would cause
-    # Packer to stop the instance before this script completes.
-    # Cleanup can be done before STIG hardening if needed.
+    # STEP 3: Run Cleanup Script (with -SkipDism to avoid 5+ minute DISM operations)
+    Write-Log "Step 3: Running cleanup script (fast mode, skipping DISM)..."
+    if (Test-Path 'C:\Windows\Temp\cleanup-sysprep.ps1') {
+        Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+        & 'C:\Windows\Temp\cleanup-sysprep.ps1' -SkipSysprep -SkipDism 2>&1 | ForEach-Object { Write-Log "  $_" }
+        Write-Log "  Cleanup script completed"
+    } else {
+        Write-Log "  WARNING: cleanup-sysprep.ps1 not found"
+    }
 
-    # STEP 3: EC2Launch v2 Reset
-    Write-Log "Step 3: Running EC2Launch v2 reset..."
+    # STEP 4: EC2Launch v2 Reset
+    Write-Log "Step 4: Running EC2Launch v2 reset..."
     $ec2LaunchV2 = 'C:\Program Files\Amazon\EC2Launch\ec2launch.exe'
     if (Test-Path $ec2LaunchV2) {
         & $ec2LaunchV2 reset --block 2>&1 | ForEach-Object { Write-Log "  $_" }
@@ -80,8 +85,8 @@ try {
         Write-Log "  WARNING: EC2Launch v2 not found at $ec2LaunchV2"
     }
 
-    # STEP 4: Copy SetupComplete.cmd (AFTER EC2Launch runs to avoid it being overwritten)
-    Write-Log "Step 4: Installing SetupComplete.cmd..."
+    # STEP 5: Copy SetupComplete.cmd (AFTER EC2Launch runs to avoid it being overwritten)
+    Write-Log "Step 5: Installing SetupComplete.cmd..."
     New-Item -Path 'C:\Windows\Setup\Scripts' -ItemType Directory -Force | Out-Null
     if (Test-Path 'C:\Windows\Temp\SetupComplete.cmd') {
         Copy-Item -Path 'C:\Windows\Temp\SetupComplete.cmd' -Destination 'C:\Windows\Setup\Scripts\SetupComplete.cmd' -Force
@@ -104,8 +109,8 @@ try {
     New-Item -Path $markerFile -ItemType File -Force | Out-Null
     Write-Log "Created completion marker: $markerFile"
 
-    # STEP 5: Run Sysprep (Windows 2022 with EC2Launch v2)
-    Write-Log "Step 5: Running Sysprep..."
+    # STEP 6: Run Sysprep (Windows 2022 with EC2Launch v2)
+    Write-Log "Step 6: Running Sysprep..."
     
     # Remove the scheduled task before sysprep
     Unregister-ScheduledTask -TaskName "PostSTIG" -Confirm:$false -ErrorAction SilentlyContinue
