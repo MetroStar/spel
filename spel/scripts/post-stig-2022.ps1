@@ -65,11 +65,11 @@ try {
         } 
     }
 
-    # STEP 3: Run Cleanup Script (with -SkipDism to avoid 5+ minute DISM operations)
-    Write-Log "Step 3: Running cleanup script (fast mode, skipping DISM)..."
+    # STEP 3: Run Cleanup Script (includes DISM operations which may take 5-10 minutes)
+    Write-Log "Step 3: Running cleanup script (full mode with DISM)..."
     if (Test-Path 'C:\Windows\Temp\cleanup-sysprep.ps1') {
         Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-        & 'C:\Windows\Temp\cleanup-sysprep.ps1' -SkipSysprep -SkipDism 2>&1 | ForEach-Object { Write-Log "  $_" }
+        & 'C:\Windows\Temp\cleanup-sysprep.ps1' -SkipSysprep 2>&1 | ForEach-Object { Write-Log "  $_" }
         Write-Log "  Cleanup script completed"
     } else {
         Write-Log "  WARNING: cleanup-sysprep.ps1 not found"
