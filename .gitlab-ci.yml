@@ -82,6 +82,9 @@ variables:
   # Set this to use a pre-created instance profile (e.g., from infra job)
   # Leave empty to have Packer create a temporary one (requires IAM permissions)
   PKR_VAR_aws_iam_instance_profile: ""
+  # Create temporary infrastructure for this build (auto-destroyed after build)
+  # Set to "true" to create temporary VPC/subnet/SG/IAM inline
+  CREATE_TEMP_INFRA: "false"
 
 stages:
   - import       # Import Docker image from tarball
@@ -630,6 +633,282 @@ infra:kms:
     - echo "Starting Docker-based build on $(hostname)"
     - echo "Git commit - ${CI_COMMIT_SHA}"
     
+    # Create temporary infrastructure if requested
+    - |
+      if [ "${CREATE_TEMP_INFRA:-false}" = "true" ]; then
+        echo "=== Creating Temporary Infrastructure ==="
+        
+        TEMP_INFRA_PREFIX="spel-temp-${CI_PIPELINE_ID}"
+        VPC_CIDR="10.$((CI_PIPELINE_ID % 100)).0.0/16"
+        SUBNET_CIDR="10.$((CI_PIPELINE_ID % 100)).1.0/24"
+        CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        
+        # Save prefix for after_script cleanup
+        echo "TEMP_INFRA_PREFIX=${TEMP_INFRA_PREFIX}" > temp_infra.env
+        
+        # Create VPC
+        echo "Creating VPC..."
+        TEMP_VPC_ID=$(aws ec2 create-vpc \
+          --cidr-block "${VPC_CIDR}" \
+          --query 'Vpc.VpcId' --output text)
+        
+        aws ec2 create-tags --resources "${TEMP_VPC_ID}" \
+          --tags Key=Name,Value="${TEMP_INFRA_PREFIX}-vpc" \
+                 Key=Project,Value=SPEL \
+                 Key=TempBuild,Value=true \
+                 Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
+                 Key=CreatedAt,Value="${CREATED_AT}"
+        
+        aws ec2 modify-vpc-attribute --vpc-id "${TEMP_VPC_ID}" --enable-dns-hostnames
+        aws ec2 modify-vpc-attribute --vpc-id "${TEMP_VPC_ID}" --enable-dns-support
+        echo "✓ Created VPC: ${TEMP_VPC_ID}"
+        echo "TEMP_VPC_ID=${TEMP_VPC_ID}" >> temp_infra.env
+        
+        # Create Subnet
+        echo "Creating subnet..."
+        AZ=$(aws ec2 describe-availability-zones --query 'AvailabilityZones[0].ZoneName' --output text)
+        TEMP_SUBNET_ID=$(aws ec2 create-subnet \
+          --vpc-id "${TEMP_VPC_ID}" \
+          --cidr-block "${SUBNET_CIDR}" \
+          --availability-zone "${AZ}" \
+          --query 'Subnet.SubnetId' --output text)
+        
+        aws ec2 create-tags --resources "${TEMP_SUBNET_ID}" \
+          --tags Key=Name,Value="${TEMP_INFRA_PREFIX}-subnet" \
+                 Key=Project,Value=SPEL \
+                 Key=TempBuild,Value=true \
+                 Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
+                 Key=CreatedAt,Value="${CREATED_AT}"
+        
+        aws ec2 modify-subnet-attribute --subnet-id "${TEMP_SUBNET_ID}" --map-public-ip-on-launch
+        echo "✓ Created subnet: ${TEMP_SUBNET_ID}"
+        echo "TEMP_SUBNET_ID=${TEMP_SUBNET_ID}" >> temp_infra.env
+        
+        # Create Internet Gateway
+        echo "Creating Internet Gateway..."
+        TEMP_IGW_ID=$(aws ec2 create-internet-gateway \
+          --query 'InternetGateway.InternetGatewayId' --output text)
+        
+        aws ec2 create-tags --resources "${TEMP_IGW_ID}" \
+          --tags Key=Name,Value="${TEMP_INFRA_PREFIX}-igw" \
+                 Key=Project,Value=SPEL \
+                 Key=TempBuild,Value=true \
+                 Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
+                 Key=CreatedAt,Value="${CREATED_AT}"
+        
+        aws ec2 attach-internet-gateway --internet-gateway-id "${TEMP_IGW_ID}" --vpc-id "${TEMP_VPC_ID}"
+        echo "✓ Created and attached Internet Gateway: ${TEMP_IGW_ID}"
+        
+        # Add default route
+        RT_ID=$(aws ec2 describe-route-tables \
+          --filters "Name=vpc-id,Values=${TEMP_VPC_ID}" "Name=association.main,Values=true" \
+          --query 'RouteTables[0].RouteTableId' --output text)
+        
+        aws ec2 create-route \
+          --route-table-id "${RT_ID}" \
+          --destination-cidr-block "0.0.0.0/0" \
+          --gateway-id "${TEMP_IGW_ID}" || true
+        echo "✓ Added default route"
+        
+        # Create Security Group
+        echo "Creating security group..."
+        TEMP_SG_ID=$(aws ec2 create-security-group \
+          --group-name "${TEMP_INFRA_PREFIX}-packer-sg" \
+          --description "Temporary security group for SPEL Packer build ${CI_PIPELINE_ID}" \
+          --vpc-id "${TEMP_VPC_ID}" \
+          --query 'GroupId' --output text)
+        
+        aws ec2 create-tags --resources "${TEMP_SG_ID}" \
+          --tags Key=Name,Value="${TEMP_INFRA_PREFIX}-packer-sg" \
+                 Key=Project,Value=SPEL \
+                 Key=TempBuild,Value=true \
+                 Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
+                 Key=CreatedAt,Value="${CREATED_AT}"
+        
+        # Allow SSH and WinRM from VPC CIDR
+        aws ec2 authorize-security-group-ingress --group-id "${TEMP_SG_ID}" --protocol tcp --port 22 --cidr "${VPC_CIDR}"
+        aws ec2 authorize-security-group-ingress --group-id "${TEMP_SG_ID}" --protocol tcp --port 5986 --cidr "${VPC_CIDR}"
+        echo "✓ Created security group: ${TEMP_SG_ID}"
+        echo "TEMP_SG_ID=${TEMP_SG_ID}" >> temp_infra.env
+        
+        # Create IAM Role
+        TEMP_ROLE_NAME="${TEMP_INFRA_PREFIX}-role"
+        echo "Creating IAM role: ${TEMP_ROLE_NAME}"
+        
+        cat > /tmp/trust-policy.json <<'TRUSTEOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "ec2.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+        TRUSTEOF
+        
+        aws iam create-role \
+          --role-name "${TEMP_ROLE_NAME}" \
+          --assume-role-policy-document file:///tmp/trust-policy.json \
+          --description "Temporary role for SPEL Packer build ${CI_PIPELINE_ID}" \
+          --max-session-duration 21600 \
+          --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" Key=CreatedAt,Value="${CREATED_AT}"
+        echo "✓ Created IAM role"
+        echo "TEMP_ROLE_NAME=${TEMP_ROLE_NAME}" >> temp_infra.env
+        
+        # Create IAM Policy
+        TEMP_POLICY_NAME="${TEMP_INFRA_PREFIX}-policy"
+        echo "Creating IAM policy: ${TEMP_POLICY_NAME}"
+        
+        cat > /tmp/packer-policy.json <<'POLICYEOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "SSMAccess",
+              "Effect": "Allow",
+              "Action": [
+                "ssm:UpdateInstanceInformation",
+                "ssmmessages:CreateControlChannel",
+                "ssmmessages:CreateDataChannel",
+                "ssmmessages:OpenControlChannel",
+                "ssmmessages:OpenDataChannel",
+                "ec2messages:AcknowledgeMessage",
+                "ec2messages:DeleteMessage",
+                "ec2messages:FailMessage",
+                "ec2messages:GetEndpoint",
+                "ec2messages:GetMessages",
+                "ec2messages:SendReply"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Sid": "S3Access",
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:ListBucket"],
+              "Resource": [
+                "arn:*:s3:::aws-ssm-*/*",
+                "arn:*:s3:::aws-ssm-*",
+                "arn:*:s3:::amazon-ssm-*/*",
+                "arn:*:s3:::amazon-ssm-*"
+              ]
+            },
+            {
+              "Sid": "CloudWatchLogs",
+              "Effect": "Allow",
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+        POLICYEOF
+        
+        TEMP_POLICY_ARN=$(aws iam create-policy \
+          --policy-name "${TEMP_POLICY_NAME}" \
+          --policy-document file:///tmp/packer-policy.json \
+          --description "Temporary policy for SPEL Packer build ${CI_PIPELINE_ID}" \
+          --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" Key=CreatedAt,Value="${CREATED_AT}" \
+          --query 'Policy.Arn' --output text)
+        echo "✓ Created IAM policy: ${TEMP_POLICY_ARN}"
+        echo "TEMP_POLICY_ARN=${TEMP_POLICY_ARN}" >> temp_infra.env
+        
+        # Attach policy to role
+        aws iam attach-role-policy --role-name "${TEMP_ROLE_NAME}" --policy-arn "${TEMP_POLICY_ARN}"
+        echo "✓ Attached policy to role"
+        
+        # Create Instance Profile
+        TEMP_PROFILE_NAME="${TEMP_INFRA_PREFIX}-profile"
+        echo "Creating instance profile: ${TEMP_PROFILE_NAME}"
+        
+        aws iam create-instance-profile --instance-profile-name "${TEMP_PROFILE_NAME}" \
+          --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" Key=CreatedAt,Value="${CREATED_AT}"
+        
+        aws iam add-role-to-instance-profile \
+          --instance-profile-name "${TEMP_PROFILE_NAME}" \
+          --role-name "${TEMP_ROLE_NAME}"
+        echo "✓ Created instance profile"
+        echo "TEMP_PROFILE_NAME=${TEMP_PROFILE_NAME}" >> temp_infra.env
+        
+        # Wait for IAM propagation (critical for AWS consistency)
+        echo "Waiting 15 seconds for IAM propagation..."
+        sleep 15
+        echo "✓ IAM propagation wait complete"
+        
+        # Check for existing shared KMS key (reuse across temp builds)
+        KMS_ALIAS="spel-temp-ebs-key"
+        EXISTING_KEY=$(aws kms list-aliases \
+          --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
+          --output text 2>/dev/null || echo "")
+        
+        if [ -n "$EXISTING_KEY" ] && [ "$EXISTING_KEY" != "None" ]; then
+          echo "✓ Reusing existing shared KMS key: ${EXISTING_KEY}"
+          KEY_ID="${EXISTING_KEY}"
+        else
+          echo "Creating shared KMS key for temp builds..."
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          PARTITION="aws"
+          [[ "${PKR_VAR_aws_region}" == us-gov-* ]] && PARTITION="aws-us-gov"
+          
+          cat > /tmp/kms-policy.json <<KMSEOF
+        {
+          "Version": "2012-10-17",
+          "Id": "${KMS_ALIAS}-policy",
+          "Statement": [
+            {
+              "Sid": "EnableRootPermissions",
+              "Effect": "Allow",
+              "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:root"},
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowEC2ForEBS",
+              "Effect": "Allow",
+              "Principal": {"Service": "ec2.amazonaws.com"},
+              "Action": ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey", "kms:CreateGrant"],
+              "Resource": "*",
+              "Condition": {"StringEquals": {"kms:CallerAccount": "${ACCOUNT_ID}", "kms:ViaService": "ec2.${PKR_VAR_aws_region}.amazonaws.com"}}
+            }
+          ]
+        }
+        KMSEOF
+          
+          KEY_ID=$(aws kms create-key \
+            --description "Shared SPEL EBS encryption key for temp Packer builds" \
+            --policy file:///tmp/kms-policy.json \
+            --tags TagKey=Name,TagValue="${KMS_ALIAS}" TagKey=Project,TagValue=SPEL TagKey=SharedTempKey,TagValue=true \
+            --query 'KeyMetadata.KeyId' --output text)
+          
+          aws kms create-alias --alias-name "alias/${KMS_ALIAS}" --target-key-id "${KEY_ID}"
+          aws kms enable-key-rotation --key-id "${KEY_ID}"
+          echo "✓ Created shared KMS key: ${KEY_ID}"
+        fi
+        
+        TEMP_KMS_KEY_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
+        echo "TEMP_KMS_KEY_ARN=${TEMP_KMS_KEY_ARN}" >> temp_infra.env
+        
+        # Export for use in build
+        export PKR_VAR_aws_vpc_id="${TEMP_VPC_ID}"
+        export PKR_VAR_aws_subnet_id="${TEMP_SUBNET_ID}"
+        export PKR_VAR_aws_security_group_id="${TEMP_SG_ID}"
+        export PKR_VAR_aws_iam_instance_profile="${TEMP_PROFILE_NAME}"
+        export PKR_VAR_aws_kms_key_id="${TEMP_KMS_KEY_ARN}"
+        
+        echo ""
+        echo "=== Temporary Infrastructure Created ==="
+        echo "VPC: ${TEMP_VPC_ID}"
+        echo "Subnet: ${TEMP_SUBNET_ID}"
+        echo "Security Group: ${TEMP_SG_ID}"
+        echo "Instance Profile: ${TEMP_PROFILE_NAME}"
+        echo "KMS Key: ${TEMP_KMS_KEY_ARN}"
+      fi
+    
     # Verify Docker image is available
     - |
       # Get image tag from import job or find from local images
@@ -649,9 +928,9 @@ infra:kms:
       echo "Using Docker image: spel-builder:${IMAGE_TAG}"
       docker images "spel-builder:${IMAGE_TAG}"
     
-    # Load infrastructure config if available
+    # Load infrastructure config if available (from infra stage or temp infra)
     - |
-      for envfile in network.env sg.env iam.env kms.env; do
+      for envfile in network.env sg.env iam.env kms.env temp_infra.env; do
         if [ -f "$envfile" ]; then
           echo "Loading ${envfile}..."
           source "$envfile"
@@ -734,6 +1013,92 @@ infra:kms:
         "${DOCKER_ENV_ARGS[@]}" \
         "spel-builder:${IMAGE_TAG}" \
         make -f Makefile.spel build
+  after_script:
+    # Cleanup temporary infrastructure (runs even if build fails)
+    - |
+      if [ -f "temp_infra.env" ]; then
+        echo "=== Destroying Temporary Infrastructure ==="
+        source temp_infra.env
+        
+        if [ -z "${TEMP_VPC_ID}" ]; then
+          echo "No temporary infrastructure to clean up"
+          exit 0
+        fi
+        
+        echo "Cleaning up resources for prefix: ${TEMP_INFRA_PREFIX}"
+        
+        # Delete Instance Profile
+        if [ -n "${TEMP_PROFILE_NAME}" ] && aws iam get-instance-profile --instance-profile-name "${TEMP_PROFILE_NAME}" &>/dev/null; then
+          echo "Removing role from instance profile..."
+          aws iam remove-role-from-instance-profile \
+            --instance-profile-name "${TEMP_PROFILE_NAME}" \
+            --role-name "${TEMP_ROLE_NAME}" 2>/dev/null || true
+          echo "Deleting instance profile: ${TEMP_PROFILE_NAME}"
+          aws iam delete-instance-profile --instance-profile-name "${TEMP_PROFILE_NAME}" || true
+          echo "✓ Deleted instance profile"
+        fi
+        
+        # Detach and delete IAM Policy
+        if [ -n "${TEMP_POLICY_ARN}" ]; then
+          echo "Detaching policy from role..."
+          aws iam detach-role-policy \
+            --role-name "${TEMP_ROLE_NAME}" \
+            --policy-arn "${TEMP_POLICY_ARN}" 2>/dev/null || true
+          echo "Deleting policy: ${TEMP_POLICY_ARN}"
+          aws iam delete-policy --policy-arn "${TEMP_POLICY_ARN}" || true
+          echo "✓ Deleted IAM policy"
+        fi
+        
+        # Delete IAM Role
+        if [ -n "${TEMP_ROLE_NAME}" ] && aws iam get-role --role-name "${TEMP_ROLE_NAME}" &>/dev/null; then
+          echo "Deleting IAM role: ${TEMP_ROLE_NAME}"
+          aws iam delete-role --role-name "${TEMP_ROLE_NAME}" || true
+          echo "✓ Deleted IAM role"
+        fi
+        
+        # Delete Security Group (retry for instance termination)
+        if [ -n "${TEMP_SG_ID}" ]; then
+          echo "Deleting security group: ${TEMP_SG_ID}"
+          for i in 1 2 3 4 5; do
+            if aws ec2 delete-security-group --group-id "${TEMP_SG_ID}" 2>/dev/null; then
+              echo "✓ Deleted security group"
+              break
+            fi
+            echo "Waiting for instances to terminate... (attempt $i/5)"
+            sleep 30
+          done
+        fi
+        
+        # Delete Subnet
+        if [ -n "${TEMP_SUBNET_ID}" ]; then
+          echo "Deleting subnet: ${TEMP_SUBNET_ID}"
+          aws ec2 delete-subnet --subnet-id "${TEMP_SUBNET_ID}" || true
+          echo "✓ Deleted subnet"
+        fi
+        
+        # Detach and delete Internet Gateway
+        IGW_ID=$(aws ec2 describe-internet-gateways \
+          --filters "Name=tag:Name,Values=${TEMP_INFRA_PREFIX}-igw" \
+          --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || echo "None")
+        
+        if [ "$IGW_ID" != "None" ] && [ -n "$IGW_ID" ]; then
+          echo "Detaching Internet Gateway: ${IGW_ID}"
+          aws ec2 detach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${TEMP_VPC_ID}" 2>/dev/null || true
+          echo "Deleting Internet Gateway: ${IGW_ID}"
+          aws ec2 delete-internet-gateway --internet-gateway-id "${IGW_ID}" || true
+          echo "✓ Deleted Internet Gateway"
+        fi
+        
+        # Delete VPC
+        echo "Deleting VPC: ${TEMP_VPC_ID}"
+        aws ec2 delete-vpc --vpc-id "${TEMP_VPC_ID}" || true
+        echo "✓ Deleted VPC"
+        
+        # NOTE: KMS key is NOT deleted - it's a shared key reused across temp builds
+        echo ""
+        echo "=== Temporary Infrastructure Destroyed ==="
+        echo "Note: Shared KMS key (alias/spel-temp-ebs-key) was NOT deleted for reuse"
+      fi
   artifacts:
     paths:
       - .spel/

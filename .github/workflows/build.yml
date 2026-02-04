@@ -156,6 +156,12 @@ on:
         required: false
         type: string
         default: ""
+      # Temporary infrastructure
+      create_temp_infra:
+        description: "Create temporary VPC/subnet/SG/IAM for this build (auto-destroyed after build)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -265,6 +271,287 @@ jobs:
           role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
           role-duration-seconds: 21600  # 6 hours - must be <= IAM role MaxSessionDuration
 
+      - name: Create temporary infrastructure
+        if: github.event.inputs.create_temp_infra == 'true'
+        id: temp_infra
+        run: |
+          echo "=== Creating Temporary Infrastructure ==="
+          
+          INFRA_PREFIX="spel-temp-${GITHUB_RUN_ID}"
+          VPC_CIDR="10.${GITHUB_RUN_ID: -2}.0.0/16"
+          SUBNET_CIDR="10.${GITHUB_RUN_ID: -2}.1.0/24"
+          AWS_REGION="us-east-1"
+          CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          echo "TEMP_INFRA_PREFIX=${INFRA_PREFIX}" >> $GITHUB_ENV
+          
+          # Create VPC
+          echo "Creating VPC..."
+          VPC_ID=$(aws ec2 create-vpc \
+            --cidr-block "${VPC_CIDR}" \
+            --query 'Vpc.VpcId' --output text)
+          
+          aws ec2 create-tags --resources "${VPC_ID}" \
+            --tags Key=Name,Value="${INFRA_PREFIX}-vpc" \
+                   Key=Project,Value=SPEL \
+                   Key=TempBuild,Value=true \
+                   Key=GitHubRunId,Value="${GITHUB_RUN_ID}" \
+                   Key=CreatedAt,Value="${CREATED_AT}"
+          
+          aws ec2 modify-vpc-attribute --vpc-id "${VPC_ID}" --enable-dns-hostnames
+          aws ec2 modify-vpc-attribute --vpc-id "${VPC_ID}" --enable-dns-support
+          echo "✓ Created VPC: ${VPC_ID}"
+          echo "vpc_id=${VPC_ID}" >> $GITHUB_OUTPUT
+          
+          # Create Subnet
+          echo "Creating subnet..."
+          AZ=$(aws ec2 describe-availability-zones --query 'AvailabilityZones[0].ZoneName' --output text)
+          SUBNET_ID=$(aws ec2 create-subnet \
+            --vpc-id "${VPC_ID}" \
+            --cidr-block "${SUBNET_CIDR}" \
+            --availability-zone "${AZ}" \
+            --query 'Subnet.SubnetId' --output text)
+          
+          aws ec2 create-tags --resources "${SUBNET_ID}" \
+            --tags Key=Name,Value="${INFRA_PREFIX}-subnet" \
+                   Key=Project,Value=SPEL \
+                   Key=TempBuild,Value=true \
+                   Key=GitHubRunId,Value="${GITHUB_RUN_ID}" \
+                   Key=CreatedAt,Value="${CREATED_AT}"
+          
+          aws ec2 modify-subnet-attribute --subnet-id "${SUBNET_ID}" --map-public-ip-on-launch
+          echo "✓ Created subnet: ${SUBNET_ID}"
+          echo "subnet_id=${SUBNET_ID}" >> $GITHUB_OUTPUT
+          
+          # Create Internet Gateway
+          echo "Creating Internet Gateway..."
+          IGW_ID=$(aws ec2 create-internet-gateway \
+            --query 'InternetGateway.InternetGatewayId' --output text)
+          
+          aws ec2 create-tags --resources "${IGW_ID}" \
+            --tags Key=Name,Value="${INFRA_PREFIX}-igw" \
+                   Key=Project,Value=SPEL \
+                   Key=TempBuild,Value=true \
+                   Key=GitHubRunId,Value="${GITHUB_RUN_ID}" \
+                   Key=CreatedAt,Value="${CREATED_AT}"
+          
+          aws ec2 attach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${VPC_ID}"
+          echo "✓ Created and attached Internet Gateway: ${IGW_ID}"
+          
+          # Add default route
+          RT_ID=$(aws ec2 describe-route-tables \
+            --filters "Name=vpc-id,Values=${VPC_ID}" "Name=association.main,Values=true" \
+            --query 'RouteTables[0].RouteTableId' --output text)
+          
+          aws ec2 create-route \
+            --route-table-id "${RT_ID}" \
+            --destination-cidr-block "0.0.0.0/0" \
+            --gateway-id "${IGW_ID}" || true
+          echo "✓ Added default route"
+          
+          # Create Security Group
+          echo "Creating security group..."
+          SG_ID=$(aws ec2 create-security-group \
+            --group-name "${INFRA_PREFIX}-packer-sg" \
+            --description "Temporary security group for SPEL Packer build ${GITHUB_RUN_ID}" \
+            --vpc-id "${VPC_ID}" \
+            --query 'GroupId' --output text)
+          
+          aws ec2 create-tags --resources "${SG_ID}" \
+            --tags Key=Name,Value="${INFRA_PREFIX}-packer-sg" \
+                   Key=Project,Value=SPEL \
+                   Key=TempBuild,Value=true \
+                   Key=GitHubRunId,Value="${GITHUB_RUN_ID}" \
+                   Key=CreatedAt,Value="${CREATED_AT}"
+          
+          # Allow SSH from VPC CIDR
+          aws ec2 authorize-security-group-ingress \
+            --group-id "${SG_ID}" \
+            --protocol tcp --port 22 \
+            --cidr "${VPC_CIDR}"
+          
+          # Allow WinRM from VPC CIDR (for Windows builds)
+          aws ec2 authorize-security-group-ingress \
+            --group-id "${SG_ID}" \
+            --protocol tcp --port 5986 \
+            --cidr "${VPC_CIDR}"
+          
+          echo "✓ Created security group: ${SG_ID}"
+          echo "security_group_id=${SG_ID}" >> $GITHUB_OUTPUT
+          
+          # Create IAM Role
+          ROLE_NAME="${INFRA_PREFIX}-role"
+          echo "Creating IAM role: ${ROLE_NAME}"
+          
+          cat > /tmp/trust-policy.json <<'TRUSTEOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+          TRUSTEOF
+          
+          aws iam create-role \
+            --role-name "${ROLE_NAME}" \
+            --assume-role-policy-document file:///tmp/trust-policy.json \
+            --description "Temporary role for SPEL Packer build ${GITHUB_RUN_ID}" \
+            --max-session-duration 21600 \
+            --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitHubRunId,Value="${GITHUB_RUN_ID}" Key=CreatedAt,Value="${CREATED_AT}"
+          
+          echo "✓ Created IAM role"
+          
+          # Create IAM Policy
+          POLICY_NAME="${INFRA_PREFIX}-policy"
+          echo "Creating IAM policy: ${POLICY_NAME}"
+          
+          cat > /tmp/packer-policy.json <<'POLICYEOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "SSMAccess",
+                "Effect": "Allow",
+                "Action": [
+                  "ssm:UpdateInstanceInformation",
+                  "ssmmessages:CreateControlChannel",
+                  "ssmmessages:CreateDataChannel",
+                  "ssmmessages:OpenControlChannel",
+                  "ssmmessages:OpenDataChannel",
+                  "ec2messages:AcknowledgeMessage",
+                  "ec2messages:DeleteMessage",
+                  "ec2messages:FailMessage",
+                  "ec2messages:GetEndpoint",
+                  "ec2messages:GetMessages",
+                  "ec2messages:SendReply"
+                ],
+                "Resource": "*"
+              },
+              {
+                "Sid": "S3Access",
+                "Effect": "Allow",
+                "Action": ["s3:GetObject", "s3:ListBucket"],
+                "Resource": [
+                  "arn:*:s3:::aws-ssm-*/*",
+                  "arn:*:s3:::aws-ssm-*",
+                  "arn:*:s3:::amazon-ssm-*/*",
+                  "arn:*:s3:::amazon-ssm-*"
+                ]
+              },
+              {
+                "Sid": "CloudWatchLogs",
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents",
+                  "logs:DescribeLogGroups",
+                  "logs:DescribeLogStreams"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+          POLICYEOF
+          
+          POLICY_ARN=$(aws iam create-policy \
+            --policy-name "${POLICY_NAME}" \
+            --policy-document file:///tmp/packer-policy.json \
+            --description "Temporary policy for SPEL Packer build ${GITHUB_RUN_ID}" \
+            --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitHubRunId,Value="${GITHUB_RUN_ID}" Key=CreatedAt,Value="${CREATED_AT}" \
+            --query 'Policy.Arn' --output text)
+          
+          echo "✓ Created IAM policy: ${POLICY_ARN}"
+          echo "policy_arn=${POLICY_ARN}" >> $GITHUB_OUTPUT
+          
+          # Attach policy to role
+          aws iam attach-role-policy \
+            --role-name "${ROLE_NAME}" \
+            --policy-arn "${POLICY_ARN}"
+          echo "✓ Attached policy to role"
+          
+          # Create Instance Profile
+          PROFILE_NAME="${INFRA_PREFIX}-profile"
+          echo "Creating instance profile: ${PROFILE_NAME}"
+          
+          aws iam create-instance-profile --instance-profile-name "${PROFILE_NAME}" \
+            --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitHubRunId,Value="${GITHUB_RUN_ID}" Key=CreatedAt,Value="${CREATED_AT}"
+          
+          aws iam add-role-to-instance-profile \
+            --instance-profile-name "${PROFILE_NAME}" \
+            --role-name "${ROLE_NAME}"
+          
+          echo "✓ Created instance profile"
+          echo "instance_profile=${PROFILE_NAME}" >> $GITHUB_OUTPUT
+          
+          # Wait for IAM propagation (critical for AWS consistency)
+          echo "Waiting 15 seconds for IAM propagation..."
+          sleep 15
+          echo "✓ IAM propagation wait complete"
+          
+          # Check for existing shared KMS key (reuse across temp builds)
+          KMS_ALIAS="spel-temp-ebs-key"
+          EXISTING_KEY=$(aws kms list-aliases \
+            --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$EXISTING_KEY" ] && [ "$EXISTING_KEY" != "None" ]; then
+            echo "✓ Reusing existing shared KMS key: ${EXISTING_KEY}"
+            KEY_ID="${EXISTING_KEY}"
+          else
+            echo "Creating shared KMS key for temp builds..."
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            PARTITION="aws"
+            
+            cat > /tmp/kms-policy.json <<KMSEOF
+          {
+            "Version": "2012-10-17",
+            "Id": "${KMS_ALIAS}-policy",
+            "Statement": [
+              {
+                "Sid": "EnableRootPermissions",
+                "Effect": "Allow",
+                "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:root"},
+                "Action": "kms:*",
+                "Resource": "*"
+              },
+              {
+                "Sid": "AllowEC2ForEBS",
+                "Effect": "Allow",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Action": ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey", "kms:CreateGrant"],
+                "Resource": "*",
+                "Condition": {"StringEquals": {"kms:CallerAccount": "${ACCOUNT_ID}", "kms:ViaService": "ec2.${AWS_REGION}.amazonaws.com"}}
+              }
+            ]
+          }
+          KMSEOF
+            
+            KEY_ID=$(aws kms create-key \
+              --description "Shared SPEL EBS encryption key for temp Packer builds" \
+              --policy file:///tmp/kms-policy.json \
+              --tags TagKey=Name,TagValue="${KMS_ALIAS}" TagKey=Project,TagValue=SPEL TagKey=SharedTempKey,TagValue=true \
+              --query 'KeyMetadata.KeyId' --output text)
+            
+            aws kms create-alias --alias-name "alias/${KMS_ALIAS}" --target-key-id "${KEY_ID}"
+            aws kms enable-key-rotation --key-id "${KEY_ID}"
+            echo "✓ Created shared KMS key: ${KEY_ID}"
+          fi
+          
+          KMS_KEY_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
+          echo "kms_key_id=${KMS_KEY_ARN}" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "=== Temporary Infrastructure Created ==="
+          echo "VPC: ${VPC_ID}"
+          echo "Subnet: ${SUBNET_ID}"
+          echo "Security Group: ${SG_ID}"
+          echo "Instance Profile: ${PROFILE_NAME}"
+          echo "KMS Key: ${KMS_KEY_ARN}"
+
       - name: Set up environment
         run: |
           echo "=== Setting up Build Environment ==="
@@ -349,10 +636,23 @@ jobs:
           )
           
           # Add optional string variables (empty string is valid for these)
-          [[ -n "${{ github.event.inputs.aws_vpc_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_vpc_id="${{ github.event.inputs.aws_vpc_id }}")
-          [[ -n "${{ github.event.inputs.aws_subnet_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_subnet_id="${{ github.event.inputs.aws_subnet_id }}")
-          [[ -n "${{ github.event.inputs.aws_kms_key_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_kms_key_id="${{ github.event.inputs.aws_kms_key_id }}")
-          [[ -n "${{ github.event.inputs.aws_iam_instance_profile }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_iam_instance_profile="${{ github.event.inputs.aws_iam_instance_profile }}")
+          # Use temp infra outputs if available, otherwise fall back to user inputs
+          TEMP_VPC_ID="${{ steps.temp_infra.outputs.vpc_id }}"
+          TEMP_SUBNET_ID="${{ steps.temp_infra.outputs.subnet_id }}"
+          TEMP_SG_ID="${{ steps.temp_infra.outputs.security_group_id }}"
+          TEMP_PROFILE="${{ steps.temp_infra.outputs.instance_profile }}"
+          TEMP_KMS_KEY="${{ steps.temp_infra.outputs.kms_key_id }}"
+          
+          VPC_ID="${TEMP_VPC_ID:-${{ github.event.inputs.aws_vpc_id }}}"
+          SUBNET_ID="${TEMP_SUBNET_ID:-${{ github.event.inputs.aws_subnet_id }}}"
+          INSTANCE_PROFILE="${TEMP_PROFILE:-${{ github.event.inputs.aws_iam_instance_profile }}}"
+          KMS_KEY_ID="${TEMP_KMS_KEY:-${{ github.event.inputs.aws_kms_key_id }}}"
+          
+          [[ -n "${VPC_ID}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_vpc_id="${VPC_ID}")
+          [[ -n "${SUBNET_ID}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_subnet_id="${SUBNET_ID}")
+          [[ -n "${TEMP_SG_ID}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_security_group_id="${TEMP_SG_ID}")
+          [[ -n "${KMS_KEY_ID}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_kms_key_id="${KMS_KEY_ID}")
+          [[ -n "${INSTANCE_PROFILE}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_iam_instance_profile="${INSTANCE_PROFILE}")
           [[ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_mirror_baseurl="${{ github.event.inputs.repo_mirror_baseurl }}")
           
           # Add boolean variables
@@ -450,3 +750,106 @@ jobs:
               echo "| KMS Key | \`${{ github.event.inputs.aws_kms_key_id }}\` |" >> $GITHUB_STEP_SUMMARY
             fi
           fi
+
+      - name: Destroy temporary infrastructure
+        if: always() && github.event.inputs.create_temp_infra == 'true'
+        run: |
+          echo "=== Destroying Temporary Infrastructure ==="
+          
+          INFRA_PREFIX="spel-temp-${GITHUB_RUN_ID}"
+          
+          # Get VPC ID from temp infra step output
+          VPC_ID="${{ steps.temp_infra.outputs.vpc_id }}"
+          POLICY_ARN="${{ steps.temp_infra.outputs.policy_arn }}"
+          
+          if [ -z "$VPC_ID" ] || [ "$VPC_ID" == "" ]; then
+            echo "No temporary infrastructure to clean up (VPC ID not found)"
+            exit 0
+          fi
+          
+          echo "Cleaning up resources for prefix: ${INFRA_PREFIX}"
+          echo "VPC ID: ${VPC_ID}"
+          
+          # Delete Instance Profile
+          PROFILE_NAME="${INFRA_PREFIX}-profile"
+          ROLE_NAME="${INFRA_PREFIX}-role"
+          
+          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
+            echo "Removing role from instance profile..."
+            aws iam remove-role-from-instance-profile \
+              --instance-profile-name "${PROFILE_NAME}" \
+              --role-name "${ROLE_NAME}" 2>/dev/null || true
+            echo "Deleting instance profile: ${PROFILE_NAME}"
+            aws iam delete-instance-profile --instance-profile-name "${PROFILE_NAME}" || true
+            echo "✓ Deleted instance profile"
+          fi
+          
+          # Detach and delete IAM Policy
+          if [ -n "${POLICY_ARN}" ] && [ "${POLICY_ARN}" != "" ]; then
+            echo "Detaching policy from role..."
+            aws iam detach-role-policy \
+              --role-name "${ROLE_NAME}" \
+              --policy-arn "${POLICY_ARN}" 2>/dev/null || true
+            echo "Deleting policy: ${POLICY_ARN}"
+            aws iam delete-policy --policy-arn "${POLICY_ARN}" || true
+            echo "✓ Deleted IAM policy"
+          fi
+          
+          # Delete IAM Role
+          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null; then
+            echo "Deleting IAM role: ${ROLE_NAME}"
+            aws iam delete-role --role-name "${ROLE_NAME}" || true
+            echo "✓ Deleted IAM role"
+          fi
+          
+          # Delete Security Group
+          SG_ID=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=${INFRA_PREFIX}-packer-sg" "Name=vpc-id,Values=${VPC_ID}" \
+            --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$SG_ID" != "None" ] && [ -n "$SG_ID" ]; then
+            echo "Deleting security group: ${SG_ID}"
+            # Retry a few times in case instances are still terminating
+            for i in 1 2 3 4 5; do
+              if aws ec2 delete-security-group --group-id "${SG_ID}" 2>/dev/null; then
+                echo "✓ Deleted security group"
+                break
+              fi
+              echo "Waiting for instances to terminate... (attempt $i/5)"
+              sleep 30
+            done
+          fi
+          
+          # Delete Subnet
+          SUBNET_ID=$(aws ec2 describe-subnets \
+            --filters "Name=tag:Name,Values=${INFRA_PREFIX}-subnet" "Name=vpc-id,Values=${VPC_ID}" \
+            --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$SUBNET_ID" != "None" ] && [ -n "$SUBNET_ID" ]; then
+            echo "Deleting subnet: ${SUBNET_ID}"
+            aws ec2 delete-subnet --subnet-id "${SUBNET_ID}" || true
+            echo "✓ Deleted subnet"
+          fi
+          
+          # Detach and delete Internet Gateway
+          IGW_ID=$(aws ec2 describe-internet-gateways \
+            --filters "Name=tag:Name,Values=${INFRA_PREFIX}-igw" \
+            --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || echo "None")
+          
+          if [ "$IGW_ID" != "None" ] && [ -n "$IGW_ID" ]; then
+            echo "Detaching Internet Gateway: ${IGW_ID}"
+            aws ec2 detach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${VPC_ID}" 2>/dev/null || true
+            echo "Deleting Internet Gateway: ${IGW_ID}"
+            aws ec2 delete-internet-gateway --internet-gateway-id "${IGW_ID}" || true
+            echo "✓ Deleted Internet Gateway"
+          fi
+          
+          # Delete VPC
+          echo "Deleting VPC: ${VPC_ID}"
+          aws ec2 delete-vpc --vpc-id "${VPC_ID}" || true
+          echo "✓ Deleted VPC"
+          
+          # NOTE: KMS key is NOT deleted - it's a shared key reused across temp builds
+          echo ""
+          echo "=== Temporary Infrastructure Destroyed ==="
+          echo "Note: Shared KMS key (alias/spel-temp-ebs-key) was NOT deleted for reuse"

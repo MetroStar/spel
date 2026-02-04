@@ -1,0 +1,284 @@
+# =============================================================================
+# Infrastructure Cleanup - Garbage Collection for Orphaned Temp Resources
+# =============================================================================
+# This workflow runs daily to clean up orphaned temporary infrastructure
+# created by build workflows that may not have completed cleanup properly.
+#
+# RESOURCES CLEANED:
+#   - VPCs with TempBuild=true tag older than 24 hours
+#   - Subnets, Internet Gateways, Security Groups in those VPCs
+#   - IAM roles, policies, and instance profiles with TempBuild=true tag
+#   - NOTE: Shared KMS key (alias/spel-temp-ebs-key) is NOT deleted
+#
+# SAFETY:
+#   - Only deletes resources older than 24 hours
+#   - Only deletes resources tagged with TempBuild=true
+#   - Resources are identified by CreatedAt tag timestamp
+# =============================================================================
+
+name: Infrastructure Cleanup
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (list resources without deleting)"
+        required: false
+        type: boolean
+        default: true
+      max_age_hours:
+        description: "Maximum age in hours before cleanup (default: 24)"
+        required: false
+        type: string
+        default: "24"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cleanup:
+    name: Cleanup Orphaned Resources
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
+          role-duration-seconds: 3600
+
+      - name: Find and cleanup orphaned resources
+        run: |
+          echo "=== Infrastructure Cleanup ==="
+          echo ""
+          
+          DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
+          MAX_AGE_HOURS="${{ github.event.inputs.max_age_hours || '24' }}"
+          CUTOFF_TIME=$(date -u -d "${MAX_AGE_HOURS} hours ago" +%Y-%m-%dT%H:%M:%SZ)
+          
+          echo "Configuration:"
+          echo "  Dry Run: ${DRY_RUN}"
+          echo "  Max Age: ${MAX_AGE_HOURS} hours"
+          echo "  Cutoff Time: ${CUTOFF_TIME}"
+          echo ""
+          
+          DELETED_COUNT=0
+          FOUND_COUNT=0
+          
+          # Find orphaned VPCs with TempBuild=true tag
+          echo "=== Searching for orphaned VPCs ==="
+          ORPHANED_VPCS=$(aws ec2 describe-vpcs \
+            --filters "Name=tag:TempBuild,Values=true" \
+            --query 'Vpcs[*].[VpcId,Tags[?Key==`CreatedAt`].Value|[0],Tags[?Key==`Name`].Value|[0]]' \
+            --output text 2>/dev/null || echo "")
+          
+          while read -r VPC_ID CREATED_AT VPC_NAME; do
+            if [ -z "$VPC_ID" ] || [ "$VPC_ID" == "None" ]; then
+              continue
+            fi
+            
+            FOUND_COUNT=$((FOUND_COUNT + 1))
+            
+            # Check if resource is old enough
+            if [ -n "$CREATED_AT" ] && [ "$CREATED_AT" != "None" ]; then
+              if [[ "$CREATED_AT" > "$CUTOFF_TIME" ]]; then
+                echo "SKIP: ${VPC_NAME} (${VPC_ID}) - Created ${CREATED_AT}, not old enough"
+                continue
+              fi
+            else
+              echo "SKIP: ${VPC_NAME} (${VPC_ID}) - No CreatedAt tag, skipping for safety"
+              continue
+            fi
+            
+            echo ""
+            echo "FOUND: ${VPC_NAME} (${VPC_ID}) - Created ${CREATED_AT}"
+            
+            if [ "${DRY_RUN}" == "true" ]; then
+              echo "  [DRY RUN] Would delete VPC and associated resources"
+              continue
+            fi
+            
+            DELETED_COUNT=$((DELETED_COUNT + 1))
+            
+            # Get the infrastructure prefix from VPC name
+            INFRA_PREFIX="${VPC_NAME%-vpc}"
+            
+            # Delete Security Groups (except default)
+            echo "  Deleting security groups..."
+            SG_IDS=$(aws ec2 describe-security-groups \
+              --filters "Name=vpc-id,Values=${VPC_ID}" \
+              --query "SecurityGroups[?GroupName!='default'].GroupId" \
+              --output text 2>/dev/null || echo "")
+            
+            for SG_ID in $SG_IDS; do
+              if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
+                # Retry for instance termination
+                for i in 1 2 3; do
+                  if aws ec2 delete-security-group --group-id "${SG_ID}" 2>/dev/null; then
+                    echo "    ✓ Deleted SG: ${SG_ID}"
+                    break
+                  fi
+                  sleep 10
+                done
+              fi
+            done
+            
+            # Delete Subnets
+            echo "  Deleting subnets..."
+            SUBNET_IDS=$(aws ec2 describe-subnets \
+              --filters "Name=vpc-id,Values=${VPC_ID}" \
+              --query 'Subnets[*].SubnetId' \
+              --output text 2>/dev/null || echo "")
+            
+            for SUBNET_ID in $SUBNET_IDS; do
+              if [ -n "$SUBNET_ID" ] && [ "$SUBNET_ID" != "None" ]; then
+                aws ec2 delete-subnet --subnet-id "${SUBNET_ID}" 2>/dev/null || true
+                echo "    ✓ Deleted Subnet: ${SUBNET_ID}"
+              fi
+            done
+            
+            # Detach and delete Internet Gateways
+            echo "  Deleting internet gateways..."
+            IGW_IDS=$(aws ec2 describe-internet-gateways \
+              --filters "Name=attachment.vpc-id,Values=${VPC_ID}" \
+              --query 'InternetGateways[*].InternetGatewayId' \
+              --output text 2>/dev/null || echo "")
+            
+            for IGW_ID in $IGW_IDS; do
+              if [ -n "$IGW_ID" ] && [ "$IGW_ID" != "None" ]; then
+                aws ec2 detach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${VPC_ID}" 2>/dev/null || true
+                aws ec2 delete-internet-gateway --internet-gateway-id "${IGW_ID}" 2>/dev/null || true
+                echo "    ✓ Deleted IGW: ${IGW_ID}"
+              fi
+            done
+            
+            # Delete VPC
+            echo "  Deleting VPC..."
+            aws ec2 delete-vpc --vpc-id "${VPC_ID}" 2>/dev/null || true
+            echo "    ✓ Deleted VPC: ${VPC_ID}"
+            
+          done <<< "$ORPHANED_VPCS"
+          
+          echo ""
+          echo "=== Searching for orphaned IAM resources ==="
+          
+          # Find orphaned IAM roles with TempBuild=true tag
+          ORPHANED_ROLES=$(aws iam list-roles \
+            --query "Roles[?contains(RoleName, 'spel-temp-')].RoleName" \
+            --output text 2>/dev/null || echo "")
+          
+          for ROLE_NAME in $ORPHANED_ROLES; do
+            if [ -z "$ROLE_NAME" ] || [ "$ROLE_NAME" == "None" ]; then
+              continue
+            fi
+            
+            FOUND_COUNT=$((FOUND_COUNT + 1))
+            
+            # Check tags for CreatedAt
+            CREATED_AT=$(aws iam list-role-tags --role-name "${ROLE_NAME}" \
+              --query "Tags[?Key=='CreatedAt'].Value|[0]" \
+              --output text 2>/dev/null || echo "None")
+            
+            if [ -n "$CREATED_AT" ] && [ "$CREATED_AT" != "None" ]; then
+              if [[ "$CREATED_AT" > "$CUTOFF_TIME" ]]; then
+                echo "SKIP: Role ${ROLE_NAME} - Created ${CREATED_AT}, not old enough"
+                continue
+              fi
+            else
+              echo "SKIP: Role ${ROLE_NAME} - No CreatedAt tag, skipping for safety"
+              continue
+            fi
+            
+            echo ""
+            echo "FOUND: Role ${ROLE_NAME} - Created ${CREATED_AT}"
+            
+            if [ "${DRY_RUN}" == "true" ]; then
+              echo "  [DRY RUN] Would delete role and associated resources"
+              continue
+            fi
+            
+            DELETED_COUNT=$((DELETED_COUNT + 1))
+            INFRA_PREFIX="${ROLE_NAME%-role}"
+            PROFILE_NAME="${INFRA_PREFIX}-profile"
+            POLICY_NAME="${INFRA_PREFIX}-policy"
+            
+            # Delete Instance Profile
+            if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
+              echo "  Removing role from instance profile..."
+              aws iam remove-role-from-instance-profile \
+                --instance-profile-name "${PROFILE_NAME}" \
+                --role-name "${ROLE_NAME}" 2>/dev/null || true
+              echo "  Deleting instance profile..."
+              aws iam delete-instance-profile --instance-profile-name "${PROFILE_NAME}" 2>/dev/null || true
+              echo "    ✓ Deleted Instance Profile: ${PROFILE_NAME}"
+            fi
+            
+            # Find and delete attached policies
+            ATTACHED_POLICIES=$(aws iam list-attached-role-policies \
+              --role-name "${ROLE_NAME}" \
+              --query 'AttachedPolicies[*].PolicyArn' \
+              --output text 2>/dev/null || echo "")
+            
+            for POLICY_ARN in $ATTACHED_POLICIES; do
+              if [ -n "$POLICY_ARN" ] && [ "$POLICY_ARN" != "None" ]; then
+                echo "  Detaching policy ${POLICY_ARN}..."
+                aws iam detach-role-policy \
+                  --role-name "${ROLE_NAME}" \
+                  --policy-arn "${POLICY_ARN}" 2>/dev/null || true
+                
+                # Only delete if it's a customer-managed policy with spel-temp prefix
+                if [[ "$POLICY_ARN" == *"spel-temp-"* ]]; then
+                  echo "  Deleting policy..."
+                  aws iam delete-policy --policy-arn "${POLICY_ARN}" 2>/dev/null || true
+                  echo "    ✓ Deleted Policy: ${POLICY_ARN}"
+                fi
+              fi
+            done
+            
+            # Delete Role
+            echo "  Deleting role..."
+            aws iam delete-role --role-name "${ROLE_NAME}" 2>/dev/null || true
+            echo "    ✓ Deleted Role: ${ROLE_NAME}"
+            
+          done
+          
+          echo ""
+          echo "=== Cleanup Summary ==="
+          echo "Resources Found: ${FOUND_COUNT}"
+          if [ "${DRY_RUN}" == "true" ]; then
+            echo "Resources Deleted: 0 (dry run)"
+            echo ""
+            echo "To actually delete resources, run with dry_run=false"
+          else
+            echo "Resources Deleted: ${DELETED_COUNT}"
+          fi
+          echo ""
+          echo "Note: Shared KMS key (alias/spel-temp-ebs-key) is never deleted"
+
+      - name: Create summary
+        if: always()
+        run: |
+          DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
+          MAX_AGE_HOURS="${{ github.event.inputs.max_age_hours || '24' }}"
+          
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## Infrastructure Cleanup Summary
+          
+          | Property | Value |
+          |----------|-------|
+          | Dry Run | \`${DRY_RUN}\` |
+          | Max Age | \`${MAX_AGE_HOURS}\` hours |
+          | Run Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
+          | Trigger | \`${{ github.event_name }}\` |
+          
+          ### Notes
+          - Only resources tagged with \`TempBuild=true\` are considered
+          - Only resources older than ${MAX_AGE_HOURS} hours are deleted
+          - Shared KMS key (\`alias/spel-temp-ebs-key\`) is never deleted
+          EOF
