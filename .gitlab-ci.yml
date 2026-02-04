@@ -78,6 +78,10 @@ variables:
   # Set this to your KMS key ARN for encrypted AMIs, e.g., arn:aws-us-gov:kms:us-gov-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
   # Leave empty to disable encryption or use default AWS-managed key
   PKR_VAR_aws_kms_key_id: ""
+  # IAM instance profile for build instances
+  # Set this to use a pre-created instance profile (e.g., from infra job)
+  # Leave empty to have Packer create a temporary one (requires IAM permissions)
+  PKR_VAR_aws_iam_instance_profile: ""
 
 stages:
   - import       # Import Docker image from tarball
@@ -720,6 +724,10 @@ infra:kms:
       # Add KMS key if set
       [[ -n "${PKR_VAR_aws_kms_key_id:-}" ]] && \
         DOCKER_ENV_ARGS+=(-e "PKR_VAR_aws_kms_key_id=${PKR_VAR_aws_kms_key_id}")
+      
+      # Add IAM instance profile if set
+      [[ -n "${PKR_VAR_aws_iam_instance_profile:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_aws_iam_instance_profile=${PKR_VAR_aws_iam_instance_profile}")
       
       docker run --rm \
         -v "${CI_PROJECT_DIR}:/workspace" \

@@ -151,6 +151,11 @@ on:
         required: false
         type: string
         default: ""
+      aws_iam_instance_profile:
+        description: "IAM instance profile for build instances. If not set, Packer creates a temporary one (requires IAM permissions)."
+        required: false
+        type: string
+        default: ""
 
 permissions:
   id-token: write
@@ -347,6 +352,7 @@ jobs:
           [[ -n "${{ github.event.inputs.aws_vpc_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_vpc_id="${{ github.event.inputs.aws_vpc_id }}")
           [[ -n "${{ github.event.inputs.aws_subnet_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_subnet_id="${{ github.event.inputs.aws_subnet_id }}")
           [[ -n "${{ github.event.inputs.aws_kms_key_id }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_kms_key_id="${{ github.event.inputs.aws_kms_key_id }}")
+          [[ -n "${{ github.event.inputs.aws_iam_instance_profile }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_iam_instance_profile="${{ github.event.inputs.aws_iam_instance_profile }}")
           [[ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_mirror_baseurl="${{ github.event.inputs.repo_mirror_baseurl }}")
           
           # Add boolean variables
