@@ -109,20 +109,28 @@ try {
     New-Item -Path $markerFile -ItemType File -Force | Out-Null
     Write-Log "Created completion marker: $markerFile"
 
-    # STEP 6: Run Sysprep (Windows 2022 with EC2Launch v2)
-    Write-Log "Step 6: Running Sysprep..."
+    # STEP 6: Run Sysprep via EC2Launch v2 (per HashiCorp documentation)
+    # https://developer.hashicorp.com/packer/integrations/hashicorp/amazon/latest/components/builder/ebs#windows-2022-sysprep-commands-for-amazon-windows-amis-only
+    Write-Log "Step 6: Running EC2Launch v2 sysprep..."
     
     # Remove the scheduled task before sysprep
     Unregister-ScheduledTask -TaskName "PostSTIG" -Confirm:$false -ErrorAction SilentlyContinue
     
-    $sysprepPath = "$env:SystemRoot\System32\Sysprep\Sysprep.exe"
-    if (Test-Path $sysprepPath) {
-        Write-Log "  Starting Sysprep.exe (will shutdown instance)..."
-        # Use Start-Process without -Wait so we can log before shutdown
-        Start-Process -FilePath $sysprepPath -ArgumentList '/generalize /oobe /shutdown /quiet' -NoNewWindow
-        Write-Log "  Sysprep started. Instance will shutdown shortly."
+    if (Test-Path $ec2LaunchV2) {
+        Write-Log "  Starting EC2Launch v2 sysprep (will shutdown instance)..."
+        # Use ec2launch sysprep instead of calling Sysprep.exe directly
+        & $ec2LaunchV2 sysprep --shutdown --block 2>&1 | ForEach-Object { Write-Log "  $_" }
+        Write-Log "  EC2Launch v2 sysprep completed. Instance should shutdown shortly."
     } else {
-        Write-Log "  ERROR: Sysprep.exe not found at $sysprepPath"
+        Write-Log "  ERROR: EC2Launch v2 not found at $ec2LaunchV2"
+        Write-Log "  Falling back to direct Sysprep.exe call..."
+        $sysprepPath = "$env:SystemRoot\System32\Sysprep\Sysprep.exe"
+        if (Test-Path $sysprepPath) {
+            Start-Process -FilePath $sysprepPath -ArgumentList '/generalize /oobe /shutdown /quiet' -NoNewWindow
+            Write-Log "  Direct Sysprep started."
+        } else {
+            Write-Log "  ERROR: Sysprep.exe not found!"
+        }
     }
 
 } catch {
