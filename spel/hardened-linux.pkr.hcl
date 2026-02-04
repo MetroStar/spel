@@ -1347,6 +1347,8 @@ build {
   # =============================================================================
 
   # Windows 2016/2019: Run post-STIG script via scheduled task to survive WinRM death
+  # Windows 2016/2019: Create scheduled task for post-STIG script
+  # The scheduled task runs as SYSTEM and survives WinRM disconnection
   provisioner "powershell" {
     pause_before = "10s"
     only = [
@@ -1366,30 +1368,11 @@ build {
       "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
       "",
       "Write-Host 'Scheduled task created. Script will run in 10 seconds.'",
-      "Write-Host 'Waiting for post-STIG script to complete (polling every 30s, max 1 hour)...'",
-      "",
-      "# Poll for completion marker file (1 hour timeout for DISM operations)",
-      "$maxWait = 3600",
-      "$waited = 0",
-      "$markerFile = 'C:\\Windows\\Temp\\post-stig-complete.marker'",
-      "while ($waited -lt $maxWait) {",
-      "    Start-Sleep -Seconds 30",
-      "    $waited += 30",
-      "    if (Test-Path $markerFile) {",
-      "        Write-Host \"Post-STIG script completed after $waited seconds.\"",
-      "        break",
-      "    }",
-      "    Write-Host \"Still waiting... ($waited seconds elapsed)\"",
-      "}",
-      "if (-not (Test-Path $markerFile)) {",
-      "    Write-Host 'WARNING: Marker file not found after 1 hour. Proceeding anyway.'",
-      "}",
-      "Write-Host 'Post-STIG provisioning complete. Packer will stop the instance.'"
+      "Write-Host 'Packer will now wait on the host machine for the script to complete.'"
     ]
   }
 
-  # Windows 2022: Run post-STIG script via scheduled task to survive WinRM death
-  # Note: post-stig-2022.ps1 includes Sysprep execution, which will shutdown the instance
+  # Windows 2022: Create scheduled task for post-STIG script (includes Sysprep)
   provisioner "powershell" {
     pause_before = "10s"
     only = [
@@ -1409,25 +1392,24 @@ build {
       "",
       "Write-Host 'Scheduled task created. Script will run in 10 seconds.'",
       "Write-Host 'Post-STIG script includes Sysprep which will shutdown the instance.'",
-      "Write-Host 'Waiting for post-STIG script to complete (polling every 30s, max 1 hour)...'",
-      "",
-      "# Poll for completion marker file (1 hour timeout for DISM operations)",
-      "$maxWait = 3600",
-      "$waited = 0",
-      "$markerFile = 'C:\\Windows\\Temp\\post-stig-complete.marker'",
-      "while ($waited -lt $maxWait) {",
-      "    Start-Sleep -Seconds 30",
-      "    $waited += 30",
-      "    if (Test-Path $markerFile) {",
-      "        Write-Host \"Post-STIG script completed after $waited seconds.\"",
-      "        break",
-      "    }",
-      "    Write-Host \"Still waiting... ($waited seconds elapsed)\"",
-      "}",
-      "if (-not (Test-Path $markerFile)) {",
-      "    Write-Host 'WARNING: Marker file not found after 1 hour. Instance may have shutdown from Sysprep.'",
-      "}",
-      "Write-Host 'Post-STIG provisioning complete.'"
+      "Write-Host 'Packer will now wait on the host machine for the script to complete.'"
+    ]
+  }
+
+  # Wait on the Packer HOST machine for post-STIG script to complete
+  # This runs locally on the build machine, NOT over WinRM, so it works even after WinRM dies
+  # 15 minutes allows time for: DISM cleanup (~5-10 min) + EC2Launch + SetupComplete copy
+  provisioner "shell-local" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "echo 'Waiting 15 minutes for post-STIG script to complete on Windows instance...'",
+      "echo 'This includes DISM cleanup, EC2Launch sysprep prep, and SetupComplete.cmd installation.'",
+      "for i in $(seq 1 15); do echo \"Minute $i of 15...\"; sleep 60; done",
+      "echo 'Wait complete. Packer will now stop the instance and create the AMI.'"
     ]
   }
 }
