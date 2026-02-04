@@ -294,6 +294,12 @@ variable "aws_kms_key_id" {
   default     = ""
 }
 
+variable "aws_iam_instance_profile" {
+  description = "Name of an IAM instance profile to attach to the build instance. Required for SSM-based polling on Windows builds. The profile must have AmazonSSMManagedInstanceCore policy or equivalent permissions."
+  type        = string
+  default     = ""
+}
+
 ###
 # Variables used by all AMIGEN platforms
 ###
@@ -629,6 +635,7 @@ source "amazon-ebs" "windows-base" {
   encrypt_boot                = var.aws_kms_key_id != "" ? true : null
   kms_key_id                  = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   force_deregister            = true
+  iam_instance_profile        = var.aws_iam_instance_profile != "" ? var.aws_iam_instance_profile : null
   instance_type               = var.aws_instance_type
   max_retries                 = 20
   region                      = var.aws_region
@@ -1395,6 +1402,7 @@ build {
 
   # Windows 2016: Poll SSM for completion marker (actual runtime ~50 min)
   # The post-STIG script creates C:\Windows\Temp\post-stig-complete.marker when done
+  # Requires: aws_iam_instance_profile set with AmazonSSMManagedInstanceCore policy
   provisioner "shell-local" {
     only = ["amazon-ebs.hardened-windows-2016-hvm"]
     environment_vars = [
@@ -1404,25 +1412,34 @@ build {
     inline = [
       "echo 'Polling SSM for Windows 2016 post-STIG completion...'",
       "echo \"Instance ID: $INSTANCE_ID\"",
+      "echo 'Waiting 2 minutes for SSM Agent to restart after STIG...'",
+      "sleep 120",
       "TIMEOUT=70",
       "ELAPSED=0",
-      "MARKER='C:\\Windows\\Temp\\post-stig-complete.marker'",
+      "MARKER='C:\\\\Windows\\\\Temp\\\\post-stig-complete.marker'",
       "while [ $ELAPSED -lt $TIMEOUT ]; do",
-      "  RESULT=$(aws ssm send-command --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --document-name 'AWS-RunPowerShellScript' --parameters \"commands=[\\\"if (Test-Path '$MARKER') { Write-Output 'MARKER_FOUND' } else { Write-Output 'MARKER_NOT_FOUND' }\\\"]\" --query 'Command.CommandId' --output text 2>/dev/null || echo 'SSM_FAILED')",
-      "  if [ \"$RESULT\" = 'SSM_FAILED' ]; then",
+      "  CMD_ID=$(aws ssm send-command --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --document-name 'AWS-RunPowerShellScript' --parameters 'commands=[\"if (Test-Path C:\\\\Windows\\\\Temp\\\\post-stig-complete.marker) { Write-Output MARKER_FOUND } else { Write-Output MARKER_NOT_FOUND }\"]' --query 'Command.CommandId' --output text 2>/dev/null) || CMD_ID=''",
+      "  if [ -z \"$CMD_ID\" ]; then",
       "    echo \"Minute $ELAPSED: SSM not available yet, waiting...\"",
       "    sleep 60",
       "    ELAPSED=$((ELAPSED + 1))",
       "    continue",
       "  fi",
-      "  sleep 5",
-      "  OUTPUT=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$RESULT\" --instance-id \"$INSTANCE_ID\" --query 'StandardOutputContent' --output text 2>/dev/null || echo 'PENDING')",
-      "  echo \"Minute $ELAPSED: SSM check result = $OUTPUT\"",
+      "  echo \"Minute $ELAPSED: SSM command sent, waiting for result...\"",
+      "  sleep 10",
+      "  for i in 1 2 3 4 5; do",
+      "    STATUS=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$CMD_ID\" --instance-id \"$INSTANCE_ID\" --query 'Status' --output text 2>/dev/null) || STATUS='Pending'",
+      "    if [ \"$STATUS\" = 'Success' ]; then break; fi",
+      "    if [ \"$STATUS\" = 'Failed' ]; then break; fi",
+      "    sleep 5",
+      "  done",
+      "  OUTPUT=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$CMD_ID\" --instance-id \"$INSTANCE_ID\" --query 'StandardOutputContent' --output text 2>/dev/null) || OUTPUT=''",
+      "  echo \"Minute $ELAPSED: Status=$STATUS Output=$OUTPUT\"",
       "  if echo \"$OUTPUT\" | grep -q 'MARKER_FOUND'; then",
       "    echo 'SUCCESS: Post-STIG script completed!'",
       "    exit 0",
       "  fi",
-      "  sleep 55",
+      "  sleep 50",
       "  ELAPSED=$((ELAPSED + 1))",
       "done",
       "echo 'WARNING: Timeout reached after 70 minutes. Proceeding anyway.'"
@@ -1431,6 +1448,7 @@ build {
 
   # Windows 2019: Poll SSM for completion marker (actual runtime ~23 min)
   # The post-STIG script creates C:\Windows\Temp\post-stig-complete.marker when done
+  # Requires: aws_iam_instance_profile set with AmazonSSMManagedInstanceCore policy
   provisioner "shell-local" {
     only = ["amazon-ebs.hardened-windows-2019-hvm"]
     environment_vars = [
@@ -1440,25 +1458,33 @@ build {
     inline = [
       "echo 'Polling SSM for Windows 2019 post-STIG completion...'",
       "echo \"Instance ID: $INSTANCE_ID\"",
+      "echo 'Waiting 2 minutes for SSM Agent to restart after STIG...'",
+      "sleep 120",
       "TIMEOUT=45",
       "ELAPSED=0",
-      "MARKER='C:\\Windows\\Temp\\post-stig-complete.marker'",
       "while [ $ELAPSED -lt $TIMEOUT ]; do",
-      "  RESULT=$(aws ssm send-command --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --document-name 'AWS-RunPowerShellScript' --parameters \"commands=[\\\"if (Test-Path '$MARKER') { Write-Output 'MARKER_FOUND' } else { Write-Output 'MARKER_NOT_FOUND' }\\\"]\" --query 'Command.CommandId' --output text 2>/dev/null || echo 'SSM_FAILED')",
-      "  if [ \"$RESULT\" = 'SSM_FAILED' ]; then",
+      "  CMD_ID=$(aws ssm send-command --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --document-name 'AWS-RunPowerShellScript' --parameters 'commands=[\"if (Test-Path C:\\\\Windows\\\\Temp\\\\post-stig-complete.marker) { Write-Output MARKER_FOUND } else { Write-Output MARKER_NOT_FOUND }\"]' --query 'Command.CommandId' --output text 2>/dev/null) || CMD_ID=''",
+      "  if [ -z \"$CMD_ID\" ]; then",
       "    echo \"Minute $ELAPSED: SSM not available yet, waiting...\"",
       "    sleep 60",
       "    ELAPSED=$((ELAPSED + 1))",
       "    continue",
       "  fi",
-      "  sleep 5",
-      "  OUTPUT=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$RESULT\" --instance-id \"$INSTANCE_ID\" --query 'StandardOutputContent' --output text 2>/dev/null || echo 'PENDING')",
-      "  echo \"Minute $ELAPSED: SSM check result = $OUTPUT\"",
+      "  echo \"Minute $ELAPSED: SSM command sent, waiting for result...\"",
+      "  sleep 10",
+      "  for i in 1 2 3 4 5; do",
+      "    STATUS=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$CMD_ID\" --instance-id \"$INSTANCE_ID\" --query 'Status' --output text 2>/dev/null) || STATUS='Pending'",
+      "    if [ \"$STATUS\" = 'Success' ]; then break; fi",
+      "    if [ \"$STATUS\" = 'Failed' ]; then break; fi",
+      "    sleep 5",
+      "  done",
+      "  OUTPUT=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$CMD_ID\" --instance-id \"$INSTANCE_ID\" --query 'StandardOutputContent' --output text 2>/dev/null) || OUTPUT=''",
+      "  echo \"Minute $ELAPSED: Status=$STATUS Output=$OUTPUT\"",
       "  if echo \"$OUTPUT\" | grep -q 'MARKER_FOUND'; then",
       "    echo 'SUCCESS: Post-STIG script completed!'",
       "    exit 0",
       "  fi",
-      "  sleep 55",
+      "  sleep 50",
       "  ELAPSED=$((ELAPSED + 1))",
       "done",
       "echo 'WARNING: Timeout reached after 45 minutes. Proceeding anyway.'"
