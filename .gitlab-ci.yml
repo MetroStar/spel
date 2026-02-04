@@ -83,8 +83,8 @@ variables:
   # Leave empty to have Packer create a temporary one (requires IAM permissions)
   PKR_VAR_aws_iam_instance_profile: ""
   # Create temporary infrastructure for this build (auto-destroyed after build)
-  # Set to "true" to create temporary VPC/subnet/SG/IAM inline
-  CREATE_TEMP_INFRA: "false"
+  # Set to "false" to use pre-existing infrastructure instead
+  CREATE_TEMP_INFRA: "true"
 
 stages:
   - import       # Import Docker image from tarball

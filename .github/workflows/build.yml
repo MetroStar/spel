@@ -161,7 +161,7 @@ on:
         description: "Create temporary VPC/subnet/SG/IAM for this build (auto-destroyed after build)"
         required: false
         type: boolean
-        default: false
+        default: true
 
 permissions:
   id-token: write
