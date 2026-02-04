@@ -1337,46 +1337,89 @@ build {
 
 
   # =============================================================================
-  # POST-STIG: Run post-STIG operations directly via PowerShell
-  # WinRM survives STIG hardening because WinRM-related STIG controls are disabled
+  # POST-STIG: Run via scheduled task to survive WinRM disconnection
+  # WinRM dies after STIG hardening despite disabling WinRM STIG controls
   # File uploads were done BEFORE STIG hardening
   # =============================================================================
 
-  # Windows 2016/2019: Run post-STIG script directly
-  # Script handles: firewall disable, network restore, DISM cleanup, EC2Launch sysprep, SetupComplete.cmd
+  # Windows 2016: Create scheduled task for post-STIG script
   provisioner "powershell" {
-    pause_before = "30s"
-    timeout      = "90m"
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm"
-    ]
+    pause_before = "10s"
+    only = ["amazon-ebs.hardened-windows-2016-hvm"]
     inline = [
       "$ErrorActionPreference = 'Continue'",
-      "Write-Host '============================================='",
-      "Write-Host 'Running post-STIG script directly via WinRM'",
-      "Write-Host '============================================='",
-      "& 'C:\\Windows\\Temp\\post-stig.ps1'",
-      "Write-Host 'Post-STIG script completed successfully.'"
+      "Write-Host 'Creating scheduled task for post-STIG script...'",
+      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
+      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
+      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
+      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
+      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
+      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
+      "Write-Host 'Scheduled task created. Packer will wait 55 minutes for script to complete.'"
     ]
   }
 
-  # Windows 2022: Run post-STIG script directly (includes Sysprep)
-  # Script handles: firewall disable, network restore, DISM cleanup, EC2Launch v2 reset, Sysprep, SetupComplete.cmd
-  # Note: Sysprep will shutdown the instance, Packer will then create the AMI
+  # Windows 2019: Create scheduled task for post-STIG script
   provisioner "powershell" {
-    pause_before = "30s"
-    timeout      = "90m"
-    only = [
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
+    pause_before = "10s"
+    only = ["amazon-ebs.hardened-windows-2019-hvm"]
     inline = [
       "$ErrorActionPreference = 'Continue'",
-      "Write-Host '============================================='",
-      "Write-Host 'Running post-STIG script directly via WinRM'",
-      "Write-Host '============================================='",
-      "& 'C:\\Windows\\Temp\\post-stig.ps1'",
-      "Write-Host 'Post-STIG script completed (Sysprep may have shut down the instance).'"
+      "Write-Host 'Creating scheduled task for post-STIG script...'",
+      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
+      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
+      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
+      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
+      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
+      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
+      "Write-Host 'Scheduled task created. Packer will wait 30 minutes for script to complete.'"
+    ]
+  }
+
+  # Windows 2022: Create scheduled task for post-STIG script (includes Sysprep)
+  provisioner "powershell" {
+    pause_before = "10s"
+    only = ["amazon-ebs.hardened-windows-2022-hvm"]
+    inline = [
+      "$ErrorActionPreference = 'Continue'",
+      "Write-Host 'Creating scheduled task for post-STIG script...'",
+      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
+      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
+      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
+      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
+      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
+      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
+      "Write-Host 'Scheduled task created. Packer will wait 60 minutes for script to complete.'"
+    ]
+  }
+
+  # Windows 2016: Wait 55 minutes (actual runtime ~50 min)
+  provisioner "shell-local" {
+    only = ["amazon-ebs.hardened-windows-2016-hvm"]
+    inline = [
+      "echo 'Waiting 55 minutes for Windows 2016 post-STIG script...'",
+      "for i in $(seq 1 55); do echo \"Minute $i of 55...\"; sleep 60; done",
+      "echo 'Wait complete.'"
+    ]
+  }
+
+  # Windows 2019: Wait 30 minutes (actual runtime ~23 min)
+  provisioner "shell-local" {
+    only = ["amazon-ebs.hardened-windows-2019-hvm"]
+    inline = [
+      "echo 'Waiting 30 minutes for Windows 2019 post-STIG script...'",
+      "for i in $(seq 1 30); do echo \"Minute $i of 30...\"; sleep 60; done",
+      "echo 'Wait complete.'"
+    ]
+  }
+
+  # Windows 2022: Wait 60 minutes (includes DISM + Sysprep)
+  provisioner "shell-local" {
+    only = ["amazon-ebs.hardened-windows-2022-hvm"]
+    inline = [
+      "echo 'Waiting 60 minutes for Windows 2022 post-STIG script (includes Sysprep)...'",
+      "for i in $(seq 1 60); do echo \"Minute $i of 60...\"; sleep 60; done",
+      "echo 'Wait complete.'"
     ]
   }
 }
