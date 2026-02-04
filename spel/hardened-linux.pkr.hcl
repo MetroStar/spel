@@ -295,7 +295,7 @@ variable "aws_kms_key_id" {
 }
 
 variable "aws_iam_instance_profile" {
-  description = "Name of an IAM instance profile to attach to the build instance. Required for SSM-based polling on Windows builds. The profile must have AmazonSSMManagedInstanceCore policy or equivalent permissions."
+  description = "Name of an IAM instance profile to attach to the build instance. Optional - if not set, a temporary IAM role with SSM permissions is created automatically for Windows builds."
   type        = string
   default     = ""
 }
@@ -651,6 +651,31 @@ source "amazon-ebs" "windows-base" {
   winrm_use_ntlm              = true
   winrm_username              = "TempPackerUser"
   winrm_password              = "ComplexP@ssw0rd123!"
+
+  # Create temporary IAM role for SSM polling (used by shell-local provisioners)
+  # Only created if no explicit iam_instance_profile is provided
+  dynamic "temporary_iam_instance_profile_policy_document" {
+    for_each = var.aws_iam_instance_profile == "" ? [1] : []
+    content {
+      Statement {
+        Effect = "Allow"
+        Action = [
+          "ssm:UpdateInstanceInformation",
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",
+          "ec2messages:AcknowledgeMessage",
+          "ec2messages:DeleteMessage",
+          "ec2messages:FailMessage",
+          "ec2messages:GetEndpoint",
+          "ec2messages:GetMessages",
+          "ec2messages:SendReply"
+        ]
+        Resource = ["*"]
+      }
+    }
+  }
 
   launch_block_device_mappings {
     device_name = "/dev/sda1"
