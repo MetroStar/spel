@@ -1352,10 +1352,14 @@ build {
   # File uploads were done BEFORE STIG hardening
   # =============================================================================
 
-  # Windows 2016: Create scheduled task for post-STIG script (includes Sysprep with shutdown)
+  # Windows: Create scheduled task for post-STIG script (runs Sysprep which shuts down the instance)
   provisioner "powershell" {
     pause_before = "10s"
-    only = ["amazon-ebs.hardened-windows-2016-hvm"]
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
     inline = [
       "$ErrorActionPreference = 'Continue'",
       "Write-Host 'Creating scheduled task for post-STIG script...'",
@@ -1369,112 +1373,20 @@ build {
     ]
   }
 
-  # Windows 2019: Create scheduled task for post-STIG script (includes Sysprep with shutdown)
-  provisioner "powershell" {
-    pause_before = "10s"
-    only = ["amazon-ebs.hardened-windows-2019-hvm"]
-    inline = [
-      "$ErrorActionPreference = 'Continue'",
-      "Write-Host 'Creating scheduled task for post-STIG script...'",
-      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
-      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
-      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
-      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
-      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
-      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
-      "Write-Host 'Scheduled task created. Script will run Sysprep which shuts down the instance.'"
-    ]
-  }
-
-  # Windows 2022: Create scheduled task for post-STIG script (includes Sysprep)
-  provisioner "powershell" {
-    pause_before = "10s"
-    only = ["amazon-ebs.hardened-windows-2022-hvm"]
-    inline = [
-      "$ErrorActionPreference = 'Continue'",
-      "Write-Host 'Creating scheduled task for post-STIG script...'",
-      "$scriptPath = 'C:\\Windows\\Temp\\post-stig.ps1'",
-      "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument \"-ExecutionPolicy Bypass -NoProfile -File `\"$scriptPath`\"\"",
-      "$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(10)",
-      "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
-      "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
-      "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
-      "Write-Host 'Scheduled task created. Packer will wait 60 minutes for script to complete.'"
-    ]
-  }
-
-  # Windows 2016: Poll instance state until stopped (Sysprep shuts down the instance)
+  # Windows: Poll instance state until stopped (Sysprep shuts down the instance)
   # This is more reliable than SSM polling - STIG hardening can block SSM connectivity
   provisioner "shell-local" {
-    only = ["amazon-ebs.hardened-windows-2016-hvm"]
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
     environment_vars = [
       "INSTANCE_ID=${build.ID}",
       "AWS_REGION=${var.aws_region}"
     ]
     inline = [
-      "echo 'Waiting for Windows 2016 Sysprep to complete (instance will stop)...'",
-      "echo \"Instance ID: $INSTANCE_ID\"",
-      "TIMEOUT=90",
-      "ELAPSED=0",
-      "while [ $ELAPSED -lt $TIMEOUT ]; do",
-      "  STATE=$(aws ec2 describe-instances --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo 'unknown')",
-      "  echo \"Minute $ELAPSED: Instance state = $STATE\"",
-      "  if [ \"$STATE\" = \"stopped\" ]; then",
-      "    echo 'SUCCESS: Instance stopped - Sysprep completed successfully!'",
-      "    exit 0",
-      "  fi",
-      "  if [ \"$STATE\" = \"stopping\" ]; then",
-      "    echo 'Instance is stopping - Sysprep initiated shutdown, waiting for full stop...'",
-      "  fi",
-      "  sleep 60",
-      "  ELAPSED=$((ELAPSED + 1))",
-      "done",
-      "echo 'WARNING: Timeout reached after 90 minutes. Proceeding anyway.'",
-      "echo 'If AMI shows IMAGE_STATE_UNDEPLOYABLE, Sysprep may not have completed.'"
-    ]
-  }
-
-  # Windows 2019: Poll instance state until stopped (Sysprep shuts down the instance)
-  # This is more reliable than SSM polling - STIG hardening can block SSM connectivity
-  provisioner "shell-local" {
-    only = ["amazon-ebs.hardened-windows-2019-hvm"]
-    environment_vars = [
-      "INSTANCE_ID=${build.ID}",
-      "AWS_REGION=${var.aws_region}"
-    ]
-    inline = [
-      "echo 'Waiting for Windows 2019 Sysprep to complete (instance will stop)...'",
-      "echo \"Instance ID: $INSTANCE_ID\"",
-      "TIMEOUT=60",
-      "ELAPSED=0",
-      "while [ $ELAPSED -lt $TIMEOUT ]; do",
-      "  STATE=$(aws ec2 describe-instances --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo 'unknown')",
-      "  echo \"Minute $ELAPSED: Instance state = $STATE\"",
-      "  if [ \"$STATE\" = \"stopped\" ]; then",
-      "    echo 'SUCCESS: Instance stopped - Sysprep completed successfully!'",
-      "    exit 0",
-      "  fi",
-      "  if [ \"$STATE\" = \"stopping\" ]; then",
-      "    echo 'Instance is stopping - Sysprep initiated shutdown, waiting for full stop...'",
-      "  fi",
-      "  sleep 60",
-      "  ELAPSED=$((ELAPSED + 1))",
-      "done",
-      "echo 'WARNING: Timeout reached after 60 minutes. Proceeding anyway.'",
-      "echo 'If AMI shows IMAGE_STATE_UNDEPLOYABLE, Sysprep may not have completed.'"
-    ]
-  }
-
-  # Windows 2022: Poll instance state until stopped (Sysprep shuts down the instance)
-  # This is more reliable than a fixed wait - we know Sysprep completed when instance stops
-  provisioner "shell-local" {
-    only = ["amazon-ebs.hardened-windows-2022-hvm"]
-    environment_vars = [
-      "INSTANCE_ID=${build.ID}",
-      "AWS_REGION=${var.aws_region}"
-    ]
-    inline = [
-      "echo 'Waiting for Windows 2022 Sysprep to complete (instance will stop)...'",
+      "echo 'Waiting for Windows Sysprep to complete (instance will stop)...'",
       "echo \"Instance ID: $INSTANCE_ID\"",
       "TIMEOUT=90",
       "ELAPSED=0",
