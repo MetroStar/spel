@@ -1407,4 +1407,9 @@ build {
       "echo 'If AMI shows IMAGE_STATE_UNDEPLOYABLE, Sysprep may not have completed.'"
     ]
   }
+
+  # Generate manifest for all builds (Linux and Windows)
+  post-processor "manifest" {
+    output = ".spel/${var.spel_version}/packer-manifest.json"
+  }
 }
