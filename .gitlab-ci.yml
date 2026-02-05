@@ -31,7 +31,7 @@
 
 variables:
   SPEL_IDENTIFIER: "spel"
-  PKR_VAR_aws_region: "us-gov-east-1"
+  PKR_VAR_aws_region: "us-gov-west-1"
   PACKER_LOG: "1"
   CHECKPOINT_DISABLE: "1"
   # Infrastructure naming
