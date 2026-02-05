@@ -147,6 +147,11 @@ on:
         required: false
         type: boolean
         default: true
+      force_cleanup_temp_vpcs:
+        description: "Force cleanup ALL temporary SPEL VPCs regardless of age (use when VPC limit reached)"
+        required: false
+        type: boolean
+        default: false
       # Post-build testing
       test_windows_instance_types:
         description: "Test Windows AMIs on multiple Nitro instance types after build (opt-in)"
@@ -276,9 +281,17 @@ jobs:
           
           echo "TEMP_INFRA_PREFIX=${INFRA_PREFIX}" >> $GITHUB_ENV
           
-          # Clean up orphaned temp VPCs from previous failed runs (older than 12 hours)
+          # Clean up orphaned temp VPCs from previous failed runs
+          # Default: older than 2 hours. With force_cleanup: ALL temp VPCs
           echo "Checking for orphaned temporary VPCs..."
-          STALE_CUTOFF=$(date -u -d '12 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-12H +%Y-%m-%dT%H:%M:%SZ)
+          FORCE_CLEANUP="${{ github.event.inputs.force_cleanup_temp_vpcs }}"
+          STALE_CUTOFF=$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-2H +%Y-%m-%dT%H:%M:%SZ)
+          
+          if [[ "$FORCE_CLEANUP" == "true" ]]; then
+            echo "Force cleanup enabled - will delete ALL temporary SPEL VPCs"
+          else
+            echo "Will cleanup temp VPCs older than 2 hours (created before $STALE_CUTOFF)"
+          fi
           
           ORPHAN_VPCS=$(aws ec2 describe-vpcs \
             --filters "Name=tag:TempBuild,Values=true" "Name=tag:Project,Values=SPEL" \
@@ -286,14 +299,23 @@ jobs:
             --output text 2>/dev/null || echo "")
           
           if [[ -n "$ORPHAN_VPCS" ]]; then
-            echo "Found temporary VPCs, checking for stale ones..."
+            echo "Found temporary VPCs, checking for cleanup..."
             while IFS=$'\t' read -r vpc_id created_at vpc_name; do
               [[ -z "$vpc_id" ]] && continue
               
-              # Check if older than 12 hours
-              if [[ -n "$created_at" && "$created_at" < "$STALE_CUTOFF" ]]; then
-                echo "Cleaning up stale VPC: $vpc_id ($vpc_name, created: $created_at)"
-                
+              # Check if should cleanup: force mode OR older than threshold
+              SHOULD_CLEANUP=false
+              if [[ "$FORCE_CLEANUP" == "true" ]]; then
+                SHOULD_CLEANUP=true
+                echo "Force cleanup: $vpc_id ($vpc_name, created: $created_at)"
+              elif [[ -n "$created_at" && "$created_at" < "$STALE_CUTOFF" ]]; then
+                SHOULD_CLEANUP=true
+                echo "Stale VPC cleanup: $vpc_id ($vpc_name, created: $created_at)"
+              else
+                echo "  Skipping recent VPC: $vpc_id ($vpc_name, created: $created_at)"
+              fi
+              
+              if [[ "$SHOULD_CLEANUP" == "true" ]]; then
                 # Delete in order: instances, NAT gateways, endpoints, subnets, route tables, IGW, security groups, VPC
                 # Terminate any instances
                 INSTANCES=$(aws ec2 describe-instances --filters "Name=vpc-id,Values=$vpc_id" \
@@ -348,9 +370,7 @@ jobs:
                 # Delete VPC
                 echo "  Deleting VPC: $vpc_id"
                 aws ec2 delete-vpc --vpc-id "$vpc_id" 2>/dev/null || true
-                echo "  ✓ Cleaned up stale VPC: $vpc_id"
-              else
-                echo "  Skipping recent VPC: $vpc_id ($vpc_name, created: $created_at)"
+                echo "  ✓ Cleaned up VPC: $vpc_id"
               fi
             done <<< "$ORPHAN_VPCS"
           fi
