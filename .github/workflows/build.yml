@@ -274,8 +274,10 @@ jobs:
           echo "=== Creating Temporary Infrastructure ==="
           
           INFRA_PREFIX="spel-temp-${GITHUB_RUN_ID}"
-          VPC_CIDR="10.${GITHUB_RUN_ID: -2}.0.0/16"
-          SUBNET_CIDR="10.${GITHUB_RUN_ID: -2}.1.0/24"
+          # Use arithmetic expansion to strip leading zeros (e.g., 04 -> 4)
+          OCTET=$((10#${GITHUB_RUN_ID: -2}))
+          VPC_CIDR="10.${OCTET}.0.0/16"
+          SUBNET_CIDR="10.${OCTET}.1.0/24"
           AWS_REGION="us-east-1"
           CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           
