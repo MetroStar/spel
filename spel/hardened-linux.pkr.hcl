@@ -630,6 +630,9 @@ source "amazon-ebs" "windows-base" {
   ami_virtualization_type     = "hvm"
   associate_public_ip_address = true
   communicator                = "winrm"
+  # Sysprep shuts down the instance - tell Packer not to stop it itself
+  # Our shell-local provisioner polls for the instance to reach 'stopped' state
+  disable_stop_instance       = true
   deprecate_at                = local.aws_ami_deprecate_at
   ena_support                 = true
   encrypt_boot                = var.aws_kms_key_id != "" ? true : null
@@ -1349,7 +1352,7 @@ build {
   # File uploads were done BEFORE STIG hardening
   # =============================================================================
 
-  # Windows 2016: Create scheduled task for post-STIG script
+  # Windows 2016: Create scheduled task for post-STIG script (includes Sysprep with shutdown)
   provisioner "powershell" {
     pause_before = "10s"
     only = ["amazon-ebs.hardened-windows-2016-hvm"]
@@ -1362,11 +1365,11 @@ build {
       "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
       "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
       "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
-      "Write-Host 'Scheduled task created. Packer will wait 55 minutes for script to complete.'"
+      "Write-Host 'Scheduled task created. Script will run Sysprep which shuts down the instance.'"
     ]
   }
 
-  # Windows 2019: Create scheduled task for post-STIG script
+  # Windows 2019: Create scheduled task for post-STIG script (includes Sysprep with shutdown)
   provisioner "powershell" {
     pause_before = "10s"
     only = ["amazon-ebs.hardened-windows-2019-hvm"]
@@ -1379,7 +1382,7 @@ build {
       "$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest",
       "$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DontStopOnIdleEnd",
       "Register-ScheduledTask -TaskName 'PostSTIG' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null",
-      "Write-Host 'Scheduled task created. Packer will wait 30 minutes for script to complete.'"
+      "Write-Host 'Scheduled task created. Script will run Sysprep which shuts down the instance.'"
     ]
   }
 
@@ -1400,9 +1403,8 @@ build {
     ]
   }
 
-  # Windows 2016: Poll SSM for completion marker (actual runtime ~50 min)
-  # The post-STIG script creates C:\Windows\Temp\post-stig-complete.marker when done
-  # Requires: aws_iam_instance_profile set with AmazonSSMManagedInstanceCore policy
+  # Windows 2016: Poll instance state until stopped (Sysprep shuts down the instance)
+  # This is more reliable than SSM polling - STIG hardening can block SSM connectivity
   provisioner "shell-local" {
     only = ["amazon-ebs.hardened-windows-2016-hvm"]
     environment_vars = [
@@ -1410,45 +1412,30 @@ build {
       "AWS_REGION=${var.aws_region}"
     ]
     inline = [
-      "echo 'Polling SSM for Windows 2016 post-STIG completion...'",
+      "echo 'Waiting for Windows 2016 Sysprep to complete (instance will stop)...'",
       "echo \"Instance ID: $INSTANCE_ID\"",
-      "echo 'Waiting 2 minutes for SSM Agent to restart after STIG...'",
-      "sleep 120",
-      "TIMEOUT=70",
+      "TIMEOUT=90",
       "ELAPSED=0",
-      "MARKER='C:\\\\Windows\\\\Temp\\\\post-stig-complete.marker'",
       "while [ $ELAPSED -lt $TIMEOUT ]; do",
-      "  CMD_ID=$(aws ssm send-command --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --document-name 'AWS-RunPowerShellScript' --parameters 'commands=[\"if (Test-Path C:\\\\Windows\\\\Temp\\\\post-stig-complete.marker) { Write-Output MARKER_FOUND } else { Write-Output MARKER_NOT_FOUND }\"]' --query 'Command.CommandId' --output text 2>/dev/null) || CMD_ID=''",
-      "  if [ -z \"$CMD_ID\" ]; then",
-      "    echo \"Minute $ELAPSED: SSM not available yet, waiting...\"",
-      "    sleep 60",
-      "    ELAPSED=$((ELAPSED + 1))",
-      "    continue",
-      "  fi",
-      "  echo \"Minute $ELAPSED: SSM command sent, waiting for result...\"",
-      "  sleep 10",
-      "  for i in 1 2 3 4 5; do",
-      "    STATUS=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$CMD_ID\" --instance-id \"$INSTANCE_ID\" --query 'Status' --output text 2>/dev/null) || STATUS='Pending'",
-      "    if [ \"$STATUS\" = 'Success' ]; then break; fi",
-      "    if [ \"$STATUS\" = 'Failed' ]; then break; fi",
-      "    sleep 5",
-      "  done",
-      "  OUTPUT=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$CMD_ID\" --instance-id \"$INSTANCE_ID\" --query 'StandardOutputContent' --output text 2>/dev/null) || OUTPUT=''",
-      "  echo \"Minute $ELAPSED: Status=$STATUS Output=$OUTPUT\"",
-      "  if echo \"$OUTPUT\" | grep -q 'MARKER_FOUND'; then",
-      "    echo 'SUCCESS: Post-STIG script completed!'",
+      "  STATE=$(aws ec2 describe-instances --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo 'unknown')",
+      "  echo \"Minute $ELAPSED: Instance state = $STATE\"",
+      "  if [ \"$STATE\" = \"stopped\" ]; then",
+      "    echo 'SUCCESS: Instance stopped - Sysprep completed successfully!'",
       "    exit 0",
       "  fi",
-      "  sleep 50",
+      "  if [ \"$STATE\" = \"stopping\" ]; then",
+      "    echo 'Instance is stopping - Sysprep initiated shutdown, waiting for full stop...'",
+      "  fi",
+      "  sleep 60",
       "  ELAPSED=$((ELAPSED + 1))",
       "done",
-      "echo 'WARNING: Timeout reached after 70 minutes. Proceeding anyway.'"
+      "echo 'WARNING: Timeout reached after 90 minutes. Proceeding anyway.'",
+      "echo 'If AMI shows IMAGE_STATE_UNDEPLOYABLE, Sysprep may not have completed.'"
     ]
   }
 
-  # Windows 2019: Poll SSM for completion marker (actual runtime ~23 min)
-  # The post-STIG script creates C:\Windows\Temp\post-stig-complete.marker when done
-  # Requires: aws_iam_instance_profile set with AmazonSSMManagedInstanceCore policy
+  # Windows 2019: Poll instance state until stopped (Sysprep shuts down the instance)
+  # This is more reliable than SSM polling - STIG hardening can block SSM connectivity
   provisioner "shell-local" {
     only = ["amazon-ebs.hardened-windows-2019-hvm"]
     environment_vars = [
@@ -1456,38 +1443,25 @@ build {
       "AWS_REGION=${var.aws_region}"
     ]
     inline = [
-      "echo 'Polling SSM for Windows 2019 post-STIG completion...'",
+      "echo 'Waiting for Windows 2019 Sysprep to complete (instance will stop)...'",
       "echo \"Instance ID: $INSTANCE_ID\"",
-      "echo 'Waiting 2 minutes for SSM Agent to restart after STIG...'",
-      "sleep 120",
-      "TIMEOUT=45",
+      "TIMEOUT=60",
       "ELAPSED=0",
       "while [ $ELAPSED -lt $TIMEOUT ]; do",
-      "  CMD_ID=$(aws ssm send-command --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --document-name 'AWS-RunPowerShellScript' --parameters 'commands=[\"if (Test-Path C:\\\\Windows\\\\Temp\\\\post-stig-complete.marker) { Write-Output MARKER_FOUND } else { Write-Output MARKER_NOT_FOUND }\"]' --query 'Command.CommandId' --output text 2>/dev/null) || CMD_ID=''",
-      "  if [ -z \"$CMD_ID\" ]; then",
-      "    echo \"Minute $ELAPSED: SSM not available yet, waiting...\"",
-      "    sleep 60",
-      "    ELAPSED=$((ELAPSED + 1))",
-      "    continue",
-      "  fi",
-      "  echo \"Minute $ELAPSED: SSM command sent, waiting for result...\"",
-      "  sleep 10",
-      "  for i in 1 2 3 4 5; do",
-      "    STATUS=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$CMD_ID\" --instance-id \"$INSTANCE_ID\" --query 'Status' --output text 2>/dev/null) || STATUS='Pending'",
-      "    if [ \"$STATUS\" = 'Success' ]; then break; fi",
-      "    if [ \"$STATUS\" = 'Failed' ]; then break; fi",
-      "    sleep 5",
-      "  done",
-      "  OUTPUT=$(aws ssm get-command-invocation --region \"$AWS_REGION\" --command-id \"$CMD_ID\" --instance-id \"$INSTANCE_ID\" --query 'StandardOutputContent' --output text 2>/dev/null) || OUTPUT=''",
-      "  echo \"Minute $ELAPSED: Status=$STATUS Output=$OUTPUT\"",
-      "  if echo \"$OUTPUT\" | grep -q 'MARKER_FOUND'; then",
-      "    echo 'SUCCESS: Post-STIG script completed!'",
+      "  STATE=$(aws ec2 describe-instances --region \"$AWS_REGION\" --instance-ids \"$INSTANCE_ID\" --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo 'unknown')",
+      "  echo \"Minute $ELAPSED: Instance state = $STATE\"",
+      "  if [ \"$STATE\" = \"stopped\" ]; then",
+      "    echo 'SUCCESS: Instance stopped - Sysprep completed successfully!'",
       "    exit 0",
       "  fi",
-      "  sleep 50",
+      "  if [ \"$STATE\" = \"stopping\" ]; then",
+      "    echo 'Instance is stopping - Sysprep initiated shutdown, waiting for full stop...'",
+      "  fi",
+      "  sleep 60",
       "  ELAPSED=$((ELAPSED + 1))",
       "done",
-      "echo 'WARNING: Timeout reached after 45 minutes. Proceeding anyway.'"
+      "echo 'WARNING: Timeout reached after 60 minutes. Proceeding anyway.'",
+      "echo 'If AMI shows IMAGE_STATE_UNDEPLOYABLE, Sysprep may not have completed.'"
     ]
   }
 

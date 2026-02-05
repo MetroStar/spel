@@ -1,6 +1,7 @@
 # Post-STIG script for Windows Server 2016/2019
 # This script is uploaded BEFORE STIG and executed AFTER STIG completes
 # It runs in background mode to avoid WinRM session issues
+# Includes Sysprep execution with shutdown for reliable instance-state polling
 
 param(
     [switch]$Background
@@ -74,16 +75,12 @@ try {
         Write-Log "  WARNING: cleanup-sysprep.ps1 not found"
     }
 
-    # STEP 4: EC2Launch v1 Sysprep Prep
+    # STEP 4: EC2Launch v1 Reset and Sysprep Prep
     Write-Log "Step 4: Running EC2Launch v1 sysprep prep..."
     $ec2LaunchPath = "$env:ProgramData\Amazon\EC2-Windows\Launch\Scripts"
     if (Test-Path "$ec2LaunchPath\InitializeInstance.ps1") {
         & "$ec2LaunchPath\InitializeInstance.ps1" -Schedule 2>&1 | ForEach-Object { Write-Log "  $_" }
         Write-Log "  InitializeInstance.ps1 completed"
-    }
-    if (Test-Path "$ec2LaunchPath\SysprepInstance.ps1") {
-        & "$ec2LaunchPath\SysprepInstance.ps1" -NoShutdown 2>&1 | ForEach-Object { Write-Log "  $_" }
-        Write-Log "  SysprepInstance.ps1 completed"
     }
 
     # STEP 5: Copy SetupComplete.cmd (AFTER EC2Launch runs to avoid it being overwritten)
@@ -103,19 +100,39 @@ try {
         Write-Log "  ERROR: SetupComplete.cmd NOT in Scripts folder!"
     }
 
-    Write-Log "=== POST-STIG: Complete. Packer will stop the instance. ==="
+    Write-Log "=== POST-STIG: Complete. Running Sysprep... ==="
+
+    # Create marker file to signal completion (before Sysprep shuts down)
+    $markerFile = 'C:\Windows\Temp\post-stig-complete.marker'
+    New-Item -Path $markerFile -ItemType File -Force | Out-Null
+    Write-Log "Created completion marker: $markerFile"
+
+    # STEP 6: Run Sysprep via EC2Launch v1 (with shutdown for instance-state polling)
+    Write-Log "Step 6: Running EC2Launch v1 sysprep..."
+    
+    # Remove the scheduled task before sysprep
+    Unregister-ScheduledTask -TaskName "PostSTIG" -Confirm:$false -ErrorAction SilentlyContinue
+    
+    $ec2LaunchPath = "$env:ProgramData\Amazon\EC2-Windows\Launch\Scripts"
+    if (Test-Path "$ec2LaunchPath\SysprepInstance.ps1") {
+        Write-Log "  Starting EC2Launch v1 sysprep (will shutdown instance)..."
+        # Run SysprepInstance.ps1 WITHOUT -NoShutdown so it shuts down after completion
+        & "$ec2LaunchPath\SysprepInstance.ps1" 2>&1 | ForEach-Object { Write-Log "  $_" }
+        Write-Log "  EC2Launch v1 sysprep initiated. Instance should shutdown shortly."
+    } else {
+        Write-Log "  WARNING: SysprepInstance.ps1 not found, falling back to direct Sysprep..."
+        $sysprepPath = "$env:SystemRoot\System32\Sysprep\Sysprep.exe"
+        if (Test-Path $sysprepPath) {
+            Start-Process -FilePath $sysprepPath -ArgumentList '/generalize /oobe /shutdown /quiet' -NoNewWindow
+            Write-Log "  Direct Sysprep started."
+        } else {
+            Write-Log "  ERROR: Sysprep.exe not found!"
+        }
+    }
 
 } catch {
     Write-Log "ERROR: $($_.Exception.Message)"
     Write-Log "Stack Trace: $($_.ScriptStackTrace)"
 }
 
-# Remove the scheduled task if it exists
-Unregister-ScheduledTask -TaskName "PostSTIG" -Confirm:$false -ErrorAction SilentlyContinue
-
-# Create marker file to signal completion to Packer
-$markerFile = 'C:\Windows\Temp\post-stig-complete.marker'
-New-Item -Path $markerFile -ItemType File -Force | Out-Null
-Write-Log "Created completion marker: $markerFile"
-
-Write-Log "Script completed successfully."
+Write-Log "Script completed."
