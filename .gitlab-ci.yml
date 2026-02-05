@@ -85,11 +85,15 @@ variables:
   # Create temporary infrastructure for this build (auto-destroyed after build)
   # Set to "false" to use pre-existing infrastructure instead
   CREATE_TEMP_INFRA: "true"
+  # Test Windows AMIs on multiple Nitro instance types after build (opt-in)
+  # Set to "true" to run instance type compatibility tests
+  TEST_INSTANCE_TYPES: "false"
 
 stages:
   - import       # Import Docker image from tarball
   - infra        # Create AWS infrastructure (optional one-time setup)
   - build        # Build AMIs
+  - test         # Test AMIs on different instance types (optional)
 
 # Default settings for all jobs
 default:
@@ -1189,3 +1193,90 @@ build:all:
     - if: '$CI_COMMIT_TAG'
       when: on_success
     - when: manual
+
+#############################################################################
+# Test Stage - Test Windows AMIs on Multiple Instance Types (Opt-in)
+#############################################################################
+
+# Test template for Windows AMI instance type compatibility
+.test_windows_template: &test_windows_definition
+  stage: test
+  timeout: 1 hour
+  before_script:
+    - echo "Starting Windows AMI instance type test on $(hostname)"
+    - echo "Git commit - ${CI_COMMIT_SHA}"
+  script:
+    - |
+      echo "=== Testing Windows AMI Instance Type Compatibility ==="
+      echo ""
+      
+      # Source infrastructure environment if available
+      if [[ -f temp_infra.env ]]; then
+        source temp_infra.env
+        echo "Loaded infrastructure from temp_infra.env"
+      fi
+      
+      # Find packer manifest
+      MANIFEST=$(find .spel -name 'packer-manifest.json' 2>/dev/null | head -1)
+      if [[ -z "$MANIFEST" ]]; then
+        echo "ERROR: Packer manifest not found"
+        ls -la .spel/ || true
+        exit 1
+      fi
+      
+      echo "Found manifest: $MANIFEST"
+      
+      # Extract AMI ID for this OS type
+      AMI_ID=$(jq -r ".builds[] | select(.name | contains(\"${OS_TYPE}\")) | .artifact_id" "$MANIFEST" | cut -d: -f2 | head -1)
+      
+      if [[ -z "$AMI_ID" ]]; then
+        echo "ERROR: No AMI found for ${OS_TYPE}"
+        cat "$MANIFEST" | jq '.builds[] | {name: .name}'
+        exit 1
+      fi
+      
+      echo "Testing AMI: $AMI_ID (${OS_TYPE})"
+      echo ""
+      
+      # Get infrastructure
+      SUBNET_ID="${TEMP_SUBNET_ID:-${PKR_VAR_aws_subnet_id}}"
+      SG_ID="${TEMP_SG_ID:-${PKR_VAR_aws_security_group_id}}"
+      
+      if [[ -z "$SUBNET_ID" ]] || [[ -z "$SG_ID" ]]; then
+        echo "ERROR: Missing infrastructure (SUBNET_ID or SG_ID)"
+        echo "  SUBNET_ID: $SUBNET_ID"
+        echo "  SG_ID: $SG_ID"
+        exit 1
+      fi
+      
+      # Run quick test (3 instance types for CI)
+      ./tests/test-windows-instance-types.sh --quick "$AMI_ID" "$SUBNET_ID" "$SG_ID"
+  artifacts:
+    paths:
+      - test-results-*/
+    expire_in: 7 days
+    when: always
+  tags:
+    - spel-offline-runner
+  rules:
+    - if: '$TEST_INSTANCE_TYPES == "true"'
+      when: on_success
+    - when: never
+
+test:windows2016:
+  <<: *test_windows_definition
+  needs: ["build:windows2016"]
+  variables:
+    OS_TYPE: "windows-2016"
+
+test:windows2019:
+  <<: *test_windows_definition
+  needs: ["build:windows2019"]
+  variables:
+    OS_TYPE: "windows-2019"
+
+test:windows2022:
+  <<: *test_windows_definition
+  needs: ["build:windows2022"]
+  variables:
+    OS_TYPE: "windows-2022"

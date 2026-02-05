@@ -1,16 +1,27 @@
 #!/bin/bash
 # Test Windows AMI boot compatibility across different EC2 instance families
-# Usage: ./test-windows-instance-types.sh <AMI_ID> <SUBNET_ID> <SECURITY_GROUP_ID> [KEY_NAME]
+# Usage: ./test-windows-instance-types.sh [--quick] <AMI_ID> <SUBNET_ID> <SECURITY_GROUP_ID> [KEY_NAME]
 #
 # This script launches the AMI on multiple Nitro generation instance types to verify
 # boot compatibility. Older Nitro (t3, m5) vs newer Nitro (m6i, m7i) may have different
 # driver requirements that could be affected by STIG hardening or Sysprep cleanup.
+#
+# Options:
+#   --quick   Test only 3 key instance types (t3, m6i, m7i) for CI pipelines
+#             Without --quick, tests 8 instance types across all Nitro generations
 
 set -e
 
-AMI_ID="${1:?Usage: $0 <AMI_ID> <SUBNET_ID> <SECURITY_GROUP_ID> [KEY_NAME]}"
-SUBNET_ID="${2:?Usage: $0 <AMI_ID> <SUBNET_ID> <SECURITY_GROUP_ID> [KEY_NAME]}"
-SECURITY_GROUP="${3:?Usage: $0 <AMI_ID> <SUBNET_ID> <SECURITY_GROUP_ID> [KEY_NAME]}"
+# Parse --quick flag
+QUICK_MODE=false
+if [[ "$1" == "--quick" ]]; then
+  QUICK_MODE=true
+  shift
+fi
+
+AMI_ID="${1:?Usage: $0 [--quick] <AMI_ID> <SUBNET_ID> <SECURITY_GROUP_ID> [KEY_NAME]}"
+SUBNET_ID="${2:?Usage: $0 [--quick] <AMI_ID> <SUBNET_ID> <SECURITY_GROUP_ID> [KEY_NAME]}"
+SECURITY_GROUP="${3:?Usage: $0 [--quick] <AMI_ID> <SUBNET_ID> <SECURITY_GROUP_ID> [KEY_NAME]}"
 KEY_NAME="${4:-}"
 REGION="${AWS_REGION:-us-east-1}"
 
@@ -18,17 +29,27 @@ REGION="${AWS_REGION:-us-east-1}"
 OUTPUT_DIR="./test-results-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUTPUT_DIR"
 
-# Instance types to test - mix of Nitro generations
-INSTANCE_TYPES=(
-  "t3.medium"      # Nitro Gen 1 (baseline)
-  "m5.large"       # Nitro Gen 1
-  "c5.large"       # Nitro Gen 1
-  "m6i.large"      # Nitro Gen 2 (Intel Ice Lake)
-  "c6i.large"      # Nitro Gen 2
-  "r6i.large"      # Nitro Gen 2
-  "m7i.large"      # Nitro Gen 3 (Intel Sapphire Rapids)
-  "c7i.large"      # Nitro Gen 3
-)
+# Instance types to test - depends on mode
+if $QUICK_MODE; then
+  # Quick mode: 3 key types covering each Nitro generation (for CI)
+  INSTANCE_TYPES=(
+    "t3.medium"      # Nitro Gen 1 (baseline)
+    "m6i.large"      # Nitro Gen 2 (Intel Ice Lake)
+    "m7i.large"      # Nitro Gen 3 (Intel Sapphire Rapids)
+  )
+else
+  # Full mode: 8 instance types across all Nitro generations
+  INSTANCE_TYPES=(
+    "t3.medium"      # Nitro Gen 1 (baseline)
+    "m5.large"       # Nitro Gen 1
+    "c5.large"       # Nitro Gen 1
+    "m6i.large"      # Nitro Gen 2 (Intel Ice Lake)
+    "c6i.large"      # Nitro Gen 2
+    "r6i.large"      # Nitro Gen 2
+    "m7i.large"      # Nitro Gen 3 (Intel Sapphire Rapids)
+    "c7i.large"      # Nitro Gen 3
+  )
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -46,8 +67,8 @@ declare -A RESULTS
 
 echo "=============================================="
 echo "Windows AMI Instance Type Compatibility Test"
-echo "=============================================="
-echo "AMI ID:         $AMI_ID"
+echo "=============================================="echo "Mode:           $($QUICK_MODE && echo 'Quick (CI)' || echo 'Full')"
+echo "Instance Types: ${#INSTANCE_TYPES[@]}"echo "AMI ID:         $AMI_ID"
 echo "Subnet:         $SUBNET_ID"
 echo "Security Group: $SECURITY_GROUP"
 echo "Region:         $REGION"

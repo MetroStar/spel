@@ -162,6 +162,12 @@ on:
         required: false
         type: boolean
         default: true
+      # Post-build testing
+      test_windows_instance_types:
+        description: "Test Windows AMIs on multiple Nitro instance types after build (opt-in)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -778,6 +784,70 @@ jobs:
               echo "| KMS Key | \`${{ github.event.inputs.aws_kms_key_id }}\` |" >> $GITHUB_STEP_SUMMARY
             fi
           fi
+
+      - name: Test Windows AMI Instance Type Compatibility
+        if: |
+          github.event.inputs.test_windows_instance_types == 'true' && 
+          (github.event.inputs.run_ws2016 == 'true' || 
+           github.event.inputs.run_ws2019 == 'true' || 
+           github.event.inputs.run_ws2022 == 'true')
+        run: |
+          echo "=== Testing Windows AMI Instance Type Compatibility ==="
+          echo ""
+          
+          # Find packer manifest
+          MANIFEST=".spel/${SPEL_VERSION}/packer-manifest.json"
+          if [[ ! -f "$MANIFEST" ]]; then
+            echo "ERROR: Packer manifest not found at $MANIFEST"
+            ls -la .spel/ || true
+            exit 1
+          fi
+          
+          echo "Found manifest: $MANIFEST"
+          cat "$MANIFEST" | jq '.builds[] | {name: .name, artifact_id: .artifact_id}'
+          echo ""
+          
+          # Extract Windows AMI IDs from manifest
+          WINDOWS_AMIS=$(jq -r '.builds[] | select(.name | contains("windows")) | .artifact_id' "$MANIFEST" | cut -d: -f2)
+          
+          if [[ -z "$WINDOWS_AMIS" ]]; then
+            echo "No Windows AMIs found in manifest"
+            exit 0
+          fi
+          
+          # Get infrastructure from temp_infra step
+          SUBNET_ID="${{ steps.temp_infra.outputs.subnet_id }}"
+          SG_ID="${{ steps.temp_infra.outputs.security_group_id }}"
+          
+          if [[ -z "$SUBNET_ID" ]] || [[ -z "$SG_ID" ]]; then
+            echo "ERROR: Missing infrastructure (subnet_id or security_group_id)"
+            echo "  SUBNET_ID: $SUBNET_ID"
+            echo "  SG_ID: $SG_ID"
+            exit 1
+          fi
+          
+          # Test each Windows AMI
+          TEST_FAILED=false
+          for AMI_ID in $WINDOWS_AMIS; do
+            echo ""
+            echo "============================================="
+            echo "Testing AMI: $AMI_ID"
+            echo "============================================="
+            
+            if ! ./tests/test-windows-instance-types.sh --quick "$AMI_ID" "$SUBNET_ID" "$SG_ID"; then
+              echo "ERROR: Instance type test failed for $AMI_ID"
+              TEST_FAILED=true
+            fi
+          done
+          
+          if $TEST_FAILED; then
+            echo ""
+            echo "ERROR: One or more Windows AMIs failed instance type testing"
+            exit 1
+          fi
+          
+          echo ""
+          echo "=== All Windows AMI instance type tests passed ==="
 
       - name: Destroy temporary infrastructure
         if: always() && github.event.inputs.create_temp_infra == 'true'
