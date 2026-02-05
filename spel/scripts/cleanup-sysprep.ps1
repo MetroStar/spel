@@ -439,6 +439,38 @@ if ($SkipDism) {
     Write-Output 'Skipping WinSxS/DISM cleanup (SkipDism flag set)...'
 } else {
 
+# Capture critical AWS drivers BEFORE DISM cleanup to verify they're not removed
+Write-Output 'Capturing AWS driver inventory before DISM cleanup...'
+$awsDriverPatterns = @('*ena*', '*nvme*', '*awsnvme*', '*amazon*')
+$driversBeforeDism = @{}
+
+try {
+    $allDriversBefore = Get-WindowsDriver -Online -All -ErrorAction SilentlyContinue
+    foreach ($pattern in $awsDriverPatterns) {
+        $matching = $allDriversBefore | Where-Object { 
+            $_.OriginalFileName -like $pattern -or 
+            $_.ProviderName -like $pattern -or
+            $_.Driver -like $pattern
+        }
+        if ($matching) {
+            foreach ($drv in $matching) {
+                $key = "$($drv.Driver)_$($drv.OriginalFileName)"
+                $driversBeforeDism[$key] = @{
+                    Driver = $drv.Driver
+                    INF = $drv.OriginalFileName
+                    Version = $drv.Version
+                    Provider = $drv.ProviderName
+                    BootCritical = $drv.BootCritical
+                }
+                Write-Verbose "  Pre-DISM driver: $($drv.Driver) [$($drv.OriginalFileName)]"
+            }
+        }
+    }
+    Write-Output "  Found $($driversBeforeDism.Count) AWS-related driver packages before DISM"
+} catch {
+    Write-Verbose "Could not capture driver inventory: $_"
+}
+
 Write-Output 'Cleaning up the WinSxS Component Store...'
 try {
     Write-Output "Running DISM cleanup operations..."
@@ -503,6 +535,71 @@ try {
 
 Write-Output 'Analyzing WinSxS folder post-cleanup...'
 dism.exe /Online /Cleanup-Image /AnalyzeComponentStore
+
+# Compare AWS drivers AFTER DISM cleanup to verify none were removed
+Write-Output 'Verifying AWS driver inventory after DISM cleanup...'
+try {
+    $allDriversAfter = Get-WindowsDriver -Online -All -ErrorAction SilentlyContinue
+    $driversAfterDism = @{}
+    
+    foreach ($pattern in $awsDriverPatterns) {
+        $matching = $allDriversAfter | Where-Object { 
+            $_.OriginalFileName -like $pattern -or 
+            $_.ProviderName -like $pattern -or
+            $_.Driver -like $pattern
+        }
+        if ($matching) {
+            foreach ($drv in $matching) {
+                $key = "$($drv.Driver)_$($drv.OriginalFileName)"
+                $driversAfterDism[$key] = @{
+                    Driver = $drv.Driver
+                    INF = $drv.OriginalFileName
+                    Version = $drv.Version
+                    Provider = $drv.ProviderName
+                    BootCritical = $drv.BootCritical
+                }
+            }
+        }
+    }
+    
+    Write-Output "  Found $($driversAfterDism.Count) AWS-related driver packages after DISM"
+    
+    # Check for removed drivers
+    $removedDrivers = @()
+    foreach ($key in $driversBeforeDism.Keys) {
+        if (-not $driversAfterDism.ContainsKey($key)) {
+            $removedDrivers += $driversBeforeDism[$key]
+        }
+    }
+    
+    if ($removedDrivers.Count -gt 0) {
+        Write-Output "!!! WARNING: DISM cleanup removed $($removedDrivers.Count) AWS-related driver(s):"
+        foreach ($drv in $removedDrivers) {
+            Write-Output "    REMOVED: $($drv.Driver) [$($drv.INF)] - Boot Critical: $($drv.BootCritical)"
+            if ($drv.BootCritical -eq $true) {
+                Write-Output "    !!! CRITICAL: This boot-critical driver was removed! AMI may fail to boot !!!"
+            }
+        }
+    } else {
+        Write-Output "  [OK] All AWS-related drivers preserved after DISM cleanup"
+    }
+    
+    # Verify critical drivers still exist
+    $criticalDriverNames = @('ena', 'nvme', 'awsnvme', 'stornvme')
+    foreach ($driverName in $criticalDriverNames) {
+        $found = $allDriversAfter | Where-Object { 
+            $_.Driver -like "*$driverName*" -or 
+            $_.OriginalFileName -like "*$driverName*"
+        }
+        if ($found) {
+            Write-Output "  [OK] $driverName driver present"
+        } else {
+            Write-Output "  [WARNING] $driverName driver NOT FOUND - may impact Nitro instance compatibility"
+        }
+    }
+} catch {
+    Write-Verbose "Could not verify post-DISM driver inventory: $_"
+}
 
 } # End of SkipDism conditional
 

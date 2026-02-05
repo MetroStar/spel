@@ -65,6 +65,57 @@ try {
         } 
     }
 
+    # STEP 2.5: Verify Critical AWS Drivers for Nitro Instance Compatibility
+    Write-Log "Step 2.5: Verifying critical AWS drivers for Nitro instance compatibility..."
+    
+    # These drivers are essential for booting on Nitro-based instances (t3, m5, m6i, m7i, etc.)
+    $criticalDrivers = @(
+        @{ Name = "ENA";        Desc = "Elastic Network Adapter (network on Nitro)"; Pattern = "*ena*" },
+        @{ Name = "NVMe";       Desc = "NVMe storage driver (storage on Nitro)";     Pattern = "*nvme*" },
+        @{ Name = "AWSNVMe";    Desc = "AWS NVMe driver";                            Pattern = "*awsnvme*" }
+    )
+    
+    $driverIssues = $false
+    $allDrivers = Get-WindowsDriver -Online -All -ErrorAction SilentlyContinue
+    
+    foreach ($driver in $criticalDrivers) {
+        $found = $allDrivers | Where-Object { 
+            $_.OriginalFileName -like $driver.Pattern -or 
+            $_.ProviderName -like $driver.Pattern -or
+            $_.Driver -like $driver.Pattern
+        }
+        
+        if ($found) {
+            $count = ($found | Measure-Object).Count
+            Write-Log "  [OK] $($driver.Name): Found $count driver package(s) - $($driver.Desc)"
+            foreach ($d in $found) {
+                Write-Log "       INF: $($d.OriginalFileName), Version: $($d.Version), Provider: $($d.ProviderName)"
+            }
+        } else {
+            Write-Log "  [WARNING] $($driver.Name): NOT FOUND - $($driver.Desc)"
+            $driverIssues = $true
+        }
+    }
+    
+    # Also check for specific AWS PnP devices
+    $awsPnpDevices = Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object {
+        $_.FriendlyName -match 'ENA|NVMe|AWS' -or $_.Manufacturer -match 'Amazon'
+    }
+    
+    if ($awsPnpDevices) {
+        Write-Log "  AWS PnP devices found:"
+        foreach ($device in $awsPnpDevices) {
+            Write-Log "       $($device.FriendlyName) [$($device.Status)]"
+        }
+    }
+    
+    if ($driverIssues) {
+        Write-Log "  !!! WARNING: Missing critical AWS drivers may cause boot failures on some Nitro instance types !!!"
+        Write-Log "  !!! Older Nitro (t3, m5) may work, but newer (m6i, m7i) might fail !!!"
+    } else {
+        Write-Log "  All critical AWS drivers present"
+    }
+
     # STEP 3: Run Cleanup Script (includes DISM operations which may take 5-10 minutes)
     Write-Log "Step 3: Running cleanup script (full mode with DISM)..."
     if (Test-Path 'C:\Windows\Temp\cleanup-sysprep.ps1') {
