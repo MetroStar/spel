@@ -86,16 +86,11 @@ on:
         required: false
         type: string
         default: ""
-      amigen_cross_distro:
-        description: "Skip RHUI auto-detection (set true for air-gapped builds)"
+      airgap_mode:
+        description: "Enable air-gapped build mode (sets cross_distro=true, use_default_repos=false, repo_nosignature=true, sslverify_disable=true)"
         required: false
         type: boolean
         default: false
-      amigen_use_default_repos:
-        description: "Use default RHUI repositories (set false for air-gapped builds)"
-        required: false
-        type: boolean
-        default: true
       amigen8_repo_names:
         description: "Custom repo names for EL8 (JSON array, e.g., [\"rhel-8-baseos\",\"rhel-8-appstream\"])"
         required: false
@@ -126,16 +121,6 @@ on:
         required: false
         type: string
         default: ""
-      amigen_repo_nosignature:
-        description: "Skip RPM signature check for unsigned repos"
-        required: false
-        type: boolean
-        default: false
-      amigen_sslverify_disable:
-        description: "Disable SSL verification for yum/dnf (air-gapped with self-signed certs)"
-        required: false
-        type: boolean
-        default: false
       aws_vpc_id:
         description: "VPC ID for Packer builds (required for air-gapped)"
         required: false
@@ -689,11 +674,13 @@ jobs:
           [[ -n "${INSTANCE_PROFILE}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_iam_instance_profile="${INSTANCE_PROFILE}")
           [[ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_mirror_baseurl="${{ github.event.inputs.repo_mirror_baseurl }}")
           
-          # Add boolean variables
-          [[ "${{ github.event.inputs.amigen_cross_distro }}" == "true" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_cross_distro=true)
-          [[ "${{ github.event.inputs.amigen_use_default_repos }}" == "false" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_use_default_repos=false)
-          [[ "${{ github.event.inputs.amigen_repo_nosignature }}" == "true" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_nosignature=true)
-          [[ "${{ github.event.inputs.amigen_sslverify_disable }}" == "true" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_sslverify_disable=true)
+          # Add air-gapped mode settings (enables all air-gapped flags at once)
+          if [[ "${{ github.event.inputs.airgap_mode }}" == "true" ]]; then
+            DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_cross_distro=true)
+            DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_use_default_repos=false)
+            DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_nosignature=true)
+            DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_sslverify_disable=true)
+          fi
           
           # Add list variables only if non-empty (empty string causes Packer HCL parse error)
           [[ -n "${{ github.event.inputs.amigen8_repo_names }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_repo_names=${{ github.event.inputs.amigen8_repo_names }}")
@@ -757,7 +744,7 @@ jobs:
           
           # Air-gapped configuration (if any configured)
           if [ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ] || \
-             [ "${{ github.event.inputs.amigen_cross_distro }}" = "true" ] || \
+             [ "${{ github.event.inputs.airgap_mode }}" = "true" ] || \
              [ -n "${{ github.event.inputs.aws_vpc_id }}" ]; then
             cat >> $GITHUB_STEP_SUMMARY << 'AIRGAP'
           
@@ -768,11 +755,8 @@ jobs:
             if [ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ]; then
               echo "| Repo Mirror | \`${{ github.event.inputs.repo_mirror_baseurl }}\` |" >> $GITHUB_STEP_SUMMARY
             fi
-            if [ "${{ github.event.inputs.amigen_cross_distro }}" = "true" ]; then
-              echo "| Cross-Distro Mode | ✅ Enabled |" >> $GITHUB_STEP_SUMMARY
-            fi
-            if [ "${{ github.event.inputs.amigen_use_default_repos }}" = "false" ]; then
-              echo "| Default Repos | ❌ Disabled |" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ github.event.inputs.airgap_mode }}" = "true" ]; then
+              echo "| Air-Gap Mode | ✅ Enabled (cross_distro, no_default_repos, nosig, no_sslverify) |" >> $GITHUB_STEP_SUMMARY
             fi
             if [ -n "${{ github.event.inputs.aws_vpc_id }}" ]; then
               echo "| VPC ID | \`${{ github.event.inputs.aws_vpc_id }}\` |" >> $GITHUB_STEP_SUMMARY
