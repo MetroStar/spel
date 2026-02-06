@@ -214,13 +214,13 @@ for INSTANCE_TYPE in "${INSTANCE_TYPES[@]}"; do
   
   if [[ "$RESULT" == "SUCCESS" ]]; then
     echo -e "${GREEN}✓ $INSTANCE_TYPE: $RESULT${NC}"
-    ((SUCCESS_COUNT++))
+    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
   elif [[ "$RESULT" == *"SKIPPED"* ]]; then
     echo -e "${YELLOW}○ $INSTANCE_TYPE: $RESULT${NC}"
-    ((SKIPPED_COUNT++))
+    SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
   else
     echo -e "${RED}✗ $INSTANCE_TYPE: $RESULT${NC}"
-    ((FAILED_COUNT++))
+    FAILED_COUNT=$((FAILED_COUNT + 1))
   fi
 done
 
