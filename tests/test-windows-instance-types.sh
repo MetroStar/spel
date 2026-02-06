@@ -67,8 +67,10 @@ declare -A RESULTS
 
 echo "=============================================="
 echo "Windows AMI Instance Type Compatibility Test"
-echo "=============================================="echo "Mode:           $($QUICK_MODE && echo 'Quick (CI)' || echo 'Full')"
-echo "Instance Types: ${#INSTANCE_TYPES[@]}"echo "AMI ID:         $AMI_ID"
+echo "=============================================="
+echo "Mode:           $($QUICK_MODE && echo 'Quick (CI)' || echo 'Full')"
+echo "Instance Types: ${#INSTANCE_TYPES[@]}"
+echo "AMI ID:         $AMI_ID"
 echo "Subnet:         $SUBNET_ID"
 echo "Security Group: $SECURITY_GROUP"
 echo "Region:         $REGION"

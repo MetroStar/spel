@@ -126,6 +126,25 @@ try {
         Write-Log "  WARNING: cleanup-sysprep.ps1 not found"
     }
 
+    # STEP 3.5: Verify DriverStore integrity after cleanup (critical for Sysprep)
+    # Sysprep /generalize strips hardware bindings; PnP uses DriverStore to re-detect
+    # drivers on first boot. Without DriverStore, AMI fails on m6i/m7i instance types.
+    Write-Log "Step 3.5: Verifying DriverStore integrity after cleanup..."
+    $driverStorePath = "$env:windir\System32\DriverStore\FileRepository"
+    if (Test-Path $driverStorePath) {
+        $storeCount = (Get-ChildItem $driverStorePath -Directory -ErrorAction SilentlyContinue | Measure-Object).Count
+        Write-Log "  DriverStore FileRepository: $storeCount driver packages"
+        foreach ($pattern in @('*ena*', '*nvme*', '*awsnvme*', '*amazon*')) {
+            $match = Get-ChildItem $driverStorePath -Directory -Filter $pattern -ErrorAction SilentlyContinue
+            if ($match) { foreach ($m in $match) { Write-Log "  [OK] DriverStore: $($m.Name)" } }
+        }
+        if ($storeCount -eq 0) {
+            Write-Log "  [CRITICAL] DriverStore is EMPTY! AMI will not boot on newer Nitro instances!"
+        }
+    } else {
+        Write-Log "  [CRITICAL] DriverStore FileRepository MISSING!"
+    }
+
     # STEP 4: EC2Launch v1 Reset and Sysprep Prep
     Write-Log "Step 4: Running EC2Launch v1 sysprep prep..."
     $ec2LaunchPath = "$env:ProgramData\Amazon\EC2-Windows\Launch\Scripts"

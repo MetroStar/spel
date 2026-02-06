@@ -138,7 +138,10 @@ $tempPaths = @(
     "$env:windir\WinSxS\ManifestCache\*",
     "$env:windir\SoftwareDistribution\Download\*",
     "$env:windir\SoftwareDistribution\DataStore\*",
-    "$env:windir\System32\Driverstore\FileRepository\*",
+    # DO NOT delete DriverStore\FileRepository - it contains driver .INF packages
+    # needed for Plug and Play hardware detection after Sysprep /generalize.
+    # Without it, the AMI cannot detect drivers for newer Nitro instance types
+    # (m6i, m7i, etc.) on first boot, causing "Instance=impaired" failures.
     "$env:windir\System32\winevt\Logs\*",
     "$env:windir\inf\*.log",
     "$env:windir\Prefetch\*",
@@ -596,6 +599,26 @@ try {
         } else {
             Write-Output "  [WARNING] $driverName driver NOT FOUND - may impact Nitro instance compatibility"
         }
+    }
+    
+    # Verify DriverStore FileRepository has .INF files for critical drivers
+    # After Sysprep /generalize, PnP uses these to re-detect hardware on new instance types
+    $driverStorePath = "$env:windir\System32\DriverStore\FileRepository"
+    if (Test-Path $driverStorePath) {
+        $driverStoreItems = Get-ChildItem $driverStorePath -Directory -ErrorAction SilentlyContinue
+        Write-Output "  DriverStore FileRepository: $($driverStoreItems.Count) driver packages"
+        
+        $criticalPatterns = @('ena', 'nvme', 'awsnvme', 'amazon')
+        foreach ($pattern in $criticalPatterns) {
+            $storeMatch = $driverStoreItems | Where-Object { $_.Name -like "*$pattern*" }
+            if ($storeMatch) {
+                foreach ($m in $storeMatch) {
+                    Write-Output "  [OK] DriverStore has package: $($m.Name)"
+                }
+            }
+        }
+    } else {
+        Write-Output "  [CRITICAL] DriverStore FileRepository missing! AMI will NOT boot on new hardware!"
     }
 } catch {
     Write-Verbose "Could not verify post-DISM driver inventory: $_"
