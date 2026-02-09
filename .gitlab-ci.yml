@@ -88,6 +88,9 @@ variables:
   # Test Windows AMIs on multiple Nitro instance types after build (opt-in)
   # Set to "true" to run instance type compatibility tests
   TEST_INSTANCE_TYPES: "false"
+  # Test SSM connectivity on Linux AMIs after build (opt-in)
+  # Requires SSM infrastructure (infra:ssm job or persistent SSM setup)
+  TEST_SSM: "false"
 
 stages:
   - import       # Import Docker image from tarball
@@ -615,6 +618,66 @@ infra:kms:
   artifacts:
     reports:
       dotenv: kms.env
+    expire_in: 90 days
+  tags:
+    - spel-offline-runner
+  rules:
+    - if: '$CREATE_INFRASTRUCTURE == "true"'
+      when: manual
+
+# Setup SSM infrastructure (VPC endpoints, IAM, S3 bucket) using Terraform/OpenTofu
+infra:ssm:
+  stage: infra
+  needs: ["infra:network", "infra:security_group"]
+  script:
+    - echo "Setting up SSM infrastructure..."
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    # Detect terraform or tofu
+    - |
+      TF_CMD=""
+      if command -v tofu &>/dev/null; then
+        TF_CMD="tofu"
+      elif command -v terraform &>/dev/null; then
+        TF_CMD="terraform"
+      else
+        echo "ERROR: Neither terraform nor tofu found"
+        echo "Install terraform or tofu to enable SSM infrastructure"
+        exit 1
+      fi
+      echo "Using: $TF_CMD"
+
+    - |
+      cd infra/ssm
+
+      # Bootstrap S3 + DynamoDB backend (idempotent)
+      source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
+
+      $TF_CMD init -input=false
+
+      $TF_CMD apply -auto-approve -input=false \
+        -var="name_prefix=${INFRA_PREFIX}" \
+        -var="vpc_id=${PKR_VAR_aws_vpc_id}" \
+        -var="subnet_ids=[\"${PKR_VAR_aws_subnet_id}\"]" \
+        -var="vpc_cidr=10.0.0.0/16" \
+        -var="enable_vpc_endpoints=true" \
+        -var="enable_session_manager=true" \
+        -var="enable_inventory=true" \
+        -var="enable_state_manager=false" \
+        -var="enable_patch_manager=false" \
+        -var="create_instance_profile=false"
+
+      # Export outputs for build jobs
+      echo "SSM_INSTANCE_PROFILE=$($TF_CMD output -raw instance_profile_name 2>/dev/null || echo '')" > ../../ssm.env
+      echo "SSM_S3_BUCKET=$($TF_CMD output -raw s3_bucket_name 2>/dev/null || echo '')" >> ../../ssm.env
+      echo "SSM_DOCUMENT_OSCAP=$($TF_CMD output -raw ssm_document_oscap_name 2>/dev/null || echo '')" >> ../../ssm.env
+
+      echo ""
+      echo "=== SSM Infrastructure Created ==="
+      $TF_CMD output
+  artifacts:
+    reports:
+      dotenv: ssm.env
     expire_in: 90 days
   tags:
     - spel-offline-runner
@@ -1280,3 +1343,80 @@ test:windows2022:
   needs: ["build:windows2022"]
   variables:
     OS_TYPE: "windows-2022"
+
+# SSM validation test template
+.test_ssm_definition: &test_ssm_definition
+  stage: test
+  timeout: 30 minutes
+  script:
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    # Find AMI from build manifest
+    - |
+      MANIFEST=".spel/${SPEL_VERSION:-$(date +%Y.%m).1}/packer-manifest.json"
+      if [[ ! -f "$MANIFEST" ]]; then
+        echo "WARNING: Packer manifest not found - skipping SSM validation"
+        exit 0
+      fi
+
+      AMI_ID=$(jq -r --arg os "$OS_TYPE" \
+        '.builds[] | select(.name | contains($os)) | .artifact_id' \
+        "$MANIFEST" | cut -d: -f2 | head -1)
+
+      if [[ -z "$AMI_ID" ]]; then
+        echo "No AMI found for $OS_TYPE"
+        exit 0
+      fi
+
+    # Get infrastructure
+    - |
+      SUBNET_ID="${TEMP_SUBNET_ID:-${PKR_VAR_aws_subnet_id}}"
+      SG_ID="${TEMP_SG_ID:-${PKR_VAR_aws_security_group_id}}"
+      PROFILE="${SSM_INSTANCE_PROFILE:-${PKR_VAR_iam_instance_profile}}"
+
+      if [[ -z "$SUBNET_ID" ]] || [[ -z "$SG_ID" ]] || [[ -z "$PROFILE" ]]; then
+        echo "WARNING: Missing SSM infrastructure - skipping"
+        exit 0
+      fi
+
+    # Launch test instance
+    - |
+      INSTANCE_ID=$(aws ec2 run-instances \
+        --image-id "$AMI_ID" \
+        --instance-type t3.medium \
+        --subnet-id "$SUBNET_ID" \
+        --security-group-ids "$SG_ID" \
+        --iam-instance-profile "Name=${PROFILE}" \
+        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=spel-ssm-test-${CI_PIPELINE_ID}},{Key=Project,Value=SPEL}]" \
+        --query 'Instances[0].InstanceId' --output text)
+
+      echo "Launched test instance: $INSTANCE_ID"
+      aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+
+    # Run SSM validation
+    - ./tests/test-ssm-validation.sh "$INSTANCE_ID" --skip-oscap --skip-session --timeout 180
+
+  after_script:
+    - |
+      # Terminate test instance
+      if [[ -n "$INSTANCE_ID" ]]; then
+        aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" 2>/dev/null || true
+      fi
+  tags:
+    - spel-offline-runner
+  rules:
+    - if: '$TEST_SSM == "true"'
+      when: on_success
+    - when: never
+
+test:ssm-rhel9:
+  <<: *test_ssm_definition
+  needs: ["build:rhel9"]
+  variables:
+    OS_TYPE: "rhel-9"
+
+test:ssm-amzn2023:
+  <<: *test_ssm_definition
+  needs: ["build:amzn2023"]
+  variables:
+    OS_TYPE: "amzn-2023"

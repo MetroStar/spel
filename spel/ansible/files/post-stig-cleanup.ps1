@@ -108,10 +108,14 @@ try {
     @"
 @echo off
 REM SetupComplete.cmd - Runs on first boot after sysprep
-REM Re-enable WinRM for post-deployment configuration
+REM Re-enable WinRM and restart SSM Agent for post-deployment readiness
 
 REM Wait for network to be ready
 ping -n 30 127.0.0.1 > nul
+
+REM Restart SSM Agent to pick up new instance identity after Sysprep
+net stop AmazonSSMAgent 2>nul
+net start AmazonSSMAgent 2>nul
 
 REM Enable WinRM
 winrm quickconfig -force -q

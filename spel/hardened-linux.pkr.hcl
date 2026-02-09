@@ -282,6 +282,12 @@ variable "aws_temporary_security_group_source_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "aws_security_group_id" {
+  description = "ID of a pre-existing security group to use instead of creating a temporary one. When set, temporary_security_group_source_cidrs is ignored. Use with persistent SSM infrastructure."
+  type        = string
+  default     = ""
+}
+
 variable "amigen_repo_mirror_baseurl" {
   description = "Base URL for air-gapped yum repository mirrors. When set, disables RHUI repos and configures local mirrors. Example: http://mirror.internal.mil"
   type        = string
@@ -619,7 +625,8 @@ source "amazon-ebs" "base" {
   subnet_id                             = var.aws_subnet_id
   vpc_id                                = var.aws_vpc_id
   tags                                  = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
-  temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
+  security_group_id                     = var.aws_security_group_id != "" ? var.aws_security_group_id : null
+  temporary_security_group_source_cidrs = var.aws_security_group_id != "" ? null : var.aws_temporary_security_group_source_cidrs
 }
 
 source "amazon-ebs" "windows-base" {
@@ -646,7 +653,8 @@ source "amazon-ebs" "windows-base" {
   subnet_id                   = var.aws_subnet_id
   vpc_id                      = var.aws_vpc_id
   tags                        = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
-  temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
+  security_group_id                     = var.aws_security_group_id != "" ? var.aws_security_group_id : null
+  temporary_security_group_source_cidrs = var.aws_security_group_id != "" ? null : var.aws_temporary_security_group_source_cidrs
   user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
   winrm_insecure              = true
   winrm_timeout               = "15m"
@@ -1125,7 +1133,7 @@ build {
       "  if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "  mkdir -p $HOME/.ansible/roles",
       "  cp -r /tmp/AL2023-STIG $HOME/.ansible/roles/",
-      "  ansible-playbook -i localhost, -c local $HOME/.ansible/roles/AL2023-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false}'",
+      "  ansible-playbook -i localhost, -c local $HOME/.ansible/roles/AL2023-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false, \"rhel9stig_white_list_services\": [\"ssh\", \"https\"], \"rhel9stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"vagrant\", \"ssm-user\"], \"rhel9stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
       "fi",
       "",
       "# NOTE: OpenSCAP scan skipped - no official DISA STIG benchmark for AL2023",
@@ -1172,7 +1180,7 @@ build {
       "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL9-STIG $HOME/.ansible/roles/",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false}'",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false, \"rhel9stig_white_list_services\": [\"ssh\", \"https\"], \"rhel9stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"vagrant\", \"ssm-user\"], \"rhel9stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
       "echo 'Installing OpenSCAP for compliance scanning...'",
       "yum install -y openscap-scanner scap-security-guide",
       "echo 'Running OpenSCAP STIG compliance scan...'",
@@ -1234,7 +1242,7 @@ build {
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "echo 'Running RHEL8-STIG playbook with Python 3.6 (for SELinux module support)...'",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"rhel_08_040136\":false}'",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"rhel_08_040136\":false, \"rhel8stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"vagrant\", \"ssm-user\"], \"rhel8stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
       "echo 'Installing OpenSCAP for compliance scanning...'",
       "yum install -y openscap-scanner scap-security-guide",
       "echo 'Running OpenSCAP STIG compliance scan...'",
@@ -1274,7 +1282,7 @@ build {
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "echo 'Running RHEL8-STIG playbook with Python 3.6 (for SELinux module support)...'",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"rhel_08_040136\":false}'",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"rhel_08_040136\":false, \"rhel8stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"vagrant\", \"ssm-user\"], \"rhel8stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
       "echo 'Installing OpenSCAP for compliance scanning...'",
       "yum install -y openscap-scanner scap-security-guide",
       "echo 'Running OpenSCAP STIG compliance scan...'",

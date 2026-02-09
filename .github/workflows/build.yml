@@ -982,6 +982,76 @@ jobs:
           echo ""
           echo "=== All Windows AMI instance type tests passed ==="
 
+      - name: Test SSM Validation on Built AMIs
+        if: |
+          github.event.inputs.create_temp_infra == 'true' &&
+          (github.event.inputs.run_amzn2023 == 'true' ||
+           github.event.inputs.run_rhel9 == 'true' ||
+           github.event.inputs.run_rhel8 == 'true' ||
+           github.event.inputs.run_ol9 == 'true' ||
+           github.event.inputs.run_ol8 == 'true')
+        run: |
+          echo "=== Testing SSM Validation on Linux AMIs ==="
+          echo ""
+          
+          MANIFEST=".spel/${SPEL_VERSION}/packer-manifest.json"
+          if [[ ! -f "$MANIFEST" ]]; then
+            echo "WARNING: Packer manifest not found - skipping SSM validation"
+            exit 0
+          fi
+          
+          SUBNET_ID="${{ steps.temp_infra.outputs.subnet_id }}"
+          SG_ID="${{ steps.temp_infra.outputs.security_group_id }}"
+          INSTANCE_PROFILE="${{ steps.temp_infra.outputs.instance_profile }}"
+          
+          if [[ -z "$SUBNET_ID" ]] || [[ -z "$SG_ID" ]] || [[ -z "$INSTANCE_PROFILE" ]]; then
+            echo "WARNING: Missing temp infrastructure - skipping SSM validation"
+            exit 0
+          fi
+          
+          # Extract Linux AMI IDs from manifest (exclude Windows)
+          LINUX_AMIS=$(jq -r '.builds[] | select(.name | contains("windows") | not) | .artifact_id' "$MANIFEST" | cut -d: -f2)
+          
+          if [[ -z "$LINUX_AMIS" ]]; then
+            echo "No Linux AMIs found in manifest"
+            exit 0
+          fi
+          
+          # Test first Linux AMI for SSM connectivity (representative test)
+          FIRST_AMI=$(echo "$LINUX_AMIS" | head -1)
+          FIRST_AMI_NAME=$(jq -r --arg aid "$FIRST_AMI" '.builds[] | select(.artifact_id | contains($aid)) | .name' "$MANIFEST")
+          
+          echo "Testing SSM on: $FIRST_AMI_NAME ($FIRST_AMI)"
+          
+          # Launch test instance
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id "$FIRST_AMI" \
+            --instance-type t3.medium \
+            --subnet-id "$SUBNET_ID" \
+            --security-group-ids "$SG_ID" \
+            --iam-instance-profile "Name=${INSTANCE_PROFILE}" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=spel-ssm-test-${GITHUB_RUN_ID}},{Key=Project,Value=SPEL},{Key=TempBuild,Value=true}]" \
+            --query 'Instances[0].InstanceId' --output text)
+          
+          echo "Launched instance: $INSTANCE_ID"
+          echo "Waiting for instance to be running..."
+          aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+          
+          # Run SSM validation (skip OSCAP and session for CI speed)
+          if ./tests/test-ssm-validation.sh "$INSTANCE_ID" \
+              --skip-oscap --skip-session --timeout 180; then
+            echo "SSM validation PASSED"
+          else
+            echo "WARNING: SSM validation failed (non-blocking)"
+          fi
+          
+          # Terminate test instance
+          echo "Terminating test instance..."
+          aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" || true
+          
+          echo ""
+          echo "=== SSM Validation Complete ==="
+
       - name: Destroy temporary infrastructure
         if: always() && github.event.inputs.create_temp_infra == 'true'
         run: |

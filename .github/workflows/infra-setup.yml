@@ -55,6 +55,47 @@ on:
         required: false
         type: string
         default: "10.0.1.0/24"
+  workflow_call:
+    inputs:
+      action:
+        description: "Action to perform (create, destroy, status)"
+        required: true
+        type: string
+      aws_region:
+        description: "AWS region"
+        required: true
+        type: string
+      infra_prefix:
+        description: "Prefix for resource names"
+        required: false
+        type: string
+        default: "spel-offline"
+      vpc_cidr:
+        description: "VPC CIDR block"
+        required: false
+        type: string
+        default: "10.0.0.0/16"
+      subnet_cidr:
+        description: "Subnet CIDR block"
+        required: false
+        type: string
+        default: "10.0.1.0/24"
+    outputs:
+      vpc_id:
+        description: "VPC ID"
+        value: ${{ jobs.infrastructure.outputs.vpc_id }}
+      subnet_id:
+        description: "Subnet ID"
+        value: ${{ jobs.infrastructure.outputs.subnet_id }}
+      security_group_id:
+        description: "Security Group ID"
+        value: ${{ jobs.infrastructure.outputs.security_group_id }}
+      instance_profile:
+        description: "IAM Instance Profile name"
+        value: ${{ jobs.infrastructure.outputs.instance_profile }}
+      kms_key_id:
+        description: "KMS Key ARN"
+        value: ${{ jobs.infrastructure.outputs.kms_key_id }}
 
 permissions:
   id-token: write
@@ -62,25 +103,31 @@ permissions:
 
 jobs:
   infrastructure:
-    name: ${{ github.event.inputs.action }} Infrastructure
+    name: ${{ inputs.action }} Infrastructure
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      vpc_id: ${{ steps.create.outputs.vpc_id }}
+      subnet_id: ${{ steps.create.outputs.subnet_id }}
+      security_group_id: ${{ steps.create.outputs.security_group_id }}
+      instance_profile: ${{ steps.create.outputs.instance_profile }}
+      kms_key_id: ${{ steps.create.outputs.kms_key_id }}
 
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ github.event.inputs.aws_region }}
+          aws-region: ${{ inputs.aws_region }}
           role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
           role-duration-seconds: 3600
 
       - name: Check infrastructure status
-        if: github.event.inputs.action == 'status'
+        if: inputs.action == 'status'
         run: |
           echo "=== Infrastructure Status ==="
           echo ""
           
-          INFRA_PREFIX="${{ github.event.inputs.infra_prefix }}"
+          INFRA_PREFIX="${{ inputs.infra_prefix }}"
           VPC_NAME="${INFRA_PREFIX}-vpc"
           
           # Check VPC
@@ -142,16 +189,16 @@ jobs:
           fi
 
       - name: Create infrastructure
-        if: github.event.inputs.action == 'create'
+        if: inputs.action == 'create'
         id: create
         run: |
           echo "=== Creating Infrastructure ==="
           echo ""
           
-          INFRA_PREFIX="${{ github.event.inputs.infra_prefix }}"
-          VPC_CIDR="${{ github.event.inputs.vpc_cidr }}"
-          SUBNET_CIDR="${{ github.event.inputs.subnet_cidr }}"
-          AWS_REGION="${{ github.event.inputs.aws_region }}"
+          INFRA_PREFIX="${{ inputs.infra_prefix }}"
+          VPC_CIDR="${{ inputs.vpc_cidr }}"
+          SUBNET_CIDR="${{ inputs.subnet_cidr }}"
+          AWS_REGION="${{ inputs.aws_region }}"
           
           # Create VPC
           VPC_NAME="${INFRA_PREFIX}-vpc"
@@ -499,15 +546,103 @@ jobs:
           echo ""
           echo "=== Infrastructure Created ==="
 
+      - name: Checkout repository
+        if: inputs.action == 'create' || inputs.action == 'destroy'
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra/ssm
+
+      - name: Setup SSM infrastructure (Terraform)
+        if: inputs.action == 'create'
+        working-directory: infra/ssm
+        env:
+          AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+          INFRA_PREFIX: ${{ inputs.infra_prefix }}
+        run: |
+          echo "=== Setting up SSM Infrastructure ==="
+          
+          VPC_ID="${{ steps.create.outputs.vpc_id }}"
+          SUBNET_ID="${{ steps.create.outputs.subnet_id }}"
+          VPC_CIDR="${{ inputs.vpc_cidr }}"
+          
+          if [ -z "$VPC_ID" ]; then
+            echo "Skipping SSM setup - no VPC created"
+            exit 0
+          fi
+          
+          # Check if terraform or tofu is available
+          TF_CMD=""
+          if command -v tofu &>/dev/null; then
+            TF_CMD="tofu"
+          elif command -v terraform &>/dev/null; then
+            TF_CMD="terraform"
+          else
+            echo "WARNING: Neither terraform nor tofu found - skipping SSM setup"
+            echo "Install terraform or tofu to enable SSM infrastructure"
+            exit 0
+          fi
+          
+          echo "Using: $TF_CMD"
+          
+          # Bootstrap S3 + DynamoDB backend (idempotent)
+          source ./bootstrap-backend.sh --prefix "$INFRA_PREFIX" --region "$AWS_DEFAULT_REGION"
+          
+          # Initialize with remote backend
+          $TF_CMD init -input=false
+          
+          # Apply SSM module
+          $TF_CMD apply -auto-approve -input=false \
+            -var="name_prefix=${INFRA_PREFIX}" \
+            -var="vpc_id=${VPC_ID}" \
+            -var="subnet_ids=[\"${SUBNET_ID}\"]" \
+            -var="vpc_cidr=${VPC_CIDR}" \
+            -var="enable_vpc_endpoints=true" \
+            -var="enable_session_manager=true" \
+            -var="enable_inventory=true" \
+            -var="enable_state_manager=false" \
+            -var="enable_patch_manager=false" \
+            -var="create_instance_profile=false"
+          
+          echo ""
+          echo "=== SSM Infrastructure Created ==="
+          $TF_CMD output -json
+
+      - name: Destroy SSM infrastructure (Terraform)
+        if: inputs.action == 'destroy'
+        working-directory: infra/ssm
+        env:
+          AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+          INFRA_PREFIX: ${{ inputs.infra_prefix }}
+        run: |
+          TF_CMD=""
+          if command -v tofu &>/dev/null; then
+            TF_CMD="tofu"
+          elif command -v terraform &>/dev/null; then
+            TF_CMD="terraform"
+          fi
+          
+          if [ -z "$TF_CMD" ]; then
+            echo "Neither terraform nor tofu found - skipping SSM teardown"
+            exit 0
+          fi
+          
+          # Re-bootstrap backend config so init can connect to remote state
+          source ./bootstrap-backend.sh --prefix "$INFRA_PREFIX" --region "$AWS_DEFAULT_REGION"
+          
+          echo "=== Destroying SSM Infrastructure ==="
+          $TF_CMD init -input=false 2>/dev/null || true
+          $TF_CMD destroy -auto-approve -input=false 2>/dev/null || true
+          echo "✓ SSM infrastructure destroyed"
+
       - name: Destroy infrastructure
-        if: github.event.inputs.action == 'destroy'
+        if: inputs.action == 'destroy'
         run: |
           echo "=== Destroying Infrastructure ==="
           echo ""
           echo "⚠️  This will delete all SPEL infrastructure resources!"
           echo ""
           
-          INFRA_PREFIX="${{ github.event.inputs.infra_prefix }}"
+          INFRA_PREFIX="${{ inputs.infra_prefix }}"
           
           # Schedule KMS Key for deletion
           KMS_ALIAS="${INFRA_PREFIX}-ebs-key"
@@ -618,13 +753,13 @@ jobs:
           
           | Property | Value |
           |----------|-------|
-          | Action | \`${{ github.event.inputs.action }}\` |
-          | Region | \`${{ github.event.inputs.aws_region }}\` |
-          | Prefix | \`${{ github.event.inputs.infra_prefix }}\` |
+          | Action | \`${{ inputs.action }}\` |
+          | Region | \`${{ inputs.aws_region }}\` |
+          | Prefix | \`${{ inputs.infra_prefix }}\` |
           | Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
           EOF
           
-          if [ "${{ github.event.inputs.action }}" = "create" ]; then
+          if [ "${{ inputs.action }}" = "create" ]; then
             cat >> $GITHUB_STEP_SUMMARY << EOF
           
           ### Created Resources

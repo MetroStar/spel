@@ -37,10 +37,37 @@ if ($Background) {
 Write-Log "=== POST-STIG: EC2 Network, Cleanup, and Sysprep (Windows 2022) ==="
 
 try {
-    # STEP 1: Disable Firewall (to ensure any network services work)
-    Write-Log "Step 1: Disabling Windows Firewall..."
-    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False -ErrorAction SilentlyContinue
-    Write-Log "  Firewall disabled"
+    # STEP 1: Configure targeted firewall rules (keep firewall enabled for STIG compliance)
+    Write-Log "Step 1: Configuring targeted firewall rules..."
+
+    # Allow EC2 Instance Metadata Service (IMDS) — required for identity, credentials, userdata
+    if (-not (Get-NetFirewallRule -DisplayName "Allow EC2 IMDS" -ErrorAction SilentlyContinue)) {
+        New-NetFirewallRule -DisplayName "Allow EC2 IMDS" `
+            -Direction Outbound -RemoteAddress 169.254.169.254 `
+            -Protocol TCP -RemotePort 80 `
+            -Action Allow -Profile Any -ErrorAction SilentlyContinue
+        Write-Log "  Created IMDS firewall rule"
+    }
+
+    # Allow DNS — required for name resolution
+    if (-not (Get-NetFirewallRule -DisplayName "Allow DNS Outbound" -ErrorAction SilentlyContinue)) {
+        New-NetFirewallRule -DisplayName "Allow DNS Outbound" `
+            -Direction Outbound -Protocol UDP -RemotePort 53 `
+            -Action Allow -Profile Any -ErrorAction SilentlyContinue
+        Write-Log "  Created DNS firewall rule"
+    }
+
+    # Allow HTTP/HTTPS — required for SSM agent, Windows Update, package downloads
+    if (-not (Get-NetFirewallRule -DisplayName "Allow HTTP/HTTPS Outbound" -ErrorAction SilentlyContinue)) {
+        New-NetFirewallRule -DisplayName "Allow HTTP/HTTPS Outbound" `
+            -Direction Outbound -Protocol TCP -RemotePort 80,443 `
+            -Action Allow -Profile Any -ErrorAction SilentlyContinue
+        Write-Log "  Created HTTP/HTTPS firewall rule"
+    }
+
+    # Ensure firewall stays enabled (STIG-compliant)
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True -ErrorAction SilentlyContinue
+    Write-Log "  Firewall configured with targeted rules (remains enabled)"
 
     # STEP 2: Restore EC2 Network Functionality
     Write-Log "Step 2: Restoring EC2 network functionality..."
