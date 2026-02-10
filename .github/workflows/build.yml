@@ -1039,14 +1039,19 @@ jobs:
           else
             echo "WARNING: SSM validation failed (non-blocking)"
             echo ""
-            echo "=== Console Output (SSM diagnostics) ==="
-            # Wait a moment for console output to be available
-            sleep 15
-            aws ec2 get-console-output --instance-id "$INSTANCE_ID" --output text 2>/dev/null \
-              | grep -A 500 "SSM Agent Diagnostics" || \
-              aws ec2 get-console-output --instance-id "$INSTANCE_ID" --output text 2>/dev/null \
-              | tail -80
-            echo "=== End Console Output ==="
+            echo "=== Console Output (diagnostics) ==="
+            # Wait for console output to become available (can take 30-60s after boot)
+            sleep 30
+            # get-console-output returns Output as base64 — decode it
+            aws ec2 get-console-output --instance-id "$INSTANCE_ID" \
+              --query 'Output' --output text 2>/dev/null | tail -120 || \
+              echo "(console output not yet available)"
+            echo ""
+            echo "=== Instance Details ==="
+            aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+              --query 'Reservations[0].Instances[0].{State:State.Name,Profile:IamInstanceProfile.Arn,SubnetId:SubnetId,PublicIp:PublicIpAddress,LaunchTime:LaunchTime}' \
+              --output table 2>/dev/null || true
+            echo "=== End Diagnostics ==="
           fi
           
           # Terminate test instance

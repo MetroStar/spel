@@ -1311,6 +1311,31 @@ build {
     direction   = "download"
   }
 
+  # Ensure SSM agent is enabled to start on boot
+  # The RPM is installed via amigen extra_rpms in a chroot, which may not
+  # properly run the RPM scriptlets that enable the service. Explicitly
+  # enable it here after STIG hardening to guarantee it starts on first boot.
+  provisioner "shell" {
+    execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
+    inline = [
+      "echo 'Ensuring SSM agent is enabled...'",
+      "if rpm -q amazon-ssm-agent &>/dev/null; then",
+      "  systemctl enable amazon-ssm-agent",
+      "  echo 'SSM agent service enabled'",
+      "else",
+      "  echo 'WARNING: amazon-ssm-agent package not installed'",
+      "fi",
+    ]
+    only = [
+      "amazon-ebs.hardened-rhel-9-hvm",
+      "amazon-ebs.hardened-centos-9stream-hvm",
+      "amazon-ebs.hardened-ol-9-hvm",
+      "amazon-ebs.hardened-rhel-8-hvm",
+      "amazon-ebs.hardened-ol-8-hvm",
+      "amazon-ebs.hardened-amzn-2023-hvm",
+    ]
+  }
+
   provisioner "ansible" {
     pause_before         = "30s"
     timeout              = "30m"
