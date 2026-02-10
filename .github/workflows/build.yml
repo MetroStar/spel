@@ -997,6 +997,32 @@ jobs:
             exit 0
           fi
           
+          # Pre-flight: Verify the runner's IAM role has SSM read permissions
+          echo "Checking SSM API permissions..."
+          if ! aws ssm describe-instance-information --max-results 1 --query 'InstanceInformationList' --output text 2>&1; then
+            echo ""
+            echo "ERROR: The runner IAM role (Packer_Amazon) lacks SSM permissions."
+            echo "The SSM validation test requires ssm:DescribeInstanceInformation"
+            echo "and ssm:SendCommand on the runner's IAM role."
+            echo ""
+            echo "Add the following to the Packer_Amazon IAM role policy:"
+            echo '  {'
+            echo '    "Effect": "Allow",'
+            echo '    "Action": ['
+            echo '      "ssm:DescribeInstanceInformation",'
+            echo '      "ssm:SendCommand",'
+            echo '      "ssm:GetCommandInvocation",'
+            echo '      "ssm:ListCommandInvocations"'
+            echo '    ],'
+            echo '    "Resource": "*"'
+            echo '  }'
+            echo ""
+            echo "WARNING: Skipping SSM validation due to missing permissions"
+            exit 0
+          fi
+          echo "✓ SSM API permissions verified"
+          echo ""
+          
           # Extract hardened Linux AMI IDs from manifest
           # - builder_type "amazon-ebs" = hardened builds (minimal uses "amazon-ebssurrogate")
           # - .name "windows-base" = Windows builds (Linux uses "base")

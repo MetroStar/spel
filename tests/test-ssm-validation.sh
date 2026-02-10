@@ -80,13 +80,31 @@ test_ssm_registration() {
 
   while [[ $elapsed -lt $TIMEOUT ]]; do
     local info
-    info=$(aws ssm describe-instance-information \
-      --region "$REGION" \
-      --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
-      --query 'InstanceInformationList[0]' \
-      --output json 2>/dev/null || echo "null")
+    local ssm_err
+    # Show errors on first attempt to catch IAM permission issues
+    if [[ $elapsed -eq 0 ]]; then
+      info=$(aws ssm describe-instance-information \
+        --region "$REGION" \
+        --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+        --query 'InstanceInformationList[0]' \
+        --output json 2>&1) || {
+          ssm_err="$info"
+          if echo "$ssm_err" | grep -qi 'AccessDenied\|not authorized\|UnauthorizedAccess'; then
+            log_fail "IAM role lacks ssm:DescribeInstanceInformation permission"
+            log_fail "Error: $ssm_err"
+            return 1
+          fi
+          info="null"
+        }
+    else
+      info=$(aws ssm describe-instance-information \
+        --region "$REGION" \
+        --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+        --query 'InstanceInformationList[0]' \
+        --output json 2>/dev/null || echo "null")
+    fi
 
-    if [[ "$info" != "null" && "$info" != "" ]]; then
+    if [[ "$info" != "null" && "$info" != "" && "$info" != "None" ]]; then
       local ping_status
       ping_status=$(echo "$info" | jq -r '.PingStatus // "Unknown"')
       local agent_version
