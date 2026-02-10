@@ -1009,15 +1009,16 @@ jobs:
             exit 0
           fi
           
-          # Extract Linux AMI IDs from manifest (exclude Windows)
-          LINUX_AMIS=$(jq -r '.builds[] | select(.name | contains("windows") | not) | .artifact_id' "$MANIFEST" | cut -d: -f2)
+          # Extract hardened Linux AMI IDs from manifest (exclude Windows and minimal)
+          # Minimal AMIs are intermediate artifacts deregistered by post_build.sh
+          LINUX_AMIS=$(jq -r '.builds[] | select(.name | contains("windows") | not) | select(.name | contains("hardened")) | .artifact_id' "$MANIFEST" | cut -d: -f2)
           
           if [[ -z "$LINUX_AMIS" ]]; then
-            echo "No Linux AMIs found in manifest"
+            echo "No hardened Linux AMIs found in manifest"
             exit 0
           fi
           
-          # Test first Linux AMI for SSM connectivity (representative test)
+          # Test first hardened Linux AMI for SSM connectivity (representative test)
           FIRST_AMI=$(echo "$LINUX_AMIS" | head -1)
           FIRST_AMI_NAME=$(jq -r --arg aid "$FIRST_AMI" '.builds[] | select(.artifact_id | contains($aid)) | .name' "$MANIFEST")
           
