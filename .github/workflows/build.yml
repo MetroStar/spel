@@ -1009,9 +1009,10 @@ jobs:
             exit 0
           fi
           
-          # Extract hardened Linux AMI IDs from manifest (exclude Windows and minimal)
-          # Minimal AMIs are intermediate artifacts deregistered by post_build.sh
-          LINUX_AMIS=$(jq -r '.builds[] | select(.name | contains("windows") | not) | select(.name | contains("hardened")) | .artifact_id' "$MANIFEST" | cut -d: -f2)
+          # Extract hardened Linux AMI IDs from manifest
+          # - builder_type "amazon-ebs" = hardened builds (minimal uses "amazon-ebssurrogate")
+          # - .name "windows-base" = Windows builds (Linux uses "base")
+          LINUX_AMIS=$(jq -r '.builds[] | select(.builder_type == "amazon-ebs") | select(.name | contains("windows") | not) | .artifact_id' "$MANIFEST" | cut -d: -f2)
           
           if [[ -z "$LINUX_AMIS" ]]; then
             echo "No hardened Linux AMIs found in manifest"
