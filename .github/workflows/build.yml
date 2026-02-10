@@ -489,17 +489,17 @@ jobs:
                    Key=GitHubRunId,Value="${GITHUB_RUN_ID}" \
                    Key=CreatedAt,Value="${CREATED_AT}"
           
-          # Allow SSH from VPC CIDR
+          # Allow SSH from anywhere (Packer connects from GitHub runner via public IP)
           aws ec2 authorize-security-group-ingress \
             --group-id "${SG_ID}" \
             --protocol tcp --port 22 \
-            --cidr "${VPC_CIDR}"
+            --cidr "0.0.0.0/0"
           
-          # Allow WinRM from VPC CIDR (for Windows builds)
+          # Allow WinRM from anywhere (Packer connects from GitHub runner via public IP)
           aws ec2 authorize-security-group-ingress \
             --group-id "${SG_ID}" \
             --protocol tcp --port 5986 \
-            --cidr "${VPC_CIDR}"
+            --cidr "0.0.0.0/0"
           
           echo "✓ Created security group: ${SG_ID}"
           echo "security_group_id=${SG_ID}" >> $GITHUB_OUTPUT
