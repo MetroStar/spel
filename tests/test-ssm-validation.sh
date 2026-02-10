@@ -153,17 +153,21 @@ test_run_command() {
   fi
 
   local command_id
-  command_id=$(aws ssm send-command \
+  local send_err
+  send_err=$(aws ssm send-command \
     --region "$REGION" \
     --instance-ids "$INSTANCE_ID" \
     --document-name "$doc_name" \
-    --parameters "commands=[\"$command_text\"]" \
+    --parameters '{"commands":["echo SSM-TEST-OK"]}' \
     --timeout-seconds 60 \
     --query 'Command.CommandId' \
-    --output text 2>/dev/null)
+    --output text 2>&1) && command_id="$send_err" || {
+      log_fail "RunCommand: Failed to send command: $send_err"
+      return 1
+    }
 
   if [[ -z "$command_id" || "$command_id" == "None" ]]; then
-    log_fail "RunCommand: Failed to send command"
+    log_fail "RunCommand: Failed to send command (empty command ID)"
     return 1
   fi
 
