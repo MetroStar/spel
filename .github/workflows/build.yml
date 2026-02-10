@@ -999,7 +999,7 @@ jobs:
           
           # Pre-flight: Verify the runner's IAM role has SSM read permissions
           echo "Checking SSM API permissions..."
-          if ! aws ssm describe-instance-information --max-results 1 --query 'InstanceInformationList' --output text 2>&1; then
+          if ! aws ssm describe-instance-information --max-results 5 --query 'InstanceInformationList' --output text 2>&1; then
             echo ""
             echo "ERROR: The runner IAM role (Packer_Amazon) lacks SSM permissions."
             echo "The SSM validation test requires ssm:DescribeInstanceInformation"
