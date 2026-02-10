@@ -530,7 +530,13 @@ jobs:
           
           echo "✓ Created IAM role"
           
-          # Create IAM Policy
+          # Attach AWS managed SSM policy (provides all permissions for SSM agent registration)
+          aws iam attach-role-policy \
+            --role-name "${ROLE_NAME}" \
+            --policy-arn "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+          echo "✓ Attached AmazonSSMManagedInstanceCore managed policy"
+          
+          # Create IAM Policy for additional Packer/build permissions
           POLICY_NAME="${INFRA_PREFIX}-policy"
           echo "Creating IAM policy: ${POLICY_NAME}"
           
@@ -538,24 +544,6 @@ jobs:
           {
             "Version": "2012-10-17",
             "Statement": [
-              {
-                "Sid": "SSMAccess",
-                "Effect": "Allow",
-                "Action": [
-                  "ssm:UpdateInstanceInformation",
-                  "ssmmessages:CreateControlChannel",
-                  "ssmmessages:CreateDataChannel",
-                  "ssmmessages:OpenControlChannel",
-                  "ssmmessages:OpenDataChannel",
-                  "ec2messages:AcknowledgeMessage",
-                  "ec2messages:DeleteMessage",
-                  "ec2messages:FailMessage",
-                  "ec2messages:GetEndpoint",
-                  "ec2messages:GetMessages",
-                  "ec2messages:SendReply"
-                ],
-                "Resource": "*"
-              },
               {
                 "Sid": "S3Access",
                 "Effect": "Allow",
@@ -1087,9 +1075,15 @@ jobs:
             echo "✓ Deleted instance profile"
           fi
           
-          # Detach and delete IAM Policy
+          # Detach managed SSM policy
+          echo "Detaching AmazonSSMManagedInstanceCore managed policy..."
+          aws iam detach-role-policy \
+            --role-name "${ROLE_NAME}" \
+            --policy-arn "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore" 2>/dev/null || true
+          
+          # Detach and delete custom IAM Policy
           if [ -n "${POLICY_ARN}" ] && [ "${POLICY_ARN}" != "" ]; then
-            echo "Detaching policy from role..."
+            echo "Detaching custom policy from role..."
             aws iam detach-role-policy \
               --role-name "${ROLE_NAME}" \
               --policy-arn "${POLICY_ARN}" 2>/dev/null || true
