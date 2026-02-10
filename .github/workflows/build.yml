@@ -1013,13 +1013,18 @@ jobs:
           
           echo "Testing SSM on: $FIRST_AMI_NAME ($FIRST_AMI)"
           
-          # Launch test instance
+          # Base64-encode the SSM diagnostic userdata script
+          SSM_USERDATA=$(base64 -w0 < tests/ssm-userdata-diag.sh)
+          
+          # Launch test instance with user data for SSM diagnostics
           INSTANCE_ID=$(aws ec2 run-instances \
             --image-id "$FIRST_AMI" \
             --instance-type t3.medium \
             --subnet-id "$SUBNET_ID" \
             --security-group-ids "$SG_ID" \
             --iam-instance-profile "Name=${INSTANCE_PROFILE}" \
+            --metadata-options "HttpTokens=optional,HttpPutResponseHopLimit=2,HttpEndpoint=enabled" \
+            --user-data "$SSM_USERDATA" \
             --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=spel-ssm-test-${GITHUB_RUN_ID}},{Key=Project,Value=SPEL},{Key=TempBuild,Value=true}]" \
             --query 'Instances[0].InstanceId' --output text)
           
@@ -1033,6 +1038,15 @@ jobs:
             echo "SSM validation PASSED"
           else
             echo "WARNING: SSM validation failed (non-blocking)"
+            echo ""
+            echo "=== Console Output (SSM diagnostics) ==="
+            # Wait a moment for console output to be available
+            sleep 15
+            aws ec2 get-console-output --instance-id "$INSTANCE_ID" --output text 2>/dev/null \
+              | grep -A 500 "SSM Agent Diagnostics" || \
+              aws ec2 get-console-output --instance-id "$INSTANCE_ID" --output text 2>/dev/null \
+              | tail -80
+            echo "=== End Console Output ==="
           fi
           
           # Terminate test instance
