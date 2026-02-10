@@ -800,8 +800,6 @@ source "amazon-ebssurrogate" "base" {
     device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
     volume_size           = var.spel_root_volume_size
     volume_type           = "gp3"
-    encrypted             = var.aws_kms_key_id != "" ? true : null
-    kms_key_id            = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   }
   ami_groups                  = var.aws_ami_groups
   ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
