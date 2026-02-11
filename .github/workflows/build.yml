@@ -159,16 +159,11 @@ on:
         type: boolean
         default: false
       # Persistent SSM infrastructure
-      use_persistent_ssm:
-        description: "Use persistent SSM infrastructure (deployed via ssm-infra.yml) instead of temp SSM setup"
-        required: false
-        type: boolean
-        default: false
       ssm_name_prefix:
-        description: "Name prefix used when deploying SSM infra (must match ssm-infra.yml)"
+        description: "Enable persistent SSM infra by setting the name prefix used in ssm-infra.yml (leave empty to disable)"
         required: false
         type: string
-        default: "spel-ci"
+        default: ""
 
 permissions:
   id-token: write
@@ -983,7 +978,7 @@ jobs:
 
       - name: Test SSM Validation on Built AMIs
         if: |
-          (github.event.inputs.create_temp_infra == 'true' || github.event.inputs.use_persistent_ssm == 'true') &&
+          (github.event.inputs.create_temp_infra == 'true' || github.event.inputs.ssm_name_prefix != '') &&
           (github.event.inputs.run_amzn2023 == 'true' ||
            github.event.inputs.run_rhel9 == 'true' ||
            github.event.inputs.run_rhel8 == 'true' ||
@@ -1000,7 +995,7 @@ jobs:
           fi
           
           # Determine infrastructure source: persistent SSM or temp infra
-          if [[ "${{ github.event.inputs.use_persistent_ssm }}" == "true" ]]; then
+          if [[ -n "${{ github.event.inputs.ssm_name_prefix }}" ]]; then
             echo "Using persistent SSM infrastructure (prefix: ${{ github.event.inputs.ssm_name_prefix }})"
             
             # Look up persistent SSM infra via Terraform outputs
