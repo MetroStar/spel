@@ -1,25 +1,36 @@
 # =============================================================================
 # Infrastructure Setup for Air-Gapped SPEL Builds
 # =============================================================================
-# This workflow creates AWS infrastructure required for air-gapped Packer builds.
-# Run this ONCE to set up VPC, subnet, security group, and IAM resources.
+# This workflow manages ALL SPEL AWS infrastructure using a single Terraform
+# root module (infra/). One `terraform apply` creates everything; one
+# `terraform destroy` tears it all down.
 #
-# RESOURCES CREATED:
-#   - VPC with DNS support/hostnames enabled
-#   - Subnet with auto-assign public IP (or private if using VPC endpoints)
-#   - Security group allowing SSH from VPC CIDR
-#   - IAM role and instance profile for Packer-launched instances
-#   - SSM infrastructure via Terraform (KMS key, S3, CloudWatch, VPC endpoints)
+# RESOURCES CREATED (via Terraform modules):
+#   Networking (modules/networking):
+#     - VPC with DNS support/hostnames enabled
+#     - Subnet with auto-assign public IP (or private if using VPC endpoints)
+#     - Internet Gateway + route table (conditional on public subnet)
+#     - Security group allowing SSH + WinRM from VPC CIDR
+#   IAM (modules/iam):
+#     - IAM role and instance profile for Packer-launched instances
+#     - SSM agent communication policies
+#   SSM (modules/ssm):
+#     - KMS CMK for EBS/SSM encryption
+#     - S3 bucket for SSM session logs
+#     - CloudWatch log group
+#     - VPC endpoints for air-gapped connectivity
+#     - Session Manager, Patch Manager, Inventory (configurable)
 #
 # PREREQUISITES:
-#   - AWS credentials with permissions to create VPC, EC2, and IAM resources
+#   - AWS credentials with permissions to create VPC, EC2, IAM, KMS, S3, SSM
 #   - For GovCloud: Use appropriate partition (aws-us-gov)
 #
 # USAGE:
-#   1. Run this workflow with action="create"
-#   2. Note the output values (VPC ID, Subnet ID, etc.)
-#   3. Use those values as inputs to the build.yml workflow
-#   4. Run action="destroy" when infrastructure is no longer needed
+#   1. Run with action="plan" to review changes
+#   2. Run with action="apply" to create/update infrastructure
+#   3. Note the output values (VPC ID, Subnet ID, etc.)
+#   4. Use those values as inputs to the build.yml workflow
+#   5. Run action="destroy" when infrastructure is no longer needed
 # =============================================================================
 
 name: Infrastructure Setup
@@ -32,10 +43,11 @@ on:
         required: true
         type: choice
         options:
-          - create
+          - plan
+          - apply
           - destroy
           - status
-        default: status
+        default: plan
       aws_region:
         description: "AWS region (e.g., us-east-1, us-gov-east-1)"
         required: true
@@ -56,10 +68,25 @@ on:
         required: false
         type: string
         default: "10.0.1.0/24"
+      enable_session_manager:
+        description: "Enable SSM Session Manager"
+        required: false
+        type: boolean
+        default: true
+      enable_patch_manager:
+        description: "Enable SSM Patch Manager"
+        required: false
+        type: boolean
+        default: false
+      destroy_confirmation:
+        description: "Type 'destroy' to confirm teardown (required for destroy)"
+        required: false
+        type: string
+        default: ""
   workflow_call:
     inputs:
       action:
-        description: "Action to perform (create, destroy, status)"
+        description: "Action to perform (plan, apply, destroy, status)"
         required: true
         type: string
       aws_region:
@@ -81,6 +108,21 @@ on:
         required: false
         type: string
         default: "10.0.1.0/24"
+      enable_session_manager:
+        description: "Enable SSM Session Manager"
+        required: false
+        type: boolean
+        default: true
+      enable_patch_manager:
+        description: "Enable SSM Patch Manager"
+        required: false
+        type: boolean
+        default: false
+      destroy_confirmation:
+        description: "Type 'destroy' to confirm teardown"
+        required: false
+        type: string
+        default: ""
     outputs:
       vpc_id:
         description: "VPC ID"
@@ -104,609 +146,231 @@ permissions:
 
 jobs:
   infrastructure:
-    name: ${{ inputs.action }} Infrastructure
+    name: "${{ inputs.action }} Infrastructure"
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
-      vpc_id: ${{ steps.create.outputs.vpc_id }}
-      subnet_id: ${{ steps.create.outputs.subnet_id }}
-      security_group_id: ${{ steps.create.outputs.security_group_id }}
-      instance_profile: ${{ steps.create.outputs.instance_profile }}
-      kms_key_id: ${{ steps.ssm.outputs.kms_key_id || steps.create.outputs.kms_key_id }}
+      vpc_id: ${{ steps.outputs.outputs.vpc_id }}
+      subnet_id: ${{ steps.outputs.outputs.subnet_id }}
+      security_group_id: ${{ steps.outputs.outputs.security_group_id }}
+      instance_profile: ${{ steps.outputs.outputs.instance_profile }}
+      kms_key_id: ${{ steps.outputs.outputs.kms_key_id }}
 
     steps:
+      - name: Validate destroy confirmation
+        if: inputs.action == 'destroy' && inputs.destroy_confirmation != 'destroy'
+        run: |
+          echo "::error::Destroy action requires typing 'destroy' in the confirmation field"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ inputs.aws_region }}
-          role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
+          role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+          role-session-name: spel-infra-setup
           role-duration-seconds: 3600
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Bootstrap backend
+        working-directory: infra
+        env:
+          AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+        run: |
+          source ./bootstrap-backend.sh \
+            --prefix "${{ inputs.infra_prefix }}" \
+            --region "${{ inputs.aws_region }}"
+
+      - name: Terraform init
+        working-directory: infra
+        run: terraform init -input=false
 
       - name: Check infrastructure status
         if: inputs.action == 'status'
+        working-directory: infra
         run: |
           echo "=== Infrastructure Status ==="
           echo ""
-          
-          INFRA_PREFIX="${{ inputs.infra_prefix }}"
-          VPC_NAME="${INFRA_PREFIX}-vpc"
-          
-          # Check VPC
-          VPC_ID=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Name,Values=${VPC_NAME}" \
-            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
-          
-          if [ "$VPC_ID" != "None" ] && [ -n "$VPC_ID" ]; then
-            echo "✅ VPC: ${VPC_ID} (${VPC_NAME})"
-            
-            # Check Subnet
-            SUBNET_ID=$(aws ec2 describe-subnets \
-              --filters "Name=tag:Name,Values=${INFRA_PREFIX}-subnet" "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "None")
-            if [ "$SUBNET_ID" != "None" ] && [ -n "$SUBNET_ID" ]; then
-              echo "✅ Subnet: ${SUBNET_ID}"
-            else
-              echo "❌ Subnet: Not found"
-            fi
-            
-            # Check Security Group
-            SG_ID=$(aws ec2 describe-security-groups \
-              --filters "Name=group-name,Values=${INFRA_PREFIX}-packer-sg" "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
-            if [ "$SG_ID" != "None" ] && [ -n "$SG_ID" ]; then
-              echo "✅ Security Group: ${SG_ID}"
-            else
-              echo "❌ Security Group: Not found"
-            fi
+
+          # Try to read state — if no state exists, report "not deployed"
+          if terraform show -json 2>/dev/null | jq -e '.values.root_module' &>/dev/null; then
+            echo "Infrastructure is deployed."
+            echo ""
+            echo "=== Current Outputs ==="
+            terraform output || true
           else
-            echo "❌ VPC: Not found (${VPC_NAME})"
-          fi
-          
-          # Check IAM
-          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
-          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null; then
-            echo "✅ IAM Role: ${ROLE_NAME}"
-          else
-            echo "❌ IAM Role: Not found"
-          fi
-          
-          PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
-          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
-            echo "✅ Instance Profile: ${PROFILE_NAME}"
-          else
-            echo "❌ Instance Profile: Not found"
-          fi
-          
-          # Check KMS Key (managed by SSM Terraform module)
-          KMS_ALIAS="${INFRA_PREFIX}-ssm"
-          KEY_ID=$(aws kms list-aliases \
-            --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
-            --output text 2>/dev/null || echo "")
-          if [ -n "$KEY_ID" ] && [ "$KEY_ID" != "None" ]; then
-            KMS_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
-            echo "✅ KMS Key: ${KMS_ARN} (managed by Terraform)"
-          else
-            # Fall back to legacy alias if present
-            KMS_ALIAS_LEGACY="${INFRA_PREFIX}-ebs-key"
-            KEY_ID=$(aws kms list-aliases \
-              --query "Aliases[?AliasName=='alias/${KMS_ALIAS_LEGACY}'].TargetKeyId" \
-              --output text 2>/dev/null || echo "")
-            if [ -n "$KEY_ID" ] && [ "$KEY_ID" != "None" ]; then
-              KMS_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
-              echo "⚠️  KMS Key: ${KMS_ARN} (legacy CLI-managed — consider re-running create to migrate)"
-            else
-              echo "❌ KMS Key: Not found"
-            fi
+            echo "No Terraform state found — infrastructure has not been deployed."
+            echo ""
+            echo "Run this workflow with action='apply' to create infrastructure."
           fi
 
-      - name: Create infrastructure
-        if: inputs.action == 'create'
-        id: create
+      - name: Generate tfvars
+        if: inputs.action == 'plan' || inputs.action == 'apply' || inputs.action == 'destroy'
+        working-directory: infra
         run: |
-          echo "=== Creating Infrastructure ==="
+          cat > ci.auto.tfvars <<EOF
+          name_prefix            = "${{ inputs.infra_prefix }}"
+          vpc_cidr               = "${{ inputs.vpc_cidr }}"
+          subnet_cidr            = "${{ inputs.subnet_cidr }}"
+          public_subnet          = true
+          enable_vpc_endpoints   = true
+          enable_session_manager = ${{ inputs.enable_session_manager }}
+          enable_patch_manager   = ${{ inputs.enable_patch_manager }}
+          enable_state_manager   = false
+          enable_inventory       = true
+          create_kms_key         = true
+          EOF
+
+          echo "=== Generated tfvars ==="
+          cat ci.auto.tfvars
+
+      - name: Terraform plan
+        if: inputs.action == 'plan' || inputs.action == 'apply'
+        working-directory: infra
+        run: |
+          terraform plan -input=false -out=tfplan
           echo ""
-          
-          INFRA_PREFIX="${{ inputs.infra_prefix }}"
-          VPC_CIDR="${{ inputs.vpc_cidr }}"
-          SUBNET_CIDR="${{ inputs.subnet_cidr }}"
-          AWS_REGION="${{ inputs.aws_region }}"
-          
-          # Create VPC
-          VPC_NAME="${INFRA_PREFIX}-vpc"
-          EXISTING_VPC=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Name,Values=${VPC_NAME}" \
-            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
-          
-          if [ "$EXISTING_VPC" != "None" ] && [ -n "$EXISTING_VPC" ]; then
-            echo "✓ VPC already exists: ${EXISTING_VPC}"
-            VPC_ID="${EXISTING_VPC}"
-          else
-            echo "Creating VPC..."
-            VPC_ID=$(aws ec2 create-vpc \
-              --cidr-block "${VPC_CIDR}" \
-              --query 'Vpc.VpcId' --output text)
-            
-            aws ec2 create-tags --resources "${VPC_ID}" \
-              --tags Key=Name,Value="${VPC_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
-            
-            aws ec2 modify-vpc-attribute --vpc-id "${VPC_ID}" --enable-dns-hostnames
-            aws ec2 modify-vpc-attribute --vpc-id "${VPC_ID}" --enable-dns-support
-            
-            echo "✓ Created VPC: ${VPC_ID}"
-          fi
-          echo "vpc_id=${VPC_ID}" >> $GITHUB_OUTPUT
-          
-          # Create Subnet
-          SUBNET_NAME="${INFRA_PREFIX}-subnet"
-          EXISTING_SUBNET=$(aws ec2 describe-subnets \
-            --filters "Name=tag:Name,Values=${SUBNET_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
-            --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "None")
-          
-          if [ "$EXISTING_SUBNET" != "None" ] && [ -n "$EXISTING_SUBNET" ]; then
-            echo "✓ Subnet already exists: ${EXISTING_SUBNET}"
-            SUBNET_ID="${EXISTING_SUBNET}"
-          else
-            echo "Creating subnet..."
-            AZ=$(aws ec2 describe-availability-zones --query 'AvailabilityZones[0].ZoneName' --output text)
-            SUBNET_ID=$(aws ec2 create-subnet \
-              --vpc-id "${VPC_ID}" \
-              --cidr-block "${SUBNET_CIDR}" \
-              --availability-zone "${AZ}" \
-              --query 'Subnet.SubnetId' --output text)
-            
-            aws ec2 create-tags --resources "${SUBNET_ID}" \
-              --tags Key=Name,Value="${SUBNET_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
-            
-            aws ec2 modify-subnet-attribute --subnet-id "${SUBNET_ID}" --map-public-ip-on-launch
-            
-            echo "✓ Created subnet: ${SUBNET_ID}"
-          fi
-          echo "subnet_id=${SUBNET_ID}" >> $GITHUB_OUTPUT
-          
-          # Create Internet Gateway (needed for public IP connectivity)
-          IGW_NAME="${INFRA_PREFIX}-igw"
-          EXISTING_IGW=$(aws ec2 describe-internet-gateways \
-            --filters "Name=tag:Name,Values=${IGW_NAME}" \
-            --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || echo "None")
-          
-          if [ "$EXISTING_IGW" != "None" ] && [ -n "$EXISTING_IGW" ]; then
-            echo "✓ Internet Gateway already exists: ${EXISTING_IGW}"
-            IGW_ID="${EXISTING_IGW}"
-          else
-            echo "Creating Internet Gateway..."
-            IGW_ID=$(aws ec2 create-internet-gateway \
-              --query 'InternetGateway.InternetGatewayId' --output text)
-            
-            aws ec2 create-tags --resources "${IGW_ID}" \
-              --tags Key=Name,Value="${IGW_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
-            
-            aws ec2 attach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${VPC_ID}"
-            
-            echo "✓ Created and attached Internet Gateway: ${IGW_ID}"
-          fi
-          
-          # Create/Update Route Table
-          RT_ID=$(aws ec2 describe-route-tables \
-            --filters "Name=vpc-id,Values=${VPC_ID}" "Name=association.main,Values=true" \
-            --query 'RouteTables[0].RouteTableId' --output text)
-          
-          # Check if default route exists
-          EXISTING_ROUTE=$(aws ec2 describe-route-tables \
-            --route-table-ids "${RT_ID}" \
-            --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0'].GatewayId" --output text || echo "")
-          
-          if [ -z "$EXISTING_ROUTE" ] || [ "$EXISTING_ROUTE" == "None" ]; then
-            echo "Adding default route to Internet Gateway..."
-            aws ec2 create-route \
-              --route-table-id "${RT_ID}" \
-              --destination-cidr-block "0.0.0.0/0" \
-              --gateway-id "${IGW_ID}" || true
-            echo "✓ Added default route"
-          else
-            echo "✓ Default route already exists"
-          fi
-          
-          # Create Security Group
-          SG_NAME="${INFRA_PREFIX}-packer-sg"
-          EXISTING_SG=$(aws ec2 describe-security-groups \
-            --filters "Name=group-name,Values=${SG_NAME}" "Name=vpc-id,Values=${VPC_ID}" \
-            --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
-          
-          if [ "$EXISTING_SG" != "None" ] && [ -n "$EXISTING_SG" ]; then
-            echo "✓ Security group already exists: ${EXISTING_SG}"
-            SG_ID="${EXISTING_SG}"
-          else
-            echo "Creating security group..."
-            SG_ID=$(aws ec2 create-security-group \
-              --group-name "${SG_NAME}" \
-              --description "Security group for SPEL Packer builders" \
-              --vpc-id "${VPC_ID}" \
-              --query 'GroupId' --output text)
-            
-            aws ec2 create-tags --resources "${SG_ID}" \
-              --tags Key=Name,Value="${SG_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
-            
-            # Allow SSH from VPC CIDR
-            aws ec2 authorize-security-group-ingress \
-              --group-id "${SG_ID}" \
-              --protocol tcp --port 22 \
-              --cidr "${VPC_CIDR}"
-            
-            echo "✓ Created security group: ${SG_ID}"
-          fi
-          echo "security_group_id=${SG_ID}" >> $GITHUB_OUTPUT
-          
-          # Create IAM Role
-          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
-          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null; then
-            echo "✓ IAM role already exists: ${ROLE_NAME}"
-          else
-            echo "Creating IAM role..."
-            cat > /tmp/trust-policy.json <<'EOF'
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Principal": {
-                  "Service": "ec2.amazonaws.com"
-                },
-                "Action": "sts:AssumeRole"
-              }
-            ]
-          }
-          EOF
-            
-            aws iam create-role \
-              --role-name "${ROLE_NAME}" \
-              --assume-role-policy-document file:///tmp/trust-policy.json \
-              --description "Role for SPEL Packer builders" \
-              --max-session-duration 21600
-            
-            echo "✓ Created IAM role: ${ROLE_NAME}"
-          fi
-          
-          # Create IAM Policy
-          POLICY_NAME="${INFRA_PREFIX}-packer-builder-policy"
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          
-          EXISTING_POLICY=$(aws iam list-policies --scope Local \
-            --query "Policies[?PolicyName=='${POLICY_NAME}'].Arn" --output text 2>/dev/null)
-          
-          if [ -n "$EXISTING_POLICY" ] && [ "$EXISTING_POLICY" != "None" ]; then
-            echo "✓ IAM policy already exists: ${POLICY_NAME}"
-            POLICY_ARN="$EXISTING_POLICY"
-          else
-            echo "Creating IAM policy..."
-            cat > /tmp/packer-policy.json <<EOF
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Sid": "SSMAccess",
-                "Effect": "Allow",
-                "Action": [
-                  "ssm:UpdateInstanceInformation",
-                  "ssmmessages:CreateControlChannel",
-                  "ssmmessages:CreateDataChannel",
-                  "ssmmessages:OpenControlChannel",
-                  "ssmmessages:OpenDataChannel",
-                  "ec2messages:AcknowledgeMessage",
-                  "ec2messages:DeleteMessage",
-                  "ec2messages:FailMessage",
-                  "ec2messages:GetEndpoint",
-                  "ec2messages:GetMessages",
-                  "ec2messages:SendReply"
-                ],
-                "Resource": "*"
-              },
-              {
-                "Sid": "S3Access",
-                "Effect": "Allow",
-                "Action": [
-                  "s3:GetObject",
-                  "s3:ListBucket"
-                ],
-                "Resource": [
-                  "arn:*:s3:::aws-ssm-${AWS_REGION}/*",
-                  "arn:*:s3:::aws-ssm-${AWS_REGION}",
-                  "arn:*:s3:::amazon-ssm-${AWS_REGION}/*",
-                  "arn:*:s3:::amazon-ssm-${AWS_REGION}"
-                ]
-              },
-              {
-                "Sid": "CloudWatchLogs",
-                "Effect": "Allow",
-                "Action": [
-                  "logs:CreateLogStream",
-                  "logs:PutLogEvents",
-                  "logs:DescribeLogGroups",
-                  "logs:DescribeLogStreams"
-                ],
-                "Resource": "*"
-              }
-            ]
-          }
-          EOF
-            
-            POLICY_ARN=$(aws iam create-policy \
-              --policy-name "${POLICY_NAME}" \
-              --policy-document file:///tmp/packer-policy.json \
-              --description "Policy for SPEL Packer builder EC2 instances" \
-              --query 'Policy.Arn' --output text)
-            
-            echo "✓ Created IAM policy: ${POLICY_NAME}"
-          fi
-          
-          # Attach policy to role
-          if aws iam list-attached-role-policies --role-name "${ROLE_NAME}" \
-              --query "AttachedPolicies[?PolicyArn=='${POLICY_ARN}']" --output text | grep -q .; then
-            echo "✓ Policy already attached to role"
-          else
-            echo "Attaching policy to role..."
-            aws iam attach-role-policy \
-              --role-name "${ROLE_NAME}" \
-              --policy-arn "${POLICY_ARN}"
-            echo "✓ Attached policy to role"
-          fi
-          
-          # Create Instance Profile
-          PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
-          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
-            echo "✓ Instance profile already exists: ${PROFILE_NAME}"
-          else
-            echo "Creating instance profile..."
-            aws iam create-instance-profile --instance-profile-name "${PROFILE_NAME}"
-            aws iam add-role-to-instance-profile \
-              --instance-profile-name "${PROFILE_NAME}" \
-              --role-name "${ROLE_NAME}"
-            
-            sleep 10  # Wait for propagation
-            echo "✓ Created instance profile: ${PROFILE_NAME}"
-          fi
-          echo "instance_profile=${PROFILE_NAME}" >> $GITHUB_OUTPUT
-          
-          # NOTE: KMS key is now managed by the SSM Terraform module (see
-          # "Setup SSM infrastructure" step below). The Terraform-managed key
-          # covers both EBS encryption and SSM data-at-rest encryption,
-          # eliminating the previous duplicate CLI-created key.
-          
+          echo "=== Plan Summary ==="
+          terraform show -no-color tfplan | tail -5
+
+      - name: Terraform apply
+        if: inputs.action == 'apply'
+        working-directory: infra
+        run: |
+          terraform apply -auto-approve -input=false tfplan
           echo ""
           echo "=== Infrastructure Created ==="
+          terraform output
 
-      - name: Checkout repository
-        if: inputs.action == 'create' || inputs.action == 'destroy'
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: infra/ssm
-
-      - name: Setup SSM infrastructure (Terraform)
-        if: inputs.action == 'create'
-        id: ssm
-        working-directory: infra/ssm
-        env:
-          AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
-          INFRA_PREFIX: ${{ inputs.infra_prefix }}
-        run: |
-          echo "=== Setting up SSM Infrastructure ==="
-          
-          VPC_ID="${{ steps.create.outputs.vpc_id }}"
-          SUBNET_ID="${{ steps.create.outputs.subnet_id }}"
-          VPC_CIDR="${{ inputs.vpc_cidr }}"
-          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
-          
-          if [ -z "$VPC_ID" ]; then
-            echo "Skipping SSM setup - no VPC created"
-            exit 0
-          fi
-          
-          # Check if terraform or tofu is available
-          TF_CMD=""
-          if command -v tofu &>/dev/null; then
-            TF_CMD="tofu"
-          elif command -v terraform &>/dev/null; then
-            TF_CMD="terraform"
-          else
-            echo "WARNING: Neither terraform nor tofu found - skipping SSM setup"
-            echo "Install terraform or tofu to enable SSM infrastructure"
-            exit 0
-          fi
-          
-          echo "Using: $TF_CMD"
-          
-          # Bootstrap S3 + DynamoDB backend (idempotent)
-          source ./bootstrap-backend.sh --prefix "$INFRA_PREFIX" --region "$AWS_DEFAULT_REGION"
-          
-          # Initialize with remote backend
-          $TF_CMD init -input=false
-          
-          # Apply SSM module — KMS key is created here (single source of truth)
-          # and the existing CLI-created IAM role gets SSM managed policy attached
-          $TF_CMD apply -auto-approve -input=false \
-            -var="name_prefix=${INFRA_PREFIX}" \
-            -var="vpc_id=${VPC_ID}" \
-            -var="subnet_ids=[\"${SUBNET_ID}\"]" \
-            -var="vpc_cidr=${VPC_CIDR}" \
-            -var="enable_vpc_endpoints=true" \
-            -var="enable_session_manager=true" \
-            -var="enable_inventory=true" \
-            -var="enable_state_manager=false" \
-            -var="enable_patch_manager=false" \
-            -var="create_kms_key=true" \
-            -var="create_instance_profile=false" \
-            -var="existing_instance_role_name=${ROLE_NAME}"
-          
-          # Export KMS key ARN for Packer EBS encryption
-          KMS_KEY_ARN=$($TF_CMD output -raw kms_key_arn 2>/dev/null || echo "")
-          echo "kms_key_id=${KMS_KEY_ARN}" >> $GITHUB_OUTPUT
-          
-          echo ""
-          echo "=== SSM Infrastructure Created ==="
-          $TF_CMD output -json
-
-      - name: Destroy SSM infrastructure (Terraform)
+      - name: Terraform destroy
         if: inputs.action == 'destroy'
-        working-directory: infra/ssm
-        env:
-          AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
-          INFRA_PREFIX: ${{ inputs.infra_prefix }}
+        working-directory: infra
         run: |
-          TF_CMD=""
-          if command -v tofu &>/dev/null; then
-            TF_CMD="tofu"
-          elif command -v terraform &>/dev/null; then
-            TF_CMD="terraform"
-          fi
-          
-          if [ -z "$TF_CMD" ]; then
-            echo "Neither terraform nor tofu found - skipping SSM teardown"
-            exit 0
-          fi
-          
-          # Re-bootstrap backend config so init can connect to remote state
-          source ./bootstrap-backend.sh --prefix "$INFRA_PREFIX" --region "$AWS_DEFAULT_REGION"
-          
-          echo "=== Destroying SSM Infrastructure ==="
-          $TF_CMD init -input=false 2>/dev/null || true
-          $TF_CMD destroy -auto-approve -input=false 2>/dev/null || true
-          echo "✓ SSM infrastructure destroyed"
-
-      - name: Destroy infrastructure
-        if: inputs.action == 'destroy'
-        run: |
-          echo "=== Destroying Infrastructure ==="
-          echo ""
-          echo "⚠️  This will delete all SPEL infrastructure resources!"
-          echo ""
-          
-          INFRA_PREFIX="${{ inputs.infra_prefix }}"
-          
-          # NOTE: KMS key is destroyed by the "Destroy SSM infrastructure" step above
-          # (Terraform manages the KMS key lifecycle). Clean up any legacy CLI-created
-          # KMS key that may exist from before the migration.
-          KMS_ALIAS_LEGACY="${INFRA_PREFIX}-ebs-key"
-          LEGACY_KEY_ID=$(aws kms list-aliases \
-            --query "Aliases[?AliasName=='alias/${KMS_ALIAS_LEGACY}'].TargetKeyId" \
-            --output text 2>/dev/null || echo "")
-          
-          if [ -n "$LEGACY_KEY_ID" ] && [ "$LEGACY_KEY_ID" != "None" ]; then
-            echo "Cleaning up legacy CLI-managed KMS key..."
-            aws kms delete-alias --alias-name "alias/${KMS_ALIAS_LEGACY}" 2>/dev/null || true
-            aws kms schedule-key-deletion --key-id "${LEGACY_KEY_ID}" --pending-window-in-days 30
-            echo "✓ Legacy KMS key scheduled for deletion in 30 days"
-          fi
-          
-          # Delete Instance Profile
-          PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
-          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
-          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null; then
-            echo "Removing role from instance profile..."
-            aws iam remove-role-from-instance-profile \
-              --instance-profile-name "${PROFILE_NAME}" \
-              --role-name "${ROLE_NAME}" 2>/dev/null || true
-            echo "Deleting instance profile: ${PROFILE_NAME}"
-            aws iam delete-instance-profile --instance-profile-name "${PROFILE_NAME}"
-            echo "✓ Deleted instance profile"
-          fi
-          
-          # Delete IAM Policy and Role
-          POLICY_NAME="${INFRA_PREFIX}-packer-builder-policy"
-          POLICY_ARN=$(aws iam list-policies --scope Local \
-            --query "Policies[?PolicyName=='${POLICY_NAME}'].Arn" --output text 2>/dev/null)
-          
-          if [ -n "$POLICY_ARN" ] && [ "$POLICY_ARN" != "None" ]; then
-            echo "Detaching policy from role..."
-            aws iam detach-role-policy \
-              --role-name "${ROLE_NAME}" \
-              --policy-arn "${POLICY_ARN}" 2>/dev/null || true
-            echo "Deleting policy: ${POLICY_NAME}"
-            aws iam delete-policy --policy-arn "${POLICY_ARN}"
-            echo "✓ Deleted IAM policy"
-          fi
-          
-          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null; then
-            echo "Deleting IAM role: ${ROLE_NAME}"
-            aws iam delete-role --role-name "${ROLE_NAME}"
-            echo "✓ Deleted IAM role"
-          fi
-          
-          # Get VPC ID
-          VPC_NAME="${INFRA_PREFIX}-vpc"
-          VPC_ID=$(aws ec2 describe-vpcs \
-            --filters "Name=tag:Name,Values=${VPC_NAME}" \
-            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || echo "None")
-          
-          if [ "$VPC_ID" != "None" ] && [ -n "$VPC_ID" ]; then
-            # Delete Security Group
-            SG_ID=$(aws ec2 describe-security-groups \
-              --filters "Name=group-name,Values=${INFRA_PREFIX}-packer-sg" "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
-            
-            if [ "$SG_ID" != "None" ] && [ -n "$SG_ID" ]; then
-              echo "Deleting security group: ${SG_ID}"
-              aws ec2 delete-security-group --group-id "${SG_ID}"
-              echo "✓ Deleted security group"
-            fi
-            
-            # Delete Subnet
-            SUBNET_ID=$(aws ec2 describe-subnets \
-              --filters "Name=tag:Name,Values=${INFRA_PREFIX}-subnet" "Name=vpc-id,Values=${VPC_ID}" \
-              --query 'Subnets[0].SubnetId' --output text 2>/dev/null || echo "None")
-            
-            if [ "$SUBNET_ID" != "None" ] && [ -n "$SUBNET_ID" ]; then
-              echo "Deleting subnet: ${SUBNET_ID}"
-              aws ec2 delete-subnet --subnet-id "${SUBNET_ID}"
-              echo "✓ Deleted subnet"
-            fi
-            
-            # Detach and delete Internet Gateway
-            IGW_ID=$(aws ec2 describe-internet-gateways \
-              --filters "Name=tag:Name,Values=${INFRA_PREFIX}-igw" \
-              --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || echo "None")
-            
-            if [ "$IGW_ID" != "None" ] && [ -n "$IGW_ID" ]; then
-              echo "Detaching Internet Gateway: ${IGW_ID}"
-              aws ec2 detach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${VPC_ID}" 2>/dev/null || true
-              echo "Deleting Internet Gateway: ${IGW_ID}"
-              aws ec2 delete-internet-gateway --internet-gateway-id "${IGW_ID}"
-              echo "✓ Deleted Internet Gateway"
-            fi
-            
-            # Delete VPC
-            echo "Deleting VPC: ${VPC_ID}"
-            aws ec2 delete-vpc --vpc-id "${VPC_ID}"
-            echo "✓ Deleted VPC"
-          else
-            echo "No VPC found with name: ${VPC_NAME}"
-          fi
-          
+          echo "::warning::Destroying ALL infrastructure in ${{ inputs.aws_region }}"
+          terraform destroy -auto-approve -input=false
           echo ""
           echo "=== Infrastructure Destroyed ==="
 
+      - name: Clean up legacy CLI resources
+        if: inputs.action == 'destroy'
+        run: |
+          # Clean up any legacy CLI-created KMS key from before the Terraform migration
+          INFRA_PREFIX="${{ inputs.infra_prefix }}"
+          for ALIAS_SUFFIX in "-ebs-key" "-ssm"; do
+            KMS_ALIAS="${INFRA_PREFIX}${ALIAS_SUFFIX}"
+            LEGACY_KEY_ID=$(aws kms list-aliases \
+              --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
+              --output text 2>/dev/null || echo "")
+
+            if [ -n "$LEGACY_KEY_ID" ] && [ "$LEGACY_KEY_ID" != "None" ]; then
+              echo "Cleaning up legacy CLI-managed KMS key (alias/${KMS_ALIAS})..."
+              aws kms delete-alias --alias-name "alias/${KMS_ALIAS}" 2>/dev/null || true
+              aws kms schedule-key-deletion --key-id "${LEGACY_KEY_ID}" --pending-window-in-days 30 2>/dev/null || true
+              echo "✓ Legacy KMS key scheduled for deletion in 30 days"
+            fi
+          done
+
+          # Clean up legacy IAM resources that may exist from CLI era
+          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
+          PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
+          POLICY_NAME="${INFRA_PREFIX}-packer-builder-policy"
+
+          # Instance profile
+          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null 2>&1; then
+            aws iam remove-role-from-instance-profile \
+              --instance-profile-name "${PROFILE_NAME}" \
+              --role-name "${ROLE_NAME}" 2>/dev/null || true
+            aws iam delete-instance-profile --instance-profile-name "${PROFILE_NAME}" 2>/dev/null || true
+            echo "✓ Cleaned up legacy instance profile"
+          fi
+
+          # Policy
+          POLICY_ARN=$(aws iam list-policies --scope Local \
+            --query "Policies[?PolicyName=='${POLICY_NAME}'].Arn" --output text 2>/dev/null || echo "")
+          if [ -n "$POLICY_ARN" ] && [ "$POLICY_ARN" != "None" ]; then
+            aws iam detach-role-policy --role-name "${ROLE_NAME}" --policy-arn "${POLICY_ARN}" 2>/dev/null || true
+            aws iam delete-policy --policy-arn "${POLICY_ARN}" 2>/dev/null || true
+            echo "✓ Cleaned up legacy IAM policy"
+          fi
+
+          # Role — detach any remaining managed policies first
+          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null 2>&1; then
+            aws iam list-attached-role-policies --role-name "${ROLE_NAME}" \
+              --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null | tr '\t' '\n' | \
+              while read -r arn; do
+                [ -n "$arn" ] && aws iam detach-role-policy --role-name "${ROLE_NAME}" --policy-arn "$arn" 2>/dev/null || true
+              done
+            aws iam delete-role --role-name "${ROLE_NAME}" 2>/dev/null || true
+            echo "✓ Cleaned up legacy IAM role"
+          fi
+
+      - name: Export outputs
+        if: inputs.action == 'apply'
+        id: outputs
+        working-directory: infra
+        run: |
+          VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
+          SUBNET_ID=$(terraform output -raw subnet_id 2>/dev/null || echo "")
+          SG_ID=$(terraform output -raw security_group_id 2>/dev/null || echo "")
+          PROFILE=$(terraform output -raw instance_profile_name 2>/dev/null || echo "")
+          KMS_ARN=$(terraform output -raw kms_key_arn 2>/dev/null || echo "")
+
+          echo "vpc_id=${VPC_ID}" >> $GITHUB_OUTPUT
+          echo "subnet_id=${SUBNET_ID}" >> $GITHUB_OUTPUT
+          echo "security_group_id=${SG_ID}" >> $GITHUB_OUTPUT
+          echo "instance_profile=${PROFILE}" >> $GITHUB_OUTPUT
+          echo "kms_key_id=${KMS_ARN}" >> $GITHUB_OUTPUT
+
       - name: Create summary
         if: always()
+        working-directory: infra
         run: |
-          cat >> $GITHUB_STEP_SUMMARY << EOF
+          cat >> $GITHUB_STEP_SUMMARY << 'HEADER'
           ## Infrastructure Setup Summary
-          
+
           | Property | Value |
           |----------|-------|
+          HEADER
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
           | Action | \`${{ inputs.action }}\` |
           | Region | \`${{ inputs.aws_region }}\` |
           | Prefix | \`${{ inputs.infra_prefix }}\` |
           | Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
           EOF
-          
-          if [ "${{ inputs.action }}" = "create" ]; then
-            cat >> $GITHUB_STEP_SUMMARY << EOF
-          
-          ### Created Resources
-          
+
+          if [ "${{ inputs.action }}" = "apply" ]; then
+            cat >> $GITHUB_STEP_SUMMARY << 'SUBHEADER'
+
+          ### Terraform Outputs
+
           Use these values in the build.yml workflow:
-          
+
           | Input | Value |
           |-------|-------|
-          | aws_vpc_id | \`${{ steps.create.outputs.vpc_id }}\` |
-          | aws_subnet_id | \`${{ steps.create.outputs.subnet_id }}\` |          | aws_kms_key_id | \`${{ steps.ssm.outputs.kms_key_id }}\` |          | (optional) iam_instance_profile | \`${{ steps.create.outputs.instance_profile }}\` |
+          SUBHEADER
+
+            # Populate from Terraform outputs
+            VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "n/a")
+            SUBNET_ID=$(terraform output -raw subnet_id 2>/dev/null || echo "n/a")
+            SG_ID=$(terraform output -raw security_group_id 2>/dev/null || echo "n/a")
+            PROFILE=$(terraform output -raw instance_profile_name 2>/dev/null || echo "n/a")
+            KMS_ARN=$(terraform output -raw kms_key_arn 2>/dev/null || echo "n/a")
+
+            cat >> $GITHUB_STEP_SUMMARY << EOF
+          | aws_vpc_id | \`${VPC_ID}\` |
+          | aws_subnet_id | \`${SUBNET_ID}\` |
+          | aws_security_group_id | \`${SG_ID}\` |
+          | iam_instance_profile | \`${PROFILE}\` |
+          | aws_kms_key_id | \`${KMS_ARN}\` |
           EOF
           fi

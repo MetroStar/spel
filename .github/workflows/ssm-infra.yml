@@ -1,9 +1,13 @@
 # =============================================================================
-# GitHub Actions Workflow — SSM Infrastructure Deploy/Teardown
+# GitHub Actions Workflow — SSM Infrastructure Deploy/Teardown (Standalone)
 # =============================================================================
-# Manages persistent SSM infrastructure using Terraform/OpenTofu.
-# This is a one-time setup per AWS account — SSM resources persist across
-# Packer builds. Use the "destroy" action to tear down.
+# Manages SSM-only infrastructure using the standalone Terraform module at
+# infra/ssm/. Use this when VPC, subnet, and IAM already exist and you only
+# need to deploy/update SSM resources (KMS, VPC endpoints, S3, CloudWatch).
+#
+# For FULL infrastructure management (VPC + IAM + SSM in one apply), use
+# the "Infrastructure Setup" workflow (infra-setup.yml) which calls the
+# consolidated root module at infra/.
 #
 # Usage:
 #   - Plan:    Review changes before applying
