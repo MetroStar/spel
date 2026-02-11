@@ -88,7 +88,7 @@ and transferred to the air-gapped GitLab environment.
 | `PKR_VAR_windows_update_server` | (empty) | WSUS URL for air-gapped Windows builds (e.g., `http://wsus.internal.mil:8530`) |
 | `PKR_VAR_aws_kms_key_id` | (empty) | KMS key ARN for CMK-encrypted AMIs (e.g., `arn:aws-us-gov:kms:...`) |
 | `SPEL_IDENTIFIER` | `spel` | AMI name prefix |
-| `INFRA_PREFIX` | `spel-offline` | Infrastructure resource prefix |
+| `INFRA_PREFIX` | `spel` | Infrastructure resource prefix |
 
 ### Air-Gapped Linux Build Variables
 

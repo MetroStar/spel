@@ -1,5 +1,5 @@
 # =============================================================================
-# GitLab CI/CD Configuration for SPEL Offline Builds (Docker-based)
+# GitLab CI/CD Configuration for SPEL Builds (Docker-based)
 # =============================================================================
 # This pipeline builds STIGed AMIs using a pre-built Docker container.
 # The container has all dependencies baked in for air-gapped environments.
@@ -23,11 +23,20 @@
 #          --service-code ec2 --quota-code L-0E3CBAB9 --desired-value 20 \
 #          --region us-gov-east-1
 #
+# INFRASTRUCTURE:
+#   Infrastructure is managed by .gitlab/infra.gitlab-ci.yml via Terraform.
+#   Run infra:create once before the first build to provision VPC, IAM, KMS, etc.
+#   Infrastructure is persistent and reused across all builds.
+#
 # PIPELINE STAGES:
 #   1. import - Import Docker image from tarball
-#   2. infra  - Create AWS infrastructure (optional, one-time setup)
+#   2. infra  - Create/destroy AWS infrastructure (via included file)
 #   3. build  - Build AMIs using Docker container
+#   4. test   - Test AMIs (optional)
 # =============================================================================
+
+include:
+  - local: '.gitlab/infra.gitlab-ci.yml'
 
 variables:
   SPEL_IDENTIFIER: "spel"
@@ -35,7 +44,7 @@ variables:
   PACKER_LOG: "1"
   CHECKPOINT_DISABLE: "1"
   # Infrastructure naming
-  INFRA_PREFIX: "spel-offline"
+  INFRA_PREFIX: "spel"
   # Docker image location (must be transferred to this path)
   DOCKER_IMAGE_PATH: "/transfer/spel-builder-*.tar.gz"
   # Local yum repository mirror for air-gapped Linux builds
@@ -79,25 +88,19 @@ variables:
   # Leave empty to disable encryption or use default AWS-managed key
   PKR_VAR_aws_kms_key_id: ""
   # IAM instance profile for build instances
-  # Set this to use a pre-created instance profile (e.g., from infra job)
+  # Set this to use a pre-created instance profile (e.g., from infra:create job)
   # Leave empty to have Packer create a temporary one (requires IAM permissions)
   PKR_VAR_aws_iam_instance_profile: ""
-  # Create temporary infrastructure for this build (auto-destroyed after build)
-  # Set to "false" to use pre-existing infrastructure instead
-  CREATE_TEMP_INFRA: "true"
   # Test Windows AMIs on multiple Nitro instance types after build (opt-in)
   # Set to "true" to run instance type compatibility tests
   TEST_INSTANCE_TYPES: "false"
   # Test SSM connectivity on Linux AMIs after build (opt-in)
-  # Requires SSM infrastructure (infra:create job or persistent SSM setup)
+  # Requires SSM infrastructure (infra:create job)
   TEST_SSM: "false"
-  # Use persistent SSM infrastructure instead of per-build temp setup
-  # Set to "true" when infra:create has been run and SSM infra exists
-  USE_PERSISTENT_SSM: "false"
 
 stages:
   - import       # Import Docker image from tarball
-  - infra        # Create AWS infrastructure (optional one-time setup)
+  - infra        # Create/destroy AWS infrastructure (from included file)
   - build        # Build AMIs
   - test         # Test AMIs on different instance types (optional)
 
@@ -182,7 +185,6 @@ import:docker:
       if [ -f "$CHECKSUM_FILE" ]; then
         echo ""
         echo "Verifying tarball checksum..."
-        # Run checksum from the directory containing the tarball
         TARBALL_DIR=$(dirname "${TARBALL}")
         TARBALL_NAME=$(basename "${TARBALL}")
         pushd "${TARBALL_DIR}" > /dev/null
@@ -244,130 +246,6 @@ import:docker:
       when: manual
 
 #############################################################################
-# Infrastructure Stage - Create/Destroy AWS Resources via Terraform
-#############################################################################
-# All persistent infrastructure (VPC, subnet, IGW, SG, IAM, KMS, SSM) is
-# managed by the consolidated Terraform root module at infra/.
-# Run infra:create once to stand up everything; infra:destroy to tear down.
-#
-# Temporary per-build infrastructure (CREATE_TEMP_INFRA=true) still uses
-# CLI in the build template's before_script, since it's ephemeral.
-#############################################################################
-
-# Create or update all persistent infrastructure (single terraform apply)
-infra:create:
-  stage: infra
-  script:
-    - echo "=== Creating All Infrastructure via Terraform ==="
-    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
-
-    # Detect terraform or tofu
-    - |
-      TF_CMD=""
-      if command -v tofu &>/dev/null; then
-        TF_CMD="tofu"
-      elif command -v terraform &>/dev/null; then
-        TF_CMD="terraform"
-      else
-        echo "ERROR: Neither terraform nor tofu found"
-        echo "Install terraform or tofu to enable infrastructure management"
-        exit 1
-      fi
-      echo "Using: $TF_CMD"
-
-    - |
-      cd infra
-
-      # Bootstrap S3 + DynamoDB backend (idempotent)
-      source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
-
-      $TF_CMD init -input=false
-
-      # Generate tfvars from CI variables
-      cat > ci.auto.tfvars <<TFVARS
-      name_prefix            = "${INFRA_PREFIX}"
-      vpc_cidr               = "10.0.0.0/16"
-      subnet_cidr            = "10.0.1.0/24"
-      public_subnet          = true
-      enable_vpc_endpoints   = true
-      enable_session_manager = true
-      enable_patch_manager   = false
-      enable_state_manager   = false
-      enable_inventory       = true
-      create_kms_key         = true
-      TFVARS
-
-      echo "=== Generated tfvars ==="
-      cat ci.auto.tfvars
-
-      # Plan and apply
-      $TF_CMD plan -input=false -out=tfplan
-      $TF_CMD apply -auto-approve -input=false tfplan
-
-      # Export outputs for build jobs via dotenv artifact
-      echo "PKR_VAR_aws_vpc_id=$($TF_CMD output -raw vpc_id)" > ../infra.env
-      echo "PKR_VAR_aws_subnet_id=$($TF_CMD output -raw subnet_id)" >> ../infra.env
-      echo "PKR_VAR_aws_security_group_id=$($TF_CMD output -raw security_group_id)" >> ../infra.env
-      echo "PKR_VAR_iam_instance_profile=$($TF_CMD output -raw instance_profile_name)" >> ../infra.env
-      echo "PKR_VAR_aws_kms_key_id=$($TF_CMD output -raw kms_key_arn 2>/dev/null || echo '')" >> ../infra.env
-
-      echo ""
-      echo "=== All Infrastructure Created ==="
-      $TF_CMD output
-  artifacts:
-    reports:
-      dotenv: infra.env
-    expire_in: 90 days
-  tags:
-    - spel-offline-runner
-  rules:
-    - if: '$CREATE_INFRASTRUCTURE == "true"'
-      when: manual
-
-# Destroy all persistent infrastructure (single terraform destroy)
-infra:destroy:
-  stage: infra
-  script:
-    - echo "=== Destroying All Infrastructure via Terraform ==="
-    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
-
-    # Detect terraform or tofu
-    - |
-      TF_CMD=""
-      if command -v tofu &>/dev/null; then
-        TF_CMD="tofu"
-      elif command -v terraform &>/dev/null; then
-        TF_CMD="terraform"
-      else
-        echo "ERROR: Neither terraform nor tofu found"
-        exit 1
-      fi
-      echo "Using: $TF_CMD"
-
-    - |
-      cd infra
-
-      # Bootstrap backend config (need it to init)
-      source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
-
-      $TF_CMD init -input=false
-
-      echo ""
-      echo "=== Destroying All Infrastructure ==="
-      echo "WARNING: This will remove ALL Terraform-managed SPEL resources."
-      echo ""
-
-      $TF_CMD destroy -auto-approve -input=false
-
-      echo ""
-      echo "=== All Infrastructure Destroyed ==="
-  tags:
-    - spel-offline-runner
-  rules:
-    - if: '$DESTROY_INFRASTRUCTURE == "true"'
-      when: manual
-
-#############################################################################
 # Build Stage - Build AMIs using Docker Container
 #############################################################################
 
@@ -377,323 +255,12 @@ infra:destroy:
   needs:
     - job: import:docker
       optional: true
+    - job: infra:create
+      optional: true
   timeout: 6 hours
   before_script:
     - echo "Starting Docker-based build on $(hostname)"
     - echo "Git commit - ${CI_COMMIT_SHA}"
-    
-    # Create temporary infrastructure if requested
-    - |
-      if [ "${CREATE_TEMP_INFRA:-false}" = "true" ]; then
-        echo "=== Creating Temporary Infrastructure ==="
-        
-        TEMP_INFRA_PREFIX="spel-temp-${CI_PIPELINE_ID}"
-        VPC_CIDR="10.$((CI_PIPELINE_ID % 100)).0.0/16"
-        SUBNET_CIDR="10.$((CI_PIPELINE_ID % 100)).1.0/24"
-        CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        
-        # Save prefix for after_script cleanup
-        echo "TEMP_INFRA_PREFIX=${TEMP_INFRA_PREFIX}" > temp_infra.env
-        
-        # Create VPC
-        echo "Creating VPC..."
-        TEMP_VPC_ID=$(aws ec2 create-vpc \
-          --cidr-block "${VPC_CIDR}" \
-          --query 'Vpc.VpcId' --output text)
-        
-        aws ec2 create-tags --resources "${TEMP_VPC_ID}" \
-          --tags Key=Name,Value="${TEMP_INFRA_PREFIX}-vpc" \
-                 Key=Project,Value=SPEL \
-                 Key=TempBuild,Value=true \
-                 Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
-                 Key=CreatedAt,Value="${CREATED_AT}"
-        
-        aws ec2 modify-vpc-attribute --vpc-id "${TEMP_VPC_ID}" --enable-dns-hostnames
-        aws ec2 modify-vpc-attribute --vpc-id "${TEMP_VPC_ID}" --enable-dns-support
-        echo "✓ Created VPC: ${TEMP_VPC_ID}"
-        echo "TEMP_VPC_ID=${TEMP_VPC_ID}" >> temp_infra.env
-        
-        # Create Subnet
-        echo "Creating subnet..."
-        AZ=$(aws ec2 describe-availability-zones --query 'AvailabilityZones[0].ZoneName' --output text)
-        TEMP_SUBNET_ID=$(aws ec2 create-subnet \
-          --vpc-id "${TEMP_VPC_ID}" \
-          --cidr-block "${SUBNET_CIDR}" \
-          --availability-zone "${AZ}" \
-          --query 'Subnet.SubnetId' --output text)
-        
-        aws ec2 create-tags --resources "${TEMP_SUBNET_ID}" \
-          --tags Key=Name,Value="${TEMP_INFRA_PREFIX}-subnet" \
-                 Key=Project,Value=SPEL \
-                 Key=TempBuild,Value=true \
-                 Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
-                 Key=CreatedAt,Value="${CREATED_AT}"
-        
-        aws ec2 modify-subnet-attribute --subnet-id "${TEMP_SUBNET_ID}" --map-public-ip-on-launch
-        echo "✓ Created subnet: ${TEMP_SUBNET_ID}"
-        echo "TEMP_SUBNET_ID=${TEMP_SUBNET_ID}" >> temp_infra.env
-        
-        # Create Internet Gateway
-        echo "Creating Internet Gateway..."
-        TEMP_IGW_ID=$(aws ec2 create-internet-gateway \
-          --query 'InternetGateway.InternetGatewayId' --output text)
-        
-        aws ec2 create-tags --resources "${TEMP_IGW_ID}" \
-          --tags Key=Name,Value="${TEMP_INFRA_PREFIX}-igw" \
-                 Key=Project,Value=SPEL \
-                 Key=TempBuild,Value=true \
-                 Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
-                 Key=CreatedAt,Value="${CREATED_AT}"
-        
-        aws ec2 attach-internet-gateway --internet-gateway-id "${TEMP_IGW_ID}" --vpc-id "${TEMP_VPC_ID}"
-        echo "✓ Created and attached Internet Gateway: ${TEMP_IGW_ID}"
-        
-        # Add default route
-        RT_ID=$(aws ec2 describe-route-tables \
-          --filters "Name=vpc-id,Values=${TEMP_VPC_ID}" "Name=association.main,Values=true" \
-          --query 'RouteTables[0].RouteTableId' --output text)
-        
-        aws ec2 create-route \
-          --route-table-id "${RT_ID}" \
-          --destination-cidr-block "0.0.0.0/0" \
-          --gateway-id "${TEMP_IGW_ID}" || true
-        echo "✓ Added default route"
-        
-        # Create Security Group
-        echo "Creating security group..."
-        TEMP_SG_ID=$(aws ec2 create-security-group \
-          --group-name "${TEMP_INFRA_PREFIX}-packer-sg" \
-          --description "Temporary security group for SPEL Packer build ${CI_PIPELINE_ID}" \
-          --vpc-id "${TEMP_VPC_ID}" \
-          --query 'GroupId' --output text)
-        
-        aws ec2 create-tags --resources "${TEMP_SG_ID}" \
-          --tags Key=Name,Value="${TEMP_INFRA_PREFIX}-packer-sg" \
-                 Key=Project,Value=SPEL \
-                 Key=TempBuild,Value=true \
-                 Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
-                 Key=CreatedAt,Value="${CREATED_AT}"
-        
-        # Allow SSH and WinRM from anywhere (Packer connects from runner's public IP)
-        aws ec2 authorize-security-group-ingress --group-id "${TEMP_SG_ID}" --protocol tcp --port 22 --cidr "0.0.0.0/0"
-        aws ec2 authorize-security-group-ingress --group-id "${TEMP_SG_ID}" --protocol tcp --port 5986 --cidr "0.0.0.0/0"
-        echo "✓ Created security group: ${TEMP_SG_ID}"
-        echo "TEMP_SG_ID=${TEMP_SG_ID}" >> temp_infra.env
-        
-        # Create IAM Role
-        TEMP_ROLE_NAME="${TEMP_INFRA_PREFIX}-role"
-        echo "Creating IAM role: ${TEMP_ROLE_NAME}"
-        
-        cat > /tmp/trust-policy.json <<'TRUSTEOF'
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Effect": "Allow",
-              "Principal": {"Service": "ec2.amazonaws.com"},
-              "Action": "sts:AssumeRole"
-            }
-          ]
-        }
-        TRUSTEOF
-        
-        aws iam create-role \
-          --role-name "${TEMP_ROLE_NAME}" \
-          --assume-role-policy-document file:///tmp/trust-policy.json \
-          --description "Temporary role for SPEL Packer build ${CI_PIPELINE_ID}" \
-          --max-session-duration 21600 \
-          --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" Key=CreatedAt,Value="${CREATED_AT}"
-        echo "✓ Created IAM role"
-        echo "TEMP_ROLE_NAME=${TEMP_ROLE_NAME}" >> temp_infra.env
-        
-        # Create IAM Policy
-        TEMP_POLICY_NAME="${TEMP_INFRA_PREFIX}-policy"
-        echo "Creating IAM policy: ${TEMP_POLICY_NAME}"
-        
-        cat > /tmp/packer-policy.json <<'POLICYEOF'
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "SSMAccess",
-              "Effect": "Allow",
-              "Action": [
-                "ssm:UpdateInstanceInformation",
-                "ssmmessages:CreateControlChannel",
-                "ssmmessages:CreateDataChannel",
-                "ssmmessages:OpenControlChannel",
-                "ssmmessages:OpenDataChannel",
-                "ec2messages:AcknowledgeMessage",
-                "ec2messages:DeleteMessage",
-                "ec2messages:FailMessage",
-                "ec2messages:GetEndpoint",
-                "ec2messages:GetMessages",
-                "ec2messages:SendReply"
-              ],
-              "Resource": "*"
-            },
-            {
-              "Sid": "S3Access",
-              "Effect": "Allow",
-              "Action": ["s3:GetObject", "s3:ListBucket"],
-              "Resource": [
-                "arn:*:s3:::aws-ssm-*/*",
-                "arn:*:s3:::aws-ssm-*",
-                "arn:*:s3:::amazon-ssm-*/*",
-                "arn:*:s3:::amazon-ssm-*"
-              ]
-            },
-            {
-              "Sid": "CloudWatchLogs",
-              "Effect": "Allow",
-              "Action": [
-                "logs:CreateLogStream",
-                "logs:PutLogEvents",
-                "logs:DescribeLogGroups",
-                "logs:DescribeLogStreams"
-              ],
-              "Resource": "*"
-            }
-          ]
-        }
-        POLICYEOF
-        
-        TEMP_POLICY_ARN=$(aws iam create-policy \
-          --policy-name "${TEMP_POLICY_NAME}" \
-          --policy-document file:///tmp/packer-policy.json \
-          --description "Temporary policy for SPEL Packer build ${CI_PIPELINE_ID}" \
-          --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" Key=CreatedAt,Value="${CREATED_AT}" \
-          --query 'Policy.Arn' --output text)
-        echo "✓ Created IAM policy: ${TEMP_POLICY_ARN}"
-        echo "TEMP_POLICY_ARN=${TEMP_POLICY_ARN}" >> temp_infra.env
-        
-        # Attach policy to role
-        aws iam attach-role-policy --role-name "${TEMP_ROLE_NAME}" --policy-arn "${TEMP_POLICY_ARN}"
-        echo "✓ Attached policy to role"
-        
-        # Also attach AmazonSSMManagedInstanceCore for SSM agent registration
-        PARTITION="aws"
-        [[ "${PKR_VAR_aws_region}" == us-gov-* ]] && PARTITION="aws-us-gov"
-        aws iam attach-role-policy --role-name "${TEMP_ROLE_NAME}" \
-          --policy-arn "arn:${PARTITION}:iam::aws:policy/AmazonSSMManagedInstanceCore"
-        echo "✓ Attached AmazonSSMManagedInstanceCore managed policy"
-        
-        # Create Instance Profile
-        TEMP_PROFILE_NAME="${TEMP_INFRA_PREFIX}-profile"
-        echo "Creating instance profile: ${TEMP_PROFILE_NAME}"
-        
-        aws iam create-instance-profile --instance-profile-name "${TEMP_PROFILE_NAME}" \
-          --tags Key=Project,Value=SPEL Key=TempBuild,Value=true Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" Key=CreatedAt,Value="${CREATED_AT}"
-        
-        aws iam add-role-to-instance-profile \
-          --instance-profile-name "${TEMP_PROFILE_NAME}" \
-          --role-name "${TEMP_ROLE_NAME}"
-        echo "✓ Created instance profile"
-        echo "TEMP_PROFILE_NAME=${TEMP_PROFILE_NAME}" >> temp_infra.env
-        
-        # Wait for IAM propagation (critical for AWS consistency)
-        echo "Waiting 15 seconds for IAM propagation..."
-        sleep 15
-        echo "✓ IAM propagation wait complete"
-        
-        # Check for existing shared KMS key (reuse across temp builds)
-        KMS_ALIAS="spel-temp-ebs-key"
-        EXISTING_KEY=$(aws kms list-aliases \
-          --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
-          --output text 2>/dev/null || echo "")
-        
-        if [ -n "$EXISTING_KEY" ] && [ "$EXISTING_KEY" != "None" ]; then
-          echo "✓ Reusing existing shared KMS key: ${EXISTING_KEY}"
-          KEY_ID="${EXISTING_KEY}"
-        else
-          echo "Creating shared KMS key for temp builds..."
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          CALLER_ARN=$(aws sts get-caller-identity --query Arn --output text)
-          # Extract the role name from the caller ARN (handles assumed-role format)
-          CALLER_ROLE_ARN=$(echo "${CALLER_ARN}" | sed 's|:assumed-role/|:role/|; s|/[^/]*$||')
-          PARTITION="aws"
-          [[ "${PKR_VAR_aws_region}" == us-gov-* ]] && PARTITION="aws-us-gov"
-          
-          cat > /tmp/kms-policy.json <<KMSEOF
-        {
-          "Version": "2012-10-17",
-          "Id": "${KMS_ALIAS}-policy",
-          "Statement": [
-            {
-              "Sid": "EnableRootPermissions",
-              "Effect": "Allow",
-              "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:root"},
-              "Action": "kms:*",
-              "Resource": "*"
-            },
-            {
-              "Sid": "AllowCallerRole",
-              "Effect": "Allow",
-              "Principal": {"AWS": "${CALLER_ROLE_ARN}"},
-              "Action": [
-                "kms:Create*",
-                "kms:Describe*",
-                "kms:Enable*",
-                "kms:List*",
-                "kms:Put*",
-                "kms:Update*",
-                "kms:Revoke*",
-                "kms:Disable*",
-                "kms:Get*",
-                "kms:Delete*",
-                "kms:TagResource",
-                "kms:UntagResource",
-                "kms:ScheduleKeyDeletion",
-                "kms:CancelKeyDeletion",
-                "kms:Encrypt",
-                "kms:Decrypt",
-                "kms:ReEncrypt*",
-                "kms:GenerateDataKey*",
-                "kms:CreateGrant"
-              ],
-              "Resource": "*"
-            },
-            {
-              "Sid": "AllowEC2ForEBS",
-              "Effect": "Allow",
-              "Principal": {"Service": "ec2.amazonaws.com"},
-              "Action": ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey", "kms:CreateGrant"],
-              "Resource": "*",
-              "Condition": {"StringEquals": {"kms:CallerAccount": "${ACCOUNT_ID}", "kms:ViaService": "ec2.${PKR_VAR_aws_region}.amazonaws.com"}}
-            }
-          ]
-        }
-        KMSEOF
-          
-          KEY_ID=$(aws kms create-key \
-            --description "Shared SPEL EBS encryption key for temp Packer builds" \
-            --policy file:///tmp/kms-policy.json \
-            --tags TagKey=Name,TagValue="${KMS_ALIAS}" TagKey=Project,TagValue=SPEL TagKey=SharedTempKey,TagValue=true \
-            --query 'KeyMetadata.KeyId' --output text)
-          
-          aws kms create-alias --alias-name "alias/${KMS_ALIAS}" --target-key-id "${KEY_ID}"
-          aws kms enable-key-rotation --key-id "${KEY_ID}"
-          echo "✓ Created shared KMS key: ${KEY_ID}"
-        fi
-        
-        TEMP_KMS_KEY_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
-        echo "TEMP_KMS_KEY_ARN=${TEMP_KMS_KEY_ARN}" >> temp_infra.env
-        
-        # Export for use in build
-        export PKR_VAR_aws_vpc_id="${TEMP_VPC_ID}"
-        export PKR_VAR_aws_subnet_id="${TEMP_SUBNET_ID}"
-        export PKR_VAR_aws_security_group_id="${TEMP_SG_ID}"
-        export PKR_VAR_aws_iam_instance_profile="${TEMP_PROFILE_NAME}"
-        export PKR_VAR_aws_kms_key_id="${TEMP_KMS_KEY_ARN}"
-        
-        echo ""
-        echo "=== Temporary Infrastructure Created ==="
-        echo "VPC: ${TEMP_VPC_ID}"
-        echo "Subnet: ${TEMP_SUBNET_ID}"
-        echo "Security Group: ${TEMP_SG_ID}"
-        echo "Instance Profile: ${TEMP_PROFILE_NAME}"
-        echo "KMS Key: ${TEMP_KMS_KEY_ARN}"
-      fi
     
     # Verify Docker image is available
     - |
@@ -714,14 +281,12 @@ infra:destroy:
       echo "Using Docker image: spel-builder:${IMAGE_TAG}"
       docker images "spel-builder:${IMAGE_TAG}"
     
-    # Load infrastructure config if available (from infra stage or temp infra)
+    # Load infrastructure config if available (from infra:create dotenv artifact)
     - |
-      for envfile in infra.env network.env sg.env iam.env kms.env ssm.env temp_infra.env; do
-        if [ -f "$envfile" ]; then
-          echo "Loading ${envfile}..."
-          source "$envfile"
-        fi
-      done
+      if [ -f "infra.env" ]; then
+        echo "Loading infra.env..."
+        source infra.env
+      fi
   script:
     - |
       echo "=== Starting SPEL Build ==="
@@ -799,98 +364,6 @@ infra:destroy:
         "${DOCKER_ENV_ARGS[@]}" \
         "spel-builder:${IMAGE_TAG}" \
         make -f Makefile.spel build
-  after_script:
-    # Cleanup temporary infrastructure (runs even if build fails)
-    - |
-      if [ -f "temp_infra.env" ]; then
-        echo "=== Destroying Temporary Infrastructure ==="
-        source temp_infra.env
-        
-        if [ -z "${TEMP_VPC_ID}" ]; then
-          echo "No temporary infrastructure to clean up"
-          exit 0
-        fi
-        
-        echo "Cleaning up resources for prefix: ${TEMP_INFRA_PREFIX}"
-        
-        # Delete Instance Profile
-        if [ -n "${TEMP_PROFILE_NAME}" ] && aws iam get-instance-profile --instance-profile-name "${TEMP_PROFILE_NAME}" &>/dev/null; then
-          echo "Removing role from instance profile..."
-          aws iam remove-role-from-instance-profile \
-            --instance-profile-name "${TEMP_PROFILE_NAME}" \
-            --role-name "${TEMP_ROLE_NAME}" 2>/dev/null || true
-          echo "Deleting instance profile: ${TEMP_PROFILE_NAME}"
-          aws iam delete-instance-profile --instance-profile-name "${TEMP_PROFILE_NAME}" || true
-          echo "✓ Deleted instance profile"
-        fi
-        
-        # Detach and delete IAM Policy (including managed SSM policy)
-        if [ -n "${TEMP_POLICY_ARN}" ]; then
-          echo "Detaching policies from role..."
-          aws iam detach-role-policy \
-            --role-name "${TEMP_ROLE_NAME}" \
-            --policy-arn "${TEMP_POLICY_ARN}" 2>/dev/null || true
-          # Also detach managed SSM policy
-          aws iam list-attached-role-policies --role-name "${TEMP_ROLE_NAME}" \
-            --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null | tr '\t' '\n' | \
-            while read -r arn; do
-              aws iam detach-role-policy --role-name "${TEMP_ROLE_NAME}" --policy-arn "$arn" 2>/dev/null || true
-            done
-          echo "Deleting policy: ${TEMP_POLICY_ARN}"
-          aws iam delete-policy --policy-arn "${TEMP_POLICY_ARN}" || true
-          echo "✓ Deleted IAM policy"
-        fi
-        
-        # Delete IAM Role
-        if [ -n "${TEMP_ROLE_NAME}" ] && aws iam get-role --role-name "${TEMP_ROLE_NAME}" &>/dev/null; then
-          echo "Deleting IAM role: ${TEMP_ROLE_NAME}"
-          aws iam delete-role --role-name "${TEMP_ROLE_NAME}" || true
-          echo "✓ Deleted IAM role"
-        fi
-        
-        # Delete Security Group (retry for instance termination)
-        if [ -n "${TEMP_SG_ID}" ]; then
-          echo "Deleting security group: ${TEMP_SG_ID}"
-          for i in 1 2 3 4 5; do
-            if aws ec2 delete-security-group --group-id "${TEMP_SG_ID}" 2>/dev/null; then
-              echo "✓ Deleted security group"
-              break
-            fi
-            echo "Waiting for instances to terminate... (attempt $i/5)"
-            sleep 30
-          done
-        fi
-        
-        # Delete Subnet
-        if [ -n "${TEMP_SUBNET_ID}" ]; then
-          echo "Deleting subnet: ${TEMP_SUBNET_ID}"
-          aws ec2 delete-subnet --subnet-id "${TEMP_SUBNET_ID}" || true
-          echo "✓ Deleted subnet"
-        fi
-        
-        # Detach and delete Internet Gateway
-        IGW_ID=$(aws ec2 describe-internet-gateways \
-          --filters "Name=tag:Name,Values=${TEMP_INFRA_PREFIX}-igw" \
-          --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || echo "None")
-        
-        if [ "$IGW_ID" != "None" ] && [ -n "$IGW_ID" ]; then
-          echo "Detaching Internet Gateway: ${IGW_ID}"
-          aws ec2 detach-internet-gateway --internet-gateway-id "${IGW_ID}" --vpc-id "${TEMP_VPC_ID}" 2>/dev/null || true
-          echo "Deleting Internet Gateway: ${IGW_ID}"
-          aws ec2 delete-internet-gateway --internet-gateway-id "${IGW_ID}" || true
-          echo "✓ Deleted Internet Gateway"
-        fi
-        
-        # Delete VPC
-        echo "Deleting VPC: ${TEMP_VPC_ID}"
-        aws ec2 delete-vpc --vpc-id "${TEMP_VPC_ID}" || true
-        echo "✓ Deleted VPC"
-        
-        # NOTE: KMS key is NOT deleted - it's a shared key reused across temp builds
-        echo ""
-        echo "=== Temporary Infrastructure Destroyed ==="
-        echo "Note: Shared KMS key (alias/spel-temp-ebs-key) was NOT deleted for reuse"
-      fi
   artifacts:
     paths:
       - .spel/
@@ -969,9 +442,9 @@ build:all:
       echo ""
       
       # Source infrastructure environment if available
-      if [[ -f temp_infra.env ]]; then
-        source temp_infra.env
-        echo "Loaded infrastructure from temp_infra.env"
+      if [[ -f infra.env ]]; then
+        source infra.env
+        echo "Loaded infrastructure from infra.env"
       fi
       
       # Find packer manifest
@@ -997,13 +470,15 @@ build:all:
       echo ""
       
       # Get infrastructure
-      SUBNET_ID="${TEMP_SUBNET_ID:-${PKR_VAR_aws_subnet_id}}"
-      SG_ID="${TEMP_SG_ID:-${PKR_VAR_aws_security_group_id}}"
+      SUBNET_ID="${PKR_VAR_aws_subnet_id:-}"
+      SG_ID="${PKR_VAR_aws_security_group_id:-}"
       
       if [[ -z "$SUBNET_ID" ]] || [[ -z "$SG_ID" ]]; then
         echo "ERROR: Missing infrastructure (SUBNET_ID or SG_ID)"
         echo "  SUBNET_ID: $SUBNET_ID"
         echo "  SG_ID: $SG_ID"
+        echo ""
+        echo "Run infra:create first to provision infrastructure."
         exit 1
       fi
       
@@ -1046,6 +521,13 @@ test:windows2022:
   script:
     - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
 
+    # Load infrastructure from infra:create
+    - |
+      if [[ -f infra.env ]]; then
+        source infra.env
+        echo "Loaded infrastructure from infra.env"
+      fi
+
     # SSM pre-flight check — verify caller has SSM permissions
     - |
       echo "=== SSM Pre-flight Check ==="
@@ -1074,12 +556,13 @@ test:windows2022:
 
     # Get infrastructure
     - |
-      SUBNET_ID="${TEMP_SUBNET_ID:-${PKR_VAR_aws_subnet_id}}"
-      SG_ID="${TEMP_SG_ID:-${PKR_VAR_aws_security_group_id}}"
-      PROFILE="${SSM_INSTANCE_PROFILE:-${PKR_VAR_iam_instance_profile}}"
+      SUBNET_ID="${PKR_VAR_aws_subnet_id:-}"
+      SG_ID="${PKR_VAR_aws_security_group_id:-}"
+      PROFILE="${PKR_VAR_iam_instance_profile:-}"
 
       if [[ -z "$SUBNET_ID" ]] || [[ -z "$SG_ID" ]] || [[ -z "$PROFILE" ]]; then
-        echo "WARNING: Missing SSM infrastructure - skipping"
+        echo "WARNING: Missing infrastructure - skipping SSM validation"
+        echo "Run infra:create first to provision infrastructure."
         exit 0
       fi
 

@@ -1,9 +1,13 @@
 # =============================================================================
-# Infrastructure Setup for Air-Gapped SPEL Builds
+# Infrastructure Setup for SPEL Builds
 # =============================================================================
 # This workflow manages ALL SPEL AWS infrastructure using a single Terraform
 # root module (infra/). One `terraform apply` creates everything; one
 # `terraform destroy` tears it all down.
+#
+# Infrastructure is persistent — created once and reused across builds.
+# build.yml calls this workflow automatically via workflow_call to ensure
+# infrastructure exists before every build (terraform apply is idempotent).
 #
 # RESOURCES CREATED (via Terraform modules):
 #   Networking (modules/networking):
@@ -26,11 +30,8 @@
 #   - For GovCloud: Use appropriate partition (aws-us-gov)
 #
 # USAGE:
-#   1. Run with action="plan" to review changes
-#   2. Run with action="apply" to create/update infrastructure
-#   3. Note the output values (VPC ID, Subnet ID, etc.)
-#   4. Use those values as inputs to the build.yml workflow
-#   5. Run action="destroy" when infrastructure is no longer needed
+#   Manual: Run with action="plan" to review, "apply" to create, "destroy" to teardown
+#   Automatic: build.yml calls this with action="apply" before every build
 # =============================================================================
 
 name: Infrastructure Setup
@@ -57,7 +58,7 @@ on:
         description: "Prefix for resource names"
         required: false
         type: string
-        default: "spel-offline"
+        default: "spel"
       vpc_cidr:
         description: "VPC CIDR block"
         required: false
@@ -97,7 +98,7 @@ on:
         description: "Prefix for resource names"
         required: false
         type: string
-        default: "spel-offline"
+        default: "spel"
       vpc_cidr:
         description: "VPC CIDR block"
         required: false

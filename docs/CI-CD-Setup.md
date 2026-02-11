@@ -460,7 +460,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | `PKR_VAR_aws_vpc_id` | VPC ID for builds | (auto-create) |
 | `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (auto-create) |
 | `PKR_VAR_aws_kms_key_id` | KMS key ARN for CMK-encrypted AMIs | (none) |
-| `INFRA_PREFIX` | Prefix for created resources | `spel-offline` |
+| `INFRA_PREFIX` | Prefix for created resources | `spel` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
 | `RUN_RHEL8` | Build RHEL 8 | `false` |
 | `RUN_OL9` | Build Oracle Linux 9 | `false` |

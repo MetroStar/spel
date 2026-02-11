@@ -1,0 +1,172 @@
+# =============================================================================
+# GitLab CI/CD — Infrastructure Management (Terraform)
+# =============================================================================
+# Manages all persistent SPEL AWS infrastructure via the consolidated
+# Terraform root module at infra/.
+#
+# Included by .gitlab-ci.yml via:
+#   include:
+#     - local: '.gitlab/infra.gitlab-ci.yml'
+#
+# JOBS:
+#   infra:plan    — Preview Terraform changes (manual)
+#   infra:create  — Apply Terraform to create/update infra (manual)
+#   infra:destroy — Destroy all Terraform-managed infra (manual)
+# =============================================================================
+
+# Plan infrastructure changes (dry run)
+infra:plan:
+  stage: infra
+  script:
+    - echo "=== Planning Infrastructure Changes ==="
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    - |
+      TF_CMD=""
+      if command -v tofu &>/dev/null; then
+        TF_CMD="tofu"
+      elif command -v terraform &>/dev/null; then
+        TF_CMD="terraform"
+      else
+        echo "ERROR: Neither terraform nor tofu found"
+        exit 1
+      fi
+      echo "Using: $TF_CMD"
+
+    - |
+      cd infra
+
+      source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
+      $TF_CMD init -input=false
+
+      cat > ci.auto.tfvars <<TFVARS
+      name_prefix            = "${INFRA_PREFIX}"
+      vpc_cidr               = "10.0.0.0/16"
+      subnet_cidr            = "10.0.1.0/24"
+      public_subnet          = true
+      enable_vpc_endpoints   = true
+      enable_session_manager = true
+      enable_patch_manager   = false
+      enable_state_manager   = false
+      enable_inventory       = true
+      create_kms_key         = true
+      TFVARS
+
+      echo "=== Generated tfvars ==="
+      cat ci.auto.tfvars
+
+      $TF_CMD plan -input=false
+
+      echo ""
+      echo "=== Plan Complete ==="
+      echo "Run infra:create to apply these changes."
+  tags:
+    - spel-offline-runner
+  rules:
+    - if: '$PLAN_INFRASTRUCTURE == "true"'
+      when: manual
+    - when: never
+
+# Create or update all persistent infrastructure (single terraform apply)
+infra:create:
+  stage: infra
+  script:
+    - echo "=== Creating All Infrastructure via Terraform ==="
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    - |
+      TF_CMD=""
+      if command -v tofu &>/dev/null; then
+        TF_CMD="tofu"
+      elif command -v terraform &>/dev/null; then
+        TF_CMD="terraform"
+      else
+        echo "ERROR: Neither terraform nor tofu found"
+        exit 1
+      fi
+      echo "Using: $TF_CMD"
+
+    - |
+      cd infra
+
+      source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
+      $TF_CMD init -input=false
+
+      cat > ci.auto.tfvars <<TFVARS
+      name_prefix            = "${INFRA_PREFIX}"
+      vpc_cidr               = "10.0.0.0/16"
+      subnet_cidr            = "10.0.1.0/24"
+      public_subnet          = true
+      enable_vpc_endpoints   = true
+      enable_session_manager = true
+      enable_patch_manager   = false
+      enable_state_manager   = false
+      enable_inventory       = true
+      create_kms_key         = true
+      TFVARS
+
+      echo "=== Generated tfvars ==="
+      cat ci.auto.tfvars
+
+      $TF_CMD plan -input=false -out=tfplan
+      $TF_CMD apply -auto-approve -input=false tfplan
+
+      # Export outputs for build jobs via dotenv artifact
+      echo "PKR_VAR_aws_vpc_id=$($TF_CMD output -raw vpc_id)" > ../infra.env
+      echo "PKR_VAR_aws_subnet_id=$($TF_CMD output -raw subnet_id)" >> ../infra.env
+      echo "PKR_VAR_aws_security_group_id=$($TF_CMD output -raw security_group_id)" >> ../infra.env
+      echo "PKR_VAR_iam_instance_profile=$($TF_CMD output -raw instance_profile_name)" >> ../infra.env
+      echo "PKR_VAR_aws_kms_key_id=$($TF_CMD output -raw kms_key_arn 2>/dev/null || echo '')" >> ../infra.env
+
+      echo ""
+      echo "=== All Infrastructure Created ==="
+      $TF_CMD output
+  artifacts:
+    reports:
+      dotenv: infra.env
+    expire_in: 90 days
+  tags:
+    - spel-offline-runner
+  rules:
+    - if: '$CREATE_INFRASTRUCTURE == "true"'
+      when: manual
+
+# Destroy all persistent infrastructure (single terraform destroy)
+infra:destroy:
+  stage: infra
+  script:
+    - echo "=== Destroying All Infrastructure via Terraform ==="
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    - |
+      TF_CMD=""
+      if command -v tofu &>/dev/null; then
+        TF_CMD="tofu"
+      elif command -v terraform &>/dev/null; then
+        TF_CMD="terraform"
+      else
+        echo "ERROR: Neither terraform nor tofu found"
+        exit 1
+      fi
+      echo "Using: $TF_CMD"
+
+    - |
+      cd infra
+
+      source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
+      $TF_CMD init -input=false
+
+      echo ""
+      echo "=== Destroying All Infrastructure ==="
+      echo "WARNING: This will remove ALL Terraform-managed SPEL resources."
+      echo ""
+
+      $TF_CMD destroy -auto-approve -input=false
+
+      echo ""
+      echo "=== All Infrastructure Destroyed ==="
+  tags:
+    - spel-offline-runner
+  rules:
+    - if: '$DESTROY_INFRASTRUCTURE == "true"'
+      when: manual

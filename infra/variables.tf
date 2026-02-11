@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 
 variable "name_prefix" {
-  description = "Prefix for all resource names (e.g., 'spel-offline', 'spel-ci')"
+  description = "Prefix for all resource names (e.g., 'spel', 'spel-ci')"
   type        = string
 
   validation {
