@@ -367,7 +367,8 @@ The build system consists of:
 Before running CI/CD builds, ensure:
 
 1. **IAM Role Session Duration**: Must be ≥ 21600 seconds (6 hours) for long builds
-2. **Public AMI Quota**: Increase if making AMIs public (default limit is 5)
+2. **GitHub OIDC Provider**: Configure AWS to trust GitHub Actions OIDC tokens (GitHub Actions only)
+3. **IAM Role**: Create a role with Packer and Terraform permissions
 
 See [`docs/CI-CD-Setup.md`](docs/CI-CD-Setup.md) for detailed setup instructions.
 

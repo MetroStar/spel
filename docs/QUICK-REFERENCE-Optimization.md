@@ -91,17 +91,6 @@ aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
 aws iam get-role --role-name Packer_Amazon --query 'Role.MaxSessionDuration'
 ```
 
-### 2. Public AMI Quota (If Making AMIs Public)
-
-```bash
-# Default quota is 5, increase if needed
-aws service-quotas request-service-quota-increase \
-  --service-code ec2 \
-  --quota-code L-0E3CBAB9 \
-  --desired-value 20 \
-  --region us-east-1
-```
-
 ## Build Times
 
 | Operating System | Minimal | Hardened |
@@ -140,17 +129,6 @@ sha256sum -c spel-builder-*.tar.gz.sha256
 aws iam get-role --role-name Packer_Amazon --query 'Role.MaxSessionDuration'
 # If < 21600, update it:
 aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
-```
-
-### Public AMI Quota Exceeded
-
-```bash
-# Check current quota
-aws service-quotas get-service-quota \
-  --service-code ec2 --quota-code L-0E3CBAB9 --region us-east-1
-
-# Build continues but AMIs stay private
-# Request quota increase via Service Quotas console
 ```
 
 ### Build Can't Access Repositories

@@ -122,37 +122,7 @@ aws iam get-role --role-name Packer_Amazon --query 'Role.MaxSessionDuration'
 
 > **Note**: AMI builds (especially with STIG hardening) can take 3-5 hours. The default 1-hour session duration will cause credential expiration during long builds.
 
-#### 2. Public AMI Quota Increase
-
-If building multiple AMIs concurrently or making AMIs public (`aws_ami_groups=["all"]`), increase the public AMI quota:
-
-```bash
-# Check current quota (default is 5)
-aws service-quotas get-service-quota \
-  --service-code ec2 \
-  --quota-code L-0E3CBAB9 \
-  --region us-east-1 \
-  --query 'Quota.Value'
-
-# Request quota increase to 20 (adjust as needed)
-aws service-quotas request-service-quota-increase \
-  --service-code ec2 \
-  --quota-code L-0E3CBAB9 \
-  --desired-value 20 \
-  --region us-east-1
-
-# Check request status
-aws service-quotas list-requested-service-quota-change-history \
-  --service-code ec2 \
-  --region us-east-1 \
-  --query 'RequestedQuotas[?QuotaCode==`L-0E3CBAB9`]'
-```
-
-For GovCloud regions, use `us-gov-east-1` or `us-gov-west-1`.
-
-> **Note**: Quota increases typically take 1-3 business days for approval.
-
-#### 3. Packer Execution IAM Permissions
+#### 2. Packer Execution IAM Permissions
 
 The IAM role or user that **runs Packer** (the credentials passed to the Docker container) needs extensive EC2 and AMI permissions:
 
@@ -224,6 +194,167 @@ The IAM role or user that **runs Packer** (the credentials passed to the Docker 
 
 > **Note**: This policy is for the credentials that **execute Packer**, not the EC2 instance profile. The instance profile permissions are created by the `infra:create` job in GitLab CI (or by the `infra` job in GitHub Actions, which calls `infra-setup.yml`).
 
+#### 3. Terraform Execution IAM Permissions
+
+The IAM role also needs permissions to manage infrastructure via Terraform. The `infra-setup.yml` workflow (and GitLab's `infra:create` job) runs `terraform apply` to create VPCs, subnets, security groups, IAM roles, KMS keys, and SSM resources. Add these permissions to the same role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "TerraformNetworking",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateVpc",
+        "ec2:DeleteVpc",
+        "ec2:ModifyVpcAttribute",
+        "ec2:CreateSubnet",
+        "ec2:DeleteSubnet",
+        "ec2:CreateInternetGateway",
+        "ec2:DeleteInternetGateway",
+        "ec2:AttachInternetGateway",
+        "ec2:DetachInternetGateway",
+        "ec2:CreateRouteTable",
+        "ec2:DeleteRouteTable",
+        "ec2:CreateRoute",
+        "ec2:DeleteRoute",
+        "ec2:AssociateRouteTable",
+        "ec2:DisassociateRouteTable",
+        "ec2:CreateVpcEndpoint",
+        "ec2:DeleteVpcEndpoints",
+        "ec2:ModifyVpcEndpoint",
+        "ec2:DescribeVpcEndpoints",
+        "ec2:DescribeVpcEndpointServices"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformIAM",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:CreateInstanceProfile",
+        "iam:DeleteInstanceProfile",
+        "iam:AddRoleToInstanceProfile",
+        "iam:RemoveRoleFromInstanceProfile",
+        "iam:ListInstanceProfilesForRole",
+        "iam:TagRole",
+        "iam:UntagRole"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformKMS",
+      "Effect": "Allow",
+      "Action": [
+        "kms:CreateKey",
+        "kms:CreateAlias",
+        "kms:DeleteAlias",
+        "kms:DescribeKey",
+        "kms:GetKeyPolicy",
+        "kms:GetKeyRotationStatus",
+        "kms:ListResourceTags",
+        "kms:PutKeyPolicy",
+        "kms:EnableKeyRotation",
+        "kms:ScheduleKeyDeletion",
+        "kms:TagResource",
+        "kms:UntagResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformSSM",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:CreateDocument",
+        "ssm:DeleteDocument",
+        "ssm:DescribeDocument",
+        "ssm:GetDocument",
+        "ssm:UpdateDocument",
+        "ssm:UpdateDocumentDefaultVersion",
+        "ssm:AddTagsToResource",
+        "ssm:RemoveTagsFromResource",
+        "ssm:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformS3Backend",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:GetBucketVersioning",
+        "s3:PutBucketVersioning",
+        "s3:GetBucketPolicy",
+        "s3:PutBucketPolicy",
+        "s3:GetEncryptionConfiguration",
+        "s3:PutEncryptionConfiguration",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:*:s3:::spel-*",
+        "arn:*:s3:::spel-*/*"
+      ]
+    },
+    {
+      "Sid": "TerraformDynamoDB",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:TagResource"
+      ],
+      "Resource": "arn:*:dynamodb:*:*:table/spel-*"
+    },
+    {
+      "Sid": "TerraformCloudWatch",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:DeleteLogGroup",
+        "logs:DescribeLogGroups",
+        "logs:PutRetentionPolicy",
+        "logs:TagLogGroup",
+        "logs:ListTagsLogGroup"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformSNS",
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic",
+        "sns:DeleteTopic",
+        "sns:GetTopicAttributes",
+        "sns:SetTopicAttributes",
+        "sns:Subscribe",
+        "sns:Unsubscribe",
+        "sns:TagResource"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+> **Note**: This policy covers Terraform state backend (S3 + DynamoDB), networking, IAM, KMS, SSM, CloudWatch, and SNS resources created by the `infra/` root module. For GovCloud, the ARN partition resolves automatically.
+
 #### 4. EC2 Instance Profile Permissions (Created by Pipeline)
 
 The Terraform root module at `infra/` creates an instance profile with minimal permissions for the Packer-launched EC2 instances:
@@ -236,9 +367,94 @@ These are created automatically when you run the `infra:create` job (GitLab) or 
 
 ### GitHub Actions Prerequisites
 
-1. **OIDC Provider**: Configure AWS to trust GitHub Actions OIDC tokens
-2. **IAM Role**: Create a role that GitHub Actions can assume via OIDC
-3. **Submodules**: Ensure `vendor/amigen8` and `vendor/amigen9` submodules are present
+#### 1. GitHub OIDC Identity Provider
+
+GitHub Actions uses [OpenID Connect (OIDC)](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services) to obtain short-lived AWS credentials without storing secrets. Create the OIDC provider in each AWS account (Commercial and/or GovCloud):
+
+```bash
+# Create the GitHub OIDC provider (one-time per AWS account)
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+
+# Verify
+aws iam list-open-id-connect-providers
+```
+
+> **Note**: The thumbprint may change over time. See [GitHub's documentation](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services) for the current value. AWS also validates the certificate chain automatically.
+
+#### 2. IAM Role for GitHub Actions (OIDC)
+
+Create an IAM role that GitHub Actions can assume via OIDC. The trust policy restricts access to your specific repository and branch:
+
+```bash
+# Create the trust policy
+cat > trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:OWNER/REPO:*"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+# Replace placeholders
+sed -i 's/ACCOUNT_ID/123456789012/' trust-policy.json
+sed -i 's|OWNER/REPO|MetroStar/spel|' trust-policy.json
+
+# Create the role
+aws iam create-role \
+  --role-name Packer_Amazon \
+  --assume-role-policy-document file://trust-policy.json \
+  --max-session-duration 21600
+
+# Attach the Packer and Terraform permissions (from sections 2 and 3 above)
+aws iam put-role-policy \
+  --role-name Packer_Amazon \
+  --policy-name PackerBuildPolicy \
+  --policy-document file://packer-policy.json
+
+aws iam put-role-policy \
+  --role-name Packer_Amazon \
+  --policy-name TerraformInfraPolicy \
+  --policy-document file://terraform-policy.json
+```
+
+> **Security**: The `sub` condition restricts which repository (and optionally branch) can assume the role. Use `repo:OWNER/REPO:ref:refs/heads/BRANCH` to restrict to a specific branch, or `repo:OWNER/REPO:*` to allow any branch.
+
+> **GovCloud**: For GovCloud accounts, replace the ARN partition with `aws-us-gov` (e.g., `arn:aws-us-gov:iam::ACCOUNT_ID:oidc-provider/...`).
+
+#### 3. Store Role ARN
+
+The `infra-setup.yml` workflow reads the role ARN from `vars.AWS_ROLE_ARN` or `secrets.AWS_ROLE_ARN`. Store it in your GitHub repository:
+
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Add a **Repository variable** named `AWS_ROLE_ARN` with value `arn:aws:iam::ACCOUNT_ID:role/Packer_Amazon`
+
+Alternatively, store it as a **Repository secret** if you prefer to keep the account ID hidden.
+
+#### 4. Submodules
+
+Ensure `vendor/amigen8` and `vendor/amigen9` submodules are initialized:
+
+```bash
+git submodule update --init --recursive
+```
 
 ### GitLab CI Prerequisites
 
@@ -329,7 +545,6 @@ Before running this workflow:
 1. Run the `offline-prepare.yml` workflow first
 2. Note the artifact name (e.g., `spel-builder-20251230`)
 3. Ensure IAM role has `MaxSessionDuration >= 21600`
-4. Ensure public AMI quota is sufficient (if making AMIs public)
 
 #### Trigger
 
@@ -643,28 +858,6 @@ aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
 # Obtain new credentials with longer session duration
 ```
 
-#### Public AMI Quota Exceeded
-
-**Problem**: Build fails with "public AMI quota exceeded" error.
-
-**Solution**:
-```bash
-# Check current quota
-aws service-quotas get-service-quota \
-  --service-code ec2 \
-  --quota-code L-0E3CBAB9 \
-  --region us-east-1
-
-# Request increase (takes 1-3 business days)
-aws service-quotas request-service-quota-increase \
-  --service-code ec2 \
-  --quota-code L-0E3CBAB9 \
-  --desired-value 20 \
-  --region us-east-1
-```
-
-> **Note**: The build will continue even if public AMI quota is exceeded, but the AMIs will remain private.
-
 #### Docker Container Can't Access AWS
 
 **Problem**: Packer fails with AWS authentication errors inside container.
@@ -749,9 +942,8 @@ cat packer.log
 ### Build Optimization
 
 1. **Sequential builds**: Run one OS build at a time to avoid resource contention
-2. **Monitor quotas**: Check AMI quotas before starting builds
-3. **Off-hours builds**: Schedule long builds during off-peak hours
-4. **Use specific builders**: Don't run all builders unless necessary
+2. **Off-hours builds**: Schedule long builds during off-peak hours
+3. **Use specific builders**: Don't run all builders unless necessary
 
 ### Security
 

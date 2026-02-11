@@ -10,9 +10,6 @@
 #   3. Provide the artifact name when running this workflow
 #   4. IAM role MaxSessionDuration must be >= 21600 (6 hours):
 #        aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
-#   5. Public AMI quota must be increased if building multiple AMIs concurrently:
-#        aws service-quotas request-service-quota-increase \
-#          --service-code ec2 --quota-code L-0E3CBAB9 --desired-value 20 --region us-east-1
 #
 # INFRASTRUCTURE:
 #   Infrastructure is managed by infra-setup.yml via Terraform. This workflow

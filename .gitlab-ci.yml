@@ -18,11 +18,6 @@
 #      - AWS_SESSION_TOKEN (optional, for OIDC/STS credentials)
 #      - DOCKER_IMAGE_PATH (path to spel-builder-*.tar.gz)
 #
-#   4. Public AMI quota must be increased if building multiple AMIs concurrently:
-#        aws service-quotas request-service-quota-increase \
-#          --service-code ec2 --quota-code L-0E3CBAB9 --desired-value 20 \
-#          --region us-gov-east-1
-#
 # INFRASTRUCTURE:
 #   Infrastructure is managed by .gitlab/infra.gitlab-ci.yml via Terraform.
 #   Run infra:create once before the first build to provision VPC, IAM, KMS, etc.
