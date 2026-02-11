@@ -1,0 +1,185 @@
+# =============================================================================
+# GitHub Actions Workflow — SSM Infrastructure Deploy/Teardown
+# =============================================================================
+# Manages persistent SSM infrastructure using Terraform/OpenTofu.
+# This is a one-time setup per AWS account — SSM resources persist across
+# Packer builds. Use the "destroy" action to tear down.
+#
+# Usage:
+#   - Plan:    Review changes before applying
+#   - Apply:   Create/update SSM infrastructure
+#   - Destroy: Remove all SSM infrastructure (requires confirmation)
+# =============================================================================
+
+name: SSM Infrastructure
+run-name: "SSM Infra — ${{ inputs.action }} (${{ inputs.aws_region }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Terraform action to perform"
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      aws_region:
+        description: "AWS region"
+        required: true
+        type: string
+        default: "us-east-1"
+      name_prefix:
+        description: "Resource name prefix"
+        required: true
+        type: string
+        default: "spel-ci"
+      vpc_id:
+        description: "VPC ID for SSM VPC endpoints"
+        required: true
+        type: string
+      subnet_ids:
+        description: "Comma-separated subnet IDs for VPC endpoints"
+        required: true
+        type: string
+      vpc_cidr:
+        description: "VPC CIDR block"
+        required: true
+        type: string
+        default: "10.0.0.0/16"
+      enable_session_manager:
+        description: "Enable Session Manager preferences document"
+        required: false
+        type: boolean
+        default: true
+      enable_patch_manager:
+        description: "Enable Patch Manager baselines and maintenance windows"
+        required: false
+        type: boolean
+        default: false
+      enable_state_manager:
+        description: "Enable State Manager associations (scheduled scans)"
+        required: false
+        type: boolean
+        default: false
+      create_kms_key:
+        description: "Create a new KMS CMK for SSM encryption"
+        required: false
+        type: boolean
+        default: true
+      alert_email:
+        description: "Email for SNS alert notifications (leave empty to skip)"
+        required: false
+        type: string
+        default: ""
+      destroy_confirmation:
+        description: "Type 'destroy' to confirm teardown (required for destroy action)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  ssm-infra:
+    name: "${{ inputs.action }} SSM Infrastructure"
+    runs-on: ubuntu-latest
+    env:
+      AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
+      AWS_REGION: ${{ inputs.aws_region }}
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - name: Validate destroy confirmation
+        if: inputs.action == 'destroy' && inputs.destroy_confirmation != 'destroy'
+        run: |
+          echo "::error::Destroy action requires typing 'destroy' in the confirmation field"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+          role-session-name: spel-ssm-infra
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Bootstrap backend
+        working-directory: infra/ssm
+        run: |
+          source ./bootstrap-backend.sh \
+            --prefix "${{ inputs.name_prefix }}" \
+            --region "${{ inputs.aws_region }}"
+
+      - name: Terraform init
+        working-directory: infra/ssm
+        run: terraform init -input=false
+
+      - name: Build tfvars
+        working-directory: infra/ssm
+        run: |
+          # Convert comma-separated subnet IDs to HCL list
+          SUBNET_LIST=$(echo '${{ inputs.subnet_ids }}' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | awk '{printf "\"%s\",", $0}' | sed 's/,$//')
+
+          cat > ci.auto.tfvars <<EOF
+          name_prefix            = "${{ inputs.name_prefix }}"
+          vpc_id                 = "${{ inputs.vpc_id }}"
+          subnet_ids             = [${SUBNET_LIST}]
+          vpc_cidr               = "${{ inputs.vpc_cidr }}"
+          enable_vpc_endpoints   = true
+          enable_session_manager = ${{ inputs.enable_session_manager }}
+          enable_patch_manager   = ${{ inputs.enable_patch_manager }}
+          enable_state_manager   = ${{ inputs.enable_state_manager }}
+          enable_inventory       = true
+          create_kms_key         = ${{ inputs.create_kms_key }}
+          create_instance_profile = true
+          alert_email            = "${{ inputs.alert_email }}"
+          EOF
+
+          echo "=== Generated tfvars ==="
+          cat ci.auto.tfvars
+
+      - name: Terraform plan
+        working-directory: infra/ssm
+        run: |
+          terraform plan -input=false -out=tfplan
+          echo ""
+          echo "=== Plan Summary ==="
+          terraform show -no-color tfplan | tail -5
+
+      - name: Terraform apply
+        if: inputs.action == 'apply'
+        working-directory: infra/ssm
+        run: |
+          terraform apply -auto-approve -input=false tfplan
+          echo ""
+          echo "=== SSM Infrastructure Outputs ==="
+          terraform output
+
+      - name: Terraform destroy
+        if: inputs.action == 'destroy'
+        working-directory: infra/ssm
+        run: |
+          echo "::warning::Destroying SSM infrastructure in ${{ inputs.aws_region }}"
+          terraform destroy -auto-approve -input=false
+          echo ""
+          echo "=== SSM Infrastructure Destroyed ==="
+
+      - name: Export outputs
+        if: inputs.action == 'apply'
+        working-directory: infra/ssm
+        run: |
+          echo "## SSM Infrastructure Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          terraform output -json | jq -r 'to_entries[] | "| \(.key) | \(.value.value // "null") |"' >> $GITHUB_STEP_SUMMARY

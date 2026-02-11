@@ -141,6 +141,26 @@ resource "aws_iam_role_policy" "ssm_instance_core" {
           aws_cloudwatch_log_group.ssm.arn,
           "${aws_cloudwatch_log_group.ssm.arn}:*"
         ]
+      },
+      {
+        Sid    = "SSMParameters"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:PutParameter"
+        ]
+        Resource = "${local.arn_prefix}:ssm:${local.region}:${local.account_id}:parameter/${var.name_prefix}/*"
+      },
+      {
+        Sid    = "KMSDecrypt"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey"
+        ]
+        Resource = local.kms_enabled ? [local.effective_kms_key_arn] : ["*"]
       }
     ]
   })

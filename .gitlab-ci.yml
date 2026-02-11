@@ -91,6 +91,9 @@ variables:
   # Test SSM connectivity on Linux AMIs after build (opt-in)
   # Requires SSM infrastructure (infra:ssm job or persistent SSM setup)
   TEST_SSM: "false"
+  # Use persistent SSM infrastructure instead of per-build temp setup
+  # Set to "true" when infra:ssm has been run and SSM infra exists
+  USE_PERSISTENT_SSM: "false"
 
 stages:
   - import       # Import Docker image from tarball
@@ -345,14 +348,11 @@ infra:security_group:
         aws ec2 create-tags --resources "${SG_ID}" \
           --tags Key=Name,Value="${SG_NAME}" Key=Project,Value=SPEL Key=Environment,Value=Offline
         
-        # Allow SSH from VPC CIDR
-        aws ec2 authorize-security-group-ingress \
-          --group-id "${SG_ID}" \
-          --protocol tcp --port 22 \
-          --cidr 10.0.0.0/16
-        
-        echo "PKR_VAR_aws_security_group_id=${SG_ID}" > sg.env
+        # Allow SSH and WinRM from anywhere (Packer connects from runner's public IP)
+        aws ec2 authorize-security-group-ingress --group-id "${SG_ID}" --protocol tcp --port 22 --cidr 0.0.0.0/0
+        aws ec2 authorize-security-group-ingress --group-id "${SG_ID}" --protocol tcp --port 5986 --cidr 0.0.0.0/0
         echo "✓ Created security group: ${SG_ID}"
+        echo "PKR_VAR_aws_security_group_id=${SG_ID}" > sg.env
       fi
   artifacts:
     reports:
@@ -512,6 +512,19 @@ infra:iam:
       fi
       
       echo "PKR_VAR_iam_instance_profile=${PROFILE_NAME}" > iam.env
+
+    # Attach AmazonSSMManagedInstanceCore managed policy for SSM agent registration
+    - |
+      ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
+      SSM_MANAGED_POLICY="arn:${PARTITION:-aws}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      if ! aws iam list-attached-role-policies --role-name "${ROLE_NAME}" \
+          --query "AttachedPolicies[?PolicyName=='AmazonSSMManagedInstanceCore']" --output text | grep -q .; then
+        echo "Attaching AmazonSSMManagedInstanceCore managed policy..."
+        aws iam attach-role-policy --role-name "${ROLE_NAME}" --policy-arn "${SSM_MANAGED_POLICY}"
+        echo "✓ Attached AmazonSSMManagedInstanceCore"
+      else
+        echo "✓ AmazonSSMManagedInstanceCore already attached"
+      fi
   artifacts:
     reports:
       dotenv: iam.env
@@ -685,6 +698,53 @@ infra:ssm:
     - if: '$CREATE_INFRASTRUCTURE == "true"'
       when: manual
 
+# Destroy SSM infrastructure (Terraform destroy)
+infra:ssm:destroy:
+  stage: infra
+  script:
+    - echo "Destroying SSM infrastructure..."
+    - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    # Detect terraform or tofu
+    - |
+      TF_CMD=""
+      if command -v tofu &>/dev/null; then
+        TF_CMD="tofu"
+      elif command -v terraform &>/dev/null; then
+        TF_CMD="terraform"
+      else
+        echo "ERROR: Neither terraform nor tofu found"
+        exit 1
+      fi
+      echo "Using: $TF_CMD"
+
+    - |
+      cd infra/ssm
+
+      # Bootstrap backend config (need it to init)
+      source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
+
+      $TF_CMD init -input=false
+
+      echo ""
+      echo "=== Destroying SSM Infrastructure ==="
+      echo "WARNING: This will remove all SSM resources managed by Terraform."
+      echo ""
+
+      $TF_CMD destroy -auto-approve -input=false \
+        -var="name_prefix=${INFRA_PREFIX}" \
+        -var="vpc_id=${PKR_VAR_aws_vpc_id:-placeholder}" \
+        -var="subnet_ids=[\"${PKR_VAR_aws_subnet_id:-placeholder}\"]" \
+        -var="vpc_cidr=10.0.0.0/16"
+
+      echo ""
+      echo "=== SSM Infrastructure Destroyed ==="
+  tags:
+    - spel-offline-runner
+  rules:
+    - if: '$DESTROY_SSM_INFRA == "true"'
+      when: manual
+
 #############################################################################
 # Build Stage - Build AMIs using Docker Container
 #############################################################################
@@ -792,9 +852,9 @@ infra:ssm:
                  Key=GitLabPipelineId,Value="${CI_PIPELINE_ID}" \
                  Key=CreatedAt,Value="${CREATED_AT}"
         
-        # Allow SSH and WinRM from VPC CIDR
-        aws ec2 authorize-security-group-ingress --group-id "${TEMP_SG_ID}" --protocol tcp --port 22 --cidr "${VPC_CIDR}"
-        aws ec2 authorize-security-group-ingress --group-id "${TEMP_SG_ID}" --protocol tcp --port 5986 --cidr "${VPC_CIDR}"
+        # Allow SSH and WinRM from anywhere (Packer connects from runner's public IP)
+        aws ec2 authorize-security-group-ingress --group-id "${TEMP_SG_ID}" --protocol tcp --port 22 --cidr "0.0.0.0/0"
+        aws ec2 authorize-security-group-ingress --group-id "${TEMP_SG_ID}" --protocol tcp --port 5986 --cidr "0.0.0.0/0"
         echo "✓ Created security group: ${TEMP_SG_ID}"
         echo "TEMP_SG_ID=${TEMP_SG_ID}" >> temp_infra.env
         
@@ -888,6 +948,13 @@ infra:ssm:
         # Attach policy to role
         aws iam attach-role-policy --role-name "${TEMP_ROLE_NAME}" --policy-arn "${TEMP_POLICY_ARN}"
         echo "✓ Attached policy to role"
+        
+        # Also attach AmazonSSMManagedInstanceCore for SSM agent registration
+        PARTITION="aws"
+        [[ "${PKR_VAR_aws_region}" == us-gov-* ]] && PARTITION="aws-us-gov"
+        aws iam attach-role-policy --role-name "${TEMP_ROLE_NAME}" \
+          --policy-arn "arn:${PARTITION}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        echo "✓ Attached AmazonSSMManagedInstanceCore managed policy"
         
         # Create Instance Profile
         TEMP_PROFILE_NAME="${TEMP_INFRA_PREFIX}-profile"
@@ -1135,12 +1202,18 @@ infra:ssm:
           echo "✓ Deleted instance profile"
         fi
         
-        # Detach and delete IAM Policy
+        # Detach and delete IAM Policy (including managed SSM policy)
         if [ -n "${TEMP_POLICY_ARN}" ]; then
-          echo "Detaching policy from role..."
+          echo "Detaching policies from role..."
           aws iam detach-role-policy \
             --role-name "${TEMP_ROLE_NAME}" \
             --policy-arn "${TEMP_POLICY_ARN}" 2>/dev/null || true
+          # Also detach managed SSM policy
+          aws iam list-attached-role-policies --role-name "${TEMP_ROLE_NAME}" \
+            --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null | tr '\t' '\n' | \
+            while read -r arn; do
+              aws iam detach-role-policy --role-name "${TEMP_ROLE_NAME}" --policy-arn "$arn" 2>/dev/null || true
+            done
           echo "Deleting policy: ${TEMP_POLICY_ARN}"
           aws iam delete-policy --policy-arn "${TEMP_POLICY_ARN}" || true
           echo "✓ Deleted IAM policy"
@@ -1351,7 +1424,16 @@ test:windows2022:
   script:
     - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
 
-    # Find AMI from build manifest
+    # SSM pre-flight check — verify caller has SSM permissions
+    - |
+      echo "=== SSM Pre-flight Check ==="
+      if ! aws ssm describe-instance-information --max-results 5 2>&1 | head -5; then
+        echo "ERROR: SSM permissions check failed. Ensure the runner role has SSM permissions."
+        exit 1
+      fi
+      echo "✓ SSM permissions verified"
+
+    # Find AMI from build manifest — filter for hardened (amazon-ebs) Linux only
     - |
       MANIFEST=".spel/${SPEL_VERSION:-$(date +%Y.%m).1}/packer-manifest.json"
       if [[ ! -f "$MANIFEST" ]]; then
@@ -1360,7 +1442,7 @@ test:windows2022:
       fi
 
       AMI_ID=$(jq -r --arg os "$OS_TYPE" \
-        '.builds[] | select(.name | contains($os)) | .artifact_id' \
+        '.builds[] | select(.builder_type == "amazon-ebs") | select(.name | contains($os)) | select(.name | contains("windows") | not) | .artifact_id' \
         "$MANIFEST" | cut -d: -f2 | head -1)
 
       if [[ -z "$AMI_ID" ]]; then
@@ -1379,14 +1461,21 @@ test:windows2022:
         exit 0
       fi
 
-    # Launch test instance
+    # Launch test instance with IMDSv1+v2 and diagnostics userdata
     - |
+      USERDATA_OPTS=""
+      if [[ -f tests/ssm-userdata-diag.sh ]]; then
+        USERDATA_OPTS="--user-data file://tests/ssm-userdata-diag.sh"
+      fi
+
       INSTANCE_ID=$(aws ec2 run-instances \
         --image-id "$AMI_ID" \
         --instance-type t3.medium \
         --subnet-id "$SUBNET_ID" \
         --security-group-ids "$SG_ID" \
         --iam-instance-profile "Name=${PROFILE}" \
+        --metadata-options "HttpEndpoint=enabled,HttpTokens=optional,HttpPutResponseHopLimit=2" \
+        $USERDATA_OPTS \
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=spel-ssm-test-${CI_PIPELINE_ID}},{Key=Project,Value=SPEL}]" \
         --query 'Instances[0].InstanceId' --output text)
 
@@ -1398,8 +1487,15 @@ test:windows2022:
 
   after_script:
     - |
-      # Terminate test instance
+      # Capture diagnostics on failure
       if [[ -n "$INSTANCE_ID" ]]; then
+        echo "=== Instance diagnostics ==="
+        aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+          --query 'Reservations[0].Instances[0].{State:State.Name,Profile:IamInstanceProfile.Arn,SubnetId:SubnetId}' 2>/dev/null || true
+        echo "=== Console output (last 500 chars) ==="
+        aws ec2 get-console-output --instance-id "$INSTANCE_ID" --query 'Output' --output text 2>/dev/null | tail -c 500 || true
+        echo ""
+        # Terminate test instance
         aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" 2>/dev/null || true
       fi
   tags:

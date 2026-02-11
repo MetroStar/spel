@@ -4,7 +4,7 @@
 # Creates VPC endpoints for SSM services so instances in private subnets
 # (or air-gapped environments) can communicate with SSM without internet.
 #
-# Interface endpoints (PrivateLink): ssm, ssmmessages, ec2messages, logs
+# Interface endpoints (PrivateLink): ssm, ssmmessages, ec2messages, logs, kms
 # Gateway endpoint: s3
 #
 # Service names automatically resolve for GovCloud via data.aws_region.
@@ -111,6 +111,21 @@ resource "aws_vpc_endpoint" "logs" {
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-logs-endpoint"
+  })
+}
+
+resource "aws_vpc_endpoint" "kms" {
+  count = var.enable_vpc_endpoints && local.kms_enabled ? 1 : 0
+
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${local.region}.kms"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints[0].id]
+  private_dns_enabled = true
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name_prefix}-kms-endpoint"
   })
 }
 

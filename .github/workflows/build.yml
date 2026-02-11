@@ -158,6 +158,17 @@ on:
         required: false
         type: boolean
         default: false
+      # Persistent SSM infrastructure
+      use_persistent_ssm:
+        description: "Use persistent SSM infrastructure (deployed via ssm-infra.yml) instead of temp SSM setup"
+        required: false
+        type: boolean
+        default: false
+      ssm_name_prefix:
+        description: "Name prefix used when deploying SSM infra (must match ssm-infra.yml)"
+        required: false
+        type: string
+        default: "spel-ci"
 
 permissions:
   id-token: write
@@ -972,7 +983,7 @@ jobs:
 
       - name: Test SSM Validation on Built AMIs
         if: |
-          github.event.inputs.create_temp_infra == 'true' &&
+          (github.event.inputs.create_temp_infra == 'true' || github.event.inputs.use_persistent_ssm == 'true') &&
           (github.event.inputs.run_amzn2023 == 'true' ||
            github.event.inputs.run_rhel9 == 'true' ||
            github.event.inputs.run_rhel8 == 'true' ||
@@ -988,9 +999,36 @@ jobs:
             exit 0
           fi
           
-          SUBNET_ID="${{ steps.temp_infra.outputs.subnet_id }}"
-          SG_ID="${{ steps.temp_infra.outputs.security_group_id }}"
-          INSTANCE_PROFILE="${{ steps.temp_infra.outputs.instance_profile }}"
+          # Determine infrastructure source: persistent SSM or temp infra
+          if [[ "${{ github.event.inputs.use_persistent_ssm }}" == "true" ]]; then
+            echo "Using persistent SSM infrastructure (prefix: ${{ github.event.inputs.ssm_name_prefix }})"
+            
+            # Look up persistent SSM infra via Terraform outputs
+            cd infra/ssm
+            if [[ ! -f backend.tf ]]; then
+              source ./bootstrap-backend.sh \
+                --prefix "${{ github.event.inputs.ssm_name_prefix }}" \
+                --region "${AWS_DEFAULT_REGION}"
+            fi
+            terraform init -input=false -no-color >/dev/null 2>&1 || true
+            
+            INSTANCE_PROFILE=$(terraform output -raw instance_profile_name 2>/dev/null || echo "")
+            SSM_S3_BUCKET=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "")
+            cd ../..
+            
+            # Use temp infra VPC/subnet (persistent SSM shares the VPC)
+            SUBNET_ID="${{ steps.temp_infra.outputs.subnet_id }}"
+            SG_ID="${{ steps.temp_infra.outputs.security_group_id }}"
+            
+            if [[ -z "$INSTANCE_PROFILE" ]]; then
+              echo "WARNING: Could not look up persistent SSM instance profile - skipping"
+              exit 0
+            fi
+          else
+            SUBNET_ID="${{ steps.temp_infra.outputs.subnet_id }}"
+            SG_ID="${{ steps.temp_infra.outputs.security_group_id }}"
+            INSTANCE_PROFILE="${{ steps.temp_infra.outputs.instance_profile }}"
+          fi
           
           if [[ -z "$SUBNET_ID" ]] || [[ -z "$SG_ID" ]] || [[ -z "$INSTANCE_PROFILE" ]]; then
             echo "WARNING: Missing temp infrastructure - skipping SSM validation"

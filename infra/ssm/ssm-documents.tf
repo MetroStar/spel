@@ -6,6 +6,9 @@
 # 1. OpenSCAP STIG Scan: Runs oscap xccdf eval with configurable profile
 #    and data stream, uploads results to S3. Works on both RHEL 8/9 and
 #    Oracle Linux 8/9.
+#
+# 2. Session Manager Preferences: Configures Session Manager with KMS
+#    encryption, S3/CloudWatch logging, and STIG-aligned idle timeout.
 # =============================================================================
 
 resource "aws_ssm_document" "oscap_scan" {
@@ -153,5 +156,50 @@ resource "aws_ssm_document" "oscap_scan" {
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-RunOpenSCAPScan"
+  })
+}
+
+# -----------------------------------------------------------------------------
+# 2. Session Manager Preferences
+# -----------------------------------------------------------------------------
+# Configures Session Manager with:
+#   - KMS encryption for session data (STIG V-72057 / AC-17)
+#   - S3 logging of session output
+#   - CloudWatch logging
+#   - 20-minute idle timeout (STIG-aligned: AC-12 / SC-10)
+#   - Shell profile banner
+# -----------------------------------------------------------------------------
+
+resource "aws_ssm_document" "session_manager_prefs" {
+  count = var.enable_session_manager ? 1 : 0
+
+  name            = "SSM-SessionManagerRunShell"
+  document_type   = "Session"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "1.0"
+    description   = "Session Manager preferences for ${var.name_prefix}"
+    sessionType   = "Standard_Stream"
+    inputs = {
+      kmsKeyId                    = local.kms_enabled ? local.effective_kms_key_arn : ""
+      s3BucketName                = aws_s3_bucket.ssm.id
+      s3KeyPrefix                 = "session-logs"
+      s3EncryptionEnabled         = true
+      cloudWatchLogGroupName      = aws_cloudwatch_log_group.ssm.name
+      cloudWatchEncryptionEnabled = local.kms_enabled
+      cloudWatchStreamingEnabled  = true
+      idleSessionTimeout          = tostring(var.session_idle_timeout)
+      maxSessionDuration          = ""
+      runAsEnabled                = false
+      shellProfile = {
+        linux   = "echo '*** STIG-hardened instance — Session Manager ***'; echo ''"
+        windows = ""
+      }
+    }
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name_prefix}-session-manager-prefs"
   })
 }

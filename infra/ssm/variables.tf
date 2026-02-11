@@ -124,8 +124,14 @@ variable "log_retention_days" {
 # Encryption
 # -----------------------------------------------------------------------------
 
+variable "create_kms_key" {
+  description = "Create a new KMS CMK for SSM encryption. Set to false and provide kms_key_arn to use an existing key."
+  type        = bool
+  default     = true
+}
+
 variable "kms_key_arn" {
-  description = "ARN of an existing KMS key for S3/CloudWatch/SSM encryption. If empty, uses AWS-managed keys."
+  description = "ARN of an existing KMS key for S3/CloudWatch/SSM encryption. Only used when create_kms_key = false."
   type        = string
   default     = ""
 }
@@ -138,6 +144,26 @@ variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+# -----------------------------------------------------------------------------
+# Alerting
+# -----------------------------------------------------------------------------
+
+variable "alert_email" {
+  description = "Email address for SNS alert notifications. Leave empty to skip email subscription (topic is always created)."
+  type        = string
+  default     = ""
+}
+
+# -----------------------------------------------------------------------------
+# Session Manager
+# -----------------------------------------------------------------------------
+
+variable "session_idle_timeout" {
+  description = "Session Manager idle timeout in minutes (STIG AC-12 / SC-10 recommends 20)"
+  type        = number
+  default     = 20
 }
 
 # -----------------------------------------------------------------------------
@@ -160,6 +186,42 @@ variable "patch_approve_after_days" {
   description = "Number of days after release before auto-approving patches"
   type        = number
   default     = 7
+}
+
+variable "maintenance_window_schedule" {
+  description = "Cron or rate expression for the maintenance window. Default: Sunday 4AM UTC."
+  type        = string
+  default     = "cron(0 4 ? * SUN *)"
+}
+
+variable "maintenance_window_timezone" {
+  description = "IANA timezone for the maintenance window schedule"
+  type        = string
+  default     = "UTC"
+}
+
+variable "maintenance_window_duration" {
+  description = "Duration of the maintenance window in hours"
+  type        = number
+  default     = 3
+}
+
+variable "maintenance_window_cutoff" {
+  description = "Hours before the end of the maintenance window to stop scheduling new tasks"
+  type        = number
+  default     = 1
+}
+
+variable "patch_max_concurrency" {
+  description = "Maximum number of targets to patch simultaneously"
+  type        = string
+  default     = "25%"
+}
+
+variable "patch_max_errors" {
+  description = "Maximum number of errors allowed before stopping the patching task"
+  type        = string
+  default     = "25%"
 }
 
 # -----------------------------------------------------------------------------
