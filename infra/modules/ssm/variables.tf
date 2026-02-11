@@ -50,17 +50,29 @@ variable "enable_session_manager" {
 variable "enable_state_manager" {
   description = "Create State Manager associations for scheduled Ansible and OpenSCAP runs"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_patch_manager" {
   description = "Create custom patch baseline and patch group for STIG-hardened instances"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_inventory" {
   description = "Create SSM Inventory association for software and configuration data collection"
+  type        = bool
+  default     = true
+}
+
+variable "enable_stig_enforcement" {
+  description = "Create State Manager associations to enforce STIG hardening on a schedule. Uses AWS-RunAnsiblePlaybook for EL distros and a shell script for AL2023."
+  type        = bool
+  default     = true
+}
+
+variable "enable_ssm_agent_update" {
+  description = "Create State Manager association to keep the SSM agent up to date"
   type        = bool
   default     = true
 }
@@ -85,6 +97,24 @@ variable "ansible_s3_key" {
   description = "S3 key (path) for the Ansible STIG playbook zip package. Set by package-ansible-stig.sh."
   type        = string
   default     = "ansible/stig-playbook.zip"
+}
+
+variable "stig_enforcement_schedule" {
+  description = "Cron or rate expression for STIG enforcement runs (applies hardening). Example: 'rate(7 days)'"
+  type        = string
+  default     = "rate(7 days)"
+}
+
+variable "stig_al2023_s3_key" {
+  description = "S3 key (path) for the AL2023 STIG enforcement script package"
+  type        = string
+  default     = "ansible/al2023-stig-script.zip"
+}
+
+variable "ssm_agent_update_schedule" {
+  description = "Cron or rate expression for SSM agent update schedule. Default: daily at 3AM UTC."
+  type        = string
+  default     = "cron(0 3 ? * * *)"
 }
 
 variable "oscap_profile" {

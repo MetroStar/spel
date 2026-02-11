@@ -53,14 +53,16 @@ module "ssm" {
   existing_instance_role_name = module.iam.role_name
 
   # Feature toggles
-  enable_vpc_endpoints   = var.enable_vpc_endpoints
-  enable_session_manager = var.enable_session_manager
-  enable_state_manager   = var.enable_state_manager
-  enable_patch_manager   = var.enable_patch_manager
-  enable_inventory       = var.enable_inventory
-  create_kms_key         = var.create_kms_key
-  kms_key_arn            = var.kms_key_arn
-  alert_email            = var.alert_email
+  enable_vpc_endpoints    = var.enable_vpc_endpoints
+  enable_session_manager  = var.enable_session_manager
+  enable_state_manager    = var.enable_state_manager
+  enable_patch_manager    = var.enable_patch_manager
+  enable_inventory        = var.enable_inventory
+  enable_stig_enforcement = var.enable_stig_enforcement
+  enable_ssm_agent_update = var.enable_ssm_agent_update
+  create_kms_key          = var.create_kms_key
+  kms_key_arn             = var.kms_key_arn
+  alert_email             = var.alert_email
 
   tags = local.common_tags
 }

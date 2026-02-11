@@ -17,7 +17,9 @@ Architecture: **one deployment per AWS account** (not per-AMI). SSM resources pe
 | IAM Instance Profile | EC2 role with SSM, S3, CloudWatch, KMS, Parameter Store permissions | `create_instance_profile` |
 | IAM Caller Policy | Permissions for CI/humans to invoke SSM operations | Always created |
 | SSM Documents | Custom `RunOpenSCAPScan` + Session Manager preferences (`SSM-SessionManagerRunShell`) | Always / `enable_session_manager` |
-| SSM Associations | Ansible STIG check-mode, OpenSCAP scan, Software Inventory | `enable_state_manager`, `enable_inventory` |
+| SSM Associations | Ansible STIG check-mode, OpenSCAP scan, Software Inventory (compliance verification) | `enable_state_manager`, `enable_inventory` |
+| STIG Enforcement | Ansible Lockdown (EL) + native script (AL2023) enforce mode | `enable_stig_enforcement` |
+| SSM Agent Update | Automatic SSM agent updates (daily, before patch window) | `enable_ssm_agent_update` |
 | Patch Baselines | Linux + Windows STIG-aligned baselines | `enable_patch_manager` |
 | Maintenance Windows | Scheduled patching tasks (default Sunday 4AM UTC, 3h window) | `enable_patch_manager` |
 | S3 Bucket | SSM outputs, OpenSCAP results, session logs, patch logs | Always created |
@@ -41,10 +43,11 @@ module "ssm" {
 
   create_kms_key         = true
   enable_vpc_endpoints   = true
-  enable_state_manager   = false  # No scheduled runs for CI
-  enable_patch_manager   = false  # No patching in CI
+  enable_state_manager   = true
+  enable_patch_manager   = true
   enable_inventory       = true
   enable_session_manager = true
+  enable_stig_enforcement = false  # No enforcement in CI
 
   tags = {
     Project     = "SPEL"
@@ -70,9 +73,11 @@ module "ssm" {
   enable_patch_manager   = true
   enable_inventory       = true
   enable_session_manager = true
+  enable_stig_enforcement = true
 
   oscap_schedule   = "rate(7 days)"
   ansible_schedule = "rate(7 days)"
+  stig_enforcement_schedule = "rate(7 days)"
 
   log_retention_days = 365
   alert_email        = "ops@example.com"
@@ -160,9 +165,11 @@ The module is fully GovCloud-compatible:
 | `kms_key_arn` | Existing KMS key ARN (when `create_kms_key=false`) | `string` | `""` | no |
 | `enable_vpc_endpoints` | Create VPC endpoints | `bool` | `true` | no |
 | `enable_session_manager` | Enable Session Manager preferences | `bool` | `true` | no |
-| `enable_state_manager` | Create State Manager associations | `bool` | `false` | no |
-| `enable_patch_manager` | Create patch baselines + maintenance windows | `bool` | `false` | no |
+| `enable_state_manager` | Create State Manager associations | `bool` | `true` | no |
+| `enable_patch_manager` | Create patch baselines + maintenance windows | `bool` | `true` | no |
 | `enable_inventory` | Create inventory association | `bool` | `true` | no |
+| `enable_stig_enforcement` | Enable STIG enforcement (Ansible Lockdown for EL, native script for AL2023) | `bool` | `true` | no |
+| `enable_ssm_agent_update` | Enable automatic SSM agent updates | `bool` | `true` | no |
 | `create_instance_profile` | Create IAM instance profile | `bool` | `true` | no |
 | `session_idle_timeout` | Session Manager idle timeout (minutes) | `number` | `20` | no |
 | `alert_email` | SNS email subscription for alerts | `string` | `""` | no |
@@ -171,6 +178,9 @@ The module is fully GovCloud-compatible:
 | `maintenance_window_duration` | Patch window duration (hours) | `number` | `3` | no |
 | `maintenance_window_cutoff` | Task scheduling cutoff (hours) | `number` | `1` | no |
 | `patch_approve_after_days` | Patch auto-approval delay (days) | `number` | `7` | no |
+| `stig_enforcement_schedule` | Schedule for STIG enforcement runs | `string` | `rate(7 days)` | no |
+| `stig_al2023_s3_key` | S3 key for AL2023 STIG script package | `string` | `ansible/al2023-stig-script.zip` | no |
+| `ssm_agent_update_schedule` | Schedule for SSM agent updates | `string` | `cron(0 3 ? * * *)` | no |
 | `tags` | Additional tags | `map(string)` | `{}` | no |
 
 ## Outputs
@@ -187,6 +197,9 @@ The module is fully GovCloud-compatible:
 | `ssm_document_oscap_name` | OpenSCAP SSM document name |
 | `linux_patch_baseline_id` | Linux STIG patch baseline ID |
 | `linux_maintenance_window_id` | Linux maintenance window ID |
+| `stig_enforce_el_association_id` | EL STIG enforcement association ID |
+| `stig_enforce_al2023_association_id` | AL2023 STIG enforcement association ID |
+| `ssm_agent_update_association_id` | SSM agent update association ID |
 | `s3_bucket_name` | Primary SSM S3 bucket |
 | `s3_access_logs_bucket_name` | Access logging S3 bucket |
 | `cloudwatch_log_group_name` | CloudWatch log group |

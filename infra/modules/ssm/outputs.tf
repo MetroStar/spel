@@ -130,6 +130,25 @@ output "windows_maintenance_window_id" {
 }
 
 # -----------------------------------------------------------------------------
+# STIG Enforcement
+# -----------------------------------------------------------------------------
+
+output "stig_enforce_el_association_id" {
+  description = "ID of the State Manager association for EL STIG enforcement"
+  value       = var.enable_stig_enforcement && var.enable_state_manager ? aws_ssm_association.stig_enforce_el[0].association_id : null
+}
+
+output "stig_enforce_al2023_association_id" {
+  description = "ID of the State Manager association for AL2023 STIG enforcement"
+  value       = var.enable_stig_enforcement && var.enable_state_manager ? aws_ssm_association.stig_enforce_al2023[0].association_id : null
+}
+
+output "ssm_agent_update_association_id" {
+  description = "ID of the State Manager association for SSM agent auto-update"
+  value       = var.enable_ssm_agent_update && var.enable_state_manager ? aws_ssm_association.ssm_agent_update[0].association_id : null
+}
+
+# -----------------------------------------------------------------------------
 # S3
 # -----------------------------------------------------------------------------
 

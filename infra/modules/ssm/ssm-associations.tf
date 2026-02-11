@@ -1,12 +1,15 @@
 # =============================================================================
-# SSM Infrastructure Module — State Manager Associations
+# SSM Infrastructure Module — State Manager Associations (Compliance Verification)
 # =============================================================================
-# Scheduled SSM associations for ongoing compliance management:
+# Scheduled SSM associations for ongoing compliance VERIFICATION:
 #
 # 1. Ansible STIG check-mode: Runs Ansible playbook in --check mode to
 #    verify continued compliance without modifying the instance.
 # 2. OpenSCAP scan: Runs the custom SSM document on a schedule.
 # 3. Software Inventory: Collects installed software and configuration data.
+#
+# For STIG ENFORCEMENT (actually applying hardening), see:
+#   ssm-stig-enforcement.tf
 #
 # Associations target instances by tag (default: Project=SPEL).
 # =============================================================================

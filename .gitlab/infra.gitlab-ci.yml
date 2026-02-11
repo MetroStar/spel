@@ -40,16 +40,18 @@ infra:plan:
       $TF_CMD init -input=false
 
       cat > ci.auto.tfvars <<TFVARS
-      name_prefix            = "${INFRA_PREFIX}"
-      vpc_cidr               = "10.0.0.0/16"
-      subnet_cidr            = "10.0.1.0/24"
-      public_subnet          = true
-      enable_vpc_endpoints   = true
-      enable_session_manager = true
-      enable_patch_manager   = false
-      enable_state_manager   = false
-      enable_inventory       = true
-      create_kms_key         = true
+      name_prefix             = "${INFRA_PREFIX}"
+      vpc_cidr                = "10.0.0.0/16"
+      subnet_cidr             = "10.0.1.0/24"
+      public_subnet           = true
+      enable_vpc_endpoints    = true
+      enable_session_manager  = true
+      enable_patch_manager    = true
+      enable_state_manager    = true
+      enable_stig_enforcement = true
+      enable_ssm_agent_update = true
+      enable_inventory        = true
+      create_kms_key          = true
       TFVARS
 
       echo "=== Generated tfvars ==="
@@ -93,16 +95,18 @@ infra:create:
       $TF_CMD init -input=false
 
       cat > ci.auto.tfvars <<TFVARS
-      name_prefix            = "${INFRA_PREFIX}"
-      vpc_cidr               = "10.0.0.0/16"
-      subnet_cidr            = "10.0.1.0/24"
-      public_subnet          = true
-      enable_vpc_endpoints   = true
-      enable_session_manager = true
-      enable_patch_manager   = false
-      enable_state_manager   = false
-      enable_inventory       = true
-      create_kms_key         = true
+      name_prefix             = "${INFRA_PREFIX}"
+      vpc_cidr                = "10.0.0.0/16"
+      subnet_cidr             = "10.0.1.0/24"
+      public_subnet           = true
+      enable_vpc_endpoints    = true
+      enable_session_manager  = true
+      enable_patch_manager    = true
+      enable_state_manager    = true
+      enable_stig_enforcement = true
+      enable_ssm_agent_update = true
+      enable_inventory        = true
+      create_kms_key          = true
       TFVARS
 
       echo "=== Generated tfvars ==="

@@ -57,17 +57,29 @@ variable "enable_session_manager" {
 variable "enable_state_manager" {
   description = "Create State Manager associations for scheduled scans"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_patch_manager" {
   description = "Create patch baselines and maintenance windows"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_inventory" {
   description = "Create SSM Inventory association for data collection"
+  type        = bool
+  default     = true
+}
+
+variable "enable_stig_enforcement" {
+  description = "Create State Manager associations to enforce STIG hardening (Ansible Lockdown for EL, shell script for AL2023)"
+  type        = bool
+  default     = true
+}
+
+variable "enable_ssm_agent_update" {
+  description = "Create State Manager association to keep the SSM agent up to date"
   type        = bool
   default     = true
 }
