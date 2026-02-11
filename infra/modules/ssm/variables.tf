@@ -117,6 +117,44 @@ variable "ssm_agent_update_schedule" {
   default     = "cron(0 3 ? * * *)"
 }
 
+variable "stig_extra_variables" {
+  description = <<-EOT
+    Extra variables passed to the Ansible STIG playbook for both check-mode
+    and enforcement runs. Encoded as JSON and passed via --extra-vars.
+    Must include safety-critical overrides to prevent SSH/SSM lockout.
+    Combines EL8 and EL9 variables — Ansible roles ignore unknown vars.
+  EOT
+  type        = any
+  default = {
+    # Common
+    SSM           = true
+    system_is_ec2 = true
+
+    # EL9 — disable AIDE/crypto controls incompatible with EC2
+    rhel_09_251010 = false
+    rhel_09_251015 = false
+    rhel_09_251020 = false
+    rhel_09_251025 = false
+    rhel_09_251030 = false
+    rhel_09_251035 = false
+    rhel_09_251040 = false
+    rhel_09_251045 = false
+
+    # EL9 — service and user safety (prevent lockout)
+    rhel9stig_white_list_services          = ["ssh", "https"]
+    rhel9stig_sudoers_exclude_nopasswd_list = ["ec2-user", "vagrant", "ssm-user"]
+    rhel9stig_faillock_exclude_users        = ["ec2-user", "ssm-user"]
+
+    # EL8 — disable incompatible controls
+    rhel8stig_copy_existing_zone = false
+    rhel_08_040136               = false
+
+    # EL8 — user safety (prevent lockout)
+    rhel8stig_sudoers_exclude_nopasswd_list = ["ec2-user", "vagrant", "ssm-user"]
+    rhel8stig_faillock_exclude_users        = ["ec2-user", "ssm-user"]
+  }
+}
+
 variable "oscap_profile" {
   description = "OpenSCAP XCCDF profile name for STIG scanning"
   type        = string

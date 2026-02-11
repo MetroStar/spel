@@ -34,7 +34,7 @@ resource "aws_ssm_association" "ansible_stig_check" {
     SourceType          = "S3"
     SourceInfo          = jsonencode({ path = "https://s3.amazonaws.com/${aws_s3_bucket.ssm.id}/${var.ansible_s3_key}" })
     PlaybookFile        = "site.yml"
-    ExtraVariables      = "SSM=True system_is_ec2=True"
+    ExtraVariables      = jsonencode(var.stig_extra_variables)
     Check               = "True"
     InstallDependencies = "True"
     Verbose             = "-v"
