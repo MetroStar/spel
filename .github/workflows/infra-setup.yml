@@ -9,6 +9,7 @@
 #   - Subnet with auto-assign public IP (or private if using VPC endpoints)
 #   - Security group allowing SSH from VPC CIDR
 #   - IAM role and instance profile for Packer-launched instances
+#   - SSM infrastructure via Terraform (KMS key, S3, CloudWatch, VPC endpoints)
 #
 # PREREQUISITES:
 #   - AWS credentials with permissions to create VPC, EC2, and IAM resources
@@ -111,7 +112,7 @@ jobs:
       subnet_id: ${{ steps.create.outputs.subnet_id }}
       security_group_id: ${{ steps.create.outputs.security_group_id }}
       instance_profile: ${{ steps.create.outputs.instance_profile }}
-      kms_key_id: ${{ steps.create.outputs.kms_key_id }}
+      kms_key_id: ${{ steps.ssm.outputs.kms_key_id || steps.create.outputs.kms_key_id }}
 
     steps:
       - name: Configure AWS credentials
@@ -176,16 +177,26 @@ jobs:
             echo "❌ Instance Profile: Not found"
           fi
           
-          # Check KMS Key
-          KMS_ALIAS="${INFRA_PREFIX}-ebs-key"
+          # Check KMS Key (managed by SSM Terraform module)
+          KMS_ALIAS="${INFRA_PREFIX}-ssm"
           KEY_ID=$(aws kms list-aliases \
             --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
             --output text 2>/dev/null || echo "")
           if [ -n "$KEY_ID" ] && [ "$KEY_ID" != "None" ]; then
             KMS_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
-            echo "✅ KMS Key: ${KMS_ARN}"
+            echo "✅ KMS Key: ${KMS_ARN} (managed by Terraform)"
           else
-            echo "❌ KMS Key: Not found (alias/${KMS_ALIAS})"
+            # Fall back to legacy alias if present
+            KMS_ALIAS_LEGACY="${INFRA_PREFIX}-ebs-key"
+            KEY_ID=$(aws kms list-aliases \
+              --query "Aliases[?AliasName=='alias/${KMS_ALIAS_LEGACY}'].TargetKeyId" \
+              --output text 2>/dev/null || echo "")
+            if [ -n "$KEY_ID" ] && [ "$KEY_ID" != "None" ]; then
+              KMS_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
+              echo "⚠️  KMS Key: ${KMS_ARN} (legacy CLI-managed — consider re-running create to migrate)"
+            else
+              echo "❌ KMS Key: Not found"
+            fi
           fi
 
       - name: Create infrastructure
@@ -455,93 +466,10 @@ jobs:
           fi
           echo "instance_profile=${PROFILE_NAME}" >> $GITHUB_OUTPUT
           
-          # Create KMS Key for EBS encryption
-          KMS_ALIAS="${INFRA_PREFIX}-ebs-key"
-          EXISTING_KEY=$(aws kms list-aliases \
-            --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
-            --output text 2>/dev/null || echo "")
-          
-          if [ -n "$EXISTING_KEY" ] && [ "$EXISTING_KEY" != "None" ]; then
-            echo "✓ KMS key already exists: ${EXISTING_KEY}"
-            KEY_ID="${EXISTING_KEY}"
-          else
-            echo "Creating KMS key for EBS encryption..."
-            
-            # Determine partition for GovCloud support
-            PARTITION="aws"
-            [[ "${AWS_REGION}" == us-gov-* ]] && PARTITION="aws-us-gov"
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            
-            # Create key policy allowing EC2, Packer role, and instance profile
-            cat > /tmp/kms-policy.json <<EOF
-          {
-            "Version": "2012-10-17",
-            "Id": "${KMS_ALIAS}-policy",
-            "Statement": [
-              {
-                "Sid": "EnableRootPermissions",
-                "Effect": "Allow",
-                "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:root"},
-                "Action": "kms:*",
-                "Resource": "*"
-              },
-              {
-                "Sid": "AllowEC2ForEBS",
-                "Effect": "Allow",
-                "Principal": {"Service": "ec2.amazonaws.com"},
-                "Action": [
-                  "kms:Encrypt",
-                  "kms:Decrypt",
-                  "kms:ReEncrypt*",
-                  "kms:GenerateDataKey*",
-                  "kms:DescribeKey",
-                  "kms:CreateGrant"
-                ],
-                "Resource": "*",
-                "Condition": {
-                  "StringEquals": {
-                    "kms:CallerAccount": "${ACCOUNT_ID}",
-                    "kms:ViaService": "ec2.${AWS_REGION}.amazonaws.com"
-                  }
-                }
-              },
-              {
-                "Sid": "AllowPackerRole",
-                "Effect": "Allow",
-                "Principal": {"AWS": "arn:${PARTITION}:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"},
-                "Action": [
-                  "kms:Encrypt",
-                  "kms:Decrypt",
-                  "kms:ReEncrypt*",
-                  "kms:GenerateDataKey*",
-                  "kms:DescribeKey",
-                  "kms:CreateGrant",
-                  "kms:ListGrants",
-                  "kms:RevokeGrant"
-                ],
-                "Resource": "*"
-              }
-            ]
-          }
-          EOF
-            
-            KEY_ID=$(aws kms create-key \
-              --description "SPEL EBS encryption key for Packer builds" \
-              --policy file:///tmp/kms-policy.json \
-              --tags TagKey=Name,TagValue="${KMS_ALIAS}" TagKey=Project,TagValue=SPEL TagKey=Environment,TagValue=Offline \
-              --query 'KeyMetadata.KeyId' --output text)
-            
-            # Create alias for easy identification
-            aws kms create-alias --alias-name "alias/${KMS_ALIAS}" --target-key-id "${KEY_ID}"
-            
-            # Enable automatic annual key rotation
-            aws kms enable-key-rotation --key-id "${KEY_ID}"
-            
-            echo "✓ Created KMS key: ${KEY_ID} with automatic rotation enabled"
-          fi
-          
-          KMS_KEY_ARN=$(aws kms describe-key --key-id "${KEY_ID}" --query 'KeyMetadata.Arn' --output text)
-          echo "kms_key_id=${KMS_KEY_ARN}" >> $GITHUB_OUTPUT
+          # NOTE: KMS key is now managed by the SSM Terraform module (see
+          # "Setup SSM infrastructure" step below). The Terraform-managed key
+          # covers both EBS encryption and SSM data-at-rest encryption,
+          # eliminating the previous duplicate CLI-created key.
           
           echo ""
           echo "=== Infrastructure Created ==="
@@ -554,6 +482,7 @@ jobs:
 
       - name: Setup SSM infrastructure (Terraform)
         if: inputs.action == 'create'
+        id: ssm
         working-directory: infra/ssm
         env:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
@@ -564,6 +493,7 @@ jobs:
           VPC_ID="${{ steps.create.outputs.vpc_id }}"
           SUBNET_ID="${{ steps.create.outputs.subnet_id }}"
           VPC_CIDR="${{ inputs.vpc_cidr }}"
+          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
           
           if [ -z "$VPC_ID" ]; then
             echo "Skipping SSM setup - no VPC created"
@@ -590,7 +520,8 @@ jobs:
           # Initialize with remote backend
           $TF_CMD init -input=false
           
-          # Apply SSM module
+          # Apply SSM module — KMS key is created here (single source of truth)
+          # and the existing CLI-created IAM role gets SSM managed policy attached
           $TF_CMD apply -auto-approve -input=false \
             -var="name_prefix=${INFRA_PREFIX}" \
             -var="vpc_id=${VPC_ID}" \
@@ -601,7 +532,13 @@ jobs:
             -var="enable_inventory=true" \
             -var="enable_state_manager=false" \
             -var="enable_patch_manager=false" \
-            -var="create_instance_profile=false"
+            -var="create_kms_key=true" \
+            -var="create_instance_profile=false" \
+            -var="existing_instance_role_name=${ROLE_NAME}"
+          
+          # Export KMS key ARN for Packer EBS encryption
+          KMS_KEY_ARN=$($TF_CMD output -raw kms_key_arn 2>/dev/null || echo "")
+          echo "kms_key_id=${KMS_KEY_ARN}" >> $GITHUB_OUTPUT
           
           echo ""
           echo "=== SSM Infrastructure Created ==="
@@ -644,18 +581,19 @@ jobs:
           
           INFRA_PREFIX="${{ inputs.infra_prefix }}"
           
-          # Schedule KMS Key for deletion
-          KMS_ALIAS="${INFRA_PREFIX}-ebs-key"
-          KEY_ID=$(aws kms list-aliases \
-            --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
+          # NOTE: KMS key is destroyed by the "Destroy SSM infrastructure" step above
+          # (Terraform manages the KMS key lifecycle). Clean up any legacy CLI-created
+          # KMS key that may exist from before the migration.
+          KMS_ALIAS_LEGACY="${INFRA_PREFIX}-ebs-key"
+          LEGACY_KEY_ID=$(aws kms list-aliases \
+            --query "Aliases[?AliasName=='alias/${KMS_ALIAS_LEGACY}'].TargetKeyId" \
             --output text 2>/dev/null || echo "")
           
-          if [ -n "$KEY_ID" ] && [ "$KEY_ID" != "None" ]; then
-            echo "Deleting KMS alias: alias/${KMS_ALIAS}"
-            aws kms delete-alias --alias-name "alias/${KMS_ALIAS}" 2>/dev/null || true
-            echo "Scheduling KMS key deletion (30 days): ${KEY_ID}"
-            aws kms schedule-key-deletion --key-id "${KEY_ID}" --pending-window-in-days 30
-            echo "✓ KMS key scheduled for deletion in 30 days"
+          if [ -n "$LEGACY_KEY_ID" ] && [ "$LEGACY_KEY_ID" != "None" ]; then
+            echo "Cleaning up legacy CLI-managed KMS key..."
+            aws kms delete-alias --alias-name "alias/${KMS_ALIAS_LEGACY}" 2>/dev/null || true
+            aws kms schedule-key-deletion --key-id "${LEGACY_KEY_ID}" --pending-window-in-days 30
+            echo "✓ Legacy KMS key scheduled for deletion in 30 days"
           fi
           
           # Delete Instance Profile
@@ -769,6 +707,6 @@ jobs:
           | Input | Value |
           |-------|-------|
           | aws_vpc_id | \`${{ steps.create.outputs.vpc_id }}\` |
-          | aws_subnet_id | \`${{ steps.create.outputs.subnet_id }}\` |          | aws_kms_key_id | \`${{ steps.create.outputs.kms_key_id }}\` |          | (optional) iam_instance_profile | \`${{ steps.create.outputs.instance_profile }}\` |
+          | aws_subnet_id | \`${{ steps.create.outputs.subnet_id }}\` |          | aws_kms_key_id | \`${{ steps.ssm.outputs.kms_key_id }}\` |          | (optional) iam_instance_profile | \`${{ steps.create.outputs.instance_profile }}\` |
           EOF
           fi
