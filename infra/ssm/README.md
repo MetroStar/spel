@@ -4,7 +4,7 @@ Terraform/OpenTofu module for deploying SSM infrastructure to support STIG-harde
 
 ## Overview
 
-This module creates SSM infrastructure that attaches to an **existing VPC**. It does NOT create the VPC itself — use `infra-setup.yml` or inline temp infra in `build.yml` for that.
+This module creates SSM infrastructure that attaches to an **existing VPC**. It does NOT create the VPC itself — use `infra-setup.yml` for that.
 
 Architecture: **one deployment per AWS account** (not per-AMI). SSM resources persist across Packer builds.
 
@@ -106,25 +106,25 @@ module "ssm" {
 
 | Workflow | Purpose |
 |----------|---------|
-| `ssm-infra.yml` | Deploy/teardown SSM infrastructure (plan/apply/destroy) |
-| `build.yml` | Build AMIs — supports `use_persistent_ssm` input to look up Terraform outputs |
+| `infra-setup.yml` | Deploy/teardown all infrastructure including SSM (plan/apply/destroy) |
+| `build.yml` | Build AMIs — calls `infra-setup.yml` with `infra_prefix` to ensure infrastructure exists |
 
-Deploy SSM infra: **Actions → SSM Infrastructure → Run workflow → apply**
+Deploy infra: **Actions → Infrastructure Setup → Run workflow → apply**
 
-Teardown: **Actions → SSM Infrastructure → Run workflow → destroy** (requires typing "destroy" in confirmation field)
+Teardown: **Actions → Infrastructure Setup → Run workflow → destroy** (requires typing "destroy" in confirmation field)
 
 ### GitLab CI
 
 | Job | Purpose |
 |-----|---------|
-| `infra:ssm` | Deploy SSM infrastructure (manual trigger, `CREATE_INFRASTRUCTURE=true`) |
-| `infra:ssm:destroy` | Teardown SSM infrastructure (manual trigger, `DESTROY_SSM_INFRA=true`) |
+| `infra:create` | Deploy all infrastructure including SSM via Terraform (manual trigger, from `.gitlab/infra.gitlab-ci.yml`) |
+| `infra:destroy` | Teardown all Terraform-managed infrastructure (manual trigger, from `.gitlab/infra.gitlab-ci.yml`) |
 
-Set `USE_PERSISTENT_SSM=true` to use persistent SSM infra in builds.
+All SSM infrastructure is persistent by default — provisioned via the Terraform root module at `infra/`.
 
 ## Backend Setup
 
-**CI/CD pipelines handle this automatically** — both GitHub Actions (`ssm-infra.yml`) and GitLab CI (`infra:ssm` job) call `bootstrap-backend.sh` which idempotently creates the S3 bucket, DynamoDB table, and `backend.tf` before running `terraform init`.
+**CI/CD pipelines handle this automatically** — both GitHub Actions (`infra-setup.yml`) and GitLab CI (`infra:create` job) call `bootstrap-backend.sh` which idempotently creates the S3 bucket, DynamoDB table, and `backend.tf` before running `terraform init`.
 
 For manual / local use:
 

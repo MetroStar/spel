@@ -71,7 +71,8 @@ The SPEL CI/CD pipeline uses a **Docker-based build system** where all dependenc
 │  │ .gitlab-ci.yml                                                        │   │
 │  │                                                                      │   │
 │  │  Stage 1: import - Import Docker image from tarball                  │   │
-│  │  Stage 2: infra  - Create AWS infrastructure (optional)              │   │
+│  │  Stage 2: infra  - Provision persistent AWS infrastructure via        │   │
+│  │                    Terraform (one-time, from .gitlab/infra.gitlab-ci)  │   │
 │  │  Stage 3: build  - Build AMIs using Docker container                 │   │
 │  │                                                                      │   │
 │  │  Output: STIGed AMIs in AWS GovCloud                                 │   │
@@ -221,17 +222,17 @@ The IAM role or user that **runs Packer** (the credentials passed to the Docker 
 }
 ```
 
-> **Note**: This policy is for the credentials that **execute Packer**, not the EC2 instance profile. The instance profile permissions are created by the `infra:iam` job in GitLab CI.
+> **Note**: This policy is for the credentials that **execute Packer**, not the EC2 instance profile. The instance profile permissions are created by the `infra:create` job in GitLab CI (or by the `infra` job in GitHub Actions, which calls `infra-setup.yml`).
 
 #### 4. EC2 Instance Profile Permissions (Created by Pipeline)
 
-The GitLab CI `infra:iam` job creates an instance profile with minimal permissions for the Packer-launched EC2 instances:
+The Terraform root module at `infra/` creates an instance profile with minimal permissions for the Packer-launched EC2 instances:
 
 - **SSM Access**: For Session Manager connectivity (if using SSH via SSM)
 - **S3 Access**: To SSM buckets for agent operation
 - **CloudWatch Logs**: For optional logging
 
-These are created automatically when you run the `infra:iam` job.
+These are created automatically when you run the `infra:create` job (GitLab) or when `build.yml` calls `infra-setup.yml` (GitHub Actions).
 
 ### GitHub Actions Prerequisites
 
@@ -436,7 +437,7 @@ The GitLab CI pipeline has 3 stages:
 | Stage | Purpose | Trigger | Duration |
 |-------|---------|---------|----------|
 | **import** | Import Docker image from tarball | Manual | 2-3 min |
-| **infra** | Create AWS infrastructure (optional) | Manual | 2-3 min |
+| **infra** | Provision persistent AWS infrastructure via Terraform (one-time) | Manual | 2-3 min |
 | **build** | Build AMIs using Docker container | Manual | 2-5 hr/OS |
 
 ### CI/CD Variables
@@ -457,8 +458,8 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 |----------|-------------|---------|
 | `AWS_SESSION_TOKEN` | STS session token | (none) |
 | `PKR_VAR_aws_region` | AWS region | `us-gov-east-1` |
-| `PKR_VAR_aws_vpc_id` | VPC ID for builds | (auto-create) |
-| `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (auto-create) |
+| `PKR_VAR_aws_vpc_id` | VPC ID for builds | (from Terraform) |
+| `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (from Terraform) |
 | `PKR_VAR_aws_kms_key_id` | KMS key ARN for CMK-encrypted AMIs | (none) |
 | `INFRA_PREFIX` | Prefix for created resources | `spel` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
@@ -512,9 +513,9 @@ cp spel-builder-*.tar.gz /transfer/
 
 **Step 3: Create AWS infrastructure (one-time)**
 
-1. In the same pipeline, click **▶** on `infra:network`
-2. Wait for completion, then run `infra:security_group`
-3. Finally run `infra:iam` to create IAM role and instance profile
+1. In the same pipeline, click **▶** on `infra:create`
+2. Wait for completion — this single Terraform job provisions all infrastructure (VPC, subnets, security groups, IAM roles, KMS, SSM)
+3. Infrastructure outputs are exported as `infra.env` dotenv artifact for build jobs
 
 **Step 4: Build AMIs**
 
@@ -553,9 +554,9 @@ import:docker:
     - docker run --rm "spel-builder:${TAG}" ansible --version
 ```
 
-#### infra:network, infra:security_group, infra:iam
+#### infra:create
 
-Create AWS infrastructure resources:
+Provisions all AWS infrastructure via the Terraform root module at `infra/`:
 
 - **VPC** with DNS enabled
 - **Internet Gateway** (required for RHUI access)
@@ -564,6 +565,10 @@ Create AWS infrastructure resources:
 - **Security Group** (SSH/WinRM access)
 - **IAM Role** with EC2 permissions
 - **Instance Profile** for Packer builders
+- **KMS Key** for encrypted AMIs
+- **SSM infrastructure** (VPC endpoints, documents, etc.)
+
+Defined in `.gitlab/infra.gitlab-ci.yml` and included by `.gitlab-ci.yml`.
 
 #### build:* Jobs
 

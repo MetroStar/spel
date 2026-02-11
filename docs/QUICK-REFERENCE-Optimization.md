@@ -45,7 +45,7 @@ cp spel-builder-*.tar.gz /transfer/
 # Click ▶ on import:docker job
 
 # 3. Create infrastructure
-# Click ▶ on infra:network, then infra:security_group, then infra:iam
+# Click ▶ on infra:create (single Terraform job provisions all infrastructure)
 ```
 
 ### Monthly Builds
