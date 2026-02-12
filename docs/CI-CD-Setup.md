@@ -160,6 +160,8 @@ The IAM role or user that **runs Packer** (the credentials passed to the Docker 
         "ec2:DescribeVolumes",
         "ec2:DescribeVpcs",
         "ec2:DetachVolume",
+        "ec2:DisableImageDeprecation",
+        "ec2:EnableImageDeprecation",
         "ec2:GetPasswordData",
         "ec2:ModifyImageAttribute",
         "ec2:ModifyInstanceAttribute",
