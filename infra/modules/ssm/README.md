@@ -35,7 +35,7 @@ Architecture: **one deployment per AWS account** (not per-AMI). SSM resources pe
 
 ```hcl
 module "ssm" {
-  source = "./infra/ssm"
+  source = "./modules/ssm"
 
   name_prefix = "spel-ci"
   vpc_id      = "vpc-0123456789abcdef0"
@@ -61,7 +61,7 @@ module "ssm" {
 
 ```hcl
 module "ssm" {
-  source = "./infra/ssm"
+  source = "./modules/ssm"
 
   name_prefix = "spel-prod"
   vpc_id      = "vpc-prod-id"
@@ -94,7 +94,7 @@ module "ssm" {
 
 ```hcl
 module "ssm" {
-  source = "./infra/ssm"
+  source = "./modules/ssm"
 
   name_prefix    = "spel-prod"
   vpc_id         = "vpc-prod-id"
