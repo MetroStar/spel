@@ -215,12 +215,14 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
       - https
     rhel9stig_sudoers_exclude_nopasswd_list:
       - ec2-user
+      - vagrant
       - ssm-user
     rhel9stig_faillock_exclude_users:
       - ec2-user
       - ssm-user
     rhel8stig_sudoers_exclude_nopasswd_list:
       - ec2-user
+      - vagrant
       - ssm-user
     rhel8stig_faillock_exclude_users:
       - ec2-user

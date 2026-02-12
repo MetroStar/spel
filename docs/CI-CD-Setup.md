@@ -285,6 +285,7 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "iam:UntagPolicy",
         "iam:ListPolicyTags",
         "iam:ListEntitiesForPolicy",
+        "iam:CreateServiceLinkedRole",
         "iam:PassRole"
       ],
       "Resource": "*"

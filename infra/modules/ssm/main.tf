@@ -22,4 +22,14 @@ locals {
     ManagedBy = "terraform"
     Module    = "spel-ssm"
   })
+
+  # Convert extra-variables maps to SSM-compatible "key=value key2=value2" format.
+  # AWS-ApplyAnsiblePlaybooks validates ExtraVariables against a regex that
+  # only allows key=value pairs — JSON format is rejected.
+  el_extra_vars = join(" ", [
+    for k, v in var.stig_extra_variables : "${k}=${v}"
+  ])
+  windows_extra_vars = join(" ", [
+    for k, v in var.windows_stig_extra_variables : "${k}=${v}"
+  ])
 }

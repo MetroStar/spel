@@ -55,7 +55,7 @@ resource "aws_ssm_association" "stig_enforce_el" {
     SourceType          = "S3"
     SourceInfo          = jsonencode({ path = "https://s3.amazonaws.com/${aws_s3_bucket.ssm.id}/${var.ansible_s3_key}" })
     PlaybookFile        = "site.yml"
-    ExtraVariables      = jsonencode(var.stig_extra_variables)
+    ExtraVariables      = local.el_extra_vars
     Check               = "False"
     InstallDependencies = "True"
     Verbose             = "-v"
@@ -184,7 +184,7 @@ resource "aws_ssm_association" "stig_enforce_windows" {
     SourceType          = "S3"
     SourceInfo          = jsonencode({ path = "https://s3.amazonaws.com/${aws_s3_bucket.ssm.id}/${var.windows_stig_s3_key}" })
     PlaybookFile        = each.value.playbook_file
-    ExtraVariables      = jsonencode(var.windows_stig_extra_variables)
+    ExtraVariables      = local.windows_extra_vars
     Check               = "False"
     InstallDependencies = "True"
     Verbose             = "-v"

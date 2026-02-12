@@ -46,7 +46,7 @@ resource "aws_sns_topic_subscription" "email" {
 
 resource "aws_cloudwatch_log_metric_filter" "ssm_errors" {
   name           = "${var.name_prefix}-ssm-errors"
-  pattern        = "?ERROR ?Failed ?\"status\":\"Failed\""
+  pattern        = "?ERROR ?Failed"
   log_group_name = aws_cloudwatch_log_group.ssm.name
 
   metric_transformation {
@@ -59,7 +59,7 @@ resource "aws_cloudwatch_log_metric_filter" "ssm_errors" {
 
 resource "aws_cloudwatch_log_metric_filter" "compliance_failures" {
   name           = "${var.name_prefix}-compliance-failures"
-  pattern        = "?\"result\":\"fail\" ?NON_COMPLIANT ?\"fail\":"
+  pattern        = "?NON_COMPLIANT ?fail"
   log_group_name = aws_cloudwatch_log_group.ssm.name
 
   metric_transformation {

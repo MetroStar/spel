@@ -126,38 +126,31 @@ variable "ssm_agent_update_schedule" {
 variable "stig_extra_variables" {
   description = <<-EOT
     Extra variables passed to the Ansible STIG playbook for both check-mode
-    and enforcement runs. Encoded as JSON and passed via --extra-vars.
+    and enforcement runs. Passed via ExtraVariables in key=value format.
     Must include safety-critical overrides to prevent SSH/SSM lockout.
     Combines EL8 and EL9 variables — Ansible roles ignore unknown vars.
+    NOTE: Only scalar values (string, bool, number) are supported here.
+    List/complex values must go in the playbook package's site.yml vars.
   EOT
-  type        = any
+  type        = map(string)
   default = {
     # Common
-    SSM           = true
-    system_is_ec2 = true
+    SSM           = "true"
+    system_is_ec2 = "true"
 
     # EL9 — disable AIDE/crypto controls incompatible with EC2
-    rhel_09_251010 = false
-    rhel_09_251015 = false
-    rhel_09_251020 = false
-    rhel_09_251025 = false
-    rhel_09_251030 = false
-    rhel_09_251035 = false
-    rhel_09_251040 = false
-    rhel_09_251045 = false
-
-    # EL9 — service and user safety (prevent lockout)
-    rhel9stig_white_list_services          = ["ssh", "https"]
-    rhel9stig_sudoers_exclude_nopasswd_list = ["ec2-user", "vagrant", "ssm-user"]
-    rhel9stig_faillock_exclude_users        = ["ec2-user", "ssm-user"]
+    rhel_09_251010 = "false"
+    rhel_09_251015 = "false"
+    rhel_09_251020 = "false"
+    rhel_09_251025 = "false"
+    rhel_09_251030 = "false"
+    rhel_09_251035 = "false"
+    rhel_09_251040 = "false"
+    rhel_09_251045 = "false"
 
     # EL8 — disable incompatible controls
-    rhel8stig_copy_existing_zone = false
-    rhel_08_040136               = false
-
-    # EL8 — user safety (prevent lockout)
-    rhel8stig_sudoers_exclude_nopasswd_list = ["ec2-user", "vagrant", "ssm-user"]
-    rhel8stig_faillock_exclude_users        = ["ec2-user", "ssm-user"]
+    rhel8stig_copy_existing_zone = "false"
+    rhel_08_040136               = "false"
   }
 }
 
@@ -178,50 +171,51 @@ variable "windows_stig_extra_variables" {
     Extra variables passed to the Windows Ansible STIG playbooks.
     Combines all version-specific overrides — Ansible roles ignore unknown vars.
     WinRM/Packer-specific vars are omitted (SSM runs Ansible locally).
+    Passed via ExtraVariables in key=value format (scalars only).
   EOT
-  type        = any
+  type        = map(string)
   default = {
     # Common Windows STIG vars
-    SSM                           = true
+    SSM                           = "true"
     ansible_windows_domain_role   = "Standalone"
-    ansible_windows_domain_member = false
+    ansible_windows_domain_member = "false"
     ansible_system_vendor         = "NA"
     ansible_virtualization_type   = "hvm"
-    win_skip_for_test             = false
+    win_skip_for_test             = "false"
 
     # Win2016 — disable EC2-incompatible controls
     wn16_00_000030_pass_age           = "60"
-    wn16_cc_000500                    = false
-    wn16_cc_000530                    = false
-    wn16_so_000010                    = false
-    wn16_so_000020                    = false
-    wn16_so_000030                    = false
-    wn16_00_000450                    = false
-    wn16_cc_000010                    = false
-    wn16_cc_000020                    = false
+    wn16_cc_000500                    = "false"
+    wn16_cc_000530                    = "false"
+    wn16_so_000010                    = "false"
+    wn16_so_000020                    = "false"
+    wn16_so_000030                    = "false"
+    wn16_00_000450                    = "false"
+    wn16_cc_000010                    = "false"
+    wn16_cc_000020                    = "false"
     wn16stig_newadministratorname     = "maintuser"
 
     # Win2019 — disable EC2-incompatible controls
-    wn19_cc_000470                    = false
-    wn19_cc_000500                    = false
-    wn19_so_000010                    = false
-    wn19_so_000020                    = false
-    wn19_so_000030                    = false
-    wn19_00_000450                    = false
-    wn19_cc_000010                    = false
-    wn19_cc_000020                    = false
+    wn19_cc_000470                    = "false"
+    wn19_cc_000500                    = "false"
+    wn19_so_000010                    = "false"
+    wn19_so_000020                    = "false"
+    wn19_so_000030                    = "false"
+    wn19_00_000450                    = "false"
+    wn19_cc_000010                    = "false"
+    wn19_cc_000020                    = "false"
     wn19stig_newadministratorname     = "maintuser"
 
     # Win2022 — disable EC2-incompatible controls
-    wn22_ac_000010                    = false
-    wn22_cc_000470                    = false
-    wn22_cc_000500                    = false
-    wn22_so_000010                    = false
-    wn22_so_000020                    = false
-    wn22_so_000030                    = false
-    wn22_00_000450                    = false
-    wn22_cc_000010                    = false
-    wn22_cc_000020                    = false
+    wn22_ac_000010                    = "false"
+    wn22_cc_000470                    = "false"
+    wn22_cc_000500                    = "false"
+    wn22_so_000010                    = "false"
+    wn22_so_000020                    = "false"
+    wn22_so_000030                    = "false"
+    wn22_00_000450                    = "false"
+    wn22_cc_000010                    = "false"
+    wn22_cc_000020                    = "false"
     wn22stig_newadministratorname     = "maintuser"
   }
 }
