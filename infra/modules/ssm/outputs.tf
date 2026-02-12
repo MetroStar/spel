@@ -148,6 +148,11 @@ output "ssm_agent_update_association_id" {
   value       = var.enable_ssm_agent_update && var.enable_state_manager ? aws_ssm_association.ssm_agent_update[0].association_id : null
 }
 
+output "stig_enforce_windows_association_ids" {
+  description = "Map of Windows Server version to STIG enforcement association IDs"
+  value       = { for k, v in aws_ssm_association.stig_enforce_windows : k => v.association_id }
+}
+
 # -----------------------------------------------------------------------------
 # S3
 # -----------------------------------------------------------------------------

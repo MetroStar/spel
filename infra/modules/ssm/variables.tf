@@ -161,6 +161,65 @@ variable "oscap_profile" {
   default     = "xccdf_org.ssgproject.content_profile_stig"
 }
 
+variable "windows_stig_s3_key" {
+  description = "S3 key (path) for the Windows STIG playbook zip package containing per-version playbooks"
+  type        = string
+  default     = "ansible/windows-stig-playbook.zip"
+}
+
+variable "windows_stig_extra_variables" {
+  description = <<-EOT
+    Extra variables passed to the Windows Ansible STIG playbooks.
+    Combines all version-specific overrides — Ansible roles ignore unknown vars.
+    WinRM/Packer-specific vars are omitted (SSM runs Ansible locally).
+  EOT
+  type        = any
+  default = {
+    # Common Windows STIG vars
+    SSM                           = true
+    ansible_windows_domain_role   = "Standalone"
+    ansible_windows_domain_member = false
+    ansible_system_vendor         = "NA"
+    ansible_virtualization_type   = "hvm"
+    win_skip_for_test             = false
+
+    # Win2016 — disable EC2-incompatible controls
+    wn16_00_000030_pass_age           = "60"
+    wn16_cc_000500                    = false
+    wn16_cc_000530                    = false
+    wn16_so_000010                    = false
+    wn16_so_000020                    = false
+    wn16_so_000030                    = false
+    wn16_00_000450                    = false
+    wn16_cc_000010                    = false
+    wn16_cc_000020                    = false
+    wn16stig_newadministratorname     = "maintuser"
+
+    # Win2019 — disable EC2-incompatible controls
+    wn19_cc_000470                    = false
+    wn19_cc_000500                    = false
+    wn19_so_000010                    = false
+    wn19_so_000020                    = false
+    wn19_so_000030                    = false
+    wn19_00_000450                    = false
+    wn19_cc_000010                    = false
+    wn19_cc_000020                    = false
+    wn19stig_newadministratorname     = "maintuser"
+
+    # Win2022 — disable EC2-incompatible controls
+    wn22_ac_000010                    = false
+    wn22_cc_000470                    = false
+    wn22_cc_000500                    = false
+    wn22_so_000010                    = false
+    wn22_so_000020                    = false
+    wn22_so_000030                    = false
+    wn22_00_000450                    = false
+    wn22_cc_000010                    = false
+    wn22_cc_000020                    = false
+    wn22stig_newadministratorname     = "maintuser"
+  }
+}
+
 variable "target_tag_key" {
   description = "EC2 instance tag key used to target SSM associations"
   type        = string

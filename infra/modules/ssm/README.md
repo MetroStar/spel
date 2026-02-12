@@ -18,7 +18,7 @@ Architecture: **one deployment per AWS account** (not per-AMI). SSM resources pe
 | IAM Caller Policy | Permissions for CI/humans to invoke SSM operations | Always created |
 | SSM Documents | Custom `RunOpenSCAPScan` + Session Manager preferences (`SSM-SessionManagerRunShell`) | Always / `enable_session_manager` |
 | SSM Associations | Ansible STIG check-mode, OpenSCAP scan, Software Inventory (compliance verification) | `enable_state_manager`, `enable_inventory` |
-| STIG Enforcement | Ansible Lockdown (EL) + native script (AL2023) enforce mode | `enable_stig_enforcement` |
+| STIG Enforcement | Ansible Lockdown (EL + Windows) + native script (AL2023) enforce mode | `enable_stig_enforcement` |
 | SSM Agent Update | Automatic SSM agent updates (daily, before patch window) | `enable_ssm_agent_update` |
 | Patch Baselines | Linux + Windows STIG-aligned baselines | `enable_patch_manager` |
 | Maintenance Windows | Scheduled patching tasks (default Sunday 4AM UTC, 3h window) | `enable_patch_manager` |
@@ -180,6 +180,7 @@ The module is fully GovCloud-compatible:
 | `patch_approve_after_days` | Patch auto-approval delay (days) | `number` | `7` | no |
 | `stig_enforcement_schedule` | Schedule for STIG enforcement runs | `string` | `rate(7 days)` | no |
 | `stig_al2023_s3_key` | S3 key for AL2023 STIG script package | `string` | `ansible/al2023-stig-script.zip` | no |
+| `windows_stig_s3_key` | S3 key for Windows STIG playbook package | `string` | `ansible/windows-stig-playbook.zip` | no |
 | `ssm_agent_update_schedule` | Schedule for SSM agent updates | `string` | `cron(0 3 ? * * *)` | no |
 | `tags` | Additional tags | `map(string)` | `{}` | no |
 
@@ -200,6 +201,7 @@ The module is fully GovCloud-compatible:
 | `stig_enforce_el_association_id` | EL STIG enforcement association ID |
 | `stig_enforce_al2023_association_id` | AL2023 STIG enforcement association ID |
 | `ssm_agent_update_association_id` | SSM agent update association ID |
+| `stig_enforce_windows_association_ids` | Map of Windows version to STIG enforcement association IDs |
 | `s3_bucket_name` | Primary SSM S3 bucket |
 | `s3_access_logs_bucket_name` | Access logging S3 bucket |
 | `cloudwatch_log_group_name` | CloudWatch log group |
