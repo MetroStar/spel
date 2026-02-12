@@ -15,6 +15,7 @@ resource "aws_ssm_document" "oscap_scan" {
   name            = "${var.name_prefix}-RunOpenSCAPScan"
   document_type   = "Command"
   document_format = "YAML"
+  update_method   = "NewVersion"
 
   content = yamlencode({
     schemaVersion = "2.2"
@@ -176,6 +177,7 @@ resource "aws_ssm_document" "session_manager_prefs" {
   name            = "SSM-SessionManagerRunShell"
   document_type   = "Session"
   document_format = "JSON"
+  update_method   = "NewVersion"
 
   content = jsonencode({
     schemaVersion = "1.0"
