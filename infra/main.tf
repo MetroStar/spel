@@ -47,6 +47,7 @@ module "ssm" {
   vpc_id      = module.networking.vpc_id
   subnet_ids  = [module.networking.subnet_id]
   vpc_cidr    = var.vpc_cidr
+  route_table_ids = module.networking.route_table_ids
 
   # Wire SSM module to use the IAM module's role (no duplicate IAM)
   create_instance_profile     = false

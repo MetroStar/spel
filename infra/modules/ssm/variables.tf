@@ -31,6 +31,12 @@ variable "vpc_cidr" {
   type        = string
 }
 
+variable "route_table_ids" {
+  description = "List of route table IDs to associate with the S3 gateway endpoint. Passed from the networking module to avoid data source race conditions."
+  type        = list(string)
+  default     = []
+}
+
 # -----------------------------------------------------------------------------
 # Feature Toggles
 # -----------------------------------------------------------------------------

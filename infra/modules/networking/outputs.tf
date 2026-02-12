@@ -26,3 +26,8 @@ output "internet_gateway_id" {
   description = "ID of the internet gateway (null if public_subnet = false)"
   value       = var.public_subnet ? aws_internet_gateway.this[0].id : null
 }
+
+output "route_table_ids" {
+  description = "List of route table IDs created by this module"
+  value       = var.public_subnet ? [aws_route_table.this[0].id] : []
+}

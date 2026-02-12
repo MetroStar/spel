@@ -133,19 +133,13 @@ resource "aws_vpc_endpoint" "kms" {
 # Gateway VPC Endpoint (S3)
 # -----------------------------------------------------------------------------
 
-# Look up the main route table for the VPC to associate the S3 gateway endpoint
-data "aws_route_tables" "vpc" {
-  count  = var.enable_vpc_endpoints ? 1 : 0
-  vpc_id = var.vpc_id
-}
-
 resource "aws_vpc_endpoint" "s3" {
   count = var.enable_vpc_endpoints ? 1 : 0
 
   vpc_id            = var.vpc_id
   service_name      = "com.amazonaws.${local.region}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = data.aws_route_tables.vpc[0].ids
+  route_table_ids   = var.route_table_ids
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-s3-endpoint"
