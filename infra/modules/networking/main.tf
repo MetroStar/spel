@@ -93,9 +93,9 @@ resource "aws_security_group_rule" "ssh_ingress" {
   from_port         = 22
   to_port           = 22
   protocol          = "tcp"
-  cidr_blocks       = [var.vpc_cidr]
+  cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.packer.id
-  description       = "SSH from VPC CIDR"
+  description       = "SSH from anywhere (Packer connects from GitHub Actions)"
 }
 
 resource "aws_security_group_rule" "winrm_ingress" {
@@ -103,9 +103,9 @@ resource "aws_security_group_rule" "winrm_ingress" {
   from_port         = 5986
   to_port           = 5986
   protocol          = "tcp"
-  cidr_blocks       = [var.vpc_cidr]
+  cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.packer.id
-  description       = "WinRM-HTTPS from VPC CIDR"
+  description       = "WinRM-HTTPS from anywhere (Packer connects from GitHub Actions)"
 }
 
 resource "aws_security_group_rule" "egress_all" {

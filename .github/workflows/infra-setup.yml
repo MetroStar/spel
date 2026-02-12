@@ -14,7 +14,7 @@
 #     - VPC with DNS support/hostnames enabled
 #     - Subnet with auto-assign public IP (or private if using VPC endpoints)
 #     - Internet Gateway + route table (conditional on public subnet)
-#     - Security group allowing SSH + WinRM from VPC CIDR
+#     - Security group allowing SSH + WinRM from anywhere (Packer on GitHub Actions)
 #   IAM (modules/iam):
 #     - IAM role and instance profile for Packer-launched instances
 #     - SSM agent communication policies
