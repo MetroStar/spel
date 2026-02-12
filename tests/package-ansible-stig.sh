@@ -96,6 +96,16 @@ if [[ -d "$ROLES_DIR/AL2023-STIG" ]] && [[ "$OS_TARGET" == "all" || "$OS_TARGET"
   echo "  [OK] AL2023-STIG"
 fi
 
+# Stage boot-fips-wrapper.sh for EL8 FIPS boot repair
+BOOT_FIPS_WRAPPER="$REPO_ROOT/spel/scripts/boot-fips-wrapper.sh"
+if [[ -f "$BOOT_FIPS_WRAPPER" ]]; then
+  cp "$BOOT_FIPS_WRAPPER" "$STAGING/boot-fips-wrapper.sh"
+  chmod +x "$STAGING/boot-fips-wrapper.sh"
+  echo "  [OK] boot-fips-wrapper.sh"
+else
+  echo "  [WARN] boot-fips-wrapper.sh not found at $BOOT_FIPS_WRAPPER — EL8 FIPS boot repair will not be available"
+fi
+
 # Stage collections if present
 if [[ -d "$COLLECTIONS_DIR" ]]; then
   echo "Staging collections..."
@@ -110,13 +120,27 @@ echo "Creating SSM wrapper playbook..."
 
 cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
 ---
-# SSM-compatible STIG compliance check playbook
-# This playbook is designed to be run via AWS-ApplyAnsiblePlaybooks
-# in --check mode for compliance validation (no changes made)
+# SSM-compatible STIG playbook with EL8 FIPS boot repair
+# ======================================================
+# This playbook is designed to be run via AWS-ApplyAnsiblePlaybooks.
+# It supports both enforcement (Check=False) and compliance checking
+# (Check=True / --check mode).
 #
 # The playbook auto-detects the OS and applies the correct STIG role.
+#
+# EL8 FIPS Boot Repair:
+#   The upstream RHEL8-STIG role templates /etc/default/grub wholesale,
+#   stripping the boot=UUID parameter needed for FIPS boot integrity.
+#   pre_tasks runs boot-fips-wrapper.sh pre (installs dracut-fips, sets
+#   boot=UUID) BEFORE the role, and post_tasks runs boot-fips-wrapper.sh
+#   post (validates boot=UUID, checks kernel HMACs, rebuilds initramfs)
+#   AFTER the role to repair the damage.
+#
+#   In --check mode, ansible.builtin.script is naturally skipped (the
+#   script module does not support check_mode), so boot-fips-wrapper.sh
+#   will NOT run during compliance-check-only scans.
 
-- name: STIG Compliance Check
+- name: STIG Hardening
   hosts: localhost
   connection: local
   become: true
@@ -151,8 +175,37 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
         msg: "Unsupported OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
       when: stig_role == 'UNSUPPORTED'
 
+    # -----------------------------------------------------------------
+    # EL8 FIPS boot repair — PRE step
+    # Installs dracut-fips, rebuilds initramfs, inserts boot=UUID.
+    # Skipped automatically in --check mode (script module limitation).
+    # -----------------------------------------------------------------
+    - name: "EL8 FIPS boot-repair pre (install dracut-fips, set boot=UUID)"
+      ansible.builtin.script: boot-fips-wrapper.sh pre
+      args:
+        chdir: "{{ playbook_dir }}"
+      when:
+        - stig_role == 'RHEL8-STIG'
+        - ansible_distribution_major_version == '8'
+
   roles:
     - role: "{{ stig_role }}"
+
+  post_tasks:
+    # -----------------------------------------------------------------
+    # EL8 FIPS boot repair — POST step
+    # Validates boot=UUID matches actual kernel device, checks HMAC
+    # files, rebuilds initramfs. Repairs any GRUB damage from the
+    # RHEL8-STIG role's etc_default_grub.j2 template.
+    # Skipped automatically in --check mode.
+    # -----------------------------------------------------------------
+    - name: "EL8 FIPS boot-repair post (validate boot=UUID, rebuild initramfs)"
+      ansible.builtin.script: boot-fips-wrapper.sh post
+      args:
+        chdir: "{{ playbook_dir }}"
+      when:
+        - stig_role == 'RHEL8-STIG'
+        - ansible_distribution_major_version == '8'
 
   vars:
     system_is_ec2: true
@@ -181,6 +234,9 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
     rhel_09_251035: false
     rhel_09_251040: false
     rhel_09_251045: false
+    # Disable EL8 incompatible controls
+    rhel8stig_copy_existing_zone: false
+    rhel_08_040136: false
 PLAYBOOK_EOF
 
 echo "  [OK] site.yml"

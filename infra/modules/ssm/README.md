@@ -156,7 +156,30 @@ The module is fully GovCloud-compatible:
 
 ## Instance Targeting
 
-SSM associations target instances using the `StigManaged=true` tag (configurable via `target_tag_key`/`target_tag_value`). Platform-specific STIG enforcement additionally targets by `StigPlatform` tag.
+SSM associations use **platform-specific targeting** via the `StigPlatform` tag for platform-specific operations, and the `StigManaged=true` tag (configurable via `target_tag_key`/`target_tag_value`) for cross-platform operations.
+
+### Targeting by association type
+
+| Association | Tag Key | Tag Values | Rationale |
+|-------------|---------|------------|-----------|
+| **EL STIG enforcement** | `StigPlatform` | `EL8`, `EL9` | Linux Ansible playbook — not compatible with Windows/AL2023 |
+| **EL STIG check-mode** | `StigPlatform` | `EL8`, `EL9` | Same playbook in `--check` mode |
+| **OpenSCAP scan** | `StigPlatform` | `EL8`, `EL9` | OpenSCAP content is Linux-specific |
+| **AL2023 enforcement** | `StigPlatform` | `AL2023` | AL2023 uses its own native script |
+| **Windows enforcement** | `StigPlatform` | `Win2016`, `Win2019`, `Win2022` | Per-version Windows playbooks |
+| **SSM agent update** | `StigManaged` | `true` | All platforms need agent updates |
+| **Software inventory** | `StigManaged` | `true` | Collect inventory from all platforms |
+
+### EL8 FIPS boot repair
+
+The upstream RHEL8-STIG role (`ansible-lockdown/RHEL8-STIG`) templates `/etc/default/grub` wholesale via `etc_default_grub.j2`, replacing `GRUB_CMDLINE_LINUX` and stripping the `boot=UUID=<uuid>` parameter required for FIPS boot integrity on EL8 systems with a separate `/boot` partition.
+
+The S3 playbook package includes `boot-fips-wrapper.sh` alongside the roles. The wrapper `site.yml` runs it as pre/post tasks:
+
+- **pre**: Installs `dracut-fips`, rebuilds initramfs, inserts `boot=UUID` for the correct device
+- **post**: Validates `boot=UUID` matches the actual kernel device, checks HMAC files, rebuilds initramfs
+
+In `--check` mode (compliance scans), `ansible.builtin.script` is naturally skipped, so the wrapper does not run during check-only scans.
 
 ### How instances get tagged
 
@@ -168,6 +191,32 @@ To propagate these tags to launched instances, use **one** of:
 1. **EC2 account setting**: Enable "Copy AMI tags to instances" in EC2 → Account Settings → Default Settings
 2. **Launch Template**: Add `TagSpecification` blocks that copy the AMI tags
 3. **Manual tagging**: Apply `StigManaged=true` and `StigPlatform=<platform>` to instances at launch
+
+### S3 Playbook Packaging
+
+The EL STIG enforcement and check-mode associations expect a zip at the `ansible_s3_key` path (default: `ansible/stig-playbook.zip`). Use `tests/package-ansible-stig.sh` to build it:
+
+```bash
+# Package all platforms (default)
+./tests/package-ansible-stig.sh --output ./dist
+
+# Package and upload to S3
+./tests/package-ansible-stig.sh --s3-bucket <bucket-name> --s3-prefix ansible
+```
+
+The resulting zip contains:
+
+```
+stig-playbook.zip
+├── site.yml                # Wrapper playbook (auto-detects OS, includes FIPS pre/post)
+├── boot-fips-wrapper.sh    # EL8 FIPS boot repair script
+├── roles/
+│   ├── RHEL8-STIG/         # Ansible Lockdown RHEL8 STIG role
+│   ├── RHEL9-STIG/         # Ansible Lockdown RHEL9 STIG role
+│   └── AL2023-STIG/        # AL2023 STIG role (based on RHEL9)
+├── collections/            # Pre-packaged Ansible collections (if present)
+└── requirements.yml        # Collection metadata
+```
 
 ### Default Host Management Configuration (DHMC)
 

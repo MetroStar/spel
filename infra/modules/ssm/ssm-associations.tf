@@ -11,11 +11,15 @@
 # For STIG ENFORCEMENT (actually applying hardening), see:
 #   ssm-stig-enforcement.tf
 #
-# Associations target instances by tag (default: StigManaged=true).
+# Associations target EL instances by StigPlatform tag (EL8, EL9).
+# Cross-platform associations (inventory) use StigManaged=true.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # 1. Ansible STIG Compliance Check (check-mode only)
+# -----------------------------------------------------------------------------
+# Targets EL platforms only — the Linux Ansible playbook is not compatible
+# with Windows or AL2023 (which has its own enforcement association).
 # -----------------------------------------------------------------------------
 
 resource "aws_ssm_association" "ansible_stig_check" {
@@ -26,8 +30,8 @@ resource "aws_ssm_association" "ansible_stig_check" {
   schedule_expression = var.ansible_schedule
 
   targets {
-    key    = "tag:${var.target_tag_key}"
-    values = [var.target_tag_value]
+    key    = "tag:StigPlatform"
+    values = ["EL8", "EL9"]
   }
 
   parameters = {
@@ -49,6 +53,8 @@ resource "aws_ssm_association" "ansible_stig_check" {
 # -----------------------------------------------------------------------------
 # 2. OpenSCAP Scheduled Scan
 # -----------------------------------------------------------------------------
+# Targets EL platforms only — OpenSCAP content is Linux-specific.
+# -----------------------------------------------------------------------------
 
 resource "aws_ssm_association" "oscap_scan" {
   count = var.enable_state_manager ? 1 : 0
@@ -58,8 +64,8 @@ resource "aws_ssm_association" "oscap_scan" {
   schedule_expression = var.oscap_schedule
 
   targets {
-    key    = "tag:${var.target_tag_key}"
-    values = [var.target_tag_value]
+    key    = "tag:StigPlatform"
+    values = ["EL8", "EL9"]
   }
 
   parameters = {

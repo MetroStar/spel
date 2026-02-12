@@ -5,7 +5,8 @@
 #
 # 1. EL (RHEL/CentOS/OracleLinux) STIG Enforcement:
 #    Uses AWS-ApplyAnsiblePlaybooks with Ansible Lockdown playbooks.
-#    Targets instances tagged with the target tag.
+#    Targets instances tagged StigPlatform = EL8 | EL9.
+#    Includes boot-fips-wrapper.sh pre/post for EL8 FIPS boot repair.
 #
 # 2. Amazon Linux 2023 STIG Enforcement:
 #    Uses AWS-RunShellScript to run AL2023's native STIG script.
@@ -25,13 +26,15 @@
 # -----------------------------------------------------------------------------
 # 1. EL (RHEL/OL/CentOS) STIG Enforcement via Ansible Lockdown
 # -----------------------------------------------------------------------------
-# Uses the AWS-RunAnsiblePlaybook document to apply the Ansible Lockdown
+# Uses the AWS-ApplyAnsiblePlaybook document to apply the Ansible Lockdown
 # STIG role in ENFORCE mode (Check = False). The playbook package must be
 # uploaded to the S3 bucket at the configured ansible_s3_key path.
 #
-# Targets instances with BOTH:
-#   - StigManaged = true (or configured target tag)
-#   - StigPlatform = EL
+# The package's site.yml auto-detects the OS (EL8 vs EL9) and applies the
+# correct role. For EL8, pre/post tasks run boot-fips-wrapper.sh to repair
+# FIPS boot integrity after the RHEL8-STIG role templates /etc/default/grub.
+#
+# Targets instances tagged: StigPlatform = EL8 | EL9
 # -----------------------------------------------------------------------------
 
 resource "aws_ssm_association" "stig_enforce_el" {
@@ -44,8 +47,8 @@ resource "aws_ssm_association" "stig_enforce_el" {
   max_errors          = var.patch_max_errors
 
   targets {
-    key    = "tag:${var.target_tag_key}"
-    values = [var.target_tag_value]
+    key    = "tag:StigPlatform"
+    values = ["EL8", "EL9"]
   }
 
   parameters = {
