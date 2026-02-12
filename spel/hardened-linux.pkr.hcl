@@ -624,7 +624,6 @@ source "amazon-ebs" "base" {
   ]
   subnet_id                             = var.aws_subnet_id
   vpc_id                                = var.aws_vpc_id
-  tags                                  = local.base_ami_tags
   security_group_id                     = var.aws_security_group_id != "" ? var.aws_security_group_id : null
   temporary_security_group_source_cidrs = var.aws_security_group_id != "" ? null : var.aws_temporary_security_group_source_cidrs
 }
@@ -652,7 +651,6 @@ source "amazon-ebs" "windows-base" {
   sriov_support               = true
   subnet_id                   = var.aws_subnet_id
   vpc_id                      = var.aws_vpc_id
-  tags                        = local.base_ami_tags
   security_group_id                     = var.aws_security_group_id != "" ? var.aws_security_group_id : null
   temporary_security_group_source_cidrs = var.aws_security_group_id != "" ? null : var.aws_temporary_security_group_source_cidrs
   user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
