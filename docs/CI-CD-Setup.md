@@ -209,23 +209,34 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "ec2:CreateVpc",
         "ec2:DeleteVpc",
         "ec2:ModifyVpcAttribute",
+        "ec2:DescribeVpcAttribute",
         "ec2:CreateSubnet",
         "ec2:DeleteSubnet",
         "ec2:CreateInternetGateway",
         "ec2:DeleteInternetGateway",
         "ec2:AttachInternetGateway",
         "ec2:DetachInternetGateway",
+        "ec2:DescribeInternetGateways",
         "ec2:CreateRouteTable",
         "ec2:DeleteRouteTable",
         "ec2:CreateRoute",
         "ec2:DeleteRoute",
         "ec2:AssociateRouteTable",
         "ec2:DisassociateRouteTable",
+        "ec2:DescribeRouteTables",
         "ec2:CreateVpcEndpoint",
         "ec2:DeleteVpcEndpoints",
         "ec2:ModifyVpcEndpoint",
         "ec2:DescribeVpcEndpoints",
-        "ec2:DescribeVpcEndpointServices"
+        "ec2:DescribeVpcEndpointServices",
+        "ec2:DescribePrefixLists",
+        "ec2:DescribeAvailabilityZones",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DescribeSecurityGroupRules",
+        "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupIngress",
+        "ec2:DeleteTags"
       ],
       "Resource": "*"
     },
@@ -245,11 +256,22 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "iam:ListAttachedRolePolicies",
         "iam:CreateInstanceProfile",
         "iam:DeleteInstanceProfile",
+        "iam:GetInstanceProfile",
         "iam:AddRoleToInstanceProfile",
         "iam:RemoveRoleFromInstanceProfile",
         "iam:ListInstanceProfilesForRole",
         "iam:TagRole",
-        "iam:UntagRole"
+        "iam:UntagRole",
+        "iam:TagInstanceProfile",
+        "iam:UntagInstanceProfile",
+        "iam:CreatePolicy",
+        "iam:DeletePolicy",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "iam:ListPolicyVersions",
+        "iam:CreatePolicyVersion",
+        "iam:DeletePolicyVersion",
+        "iam:PassRole"
       ],
       "Resource": "*"
     },
@@ -263,6 +285,7 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "kms:DescribeKey",
         "kms:GetKeyPolicy",
         "kms:GetKeyRotationStatus",
+        "kms:ListAliases",
         "kms:ListResourceTags",
         "kms:PutKeyPolicy",
         "kms:EnableKeyRotation",
@@ -284,21 +307,56 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "ssm:UpdateDocumentDefaultVersion",
         "ssm:AddTagsToResource",
         "ssm:RemoveTagsFromResource",
-        "ssm:ListTagsForResource"
+        "ssm:ListTagsForResource",
+        "ssm:CreateAssociation",
+        "ssm:DeleteAssociation",
+        "ssm:DescribeAssociation",
+        "ssm:UpdateAssociation",
+        "ssm:CreatePatchBaseline",
+        "ssm:DeletePatchBaseline",
+        "ssm:GetPatchBaseline",
+        "ssm:UpdatePatchBaseline",
+        "ssm:RegisterPatchBaselineForPatchGroup",
+        "ssm:DeregisterPatchBaselineForPatchGroup",
+        "ssm:CreateMaintenanceWindow",
+        "ssm:DeleteMaintenanceWindow",
+        "ssm:GetMaintenanceWindow",
+        "ssm:UpdateMaintenanceWindow",
+        "ssm:DescribeMaintenanceWindows",
+        "ssm:RegisterTargetWithMaintenanceWindow",
+        "ssm:DeregisterTargetFromMaintenanceWindow",
+        "ssm:DescribeMaintenanceWindowTargets",
+        "ssm:RegisterTaskWithMaintenanceWindow",
+        "ssm:DeregisterTaskFromMaintenanceWindow",
+        "ssm:GetMaintenanceWindowTask",
+        "ssm:DescribeMaintenanceWindowTasks",
+        "ssm:GetServiceSetting",
+        "ssm:UpdateServiceSetting",
+        "ssm:ResetServiceSetting"
       ],
       "Resource": "*"
     },
     {
-      "Sid": "TerraformS3Backend",
+      "Sid": "TerraformS3",
       "Effect": "Allow",
       "Action": [
         "s3:CreateBucket",
+        "s3:DeleteBucket",
         "s3:GetBucketVersioning",
         "s3:PutBucketVersioning",
         "s3:GetBucketPolicy",
         "s3:PutBucketPolicy",
         "s3:GetEncryptionConfiguration",
         "s3:PutEncryptionConfiguration",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:GetLifecycleConfiguration",
+        "s3:PutLifecycleConfiguration",
+        "s3:GetBucketLogging",
+        "s3:PutBucketLogging",
+        "s3:GetBucketAcl",
+        "s3:GetBucketTagging",
+        "s3:PutBucketTagging",
         "s3:GetObject",
         "s3:PutObject",
         "s3:DeleteObject",
@@ -331,7 +389,13 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "logs:DescribeLogGroups",
         "logs:PutRetentionPolicy",
         "logs:TagLogGroup",
-        "logs:ListTagsLogGroup"
+        "logs:ListTagsLogGroup",
+        "logs:PutMetricFilter",
+        "logs:DeleteMetricFilter",
+        "logs:DescribeMetricFilters",
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms"
       ],
       "Resource": "*"
     },
@@ -345,7 +409,18 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "sns:SetTopicAttributes",
         "sns:Subscribe",
         "sns:Unsubscribe",
-        "sns:TagResource"
+        "sns:GetSubscriptionAttributes",
+        "sns:TagResource",
+        "sns:UntagResource",
+        "sns:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformSTS",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity"
       ],
       "Resource": "*"
     }
@@ -353,7 +428,7 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
 }
 ```
 
-> **Note**: This policy covers Terraform state backend (S3 + DynamoDB), networking, IAM, KMS, SSM, CloudWatch, and SNS resources created by the `infra/` root module. For GovCloud, the ARN partition resolves automatically.
+> **Note**: This policy covers Terraform state backend (S3 + DynamoDB), networking, IAM, KMS, SSM (documents, associations, patch baselines, maintenance windows, DHMC), CloudWatch (logs, metric filters, alarms), SNS, and STS resources created by the `infra/` root module. For GovCloud, the ARN partition resolves automatically.
 
 #### 4. EC2 Instance Profile Permissions (Created by Pipeline)
 
