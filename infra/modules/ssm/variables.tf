@@ -312,7 +312,7 @@ variable "patch_classification" {
 variable "patch_severity" {
   description = "Patch severities to approve (Linux). Example: ['Critical', 'Important']"
   type        = list(string)
-  default     = ["Critical", "Important", "Medium"]
+  default     = ["Critical", "Important", "Moderate"]
 }
 
 variable "patch_approve_after_days" {

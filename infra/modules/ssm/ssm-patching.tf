@@ -4,7 +4,7 @@
 # Custom patch baseline for STIG-hardened instances. The baseline is more
 # conservative than the AWS default to align with STIG requirements:
 #   - Only Security and Bugfix classifications
-#   - Only Critical/Important/Medium severity
+#   - Only Critical/Important/Moderate severity
 #   - Auto-approval after a configurable delay (default: 7 days)
 #
 # Patch groups allow different baselines for different OS families.
