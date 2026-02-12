@@ -257,17 +257,23 @@ jobs:
           echo "=== Generated tfvars ==="
           cat ci.auto.tfvars
 
-      - name: Import pre-existing SSM Session Manager document
+      - name: Handle pre-existing SSM Session Manager document
         if: inputs.action == 'plan' || inputs.action == 'apply'
         working-directory: infra
         run: |
           # SSM-SessionManagerRunShell is a per-account singleton. If it exists
-          # in AWS but not in Terraform state, import it to avoid DocumentAlreadyExists.
+          # in AWS but not in Terraform state, delete it so Terraform can create
+          # it fresh. This handles fresh deploys where a prior stack left it behind.
           if aws ssm describe-document --name SSM-SessionManagerRunShell &>/dev/null; then
             if ! terraform state show 'module.ssm.aws_ssm_document.session_manager_prefs[0]' &>/dev/null; then
-              echo "Importing pre-existing SSM-SessionManagerRunShell document..."
-              terraform import 'module.ssm.aws_ssm_document.session_manager_prefs[0]' SSM-SessionManagerRunShell || true
+              echo "Deleting orphaned SSM-SessionManagerRunShell document..."
+              aws ssm delete-document --name SSM-SessionManagerRunShell || true
+              echo "Deleted — Terraform will recreate it."
+            else
+              echo "SSM-SessionManagerRunShell already in Terraform state, skipping."
             fi
+          else
+            echo "SSM-SessionManagerRunShell does not exist yet, skipping."
           fi
 
       - name: Terraform plan

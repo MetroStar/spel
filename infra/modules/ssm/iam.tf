@@ -168,7 +168,7 @@ resource "aws_iam_role_policy" "ssm_instance_core" {
 
 # Attach SSM managed policy to existing role if not creating a new profile
 resource "aws_iam_role_policy_attachment" "ssm_existing_role" {
-  count = var.create_instance_profile ? 0 : (var.existing_instance_role_name != "" ? 1 : 0)
+  count = var.create_instance_profile ? 0 : 1
 
   role       = var.existing_instance_role_name
   policy_arn = "${local.arn_prefix}:iam::aws:policy/AmazonSSMManagedInstanceCore"
