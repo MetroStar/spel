@@ -249,6 +249,7 @@ jobs:
           enable_state_manager    = ${{ inputs.enable_state_manager }}
           enable_stig_enforcement = ${{ inputs.enable_stig_enforcement }}
           enable_ssm_agent_update = true
+          enable_dhmc             = true
           enable_inventory        = true
           create_kms_key          = true
           EOF

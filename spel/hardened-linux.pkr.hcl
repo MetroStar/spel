@@ -624,7 +624,7 @@ source "amazon-ebs" "base" {
   ]
   subnet_id                             = var.aws_subnet_id
   vpc_id                                = var.aws_vpc_id
-  tags                                  = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
+  tags                                  = local.base_ami_tags
   security_group_id                     = var.aws_security_group_id != "" ? var.aws_security_group_id : null
   temporary_security_group_source_cidrs = var.aws_security_group_id != "" ? null : var.aws_temporary_security_group_source_cidrs
 }
@@ -652,7 +652,7 @@ source "amazon-ebs" "windows-base" {
   sriov_support               = true
   subnet_id                   = var.aws_subnet_id
   vpc_id                      = var.aws_vpc_id
-  tags                        = { Name = "" } # Empty name tag avoids inheriting "Packer Builder"
+  tags                        = local.base_ami_tags
   security_group_id                     = var.aws_security_group_id != "" ? var.aws_security_group_id : null
   temporary_security_group_source_cidrs = var.aws_security_group_id != "" ? null : var.aws_temporary_security_group_source_cidrs
   user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
@@ -720,6 +720,13 @@ locals {
   aws_ami_deprecate_at = var.spel_deprecation_lifetime != null ? timeadd(local.timestamp, var.spel_deprecation_lifetime) : null
 
   timestamp = timestamp()
+
+  # Base AMI tags applied to all hardened AMIs. Build source overrides merge
+  # in the per-OS StigPlatform tag so SSM associations can target by platform.
+  base_ami_tags = {
+    Name        = ""       # Empty name avoids inheriting "Packer Builder"
+    StigManaged = "true"   # Enables SSM association targeting for STIG compliance
+  }
 }
 
 ###
@@ -733,6 +740,7 @@ build {
   source "amazon-ebs.base" {
     ami_description = format(local.description, "Amazon Linux 2023 AMI")
     name            = "hardened-amzn-2023-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "AL2023" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -747,6 +755,7 @@ build {
   source "amazon-ebs.base" {
     ami_description = format(local.description, "CentOS Stream 9 AMI")
     name            = "hardened-centos-9stream-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "EL9" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -761,6 +770,7 @@ build {
   source "amazon-ebs.base" {
     ami_description = format(local.description, "Oracle Linux 8 AMI")
     name            = "hardened-ol-8-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "EL8" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -775,6 +785,7 @@ build {
   source "amazon-ebs.base" {
     ami_description = format(local.description, "Oracle Linux 9 AMI")
     name            = "hardened-ol-9-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "EL9" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -789,6 +800,7 @@ build {
   source "amazon-ebs.base" {
     ami_description = format(local.description, "RHEL 8 AMI")
     name            = "hardened-rhel-8-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "EL8" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -803,6 +815,7 @@ build {
   source "amazon-ebs.base" {
     ami_description = format(local.description, "RHEL 9 AMI")
     name            = "hardened-rhel-9-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "EL9" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -817,6 +830,7 @@ build {
   source "amazon-ebs.windows-base" {
     ami_description = format(local.windows_description, "Windows Server 2016 AMI")
     name            = "hardened-windows-2016-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "Win2016" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -831,6 +845,7 @@ build {
   source "amazon-ebs.windows-base" {
     ami_description = format(local.windows_description, "Windows Server 2019 AMI")
     name            = "hardened-windows-2019-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "Win2019" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"
@@ -845,6 +860,7 @@ build {
   source "amazon-ebs.windows-base" {
     ami_description = format(local.windows_description, "Windows Server 2022 AMI")
     name            = "hardened-windows-2022-hvm"
+    tags            = merge(local.base_ami_tags, { StigPlatform = "Win2022" })
     source_ami_filter {
       filters = {
         virtualization-type = "hvm"

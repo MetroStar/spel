@@ -20,6 +20,7 @@ Architecture: **one deployment per AWS account** (not per-AMI). SSM resources pe
 | SSM Associations | Ansible STIG check-mode, OpenSCAP scan, Software Inventory (compliance verification) | `enable_state_manager`, `enable_inventory` |
 | STIG Enforcement | Ansible Lockdown (EL + Windows) + native script (AL2023) enforce mode | `enable_stig_enforcement` |
 | SSM Agent Update | Automatic SSM agent updates (daily, before patch window) | `enable_ssm_agent_update` |
+| DHMC | Default Host Management Configuration — auto-registers all EC2 instances with SSM | `enable_dhmc` |
 | Patch Baselines | Linux + Windows STIG-aligned baselines | `enable_patch_manager` |
 | Maintenance Windows | Scheduled patching tasks (default Sunday 4AM UTC, 3h window) | `enable_patch_manager` |
 | S3 Bucket | SSM outputs, OpenSCAP results, session logs, patch logs | Always created |
@@ -153,6 +154,25 @@ The module is fully GovCloud-compatible:
 - KMS key policy uses dynamic partition
 - Set `AWS_USE_FIPS_ENDPOINT=true` for FIPS compliance
 
+## Instance Targeting
+
+SSM associations target instances using the `StigManaged=true` tag (configurable via `target_tag_key`/`target_tag_value`). Platform-specific STIG enforcement additionally targets by `StigPlatform` tag.
+
+### How instances get tagged
+
+All SPEL hardened AMIs are built with these AMI-level tags:
+- `StigManaged = "true"` — all platforms
+- `StigPlatform` — platform identifier (`EL8`, `EL9`, `AL2023`, `Win2016`, `Win2019`, `Win2022`)
+
+To propagate these tags to launched instances, use **one** of:
+1. **EC2 account setting**: Enable "Copy AMI tags to instances" in EC2 → Account Settings → Default Settings
+2. **Launch Template**: Add `TagSpecification` blocks that copy the AMI tags
+3. **Manual tagging**: Apply `StigManaged=true` and `StigPlatform=<platform>` to instances at launch
+
+### Default Host Management Configuration (DHMC)
+
+When `enable_dhmc = true` (default), all EC2 instances in the account/region automatically register with SSM without needing an instance profile. DHMC provides a dedicated IAM role trusted by `ssm.amazonaws.com` with permissions for S3, CloudWatch, and KMS access.
+
 ## Inputs
 
 | Name | Description | Type | Default | Required |
@@ -170,6 +190,9 @@ The module is fully GovCloud-compatible:
 | `enable_inventory` | Create inventory association | `bool` | `true` | no |
 | `enable_stig_enforcement` | Enable STIG enforcement (Ansible Lockdown for EL, native script for AL2023) | `bool` | `true` | no |
 | `enable_ssm_agent_update` | Enable automatic SSM agent updates | `bool` | `true` | no |
+| `enable_dhmc` | Enable Default Host Management Configuration (auto-registers all instances) | `bool` | `true` | no |
+| `target_tag_key` | Instance tag key for SSM association targeting | `string` | `StigManaged` | no |
+| `target_tag_value` | Instance tag value for SSM association targeting | `string` | `true` | no |
 | `create_instance_profile` | Create IAM instance profile | `bool` | `true` | no |
 | `session_idle_timeout` | Session Manager idle timeout (minutes) | `number` | `20` | no |
 | `alert_email` | SNS email subscription for alerts | `string` | `""` | no |
@@ -202,6 +225,8 @@ The module is fully GovCloud-compatible:
 | `stig_enforce_al2023_association_id` | AL2023 STIG enforcement association ID |
 | `ssm_agent_update_association_id` | SSM agent update association ID |
 | `stig_enforce_windows_association_ids` | Map of Windows version to STIG enforcement association IDs |
+| `dhmc_role_name` | DHMC IAM role name |
+| `dhmc_role_arn` | DHMC IAM role ARN |
 | `s3_bucket_name` | Primary SSM S3 bucket |
 | `s3_access_logs_bucket_name` | Access logging S3 bucket |
 | `cloudwatch_log_group_name` | CloudWatch log group |

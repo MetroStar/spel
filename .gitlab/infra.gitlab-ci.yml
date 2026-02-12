@@ -50,6 +50,7 @@ infra:plan:
       enable_state_manager    = true
       enable_stig_enforcement = true
       enable_ssm_agent_update = true
+      enable_dhmc             = true
       enable_inventory        = true
       create_kms_key          = true
       TFVARS
@@ -105,6 +106,7 @@ infra:create:
       enable_state_manager    = true
       enable_stig_enforcement = true
       enable_ssm_agent_update = true
+      enable_dhmc             = true
       enable_inventory        = true
       create_kms_key          = true
       TFVARS

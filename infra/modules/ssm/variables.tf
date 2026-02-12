@@ -77,6 +77,12 @@ variable "enable_ssm_agent_update" {
   default     = true
 }
 
+variable "enable_dhmc" {
+  description = "Enable Default Host Management Configuration (DHMC). When enabled, ALL EC2 instances in the account/region auto-register with SSM without needing an instance profile."
+  type        = bool
+  default     = true
+}
+
 # -----------------------------------------------------------------------------
 # SSM Configuration
 # -----------------------------------------------------------------------------
@@ -221,15 +227,15 @@ variable "windows_stig_extra_variables" {
 }
 
 variable "target_tag_key" {
-  description = "EC2 instance tag key used to target SSM associations"
+  description = "EC2 instance tag key used to target SSM associations. Hardened AMIs are tagged with StigManaged=true."
   type        = string
-  default     = "Project"
+  default     = "StigManaged"
 }
 
 variable "target_tag_value" {
-  description = "EC2 instance tag value used to target SSM associations"
+  description = "EC2 instance tag value used to target SSM associations. Hardened AMIs are tagged with StigManaged=true."
   type        = string
-  default     = "SPEL"
+  default     = "true"
 }
 
 # -----------------------------------------------------------------------------

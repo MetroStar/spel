@@ -154,6 +154,20 @@ output "stig_enforce_windows_association_ids" {
 }
 
 # -----------------------------------------------------------------------------
+# Default Host Management Configuration (DHMC)
+# -----------------------------------------------------------------------------
+
+output "dhmc_role_name" {
+  description = "Name of the IAM role used for Default Host Management Configuration"
+  value       = var.enable_dhmc ? aws_iam_role.dhmc[0].name : null
+}
+
+output "dhmc_role_arn" {
+  description = "ARN of the IAM role used for Default Host Management Configuration"
+  value       = var.enable_dhmc ? aws_iam_role.dhmc[0].arn : null
+}
+
+# -----------------------------------------------------------------------------
 # S3
 # -----------------------------------------------------------------------------
 

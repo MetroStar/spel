@@ -84,6 +84,12 @@ variable "enable_ssm_agent_update" {
   default     = true
 }
 
+variable "enable_dhmc" {
+  description = "Enable Default Host Management Configuration (DHMC). Auto-registers all EC2 instances with SSM."
+  type        = bool
+  default     = true
+}
+
 # -----------------------------------------------------------------------------
 # Encryption
 # -----------------------------------------------------------------------------

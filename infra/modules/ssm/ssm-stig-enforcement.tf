@@ -30,7 +30,7 @@
 # uploaded to the S3 bucket at the configured ansible_s3_key path.
 #
 # Targets instances with BOTH:
-#   - Project = SPEL (or configured target tag)
+#   - StigManaged = true (or configured target tag)
 #   - StigPlatform = EL
 # -----------------------------------------------------------------------------
 
@@ -71,7 +71,7 @@ resource "aws_ssm_association" "stig_enforce_el" {
 # STIG-hardening script. This association runs it via AWS-RunShellScript.
 #
 # Targets instances with BOTH:
-#   - Project = SPEL (or configured target tag)
+#   - StigManaged = true (or configured target tag)
 #   - StigPlatform = AL2023
 # -----------------------------------------------------------------------------
 
@@ -113,7 +113,7 @@ resource "aws_ssm_association" "stig_enforce_al2023" {
 # -----------------------------------------------------------------------------
 # 3. SSM Agent Auto-Update
 # -----------------------------------------------------------------------------
-# Keeps the SSM agent up to date on all SPEL-tagged instances.
+# Keeps the SSM agent up to date on all STIG-managed instances.
 # Runs daily (default: 3AM UTC) before the patch maintenance window.
 # Uses the built-in AWS-UpdateSSMAgent document.
 # -----------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 # For STIG ENFORCEMENT (actually applying hardening), see:
 #   ssm-stig-enforcement.tf
 #
-# Associations target instances by tag (default: Project=SPEL).
+# Associations target instances by tag (default: StigManaged=true).
 # =============================================================================
 
 # -----------------------------------------------------------------------------
