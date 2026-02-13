@@ -105,18 +105,25 @@ resource "aws_iam_role_policy" "dhmc_spel" {
         ]
       },
       {
-        Sid    = "CloudWatchLogs"
+        Sid    = "CloudWatchLogsWrite"
         Effect = "Allow"
         Action = [
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
           "logs:DescribeLogStreams"
         ]
         Resource = [
           aws_cloudwatch_log_group.ssm.arn,
           "${aws_cloudwatch_log_group.ssm.arn}:*"
         ]
+      },
+      {
+        Sid    = "CloudWatchLogsDescribe"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
       },
       {
         Sid    = "KMSAccess"

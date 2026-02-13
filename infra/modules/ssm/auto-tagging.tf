@@ -47,7 +47,7 @@ resource "aws_ssm_document" "ami_tag_propagation" {
         name   = "PropagateAmiTags"
         action = "aws:executeScript"
         inputs = {
-          Runtime = "python3.11"
+          Runtime = "python3.8"
           Handler = "handler"
           InputPayload = {
             instance_ids = "{{InstanceId}}"
@@ -145,11 +145,6 @@ resource "aws_iam_role" "tag_propagation" {
         Effect    = "Allow"
         Principal = { Service = "ssm.amazonaws.com" }
         Action    = "sts:AssumeRole"
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = local.account_id
-          }
-        }
       }
     ]
   })
@@ -273,8 +268,9 @@ resource "aws_cloudwatch_event_target" "tag_propagation" {
     input_paths = {
       instance = "$.detail.instance-id"
     }
-    input_template = <<-EOT
-      {"InstanceId": ["<instance>"], "AutomationAssumeRole": ["${aws_iam_role.tag_propagation[0].arn}"]}
-    EOT
+    input_template = jsonencode({
+      InstanceId           = ["<instance>"]
+      AutomationAssumeRole = [aws_iam_role.tag_propagation[0].arn]
+    })
   }
 }
