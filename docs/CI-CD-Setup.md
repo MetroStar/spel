@@ -257,6 +257,7 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "iam:CreateRole",
         "iam:DeleteRole",
         "iam:GetRole",
+        "iam:UpdateAssumeRolePolicy",
         "iam:PutRolePolicy",
         "iam:DeleteRolePolicy",
         "iam:GetRolePolicy",

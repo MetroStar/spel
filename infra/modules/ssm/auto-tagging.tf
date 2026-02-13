@@ -47,7 +47,7 @@ resource "aws_ssm_document" "ami_tag_propagation" {
         name   = "PropagateAmiTags"
         action = "aws:executeScript"
         inputs = {
-          Runtime = "python3.8"
+          Runtime = "python3.11"
           Handler = "handler"
           InputPayload = {
             instance_ids = "{{InstanceId}}"
