@@ -17,7 +17,8 @@ resource "random_id" "bucket_suffix" {
 }
 
 resource "aws_s3_bucket" "ssm" {
-  bucket = "${var.name_prefix}-ssm-${random_id.bucket_suffix.hex}"
+  bucket        = "${var.name_prefix}-ssm-${random_id.bucket_suffix.hex}"
+  force_destroy = true
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-ssm-bucket"
@@ -144,7 +145,8 @@ resource "aws_s3_bucket_policy" "ssm" {
 # =============================================================================
 
 resource "aws_s3_bucket" "ssm_access_logs" {
-  bucket = "${var.name_prefix}-ssm-access-logs-${random_id.bucket_suffix.hex}"
+  bucket        = "${var.name_prefix}-ssm-access-logs-${random_id.bucket_suffix.hex}"
+  force_destroy = true
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-ssm-access-logs"
