@@ -387,7 +387,9 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "s3:GetObject",
         "s3:PutObject",
         "s3:DeleteObject",
-        "s3:ListBucket"
+        "s3:DeleteObjectVersion",
+        "s3:ListBucket",
+        "s3:ListBucketVersions"
       ],
       "Resource": [
         "arn:*:s3:::spel-*",
