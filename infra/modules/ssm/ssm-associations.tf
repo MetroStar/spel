@@ -23,7 +23,7 @@
 # -----------------------------------------------------------------------------
 
 resource "aws_ssm_association" "ansible_stig_check" {
-  count = var.enable_state_manager ? 1 : 0
+  count = var.enable_state_manager && var.enable_stig_enforcement ? 1 : 0
 
   name                = "AWS-ApplyAnsiblePlaybooks"
   association_name    = "${var.name_prefix}-stig-ansible-check"

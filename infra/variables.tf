@@ -73,9 +73,9 @@ variable "enable_inventory" {
 }
 
 variable "enable_stig_enforcement" {
-  description = "Create State Manager associations to enforce STIG hardening (Ansible Lockdown for EL, shell script for AL2023)"
+  description = "Create State Manager associations to enforce STIG hardening. Requires playbook packages uploaded to S3 first."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_ssm_agent_update" {

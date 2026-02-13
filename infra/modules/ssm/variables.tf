@@ -72,9 +72,14 @@ variable "enable_inventory" {
 }
 
 variable "enable_stig_enforcement" {
-  description = "Create State Manager associations to enforce STIG hardening on a schedule. Uses AWS-RunAnsiblePlaybook for EL distros and a shell script for AL2023."
+  description = <<-EOT
+    Create State Manager associations to enforce STIG hardening on a schedule.
+    Requires Ansible playbook packages to be uploaded to the S3 bucket first
+    (at the paths specified by ansible_s3_key, windows_stig_s3_key, and
+    stig_al2023_s3_key). Set to true after uploading packages.
+  EOT
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_ssm_agent_update" {
