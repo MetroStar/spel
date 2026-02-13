@@ -289,7 +289,8 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "iam:ListPolicyTags",
         "iam:ListEntitiesForPolicy",
         "iam:CreateServiceLinkedRole",
-        "iam:PassRole"
+        "iam:PassRole",
+        "sts:GetCallerIdentity"
       ],
       "Resource": "*"
     },
@@ -323,43 +324,12 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
       "Sid": "TerraformSSM",
       "Effect": "Allow",
       "Action": [
-        "ssm:CreateDocument",
-        "ssm:DeleteDocument",
-        "ssm:DescribeDocument",
-        "ssm:GetDocument",
-        "ssm:UpdateDocument",
-        "ssm:UpdateDocumentDefaultVersion",
-        "ssm:ListDocumentVersions",
-        "ssm:DescribeDocumentPermission",
-        "ssm:AddTagsToResource",
-        "ssm:RemoveTagsFromResource",
-        "ssm:ListTagsForResource",
-        "ssm:CreateAssociation",
-        "ssm:DeleteAssociation",
-        "ssm:DescribeAssociation",
-        "ssm:UpdateAssociation",
-        "ssm:CreatePatchBaseline",
-        "ssm:DeletePatchBaseline",
-        "ssm:GetPatchBaseline",
-        "ssm:UpdatePatchBaseline",
-        "ssm:RegisterPatchBaselineForPatchGroup",
-        "ssm:DeregisterPatchBaselineForPatchGroup",
-        "ssm:DescribePatchGroups",
-        "ssm:CreateMaintenanceWindow",
-        "ssm:DeleteMaintenanceWindow",
-        "ssm:GetMaintenanceWindow",
-        "ssm:UpdateMaintenanceWindow",
-        "ssm:DescribeMaintenanceWindows",
-        "ssm:RegisterTargetWithMaintenanceWindow",
-        "ssm:DeregisterTargetFromMaintenanceWindow",
-        "ssm:DescribeMaintenanceWindowTargets",
-        "ssm:RegisterTaskWithMaintenanceWindow",
-        "ssm:DeregisterTaskFromMaintenanceWindow",
-        "ssm:GetMaintenanceWindowTask",
-        "ssm:DescribeMaintenanceWindowTasks",
-        "ssm:GetServiceSetting",
-        "ssm:UpdateServiceSetting",
-        "ssm:ResetServiceSetting"
+        "ssm:*Association",
+        "ssm:*Document*",
+        "ssm:*MaintenanceWindow*",
+        "ssm:*Patch*",
+        "ssm:*ServiceSetting",
+        "ssm:*Tags*Resource"
       ],
       "Resource": "*"
     },
@@ -461,46 +431,30 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
       "Resource": "*"
     },
     {
-      "Sid": "TerraformEventBridge",
+      "Sid": "TerraformAutoTagging",
       "Effect": "Allow",
       "Action": [
-        "events:PutRule",
         "events:DeleteRule",
         "events:DescribeRule",
+        "events:ListTagsForResource",
+        "events:ListTargetsByRule",
+        "events:PutRule",
         "events:PutTargets",
         "events:RemoveTargets",
-        "events:ListTargetsByRule",
-        "events:ListTagsForResource",
         "events:TagResource",
-        "events:UntagResource"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "TerraformLambda",
-      "Effect": "Allow",
-      "Action": [
+        "events:UntagResource",
+        "lambda:AddPermission",
         "lambda:CreateFunction",
         "lambda:DeleteFunction",
         "lambda:GetFunction",
         "lambda:GetFunctionCodeSigningConfig",
         "lambda:GetPolicy",
-        "lambda:UpdateFunctionCode",
-        "lambda:UpdateFunctionConfiguration",
+        "lambda:ListTags",
         "lambda:ListVersionsByFunction",
-        "lambda:AddPermission",
         "lambda:RemovePermission",
         "lambda:TagResource",
         "lambda:UntagResource",
-        "lambda:ListTags"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "TerraformSTS",
-      "Effect": "Allow",
-      "Action": [
-        "sts:GetCallerIdentity"
+        "lambda:UpdateFunction*"
       ],
       "Resource": "*"
     }
