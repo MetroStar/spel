@@ -213,9 +213,9 @@ output "sns_topic_arn" {
 # Auto-Tagging
 # -----------------------------------------------------------------------------
 
-output "auto_tagging_automation_name" {
-  description = "Name of the SSM Automation document for AMI tag propagation"
-  value       = var.enable_auto_tagging ? aws_ssm_document.ami_tag_propagation[0].name : null
+output "auto_tagging_lambda_name" {
+  description = "Name of the Lambda function for AMI tag propagation"
+  value       = var.enable_auto_tagging ? aws_lambda_function.tag_propagation[0].function_name : null
 }
 
 output "auto_tagging_eventbridge_rule_name" {

@@ -477,6 +477,26 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
       "Resource": "*"
     },
     {
+      "Sid": "TerraformLambda",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:GetFunctionCodeSigningConfig",
+        "lambda:GetPolicy",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:ListVersionsByFunction",
+        "lambda:AddPermission",
+        "lambda:RemovePermission",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:ListTags"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "TerraformSTS",
       "Effect": "Allow",
       "Action": [
