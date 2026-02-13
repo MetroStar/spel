@@ -423,6 +423,8 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "logs:DeleteLogGroup",
         "logs:DescribeLogGroups",
         "logs:PutRetentionPolicy",
+        "logs:AssociateKmsKey",
+        "logs:DisassociateKmsKey",
         "logs:TagLogGroup",
         "logs:ListTagsLogGroup",
         "logs:TagResource",
@@ -454,6 +456,22 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "sns:TagResource",
         "sns:UntagResource",
         "sns:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TerraformEventBridge",
+      "Effect": "Allow",
+      "Action": [
+        "events:PutRule",
+        "events:DeleteRule",
+        "events:DescribeRule",
+        "events:PutTargets",
+        "events:RemoveTargets",
+        "events:ListTargetsByRule",
+        "events:ListTagsForResource",
+        "events:TagResource",
+        "events:UntagResource"
       ],
       "Resource": "*"
     },

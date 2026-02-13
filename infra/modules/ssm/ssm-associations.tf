@@ -92,8 +92,8 @@ resource "aws_ssm_association" "inventory" {
   schedule_expression = "rate(12 hours)"
 
   targets {
-    key    = "tag:${var.target_tag_key}"
-    values = [var.target_tag_value]
+    key    = "InstanceIds"
+    values = ["*"]
   }
 
   parameters = {

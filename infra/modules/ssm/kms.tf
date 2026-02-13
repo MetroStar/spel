@@ -70,7 +70,7 @@ resource "aws_kms_key" "ssm" {
         Resource = "*"
         Condition = {
           ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn" = "${local.arn_prefix}:logs:${local.region}:${local.account_id}:log-group:/ssm/${var.name_prefix}"
+            "kms:EncryptionContext:aws:logs:arn" = "${local.arn_prefix}:logs:${local.region}:${local.account_id}:log-group:/ssm/${var.name_prefix}*"
           }
         }
       },

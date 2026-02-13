@@ -208,3 +208,17 @@ output "sns_topic_arn" {
   description = "ARN of the SNS topic for SSM alerts"
   value       = aws_sns_topic.ssm_alerts.arn
 }
+
+# -----------------------------------------------------------------------------
+# Auto-Tagging
+# -----------------------------------------------------------------------------
+
+output "auto_tagging_automation_name" {
+  description = "Name of the SSM Automation document for AMI tag propagation"
+  value       = var.enable_auto_tagging ? aws_ssm_document.ami_tag_propagation[0].name : null
+}
+
+output "auto_tagging_eventbridge_rule_name" {
+  description = "Name of the EventBridge rule that triggers AMI tag propagation"
+  value       = var.enable_auto_tagging ? aws_cloudwatch_event_rule.instance_launch[0].name : null
+}

@@ -119,10 +119,11 @@ resource "aws_iam_role_policy" "dhmc_spel" {
         ]
       },
       {
-        Sid    = "KMSDecrypt"
+        Sid    = "KMSAccess"
         Effect = "Allow"
         Action = [
           "kms:Decrypt",
+          "kms:Encrypt",
           "kms:GenerateDataKey",
           "kms:DescribeKey"
         ]

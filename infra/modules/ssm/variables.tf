@@ -89,6 +89,12 @@ variable "enable_dhmc" {
   default     = true
 }
 
+variable "enable_auto_tagging" {
+  description = "Enable automatic propagation of StigPlatform and StigManaged tags from AMIs to newly launched instances via EventBridge + SSM Automation."
+  type        = bool
+  default     = true
+}
+
 # -----------------------------------------------------------------------------
 # SSM Configuration
 # -----------------------------------------------------------------------------

@@ -62,6 +62,7 @@ module "ssm" {
   enable_stig_enforcement = var.enable_stig_enforcement
   enable_ssm_agent_update = var.enable_ssm_agent_update
   enable_dhmc             = var.enable_dhmc
+  enable_auto_tagging     = var.enable_auto_tagging
   create_kms_key          = var.create_kms_key
   kms_key_arn             = var.kms_key_arn
   alert_email             = var.alert_email

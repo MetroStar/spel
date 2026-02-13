@@ -131,8 +131,8 @@ resource "aws_ssm_association" "ssm_agent_update" {
   max_errors          = "25%"
 
   targets {
-    key    = "tag:${var.target_tag_key}"
-    values = [var.target_tag_value]
+    key    = "InstanceIds"
+    values = ["*"]
   }
 }
 
