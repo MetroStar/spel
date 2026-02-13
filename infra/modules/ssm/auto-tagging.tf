@@ -30,16 +30,11 @@ resource "aws_ssm_document" "ami_tag_propagation" {
   content = jsonencode({
     schemaVersion = "0.3"
     description   = "Propagate StigPlatform and StigManaged tags from AMI to EC2 instance"
-    assumeRole    = "{{AutomationAssumeRole}}"
+    assumeRole    = aws_iam_role.tag_propagation[0].arn
     parameters = {
       InstanceId = {
         type        = "StringList"
         description = "EC2 Instance IDs to process"
-      }
-      AutomationAssumeRole = {
-        type        = "String"
-        description = "IAM role ARN for automation execution"
-        default     = ""
       }
     }
     mainSteps = [
@@ -240,16 +235,18 @@ resource "aws_iam_role_policy" "eventbridge_tag_propagation" {
         Sid    = "StartAutomation"
         Effect = "Allow"
         Action = "ssm:StartAutomationExecution"
-        Resource = [
-          "${local.arn_prefix}:ssm:${local.region}:${local.account_id}:automation-definition/${var.name_prefix}-AmiTagPropagation:*",
-          "${local.arn_prefix}:ssm:${local.region}:${local.account_id}:automation-execution/*"
-        ]
+        Resource = "*"
       },
       {
         Sid    = "PassRole"
         Effect = "Allow"
         Action = "iam:PassRole"
         Resource = aws_iam_role.tag_propagation[0].arn
+        Condition = {
+          StringLikeIfExists = {
+            "iam:PassedToService" = "ssm.amazonaws.com"
+          }
+        }
       }
     ]
   })
@@ -271,6 +268,6 @@ resource "aws_cloudwatch_event_target" "tag_propagation" {
     input_paths = {
       instance = "$.detail.instance-id"
     }
-    input_template = "{\"InstanceId\":[\"<instance>\"],\"AutomationAssumeRole\":[\"${aws_iam_role.tag_propagation[0].arn}\"]}"
+    input_template = "{\"InstanceId\":[\"<instance>\"]}"
   }
 }
