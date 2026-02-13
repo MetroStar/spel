@@ -97,7 +97,9 @@ resource "aws_iam_role_policy" "dhmc_spel" {
           "s3:GetObject",
           "s3:PutObject",
           "s3:ListBucket",
-          "s3:GetBucketLocation"
+          "s3:GetBucketLocation",
+          "s3:GetEncryptionConfiguration",
+          "s3:GetBucketAcl"
         ]
         Resource = [
           aws_s3_bucket.ssm.arn,

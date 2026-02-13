@@ -240,7 +240,10 @@ resource "aws_iam_role_policy" "eventbridge_tag_propagation" {
         Sid    = "StartAutomation"
         Effect = "Allow"
         Action = "ssm:StartAutomationExecution"
-        Resource = "${local.arn_prefix}:ssm:${local.region}:${local.account_id}:automation-definition/${var.name_prefix}-AmiTagPropagation:*"
+        Resource = [
+          "${local.arn_prefix}:ssm:${local.region}:${local.account_id}:automation-definition/${var.name_prefix}-AmiTagPropagation:*",
+          "${local.arn_prefix}:ssm:${local.region}:${local.account_id}:automation-execution/*"
+        ]
       },
       {
         Sid    = "PassRole"
@@ -268,9 +271,6 @@ resource "aws_cloudwatch_event_target" "tag_propagation" {
     input_paths = {
       instance = "$.detail.instance-id"
     }
-    input_template = jsonencode({
-      InstanceId           = ["<instance>"]
-      AutomationAssumeRole = [aws_iam_role.tag_propagation[0].arn]
-    })
+    input_template = "{\"InstanceId\":[\"<instance>\"],\"AutomationAssumeRole\":[\"${aws_iam_role.tag_propagation[0].arn}\"]}"
   }
 }
