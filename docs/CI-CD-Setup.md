@@ -308,7 +308,13 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
         "kms:EnableKeyRotation",
         "kms:ScheduleKeyDeletion",
         "kms:TagResource",
-        "kms:UntagResource"
+        "kms:UntagResource",
+        "kms:CreateGrant",
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:GenerateDataKey*",
+        "kms:ReEncryptFrom",
+        "kms:ReEncryptTo"
       ],
       "Resource": "*"
     },

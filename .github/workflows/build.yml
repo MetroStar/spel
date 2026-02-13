@@ -111,12 +111,6 @@ on:
         required: false
         type: string
         default: ""
-      # Infrastructure
-      infra_prefix:
-        description: "Infrastructure name prefix (used by infra-setup.yml)"
-        required: false
-        type: string
-        default: "spel"
       # Post-build testing
       test_windows_instance_types:
         description: "Test Windows AMIs on multiple Nitro instance types after build (opt-in)"
@@ -138,7 +132,6 @@ jobs:
     with:
       action: apply
       aws_region: us-east-1
-      infra_prefix: ${{ inputs.infra_prefix || 'spel' }}
     secrets: inherit
 
   # ==========================================================================

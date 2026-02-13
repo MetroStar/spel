@@ -54,11 +54,6 @@ on:
         required: true
         type: string
         default: "us-east-1"
-      infra_prefix:
-        description: "Prefix for resource names"
-        required: false
-        type: string
-        default: "spel"
       vpc_cidr:
         description: "VPC CIDR block"
         required: false
@@ -104,11 +99,6 @@ on:
         description: "AWS region"
         required: true
         type: string
-      infra_prefix:
-        description: "Prefix for resource names"
-        required: false
-        type: string
-        default: "spel"
       vpc_cidr:
         description: "VPC CIDR block"
         required: false
@@ -208,7 +198,7 @@ jobs:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
         run: |
           source ./bootstrap-backend.sh \
-            --prefix "${{ inputs.infra_prefix }}" \
+            --prefix "spel" \
             --region "${{ inputs.aws_region }}"
 
       - name: Terraform init
@@ -239,7 +229,7 @@ jobs:
         working-directory: infra
         run: |
           cat > ci.auto.tfvars <<EOF
-          name_prefix             = "${{ inputs.infra_prefix }}"
+          name_prefix             = "spel"
           vpc_cidr                = "${{ inputs.vpc_cidr }}"
           subnet_cidr             = "${{ inputs.subnet_cidr }}"
           public_subnet           = true
@@ -307,7 +297,7 @@ jobs:
         if: inputs.action == 'destroy'
         run: |
           # Clean up any legacy CLI-created KMS key from before the Terraform migration
-          INFRA_PREFIX="${{ inputs.infra_prefix }}"
+          INFRA_PREFIX="spel"
           for ALIAS_SUFFIX in "-ebs-key" "-ssm"; do
             KMS_ALIAS="${INFRA_PREFIX}${ALIAS_SUFFIX}"
             LEGACY_KEY_ID=$(aws kms list-aliases \
@@ -387,7 +377,7 @@ jobs:
           cat >> $GITHUB_STEP_SUMMARY << EOF
           | Action | \`${{ inputs.action }}\` |
           | Region | \`${{ inputs.aws_region }}\` |
-          | Prefix | \`${{ inputs.infra_prefix }}\` |
+          | Prefix | \`spel\` |
           | Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
           EOF
 
