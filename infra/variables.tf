@@ -73,9 +73,9 @@ variable "enable_inventory" {
 }
 
 variable "enable_stig_enforcement" {
-  description = "Create State Manager associations to enforce STIG hardening. Requires playbook packages uploaded to S3 first."
+  description = "Create State Manager associations to enforce STIG hardening. CI/CD pipelines upload playbook packages to S3 automatically."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_ssm_agent_update" {

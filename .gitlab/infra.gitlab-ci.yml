@@ -123,10 +123,70 @@ infra:create:
       echo "PKR_VAR_aws_security_group_id=$($TF_CMD output -raw security_group_id)" >> ../infra.env
       echo "PKR_VAR_iam_instance_profile=$($TF_CMD output -raw instance_profile_name)" >> ../infra.env
       echo "PKR_VAR_aws_kms_key_id=$($TF_CMD output -raw kms_key_arn 2>/dev/null || echo '')" >> ../infra.env
+      echo "S3_BUCKET_NAME=$($TF_CMD output -raw s3_bucket_name 2>/dev/null || echo '')" >> ../infra.env
 
       echo ""
       echo "=== All Infrastructure Created ==="
       $TF_CMD output
+
+    # Upload STIG playbooks to S3 — extract roles from the Docker image
+    # (no internet access needed; roles are baked into spel-builder)
+    - |
+      S3_BUCKET=$($TF_CMD -chdir=infra output -raw s3_bucket_name 2>/dev/null || echo "")
+      if [ -z "$S3_BUCKET" ]; then
+        echo "WARNING: Could not determine S3 bucket name — skipping playbook upload"
+      else
+        echo "=== Uploading STIG Playbooks to s3://${S3_BUCKET} ==="
+
+        # Resolve the Docker image tag (set by import:docker stage)
+        DOCKER_TAG=${DOCKER_IMAGE_TAG:-latest}
+        echo "Extracting roles from spel-builder:${DOCKER_TAG}"
+
+        # Extract Ansible Lockdown roles from the Docker image
+        ROLES_DIR="${CI_PROJECT_DIR}/spel/ansible/roles"
+        mkdir -p "$ROLES_DIR"
+        CID=$(docker create "spel-builder:${DOCKER_TAG}" /bin/true)
+        for ROLE in RHEL8-STIG RHEL9-STIG Windows-2016-STIG Windows-2019-STIG Windows-2022-STIG; do
+          docker cp "${CID}:/opt/ansible/roles/${ROLE}" "$ROLES_DIR/" 2>/dev/null && \
+            echo "  [OK] Extracted ${ROLE}" || \
+            echo "  [WARN] ${ROLE} not found in image"
+        done
+        docker rm "$CID" > /dev/null
+
+        # Package EL playbooks and upload
+        echo ""
+        echo "--- Packaging EL STIG playbooks ---"
+        mkdir -p "${CI_PROJECT_DIR}/dist"
+        bash "${CI_PROJECT_DIR}/tests/package-ansible-stig.sh" \
+          --output "${CI_PROJECT_DIR}/dist" \
+          --s3-bucket "$S3_BUCKET" \
+          --s3-prefix "ansible" \
+          --os-target all
+
+        aws s3 cp "${CI_PROJECT_DIR}/dist/ansible-stig-all-latest.tar.gz" \
+          "s3://${S3_BUCKET}/ansible/stig-playbook.tar.gz"
+        echo "  [OK] s3://${S3_BUCKET}/ansible/stig-playbook.tar.gz"
+
+        # Package Windows STIG playbooks
+        echo ""
+        echo "--- Packaging Windows STIG playbooks ---"
+        WIN_STAGING=$(mktemp -d)
+        mkdir -p "$WIN_STAGING/roles"
+        for ROLE in Windows-2016-STIG Windows-2019-STIG Windows-2022-STIG; do
+          [ -d "$ROLES_DIR/$ROLE" ] && cp -a "$ROLES_DIR/$ROLE" "$WIN_STAGING/roles/"
+        done
+        for PB in windows-2016-stig-playbook.yml windows-2019-stig-playbook.yml windows-2022-stig-playbook.yml; do
+          [ -f "${CI_PROJECT_DIR}/spel/ansible/$PB" ] && cp "${CI_PROJECT_DIR}/spel/ansible/$PB" "$WIN_STAGING/"
+        done
+        tar -czf "${CI_PROJECT_DIR}/dist/windows-stig-playbook.tar.gz" -C "$WIN_STAGING" .
+        aws s3 cp "${CI_PROJECT_DIR}/dist/windows-stig-playbook.tar.gz" \
+          "s3://${S3_BUCKET}/ansible/windows-stig-playbook.tar.gz"
+        echo "  [OK] s3://${S3_BUCKET}/ansible/windows-stig-playbook.tar.gz"
+        rm -rf "$WIN_STAGING"
+
+        echo ""
+        echo "=== Playbook Upload Complete ==="
+      fi
   artifacts:
     reports:
       dotenv: infra.env

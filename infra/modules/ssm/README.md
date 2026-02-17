@@ -194,7 +194,7 @@ To propagate these tags to launched instances, use **one** of:
 
 ### S3 Playbook Packaging
 
-The EL STIG enforcement and check-mode associations expect a zip at the `ansible_s3_key` path (default: `ansible/stig-playbook.zip`). Use `tests/package-ansible-stig.sh` to build it:
+The EL STIG enforcement and check-mode associations expect a tar.gz archive at the `ansible_s3_key` path (default: `ansible/stig-playbook.tar.gz`). CI/CD pipelines handle this automatically. To build manually, use `tests/package-ansible-stig.sh`:
 
 ```bash
 # Package all platforms (default)
@@ -207,7 +207,7 @@ The EL STIG enforcement and check-mode associations expect a zip at the `ansible
 The resulting zip contains:
 
 ```
-stig-playbook.zip
+stig-playbook.tar.gz
 ├── site.yml                # Wrapper playbook (auto-detects OS, includes FIPS pre/post)
 ├── boot-fips-wrapper.sh    # EL8 FIPS boot repair script
 ├── roles/
@@ -252,7 +252,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 | `patch_approve_after_days` | Patch auto-approval delay (days) | `number` | `7` | no |
 | `stig_enforcement_schedule` | Schedule for STIG enforcement runs | `string` | `rate(7 days)` | no |
 | `stig_al2023_s3_key` | S3 key for AL2023 STIG script package | `string` | `ansible/al2023-stig-script.zip` | no |
-| `windows_stig_s3_key` | S3 key for Windows STIG playbook package | `string` | `ansible/windows-stig-playbook.zip` | no |
+| `windows_stig_s3_key` | S3 key for Windows STIG playbook package | `string` | `ansible/windows-stig-playbook.tar.gz` | no |
 | `ssm_agent_update_schedule` | Schedule for SSM agent updates | `string` | `cron(0 3 ? * * *)` | no |
 | `tags` | Additional tags | `map(string)` | `{}` | no |
 

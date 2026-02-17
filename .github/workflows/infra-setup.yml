@@ -150,6 +150,9 @@ on:
       kms_key_id:
         description: "KMS Key ARN"
         value: ${{ jobs.infrastructure.outputs.kms_key_id }}
+      s3_bucket_name:
+        description: "SSM S3 bucket name"
+        value: ${{ jobs.infrastructure.outputs.s3_bucket_name }}
 
 permissions:
   id-token: write
@@ -166,6 +169,7 @@ jobs:
       security_group_id: ${{ steps.outputs.outputs.security_group_id }}
       instance_profile: ${{ steps.outputs.outputs.instance_profile }}
       kms_key_id: ${{ steps.outputs.outputs.kms_key_id }}
+      s3_bucket_name: ${{ steps.outputs.outputs.s3_bucket_name }}
 
     steps:
       - name: Validate destroy confirmation
@@ -356,12 +360,14 @@ jobs:
           SG_ID=$(terraform output -raw security_group_id 2>/dev/null || echo "")
           PROFILE=$(terraform output -raw instance_profile_name 2>/dev/null || echo "")
           KMS_ARN=$(terraform output -raw kms_key_arn 2>/dev/null || echo "")
+          S3_BUCKET=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "")
 
           echo "vpc_id=${VPC_ID}" >> $GITHUB_OUTPUT
           echo "subnet_id=${SUBNET_ID}" >> $GITHUB_OUTPUT
           echo "security_group_id=${SG_ID}" >> $GITHUB_OUTPUT
           echo "instance_profile=${PROFILE}" >> $GITHUB_OUTPUT
           echo "kms_key_id=${KMS_ARN}" >> $GITHUB_OUTPUT
+          echo "s3_bucket_name=${S3_BUCKET}" >> $GITHUB_OUTPUT
 
       - name: Create summary
         if: always()

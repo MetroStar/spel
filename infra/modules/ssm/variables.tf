@@ -74,12 +74,12 @@ variable "enable_inventory" {
 variable "enable_stig_enforcement" {
   description = <<-EOT
     Create State Manager associations to enforce STIG hardening on a schedule.
-    Requires Ansible playbook packages to be uploaded to the S3 bucket first
+    Requires Ansible playbook packages to be uploaded to the S3 bucket
     (at the paths specified by ansible_s3_key, windows_stig_s3_key, and
-    stig_al2023_s3_key). Set to true after uploading packages.
+    stig_al2023_s3_key). CI/CD pipelines handle upload automatically.
   EOT
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "enable_ssm_agent_update" {
@@ -117,9 +117,9 @@ variable "ansible_schedule" {
 }
 
 variable "ansible_s3_key" {
-  description = "S3 key (path) for the Ansible STIG playbook zip package. Set by package-ansible-stig.sh."
+  description = "S3 key (path) for the Ansible STIG playbook tar.gz package. Set by package-ansible-stig.sh."
   type        = string
-  default     = "ansible/stig-playbook.zip"
+  default     = "ansible/stig-playbook.tar.gz"
 }
 
 variable "stig_enforcement_schedule" {
@@ -178,9 +178,9 @@ variable "oscap_profile" {
 }
 
 variable "windows_stig_s3_key" {
-  description = "S3 key (path) for the Windows STIG playbook zip package containing per-version playbooks"
+  description = "S3 key (path) for the Windows STIG playbook tar.gz package containing per-version playbooks"
   type        = string
-  default     = "ansible/windows-stig-playbook.zip"
+  default     = "ansible/windows-stig-playbook.tar.gz"
 }
 
 variable "windows_stig_extra_variables" {

@@ -240,6 +240,60 @@ jobs:
           role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
           role-duration-seconds: 21600  # 6 hours - must be <= IAM role MaxSessionDuration
 
+      - name: Upload STIG playbooks to S3
+        if: needs.infra.outputs.s3_bucket_name != ''
+        run: |
+          echo "=== Uploading STIG Playbooks ==="
+
+          S3_BUCKET="${{ needs.infra.outputs.s3_bucket_name }}"
+          echo "Target bucket: ${S3_BUCKET}"
+          echo "Extracting roles from spel-builder:${IMAGE_TAG}"
+
+          # Extract Ansible Lockdown roles from the Docker image
+          ROLES_DIR="${GITHUB_WORKSPACE}/spel/ansible/roles"
+          mkdir -p "$ROLES_DIR"
+          CID=$(docker create "spel-builder:${IMAGE_TAG}" /bin/true)
+          for ROLE in RHEL8-STIG RHEL9-STIG Windows-2016-STIG Windows-2019-STIG Windows-2022-STIG; do
+            docker cp "${CID}:/opt/ansible/roles/${ROLE}" "$ROLES_DIR/" 2>/dev/null && \
+              echo "  [OK] Extracted ${ROLE}" || \
+              echo "  [WARN] ${ROLE} not found in image"
+          done
+          docker rm "$CID" > /dev/null
+
+          # Package EL playbooks and upload
+          echo ""
+          echo "--- Packaging EL STIG playbooks ---"
+          mkdir -p "${GITHUB_WORKSPACE}/dist"
+          bash "${GITHUB_WORKSPACE}/tests/package-ansible-stig.sh" \
+            --output "${GITHUB_WORKSPACE}/dist" \
+            --s3-bucket "$S3_BUCKET" \
+            --s3-prefix "ansible" \
+            --os-target all
+
+          aws s3 cp "${GITHUB_WORKSPACE}/dist/ansible-stig-all-latest.tar.gz" \
+            "s3://${S3_BUCKET}/ansible/stig-playbook.tar.gz"
+          echo "  [OK] s3://${S3_BUCKET}/ansible/stig-playbook.tar.gz"
+
+          # Package Windows STIG playbooks
+          echo ""
+          echo "--- Packaging Windows STIG playbooks ---"
+          WIN_STAGING=$(mktemp -d)
+          mkdir -p "$WIN_STAGING/roles"
+          for ROLE in Windows-2016-STIG Windows-2019-STIG Windows-2022-STIG; do
+            [ -d "$ROLES_DIR/$ROLE" ] && cp -a "$ROLES_DIR/$ROLE" "$WIN_STAGING/roles/"
+          done
+          for PB in windows-2016-stig-playbook.yml windows-2019-stig-playbook.yml windows-2022-stig-playbook.yml; do
+            [ -f "${GITHUB_WORKSPACE}/spel/ansible/$PB" ] && cp "${GITHUB_WORKSPACE}/spel/ansible/$PB" "$WIN_STAGING/"
+          done
+          tar -czf "${GITHUB_WORKSPACE}/dist/windows-stig-playbook.tar.gz" -C "$WIN_STAGING" .
+          aws s3 cp "${GITHUB_WORKSPACE}/dist/windows-stig-playbook.tar.gz" \
+            "s3://${S3_BUCKET}/ansible/windows-stig-playbook.tar.gz"
+          echo "  [OK] s3://${S3_BUCKET}/ansible/windows-stig-playbook.tar.gz"
+          rm -rf "$WIN_STAGING"
+
+          echo ""
+          echo "=== Playbook Upload Complete ==="
+
       - name: Set up environment
         run: |
           echo "=== Setting up Build Environment ==="
