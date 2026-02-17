@@ -242,13 +242,14 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
     rhel_09_251035: false
     rhel_09_251040: false
     rhel_09_251045: false
-    # Disable audit log path controls: upstream role bug — the prelim
-    # shell task that discovers the auditd log file path lacks
-    # check_mode: false, so it is skipped in --check mode, leaving
-    # discovered_auditd_logfile.stdout empty.  The file module in
-    # RHEL-09-653085/653090 then fails with "file () is absent".
-    # The AMI is already hardened at build time; these permissions
-    # do not drift.
+    # Disable audit log file path controls: upstream role bug —
+    # The prelim task "Discover auditd_logfile_path" only runs when
+    # rhel_09_653085 or rhel_09_653090 is true. But RHEL-09-653030's
+    # debug message also references discovered_auditd_logfile.stdout.
+    # In --check mode the shell task is also skipped (no check_mode:
+    # false). Disabling all three avoids undefined-variable errors.
+    # The AMI is already hardened at build time; these do not drift.
+    rhel_09_653030: false
     rhel_09_653085: false
     rhel_09_653090: false
     # Disable EL8 incompatible controls
