@@ -79,11 +79,6 @@ on:
         required: false
         type: boolean
         default: true
-      enable_stig_enforcement:
-        description: "Enable STIG enforcement via Ansible Lockdown (EL) and native script (AL2023)"
-        required: false
-        type: boolean
-        default: true
       destroy_confirmation:
         description: "Type 'destroy' to confirm teardown (required for destroy)"
         required: false
@@ -121,11 +116,6 @@ on:
         default: true
       enable_state_manager:
         description: "Enable SSM State Manager associations"
-        required: false
-        type: boolean
-        default: true
-      enable_stig_enforcement:
-        description: "Enable STIG enforcement via Ansible Lockdown (EL) and native script (AL2023)"
         required: false
         type: boolean
         default: true
@@ -241,7 +231,7 @@ jobs:
           enable_session_manager  = ${{ inputs.enable_session_manager }}
           enable_patch_manager    = ${{ inputs.enable_patch_manager }}
           enable_state_manager    = ${{ inputs.enable_state_manager }}
-          enable_stig_enforcement = ${{ inputs.enable_stig_enforcement }}
+          enable_stig_enforcement = true
           enable_ssm_agent_update = true
           enable_dhmc             = true
           enable_inventory        = true
