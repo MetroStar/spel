@@ -188,10 +188,14 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
         - stig_role == 'RHEL8-STIG'
         - ansible_distribution_major_version == '8'
 
-  roles:
-    - role: "{{ stig_role }}"
+  tasks:
+    # include_role is evaluated at runtime (after pre_tasks set stig_role).
+    # The roles: directive is resolved at parse time and would fail with
+    # "'stig_role' is undefined".
+    - name: "Apply {{ stig_role }} role"
+      ansible.builtin.include_role:
+        name: "{{ stig_role }}"
 
-  post_tasks:
     # -----------------------------------------------------------------
     # EL8 FIPS boot repair — POST step
     # Validates boot=UUID matches actual kernel device, checks HMAC
