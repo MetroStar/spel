@@ -163,9 +163,9 @@ infra:create:
           --s3-prefix "ansible" \
           --os-target all
 
-        aws s3 cp "${CI_PROJECT_DIR}/dist/ansible-stig-all-latest.tar.gz" \
-          "s3://${S3_BUCKET}/ansible/stig-playbook.tar.gz"
-        echo "  [OK] s3://${S3_BUCKET}/ansible/stig-playbook.tar.gz"
+        aws s3 cp "${CI_PROJECT_DIR}/dist/ansible-stig-all-latest.zip" \
+          "s3://${S3_BUCKET}/ansible/stig-playbook.zip"
+        echo "  [OK] s3://${S3_BUCKET}/ansible/stig-playbook.zip"
 
         # Package Windows STIG playbooks
         echo ""
@@ -178,10 +178,10 @@ infra:create:
         for PB in windows-2016-stig-playbook.yml windows-2019-stig-playbook.yml windows-2022-stig-playbook.yml; do
           [ -f "${CI_PROJECT_DIR}/spel/ansible/$PB" ] && cp "${CI_PROJECT_DIR}/spel/ansible/$PB" "$WIN_STAGING/"
         done
-        tar -czf "${CI_PROJECT_DIR}/dist/windows-stig-playbook.tar.gz" -C "$WIN_STAGING" .
-        aws s3 cp "${CI_PROJECT_DIR}/dist/windows-stig-playbook.tar.gz" \
-          "s3://${S3_BUCKET}/ansible/windows-stig-playbook.tar.gz"
-        echo "  [OK] s3://${S3_BUCKET}/ansible/windows-stig-playbook.tar.gz"
+        (cd "$WIN_STAGING" && zip -qr "${CI_PROJECT_DIR}/dist/windows-stig-playbook.zip" .)
+        aws s3 cp "${CI_PROJECT_DIR}/dist/windows-stig-playbook.zip" \
+          "s3://${S3_BUCKET}/ansible/windows-stig-playbook.zip"
+        echo "  [OK] s3://${S3_BUCKET}/ansible/windows-stig-playbook.zip"
         rm -rf "$WIN_STAGING"
 
         echo ""

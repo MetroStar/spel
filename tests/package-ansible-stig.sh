@@ -256,15 +256,15 @@ REQ_EOF
   echo "  [OK] requirements.yml"
 fi
 
-# Create the tarball
-ARCHIVE_NAME="ansible-stig-${OS_TARGET}-${TIMESTAMP}.tar.gz"
+# Create the zip archive (AWS-ApplyAnsiblePlaybooks only supports .zip)
+ARCHIVE_NAME="ansible-stig-${OS_TARGET}-${TIMESTAMP}.zip"
 echo ""
 echo "Creating archive: $ARCHIVE_NAME"
-tar -czf "$OUTPUT_DIR/$ARCHIVE_NAME" -C "$STAGING" .
+(cd "$STAGING" && zip -qr "$OUTPUT_DIR/$ARCHIVE_NAME" .)
 echo "  [OK] $(du -h "$OUTPUT_DIR/$ARCHIVE_NAME" | cut -f1)"
 
 # Also create a 'latest' symlink
-LATEST_NAME="ansible-stig-${OS_TARGET}-latest.tar.gz"
+LATEST_NAME="ansible-stig-${OS_TARGET}-latest.zip"
 ln -sf "$ARCHIVE_NAME" "$OUTPUT_DIR/$LATEST_NAME"
 echo "  [OK] $LATEST_NAME -> $ARCHIVE_NAME"
 

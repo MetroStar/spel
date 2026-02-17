@@ -117,9 +117,9 @@ variable "ansible_schedule" {
 }
 
 variable "ansible_s3_key" {
-  description = "S3 key (path) for the Ansible STIG playbook tar.gz package. Set by package-ansible-stig.sh."
+  description = "S3 key (path) for the Ansible STIG playbook .zip package. Set by package-ansible-stig.sh."
   type        = string
-  default     = "ansible/stig-playbook.tar.gz"
+  default     = "ansible/stig-playbook.zip"
 }
 
 variable "stig_enforcement_schedule" {
@@ -178,9 +178,9 @@ variable "oscap_profile" {
 }
 
 variable "windows_stig_s3_key" {
-  description = "S3 key (path) for the Windows STIG playbook tar.gz package containing per-version playbooks"
+  description = "S3 key (path) for the Windows STIG playbook .zip package containing per-version playbooks"
   type        = string
-  default     = "ansible/windows-stig-playbook.tar.gz"
+  default     = "ansible/windows-stig-playbook.zip"
 }
 
 variable "windows_stig_extra_variables" {
