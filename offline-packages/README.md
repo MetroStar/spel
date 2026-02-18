@@ -36,6 +36,8 @@ wget https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/
 - **Total: ~75 MB** (optimized - single SSM agent)
 - **Compressed: ~70 MB**
 
+> **Note**: The Dockerfile also downloads `LinuxAWSConfigureSTIG.tgz` (the AWS STIG script for AL2023), which is base64-encoded into the Docker image. That file is not stored in this directory.
+
 ## Usage in Packer
 
 These files are referenced in Packer templates via variables:

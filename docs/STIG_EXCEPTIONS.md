@@ -6,7 +6,7 @@ This document describes STIG (Security Technical Implementation Guide) controls 
 
 SPEL hardened AMIs are built using OpenSCAP with the DISA STIG profile. Due to the nature of cloud-based AMI builds, certain STIG controls cannot be applied at build time or require alternative implementations.
 
-**Target Profile:** DISA STIG for Oracle Linux 9 / RHEL 9  
+**Target Profile:** DISA STIG for RHEL 8 / RHEL 9 (and their clones: Oracle Linux, Rocky, Alma)  
 **OpenSCAP Datastream:** `ssg-ol9-ds.xml` / `ssg-rhel9-ds.xml`
 
 ---
@@ -126,6 +126,14 @@ These controls are marked "notchecked" by OpenSCAP and require manual verificati
 ## Category 6: Accepted Risk / Intentional Deviations
 
 These controls are intentionally not implemented with documented justification.
+
+### Home Directory Group Ownership — RHEL-08-010740 / RHEL-08-010741
+
+- **Control IDs:** `RHEL-08-010740` (Ensure home dir group-owner matches user primary group), `RHEL-08-010741` (Ensure home dir group has no greater access than owner)
+- **Status:** Disabled (set to `false` in Ansible STIG playbook vars)
+- **Reason — Harmful:** System accounts (e.g., `nobody`, `dbus`, `tss`, `polkitd`) have their home directory set to `/`, `/usr/bin`, or `/usr/sbin`. These controls recursively change group ownership of those directories, breaking system binaries and potentially bricking the instance.
+- **Reason — Performance:** In check mode, the RHEL8-STIG role loops over every user in `/etc/passwd`. For 7+ system accounts with `home=/`, this recursively scans the entire filesystem multiple times, causing SSM timeouts (>2 hours).
+- **Scope:** EL8 only. The equivalent EL9 controls do not exhibit this behavior.
 
 ### USB Storage (`kernel_module_usb-storage_disabled`)
 - **Status:** Not Disabled by Default

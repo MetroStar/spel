@@ -17,8 +17,8 @@ The Docker image contains:
 
 | Component | Approximate Size |
 |-----------|------------------|
-| Rocky Linux 8 base | ~200 MB |
-| Packer 1.12.0 | ~95 MB |
+| Rocky Linux 9 base (Iron Bank) | ~200 MB |
+| Packer 1.11.2 | ~95 MB |
 | AWS CLI v2 | ~150 MB |
 | Ansible Core | ~50 MB |
 | Packer plugins (Amazon, Ansible, etc.) | ~250 MB |

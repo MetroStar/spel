@@ -74,6 +74,7 @@ The SPEL CI/CD pipeline uses a **Docker-based build system** where all dependenc
 │  │  Stage 2: infra  - Provision persistent AWS infrastructure via        │   │
 │  │                    Terraform (one-time, from .gitlab/infra.gitlab-ci)  │   │
 │  │  Stage 3: build  - Build AMIs using Docker container                 │   │
+│  │  Stage 4: test   - Test AMIs (optional)                              │   │
 │  │                                                                      │   │
 │  │  Output: STIGed AMIs in AWS GovCloud                                 │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
@@ -85,14 +86,14 @@ The SPEL CI/CD pipeline uses a **Docker-based build system** where all dependenc
 
 ### Docker Image Contents
 
-The `spel-builder` Docker image (based on Rocky Linux 8) includes:
+The `spel-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes:
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| Packer | 1.12.0 | AMI building automation |
-| Ansible Core | 2.15.x | Configuration management |
+| Packer | 1.11.2 | AMI building automation |
+| Ansible Core | >=2.14, <2.19 | Configuration management |
 | AWS CLI v2 | Latest | AWS API interactions |
-| Python 3 | 3.11 | Runtime for Ansible and AWS CLI |
+| Python 3 | 3.9 (EL9 system) | Runtime for Ansible and AWS CLI |
 | Packer Plugins | Latest | Amazon, Ansible, PowerShell, Windows-update |
 | Ansible Roles | Latest | AMIgen8, AMIgen9, ash-linux |
 | Ansible Collections | Latest | amazon.aws, community.general, ansible.windows |
@@ -767,13 +768,14 @@ The credentials are passed to the Docker container via environment variables:
 
 ### Pipeline Stages
 
-The GitLab CI pipeline has 3 stages:
+The GitLab CI pipeline has 4 stages:
 
 | Stage | Purpose | Trigger | Duration |
 |-------|---------|---------|----------|
 | **import** | Import Docker image from tarball | Manual | 2-3 min |
 | **infra** | Provision persistent AWS infrastructure via Terraform (one-time) | Manual | 2-3 min |
 | **build** | Build AMIs using Docker container | Manual | 2-5 hr/OS |
+| **test** | Test AMIs on different instance types (optional) | Manual | 5-15 min |
 
 ### CI/CD Variables
 

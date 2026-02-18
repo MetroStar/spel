@@ -6,7 +6,7 @@ STIG-Partitioned Enterprise Linux (_spel_) is a project that helps create and
 publish Enterprise Linux images that are partitioned according to the
 [DISA STIG][0]. The resulting images also use LVM to simplify volume management.
 The images are configured with help from the scripts and packages in the
-[`amigen7`][31], [`amigen8`][40], and  [`amigen9`][47] projects[^1].
+[`amigen8`][40] and [`amigen9`][47] projects[^1].
 
 Notes on Lifecycle:
 
@@ -43,7 +43,10 @@ Notes on Lifecycle:
       The attribute may also be viewed internal to the EC2 by executing:
 
         ~~~
-        curl http://169.254.169.254/latest/dynamic/instance-identity/document | \
+        TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+          -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+        curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+          http://169.254.169.254/latest/dynamic/instance-identity/document | \
         grep "billingProducts"
         ~~~
 
@@ -342,7 +345,7 @@ The SPEL build system uses a **Docker-based approach** where all dependencies ar
 The build system consists of:
 
 1. **Docker Image**: `spel-builder:YYYYMMDD` (~305 MB gzipped, ~834 MB uncompressed)
-   - Based on Rocky Linux 8
+   - Based on Rocky Linux 9 (Iron Bank)
    - Includes: Packer, Ansible, AWS CLI, all plugins, roles, and collections
    - Portable: Can be transferred to air-gapped environments
 

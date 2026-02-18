@@ -24,6 +24,7 @@ and transferred to the air-gapped GitLab environment.
 1. `import` - Import Docker image from tarball
 2. `infra` - Provision persistent AWS infrastructure via Terraform (one-time, from `.gitlab/infra.gitlab-ci.yml`)
 3. `build` - Build AMIs using Docker container
+4. `test` - Test AMIs on different instance types (optional)
 
 ## Workflow Overview
 
@@ -82,7 +83,7 @@ and transferred to the air-gapped GitLab environment.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DOCKER_IMAGE_PATH` | `/transfer/spel-builder-*.tar.gz` | Path to Docker tarball |
-| `PKR_VAR_aws_region` | `us-gov-east-1` | AWS region for builds |
+| `PKR_VAR_aws_region` | `us-gov-west-1` | AWS region for builds |
 | `PKR_VAR_aws_ami_regions` | `["${PKR_VAR_aws_region}"]` | Regions to copy AMI to (defaults to build region) |
 | `REPO_MIRROR_BASEURL` | (empty) | Local yum mirror URL for air-gapped Linux builds (e.g., `http://mirror.internal.mil`) |
 | `PKR_VAR_windows_update_server` | (empty) | WSUS URL for air-gapped Windows builds (e.g., `http://wsus.internal.mil:8530`) |
@@ -115,10 +116,10 @@ The Docker image (~305 MB compressed) includes:
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Base Image | Rocky Linux 8 UBI Micro | Minimal footprint |
+| Base Image | Rocky Linux 9 (Iron Bank) | Minimal footprint |
 | Packer | 1.11.2 | With all required plugins |
-| Ansible | 2.14+ | With collections and roles |
-| Python | 3.9 | With pywinrm for Windows |
+| Ansible | >=2.14, <2.19 | With collections and roles |
+| Python | 3.9 (EL9 system) | With pywinrm for Windows |
 | AWS CLI v2 | Latest | For AWS operations |
 | AMIgen Scripts | Latest | Baked in for offline EC2 |
 
