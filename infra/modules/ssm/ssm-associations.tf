@@ -28,6 +28,8 @@ resource "aws_ssm_association" "ansible_stig_check" {
   name                = "AWS-ApplyAnsiblePlaybooks"
   association_name    = "${var.name_prefix}-stig-ansible-check"
   schedule_expression = var.ansible_schedule
+  max_concurrency     = var.patch_max_concurrency
+  max_errors          = var.patch_max_errors
 
   targets {
     key    = "tag:StigPlatform"
