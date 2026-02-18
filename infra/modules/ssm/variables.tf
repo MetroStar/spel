@@ -122,6 +122,12 @@ variable "ansible_s3_key" {
   default     = "ansible/stig-playbook.zip"
 }
 
+variable "ansible_timeout" {
+  description = "Timeout in seconds for Ansible STIG playbook execution via SSM. The RHEL8-STIG role can take over an hour in check mode."
+  type        = number
+  default     = 7200
+}
+
 variable "stig_enforcement_schedule" {
   description = "Cron or rate expression for STIG enforcement runs (applies hardening). Example: 'rate(7 days)'"
   type        = string

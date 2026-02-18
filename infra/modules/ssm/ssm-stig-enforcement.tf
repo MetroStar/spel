@@ -59,6 +59,7 @@ resource "aws_ssm_association" "stig_enforce_el" {
     Check               = "False"
     InstallDependencies = "True"
     Verbose             = "-v"
+    TimeoutSeconds      = tostring(var.ansible_timeout)
   }
 
   output_location {

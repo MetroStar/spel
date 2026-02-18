@@ -42,6 +42,7 @@ resource "aws_ssm_association" "ansible_stig_check" {
     Check               = "True"
     InstallDependencies = "True"
     Verbose             = "-v"
+    TimeoutSeconds      = tostring(var.ansible_timeout)
   }
 
   output_location {

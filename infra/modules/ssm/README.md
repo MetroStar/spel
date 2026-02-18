@@ -251,6 +251,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 | `maintenance_window_cutoff` | Task scheduling cutoff (hours) | `number` | `1` | no |
 | `patch_approve_after_days` | Patch auto-approval delay (days) | `number` | `7` | no |
 | `stig_enforcement_schedule` | Schedule for STIG enforcement runs | `string` | `rate(7 days)` | no |
+| `ansible_timeout` | Timeout in seconds for Ansible STIG playbook execution via SSM | `number` | `7200` | no |
 | `stig_al2023_s3_key` | S3 key for AL2023 STIG script package | `string` | `ansible/al2023-stig-script.zip` | no |
 | `windows_stig_s3_key` | S3 key for Windows STIG playbook package | `string` | `ansible/windows-stig-playbook.zip` | no |
 | `ssm_agent_update_schedule` | Schedule for SSM agent updates | `string` | `cron(0 3 ? * * *)` | no |
