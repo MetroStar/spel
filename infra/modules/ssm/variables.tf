@@ -166,8 +166,10 @@ variable "stig_extra_variables" {
     rhel_09_251045 = "false"
 
     # EL8 — disable incompatible controls
-    rhel8stig_copy_existing_zone = "false"
-    rhel_08_040136               = "false"
+    # RHEL-08-040090: zone copy fails (public.xml missing on clean installs);
+    # also too risky to reconfigure firewall zones via SSM on live instances.
+    rhel_08_040090 = "false"
+    rhel_08_040136 = "false"
   }
 }
 

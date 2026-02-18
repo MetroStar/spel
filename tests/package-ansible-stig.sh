@@ -253,7 +253,15 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
     rhel_09_653085: false
     rhel_09_653090: false
     # Disable EL8 incompatible controls
-    rhel8stig_copy_existing_zone: false
+    # RHEL-08-040090: firewall zone copy fails — /etc/firewalld/zones/public.xml
+    # does not exist on a clean instance ($ZONE.xml only lives under
+    # /usr/lib/firewalld/zones/).  Disabling the control entirely avoids the
+    # failure AND prevents the SSM association from reconfiguring firewall
+    # zones on running instances (risky: could lock out SSH/SSM).
+    # NOTE: rhel8stig_copy_existing_zone is intentionally NOT used here —
+    # the SSM ExtraVariables passes it as the string "false" which is
+    # truthy in Jinja2, defeating the purpose.
+    rhel_08_040090: false
     rhel_08_040136: false
 PLAYBOOK_EOF
 
