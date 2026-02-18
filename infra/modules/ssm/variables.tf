@@ -152,30 +152,21 @@ variable "stig_extra_variables" {
     and enforcement runs. Passed via ExtraVariables in key=value format.
     Must include safety-critical overrides to prevent SSH/SSM lockout.
     Combines EL8 and EL9 variables — Ansible roles ignore unknown vars.
-    NOTE: Only scalar values (string, bool, number) are supported here.
-    List/complex values must go in the playbook package's site.yml vars.
+
+    IMPORTANT: Do NOT put control-disable overrides (e.g. rhel_09_251010=false)
+    here. The key=value format passes all values as strings, and the string
+    "false" is TRUTHY in Jinja2's when: conditions — so it would ENABLE the
+    control instead of disabling it (and override site.yml's proper YAML
+    boolean). All control-disable vars must go in site.yml (YAML booleans).
+
+    Only truthy/string values belong here (e.g. system_is_ec2=true).
+    List/complex values must also go in site.yml vars.
   EOT
   type        = map(string)
   default = {
-    # Common
+    # Common — these are truthy values, safe as strings
     SSM           = "true"
     system_is_ec2 = "true"
-
-    # EL9 — disable AIDE/crypto controls incompatible with EC2
-    rhel_09_251010 = "false"
-    rhel_09_251015 = "false"
-    rhel_09_251020 = "false"
-    rhel_09_251025 = "false"
-    rhel_09_251030 = "false"
-    rhel_09_251035 = "false"
-    rhel_09_251040 = "false"
-    rhel_09_251045 = "false"
-
-    # EL8 — disable incompatible controls
-    # RHEL-08-040090: zone copy fails (public.xml missing on clean installs);
-    # also too risky to reconfigure firewall zones via SSM on live instances.
-    rhel_08_040090 = "false"
-    rhel_08_040136 = "false"
   }
 }
 
