@@ -189,6 +189,17 @@ The IAM role or user that **runs Packer** (the credentials passed to the Docker 
         "servicequotas:GetServiceQuota"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "PackerSSMValidation",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:DescribeInstanceInformation",
+        "ssm:SendCommand",
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommandInvocations"
+      ],
+      "Resource": "*"
     }
   ]
 }
