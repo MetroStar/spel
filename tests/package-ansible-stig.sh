@@ -263,6 +263,16 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
     # truthy in Jinja2, defeating the purpose.
     rhel_08_040090: false
     rhel_08_040136: false
+    # RHEL-08-010740 / 010741: These controls loop over EVERY user in
+    # /etc/passwd (including system accounts like bin, daemon, nobody,
+    # dbus, tss, etc.) and change group-ownership of their "home"
+    # directories. This is actively harmful — it changes the group of
+    # /, /usr/bin, /usr/sbin, /var/adm, etc. to root, which can break
+    # SELinux contexts and package verification. The loop is also
+    # extremely slow on EL8 (Python 3.6), causing SSM check-mode
+    # associations to exceed even the 7200s timeout.
+    rhel_08_010740: false
+    rhel_08_010741: false
 PLAYBOOK_EOF
 
 echo "  [OK] site.yml"
