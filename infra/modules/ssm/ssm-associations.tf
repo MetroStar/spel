@@ -38,11 +38,11 @@ resource "aws_ssm_association" "ansible_stig_check" {
 
   parameters = {
     SourceType          = "S3"
-    SourceInfo          = jsonencode({ path = "https://s3.amazonaws.com/${aws_s3_bucket.ssm.id}/${var.ansible_s3_key}" })
+    SourceInfo          = jsonencode({ path = "https://${aws_s3_bucket.ssm.bucket_regional_domain_name}/${var.ansible_s3_key}" })
     PlaybookFile        = "site.yml"
     ExtraVariables      = local.el_extra_vars
     Check               = "True"
-    InstallDependencies = "True"
+    InstallDependencies = var.install_dependencies ? "True" : "False"
     Verbose             = "-v"
     TimeoutSeconds      = tostring(var.ansible_timeout)
   }

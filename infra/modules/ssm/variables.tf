@@ -128,6 +128,18 @@ variable "ansible_timeout" {
   default     = 7200
 }
 
+variable "install_dependencies" {
+  description = <<-EOT
+    Whether to let the AWS-ApplyAnsiblePlaybooks SSM document install Ansible
+    via pip/yum/apt before running playbooks.  Set to false for air-gapped
+    environments where instances have no internet access — Ansible must
+    already be installed on the AMI (SPEL AMIs include ansible-core).
+    When true, SSM runs 'pip install ansible' which requires PyPI access.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "stig_enforcement_schedule" {
   description = "Cron or rate expression for STIG enforcement runs (applies hardening). Example: 'rate(7 days)'"
   type        = string
@@ -188,10 +200,18 @@ variable "windows_stig_extra_variables" {
     Combines all version-specific overrides — Ansible roles ignore unknown vars.
     WinRM/Packer-specific vars are omitted (SSM runs Ansible locally).
     Passed via ExtraVariables in key=value format (scalars only).
+
+    IMPORTANT: Do NOT put control-disable overrides (e.g. wn16_cc_000500=false)
+    here. The key=value format passes all values as strings, and the string
+    "false" is TRUTHY in Jinja2's when: conditions — so it would ENABLE the
+    control instead of disabling it. All control-disable vars must go in the
+    Windows playbook's vars: section (YAML booleans).
+
+    Only truthy/string values and non-boolean configuration belong here.
   EOT
   type        = map(string)
   default = {
-    # Common Windows STIG vars
+    # Common Windows STIG vars — string config values (not boolean toggles)
     SSM                           = "true"
     ansible_windows_domain_role   = "Standalone"
     ansible_windows_domain_member = "false"
@@ -199,40 +219,17 @@ variable "windows_stig_extra_variables" {
     ansible_virtualization_type   = "hvm"
     win_skip_for_test             = "false"
 
-    # Win2016 — disable EC2-incompatible controls
+    # Non-boolean overrides
     wn16_00_000030_pass_age           = "60"
-    wn16_cc_000500                    = "false"
-    wn16_cc_000530                    = "false"
-    wn16_so_000010                    = "false"
-    wn16_so_000020                    = "false"
-    wn16_so_000030                    = "false"
-    wn16_00_000450                    = "false"
-    wn16_cc_000010                    = "false"
-    wn16_cc_000020                    = "false"
     wn16stig_newadministratorname     = "maintuser"
-
-    # Win2019 — disable EC2-incompatible controls
-    wn19_cc_000470                    = "false"
-    wn19_cc_000500                    = "false"
-    wn19_so_000010                    = "false"
-    wn19_so_000020                    = "false"
-    wn19_so_000030                    = "false"
-    wn19_00_000450                    = "false"
-    wn19_cc_000010                    = "false"
-    wn19_cc_000020                    = "false"
     wn19stig_newadministratorname     = "maintuser"
-
-    # Win2022 — disable EC2-incompatible controls
-    wn22_ac_000010                    = "false"
-    wn22_cc_000470                    = "false"
-    wn22_cc_000500                    = "false"
-    wn22_so_000010                    = "false"
-    wn22_so_000020                    = "false"
-    wn22_so_000030                    = "false"
-    wn22_00_000450                    = "false"
-    wn22_cc_000010                    = "false"
-    wn22_cc_000020                    = "false"
     wn22stig_newadministratorname     = "maintuser"
+
+    # NOTE: Control-disable vars (wn16_cc_000500, wn19_so_000010, etc.)
+    # have been moved out of ExtraVariables because string "false" is
+    # truthy in Jinja2. They must be set as YAML booleans in the Windows
+    # playbook's vars: section, same as the EL STIG controls in site.yml.
+    # See: tests/package-ansible-stig.sh for the EL equivalent.
   }
 }
 

@@ -154,6 +154,48 @@ The module is fully GovCloud-compatible:
 - KMS key policy uses dynamic partition
 - Set `AWS_USE_FIPS_ENDPOINT=true` for FIPS compliance
 
+## Air-Gapped / Disconnected Environments
+
+This module is designed for air-gapped environments with no internet access. All communication routes through VPC endpoints:
+
+| Service | Endpoint Type | Purpose |
+|---------|---------------|----------|
+| `ssm` | Interface | SSM agent ↔ service communication |
+| `ssmmessages` | Interface | Session Manager WebSocket channels |
+| `ec2messages` | Interface | SSM message delivery |
+| `logs` | Interface | CloudWatch Logs delivery |
+| `kms` | Interface | Encryption key operations |
+| `s3` | Gateway | S3 playbook downloads + result uploads |
+
+### Key settings for air-gapped deployments
+
+```hcl
+module "ssm" {
+  source = "./modules/ssm"
+
+  # ...
+  enable_vpc_endpoints = true    # Required — creates all VPC endpoints
+  install_dependencies = false   # Default — DO NOT set true without internet
+}
+```
+
+### Pre-installed requirements
+
+Since `install_dependencies = false` (default), these must be on the AMI:
+
+| Package | Required By | SPEL AMI Status |
+|---------|-------------|------------------|
+| `ansible-core` | Ansible STIG playbook execution | Pre-installed |
+| `openscap-scanner` | OpenSCAP compliance scans | Pre-installed |
+| `scap-security-guide` | SCAP data streams (benchmarks) | Pre-installed |
+| `unzip`, `wget` | SSM document dependencies | Pre-installed |
+
+All packages are pre-installed on SPEL-built AMIs, so no internet access is needed at runtime.
+
+### S3 URL format
+
+All SourceInfo URLs use region-aware virtual-hosted-style format (`https://<bucket>.s3.<region>.amazonaws.com/`) instead of the global `s3.amazonaws.com` path. This ensures S3 downloads route correctly through the S3 VPC gateway endpoint.
+
 ## Instance Targeting
 
 SSM associations use **platform-specific targeting** via the `StigPlatform` tag for platform-specific operations, and the `StigManaged=true` tag (configurable via `target_tag_key`/`target_tag_value`) for cross-platform operations.
@@ -240,6 +282,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 | `enable_stig_enforcement` | Enable STIG enforcement (Ansible Lockdown for EL, native script for AL2023) | `bool` | `true` | no |
 | `enable_ssm_agent_update` | Enable automatic SSM agent updates | `bool` | `true` | no |
 | `enable_dhmc` | Enable Default Host Management Configuration (auto-registers all instances) | `bool` | `true` | no |
+| `install_dependencies` | Let SSM install Ansible via pip (set false for air-gapped) | `bool` | `false` | no |
 | `target_tag_key` | Instance tag key for SSM association targeting | `string` | `StigManaged` | no |
 | `target_tag_value` | Instance tag value for SSM association targeting | `string` | `true` | no |
 | `create_instance_profile` | Create IAM instance profile | `bool` | `true` | no |
