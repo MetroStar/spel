@@ -241,25 +241,6 @@ jobs:
           echo "=== Generated tfvars ==="
           cat ci.auto.tfvars
 
-      - name: Handle pre-existing SSM Session Manager document
-        if: inputs.action == 'plan' || inputs.action == 'apply'
-        working-directory: infra
-        run: |
-          # SSM-SessionManagerRunShell is a per-account singleton. If it exists
-          # in AWS but not in Terraform state, delete it so Terraform can create
-          # it fresh. This handles fresh deploys where a prior stack left it behind.
-          if aws ssm describe-document --name SSM-SessionManagerRunShell &>/dev/null; then
-            if ! terraform state show 'module.ssm.aws_ssm_document.session_manager_prefs[0]' &>/dev/null; then
-              echo "Deleting orphaned SSM-SessionManagerRunShell document..."
-              aws ssm delete-document --name SSM-SessionManagerRunShell || true
-              echo "Deleted — Terraform will recreate it."
-            else
-              echo "SSM-SessionManagerRunShell already in Terraform state, skipping."
-            fi
-          else
-            echo "SSM-SessionManagerRunShell does not exist yet, skipping."
-          fi
-
       - name: Terraform plan
         if: inputs.action == 'plan' || inputs.action == 'apply'
         working-directory: infra
@@ -286,59 +267,6 @@ jobs:
           terraform destroy -auto-approve -input=false
           echo ""
           echo "=== Infrastructure Destroyed ==="
-
-      - name: Clean up legacy CLI resources
-        if: inputs.action == 'destroy'
-        run: |
-          # Clean up any legacy CLI-created KMS key from before the Terraform migration
-          INFRA_PREFIX="spel"
-          for ALIAS_SUFFIX in "-ebs-key" "-ssm"; do
-            KMS_ALIAS="${INFRA_PREFIX}${ALIAS_SUFFIX}"
-            LEGACY_KEY_ID=$(aws kms list-aliases \
-              --query "Aliases[?AliasName=='alias/${KMS_ALIAS}'].TargetKeyId" \
-              --output text 2>/dev/null || echo "")
-
-            if [ -n "$LEGACY_KEY_ID" ] && [ "$LEGACY_KEY_ID" != "None" ]; then
-              echo "Cleaning up legacy CLI-managed KMS key (alias/${KMS_ALIAS})..."
-              aws kms delete-alias --alias-name "alias/${KMS_ALIAS}" 2>/dev/null || true
-              aws kms schedule-key-deletion --key-id "${LEGACY_KEY_ID}" --pending-window-in-days 30 2>/dev/null || true
-              echo "✓ Legacy KMS key scheduled for deletion in 30 days"
-            fi
-          done
-
-          # Clean up legacy IAM resources that may exist from CLI era
-          ROLE_NAME="${INFRA_PREFIX}-packer-builder-role"
-          PROFILE_NAME="${INFRA_PREFIX}-packer-builder-profile"
-          POLICY_NAME="${INFRA_PREFIX}-packer-builder-policy"
-
-          # Instance profile
-          if aws iam get-instance-profile --instance-profile-name "${PROFILE_NAME}" &>/dev/null 2>&1; then
-            aws iam remove-role-from-instance-profile \
-              --instance-profile-name "${PROFILE_NAME}" \
-              --role-name "${ROLE_NAME}" 2>/dev/null || true
-            aws iam delete-instance-profile --instance-profile-name "${PROFILE_NAME}" 2>/dev/null || true
-            echo "✓ Cleaned up legacy instance profile"
-          fi
-
-          # Policy
-          POLICY_ARN=$(aws iam list-policies --scope Local \
-            --query "Policies[?PolicyName=='${POLICY_NAME}'].Arn" --output text 2>/dev/null || echo "")
-          if [ -n "$POLICY_ARN" ] && [ "$POLICY_ARN" != "None" ]; then
-            aws iam detach-role-policy --role-name "${ROLE_NAME}" --policy-arn "${POLICY_ARN}" 2>/dev/null || true
-            aws iam delete-policy --policy-arn "${POLICY_ARN}" 2>/dev/null || true
-            echo "✓ Cleaned up legacy IAM policy"
-          fi
-
-          # Role — detach any remaining managed policies first
-          if aws iam get-role --role-name "${ROLE_NAME}" &>/dev/null 2>&1; then
-            aws iam list-attached-role-policies --role-name "${ROLE_NAME}" \
-              --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null | tr '\t' '\n' | \
-              while read -r arn; do
-                [ -n "$arn" ] && aws iam detach-role-policy --role-name "${ROLE_NAME}" --policy-arn "$arn" 2>/dev/null || true
-              done
-            aws iam delete-role --role-name "${ROLE_NAME}" 2>/dev/null || true
-            echo "✓ Cleaned up legacy IAM role"
-          fi
 
       - name: Export outputs
         if: inputs.action == 'apply'
