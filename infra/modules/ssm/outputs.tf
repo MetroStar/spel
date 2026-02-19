@@ -100,6 +100,16 @@ output "ssm_document_oscap_arn" {
   value       = aws_ssm_document.oscap_scan.arn
 }
 
+output "ssm_document_windows_ansible_name" {
+  description = "Name of the custom SSM document for running Ansible on Windows"
+  value       = aws_ssm_document.windows_ansible.name
+}
+
+output "ssm_document_windows_ansible_arn" {
+  description = "ARN of the custom SSM document for running Ansible on Windows"
+  value       = aws_ssm_document.windows_ansible.arn
+}
+
 output "session_manager_document_name" {
   description = "Name of the Session Manager preferences document"
   value       = var.enable_session_manager ? aws_ssm_document.session_manager_prefs[0].name : null

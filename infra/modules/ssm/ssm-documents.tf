@@ -52,7 +52,7 @@ resource "aws_ssm_document" "oscap_scan" {
             "PROFILE='{{ Profile }}'",
             "S3_BUCKET='{{ S3Bucket }}'",
             "S3_PREFIX='{{ S3KeyPrefix }}'",
-            "INSTANCE_ID=$(ec2-metadata -i 2>/dev/null | awk '{print $2}' || TOKEN=$(curl -s -X PUT 'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600') && curl -s -H \"X-aws-ec2-metadata-token: $TOKEN\" http://169.254.169.254/latest/meta-data/instance-id)",
+            "INSTANCE_ID=$(ec2-metadata -i 2>/dev/null | awk '{print $2}' || { TOKEN=$(curl -sf -X PUT 'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600') && curl -sf -H \"X-aws-ec2-metadata-token: $TOKEN\" http://169.254.169.254/latest/meta-data/instance-id; })",
             "TIMESTAMP=$(date +%Y%m%d-%H%M%S)",
             "RESULTS_DIR=$(mktemp -d)",
             "",
@@ -166,6 +166,173 @@ resource "aws_ssm_document" "oscap_scan" {
 
   tags = merge(local.common_tags, {
     Name = "${var.name_prefix}-RunOpenSCAPScan"
+  })
+}
+
+# -----------------------------------------------------------------------------
+# 2. Windows Ansible Playbook Runner
+# -----------------------------------------------------------------------------
+# Custom SSM document that installs Ansible on Windows via pip and runs a
+# playbook from an S3 package. Required because the AWS-managed
+# AWS-ApplyAnsiblePlaybooks document only supports Linux (its steps use
+# aws:runShellScript which has a platformType=Linux precondition).
+#
+# Steps:
+#   1. Install/upgrade pip and Ansible via PowerShell
+#   2. Download and extract the playbook package from S3
+#   3. Run ansible-playbook with configurable extra vars and check mode
+# -----------------------------------------------------------------------------
+
+resource "aws_ssm_document" "windows_ansible" {
+  name            = "${var.name_prefix}-RunWindowsAnsiblePlaybook"
+  document_type   = "Command"
+  document_format = "YAML"
+
+  content = yamlencode({
+    schemaVersion = "2.2"
+    description   = "Install Ansible and run a playbook on Windows from an S3 package"
+    parameters = {
+      SourceUrl = {
+        type        = "String"
+        description = "S3 URL of the playbook .zip package"
+      }
+      PlaybookFile = {
+        type        = "String"
+        description = "Relative path to the playbook file inside the package"
+        default     = "site.yml"
+      }
+      ExtraVariables = {
+        type        = "String"
+        description = "Space-separated key=value extra variables"
+        default     = ""
+      }
+      Check = {
+        type          = "String"
+        description   = "Run in check mode (True/False)"
+        default       = "False"
+        allowedValues = ["True", "False"]
+      }
+      Verbose = {
+        type        = "String"
+        description = "Ansible verbosity flag (-v, -vv, etc.)"
+        default     = "-v"
+      }
+      TimeoutSeconds = {
+        type        = "String"
+        description = "Execution timeout in seconds"
+        default     = "3600"
+      }
+    }
+    mainSteps = [
+      {
+        action = "aws:runPowerShellScript"
+        name   = "RunWindowsAnsiblePlaybook"
+        precondition = {
+          StringEquals = ["platformType", "Windows"]
+        }
+        inputs = {
+          timeoutSeconds = "{{ TimeoutSeconds }}"
+          runCommand = [
+            "$ErrorActionPreference = 'Stop'",
+            "",
+            "# ----- Helper: ensure pip + ansible are installed -----",
+            "Write-Host '=== Installing/upgrading Ansible ==='",
+            "if (-not (Get-Command python -ErrorAction SilentlyContinue)) {",
+            "  Write-Host 'ERROR: Python is not installed on this instance.'",
+            "  exit 1",
+            "}",
+            "python -m pip install --upgrade pip 2>&1 | Write-Host",
+            "python -m pip install --upgrade ansible-core pywinrm 2>&1 | Write-Host",
+            "",
+            "# Verify ansible-playbook is available",
+            "$ansiblePath = (python -c \"import shutil; print(shutil.which('ansible-playbook') or '')\" 2>$null).Trim()",
+            "if (-not $ansiblePath) {",
+            "  # Try the Python Scripts directory directly",
+            "  $scriptsDir = python -c \"import sys, os; print(os.path.join(sys.prefix, 'Scripts'))\"",
+            "  $env:PATH = \"$scriptsDir;$env:PATH\"",
+            "  $ansiblePath = (Get-Command ansible-playbook -ErrorAction SilentlyContinue).Source",
+            "}",
+            "if (-not $ansiblePath) {",
+            "  Write-Host 'ERROR: ansible-playbook not found after pip install.'",
+            "  exit 1",
+            "}",
+            "Write-Host \"  ansible-playbook: $ansiblePath\"",
+            "& $ansiblePath --version | Select-Object -First 1 | Write-Host",
+            "",
+            "# ----- Download and extract playbook package from S3 -----",
+            "Write-Host ''",
+            "Write-Host '=== Downloading playbook package from S3 ==='",
+            "$workDir = Join-Path $env:TEMP \"ansible-$(Get-Date -Format 'yyyyMMdd-HHmmss')\"",
+            "New-Item -ItemType Directory -Force -Path $workDir | Out-Null",
+            "$zipPath = Join-Path $workDir 'playbook.zip'",
+            "",
+            "# Parse S3 URL to bucket and key",
+            "$sourceUrl = '{{ SourceUrl }}'",
+            "if ($sourceUrl -match '^https://(.+?)\\.s3[.-].*?/(.*+)$') {",
+            "  $bucket = $Matches[1]; $key = $Matches[2]",
+            "} elseif ($sourceUrl -match '^s3://([^/]+)/(.+)$') {",
+            "  $bucket = $Matches[1]; $key = $Matches[2]",
+            "} else {",
+            "  Write-Host \"ERROR: Cannot parse S3 URL: $sourceUrl\"",
+            "  exit 1",
+            "}",
+            "",
+            "aws s3 cp \"s3://$bucket/$key\" $zipPath 2>&1 | Write-Host",
+            "if ($LASTEXITCODE -ne 0) { Write-Host 'ERROR: S3 download failed'; exit 1 }",
+            "",
+            "Expand-Archive -Path $zipPath -DestinationPath $workDir -Force",
+            "Write-Host '  Package extracted.'",
+            "",
+            "# ----- Run the playbook -----",
+            "Write-Host ''",
+            "Write-Host '=== Running Ansible Playbook ==='",
+            "$playbookPath = Join-Path $workDir '{{ PlaybookFile }}'",
+            "if (-not (Test-Path $playbookPath)) {",
+            "  Write-Host \"ERROR: Playbook not found: $playbookPath\"",
+            "  exit 1",
+            "}",
+            "",
+            "$ansibleArgs = @($playbookPath, '--connection', 'local', '-i', 'localhost,', '{{ Verbose }}')",
+            "",
+            "# Check mode",
+            "if ('{{ Check }}' -eq 'True') {",
+            "  $ansibleArgs += '--check'",
+            "  Write-Host '  Mode: CHECK (dry-run, no changes)'",
+            "} else {",
+            "  Write-Host '  Mode: ENFORCE'",
+            "}",
+            "",
+            "# Extra variables",
+            "$extraVars = '{{ ExtraVariables }}'",
+            "if ($extraVars) {",
+            "  $ansibleArgs += @('--extra-vars', $extraVars)",
+            "}",
+            "",
+            "Write-Host \"  Playbook: {{ PlaybookFile }}\"",
+            "Write-Host \"  Args: $($ansibleArgs -join ' ')\"",
+            "Write-Host ''",
+            "",
+            "& $ansiblePath @ansibleArgs",
+            "$exitCode = $LASTEXITCODE",
+            "",
+            "# ----- Cleanup -----",
+            "Remove-Item -Recurse -Force $workDir -ErrorAction SilentlyContinue",
+            "",
+            "if ($exitCode -ne 0) {",
+            "  Write-Host \"Ansible playbook exited with code: $exitCode\"",
+            "  exit $exitCode",
+            "}",
+            "",
+            "Write-Host ''",
+            "Write-Host '=== Playbook completed successfully ==='"
+          ]
+        }
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name_prefix}-RunWindowsAnsiblePlaybook"
   })
 }
 

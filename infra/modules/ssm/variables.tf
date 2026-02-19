@@ -179,6 +179,12 @@ variable "stig_extra_variables" {
     # Common — these are truthy values, safe as strings
     SSM           = "true"
     system_is_ec2 = "true"
+
+    # Use platform-python on EL8 (Python 3.6 with libselinux bindings).
+    # EL9 also has /usr/libexec/platform-python so this is safe for both.
+    # Without this, Ansible discovers /usr/bin/python3.9 on OL8 which
+    # lacks the libselinux-python3 bindings and breaks sefcontext tasks.
+    ansible_python_interpreter = "/usr/libexec/platform-python"
   }
 }
 

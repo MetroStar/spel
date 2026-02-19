@@ -94,7 +94,7 @@ resource "aws_ssm_association" "stig_enforce_al2023" {
   }
 
   parameters = {
-    commands = jsonencode([
+    commands = join("\n", [
       "set -eu",
       "WORK_DIR=$(mktemp -d)",
       "trap 'rm -rf \"$WORK_DIR\"' EXIT",
@@ -170,7 +170,7 @@ locals {
 resource "aws_ssm_association" "stig_enforce_windows" {
   for_each = local.windows_stig_versions
 
-  name                = "AWS-ApplyAnsiblePlaybooks"
+  name                = aws_ssm_document.windows_ansible.name
   association_name    = "${var.name_prefix}-stig-enforce-${each.key}"
   schedule_expression = var.stig_enforcement_schedule
   max_concurrency     = var.patch_max_concurrency
@@ -182,13 +182,11 @@ resource "aws_ssm_association" "stig_enforce_windows" {
   }
 
   parameters = {
-    SourceType          = "S3"
-    SourceInfo          = jsonencode({ path = "https://${aws_s3_bucket.ssm.bucket_regional_domain_name}/${var.windows_stig_s3_key}" })
-    PlaybookFile        = each.value.playbook_file
-    ExtraVariables      = local.windows_extra_vars
-    Check               = "False"
-    InstallDependencies = var.install_dependencies ? "True" : "False"
-    Verbose             = "-v"
+    SourceUrl      = "https://${aws_s3_bucket.ssm.bucket_regional_domain_name}/${var.windows_stig_s3_key}"
+    PlaybookFile   = each.value.playbook_file
+    ExtraVariables = local.windows_extra_vars
+    Check          = "False"
+    Verbose        = "-v"
   }
 
   output_location {
