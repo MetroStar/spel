@@ -69,3 +69,31 @@ module "ssm" {
 
   tags = local.common_tags
 }
+
+# -----------------------------------------------------------------------------
+# Cross-module policy: Grant Packer builder role S3 access to SSM bucket
+# (Lives in root module to avoid circular dependency between iam and ssm modules)
+# -----------------------------------------------------------------------------
+
+resource "aws_iam_role_policy" "packer_s3_access" {
+  name = "${var.name_prefix}-packer-builder-s3"
+  role = module.iam.role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "S3BuildArtifacts"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          module.ssm.s3_bucket_arn,
+          "${module.ssm.s3_bucket_arn}/*"
+        ]
+      }
+    ]
+  })
+}
