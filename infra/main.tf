@@ -93,6 +93,15 @@ resource "aws_iam_role_policy" "packer_s3_access" {
           module.ssm.s3_bucket_arn,
           "${module.ssm.s3_bucket_arn}/*"
         ]
+      },
+      {
+        Sid    = "KMSDecryptBuildArtifacts"
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = module.ssm.kms_key_arn != null ? [module.ssm.kms_key_arn] : ["*"]
       }
     ]
   })
