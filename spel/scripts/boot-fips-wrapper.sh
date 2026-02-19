@@ -32,6 +32,11 @@ backup_file() {
   local f="$1"; local ts
   ts=$(date +%s)
   if [[ -f "$f" ]]; then
+    # Remove prior backups to avoid filling /boot (limited space)
+    local old_bak
+    for old_bak in "${f}".bak.*; do
+      [[ -f "$old_bak" ]] && rm -f -- "$old_bak" && LOG "Removed old backup $old_bak"
+    done
     cp -a -- "$f" "${f}.bak.${ts}"
     LOG "Backed up $f -> ${f}.bak.${ts}"
   fi

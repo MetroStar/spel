@@ -274,6 +274,39 @@ jobs:
             "s3://${S3_BUCKET}/ansible/stig-playbook.zip"
           echo "  [OK] s3://${S3_BUCKET}/ansible/stig-playbook.zip"
 
+          # Package AL2023 STIG script and upload
+          echo ""
+          echo "--- Packaging AL2023 STIG script ---"
+          AL2023_STAGING=$(mktemp -d)
+          # Extract the base64-encoded AWS STIG tarball from the Docker image
+          CID=$(docker create "spel-builder:${IMAGE_TAG}" /bin/true)
+          docker cp "${CID}:/opt/offline-packages/LinuxAWSConfigureSTIG.tgz.b64" "$AL2023_STAGING/" 2>/dev/null && \
+            echo "  [OK] Extracted LinuxAWSConfigureSTIG.tgz.b64" || \
+            { echo "  [ERROR] LinuxAWSConfigureSTIG.tgz.b64 not found in image"; docker rm "$CID" > /dev/null; exit 1; }
+          docker rm "$CID" > /dev/null
+          # Decode and extract the STIG script
+          base64 -d "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz.b64" > "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz"
+          tar xzf "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz" -C "$AL2023_STAGING"
+          rm -f "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz" "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz.b64"
+          # Create wrapper script that the SSM association calls
+          printf '%s\n' '#!/bin/bash' \
+            'set -eu' \
+            'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"' \
+            'if [[ -d "$SCRIPT_DIR/linux_stigs" && -f "$SCRIPT_DIR/linux_stigs/main.sh" ]]; then' \
+            '  chmod +x "$SCRIPT_DIR/linux_stigs/main.sh"' \
+            '  "$SCRIPT_DIR/linux_stigs/main.sh" -d "$SCRIPT_DIR/linux_stigs/" -l High -h yes -s yes' \
+            'else' \
+            '  echo "ERROR: linux_stigs/main.sh not found in $SCRIPT_DIR"' \
+            '  ls -la "$SCRIPT_DIR/" 2>/dev/null' \
+            '  exit 1' \
+            'fi' > "$AL2023_STAGING/apply-stig.sh"
+          chmod +x "$AL2023_STAGING/apply-stig.sh"
+          (cd "$AL2023_STAGING" && zip -qr "${GITHUB_WORKSPACE}/dist/al2023-stig-script.zip" .)
+          aws s3 cp "${GITHUB_WORKSPACE}/dist/al2023-stig-script.zip" \
+            "s3://${S3_BUCKET}/ansible/al2023-stig-script.zip"
+          echo "  [OK] s3://${S3_BUCKET}/ansible/al2023-stig-script.zip"
+          rm -rf "$AL2023_STAGING"
+
           # Package Windows STIG playbooks
           echo ""
           echo "--- Packaging Windows STIG playbooks ---"
