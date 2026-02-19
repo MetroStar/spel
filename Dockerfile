@@ -238,6 +238,7 @@ RUN mkdir -p ${PYTHON_WIN_DEPS_PATH} \
         --only-binary=:all: \
         ansible-core \
         pywinrm \
+        sspilib \
     && echo "Downloaded Windows Python deps:" \
     && ls -lh ${PYTHON_WIN_DEPS_PATH} \
     && du -sh ${PYTHON_WIN_DEPS_PATH}
