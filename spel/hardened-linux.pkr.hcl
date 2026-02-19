@@ -10,7 +10,7 @@ packer {
     }
     ansible = {
       version = ">= 1.1.0"
-      source = "github.com/hashicorp/ansible"
+      source  = "github.com/hashicorp/ansible"
     }
   }
 }
@@ -638,35 +638,35 @@ source "amazon-ebs" "windows-base" {
   communicator                = "winrm"
   # Sysprep shuts down the instance - tell Packer not to stop it itself
   # Our shell-local provisioner polls for the instance to reach 'stopped' state
-  disable_stop_instance       = true
-  deprecate_at                = local.aws_ami_deprecate_at
-  ena_support                 = true
-  encrypt_boot                = var.aws_kms_key_id != "" ? true : null
-  kms_key_id                  = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
-  force_deregister            = true
-  iam_instance_profile        = var.aws_iam_instance_profile != "" ? var.aws_iam_instance_profile : null
-  instance_type               = var.aws_instance_type
-  max_retries                 = 20
-  region                      = var.aws_region
-  sriov_support               = true
-  subnet_id                   = var.aws_subnet_id
-  vpc_id                      = var.aws_vpc_id
+  disable_stop_instance                 = true
+  deprecate_at                          = local.aws_ami_deprecate_at
+  ena_support                           = true
+  encrypt_boot                          = var.aws_kms_key_id != "" ? true : null
+  kms_key_id                            = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
+  force_deregister                      = true
+  iam_instance_profile                  = var.aws_iam_instance_profile != "" ? var.aws_iam_instance_profile : null
+  instance_type                         = var.aws_instance_type
+  max_retries                           = 20
+  region                                = var.aws_region
+  sriov_support                         = true
+  subnet_id                             = var.aws_subnet_id
+  vpc_id                                = var.aws_vpc_id
   security_group_id                     = var.aws_security_group_id != "" ? var.aws_security_group_id : null
   temporary_security_group_source_cidrs = var.aws_security_group_id != "" ? null : var.aws_temporary_security_group_source_cidrs
-  user_data_file              = "${path.root}/userdata/winrm_bootstrap.txt"
-  winrm_insecure              = true
-  winrm_timeout               = "15m"
-  winrm_use_ssl               = true
-  winrm_use_ntlm              = true
-  winrm_username              = "TempPackerUser"
-  winrm_password              = "ComplexP@ssw0rd123!"
+  user_data_file                        = "${path.root}/userdata/winrm_bootstrap.txt"
+  winrm_insecure                        = true
+  winrm_timeout                         = "15m"
+  winrm_use_ssl                         = true
+  winrm_use_ntlm                        = true
+  winrm_username                        = "TempPackerUser"
+  winrm_password                        = "ComplexP@ssw0rd123!"
 
   launch_block_device_mappings {
-    device_name = "/dev/sda1"
-    volume_type = "gp3"
+    device_name           = "/dev/sda1"
+    volume_type           = "gp3"
     delete_on_termination = true
-    encrypted   = var.aws_kms_key_id != "" ? true : null
-    kms_key_id  = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
+    encrypted             = var.aws_kms_key_id != "" ? true : null
+    kms_key_id            = var.aws_kms_key_id != "" ? var.aws_kms_key_id : null
   }
 }
 
@@ -694,11 +694,11 @@ locals {
   # Offline-specific overrides
   # Use Offline AMI regions if specified, otherwise use commercial regions
   effective_ami_regions = var.aws_offline_ami_regions != null ? var.aws_offline_ami_regions : var.aws_ami_regions
-  
+
   # Use Offline account ID for source AMI owners if specified
   # This allows using Offline marketplace AMIs instead of commercial marketplace AMIs
   use_offline_ami_owners = var.aws_offline_account_id != ""
-  
+
   # Effective source AMI filter owners - use Offline account if specified, otherwise use commercial
   effective_al2023_owners        = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_al2023_hvm.owners
   effective_centos9stream_owners = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_centos9stream_hvm.owners
@@ -711,7 +711,7 @@ locals {
   effective_windows2022_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2022_hvm.owners
 
   # Template the description strings
-  description = "STIG-partitioned [*HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.spel_description_url}."
+  description         = "STIG-partitioned [*HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.spel_description_url}."
   windows_description = "STIG-partitioned [*HARDENED*] %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.spel_description_url}."
 
   # Calculate AWS AMI deprecate_at timestamp
@@ -722,8 +722,8 @@ locals {
   # Base AMI tags applied to all hardened AMIs. Build source overrides merge
   # in the per-OS StigPlatform tag so SSM associations can target by platform.
   base_ami_tags = {
-    Name        = ""       # Empty name avoids inheriting "Packer Builder"
-    StigManaged = "true"   # Enables SSM association targeting for STIG compliance
+    Name        = ""     # Empty name avoids inheriting "Packer Builder"
+    StigManaged = "true" # Enables SSM association targeting for STIG compliance
   }
 }
 
@@ -949,9 +949,9 @@ build {
   }
 
   provisioner "ansible" {
-    pause_before  = "30s"
-    timeout       = "30m"
-    only          = [
+    pause_before = "30s"
+    timeout      = "30m"
+    only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
       "amazon-ebs.hardened-rhel-9-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
@@ -964,9 +964,9 @@ build {
   }
 
   provisioner "ansible" {
-    pause_before  = "30s"
-    timeout       = "30m"
-    only          = [
+    pause_before = "30s"
+    timeout      = "30m"
+    only = [
       "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm",
       "amazon-ebs.hardened-windows-2022-hvm"
@@ -1020,6 +1020,92 @@ build {
     ]
     source      = "${path.root}/scripts/post-stig-2022.ps1"
     destination = "C:/Windows/Temp/post-stig.ps1"
+  }
+
+  # =============================================================================
+  # WINDOWS PYTHON + ANSIBLE INSTALLATION (offline / air-gap compatible)
+  # Mirrors the Linux offline approach:
+  #   1. Docker image pre-downloads Python installer + Windows .whl files
+  #   2. Entrypoint copies them to workspace tools/python-deps-win/
+  #   3. Packer file provisioner uploads to C:\Windows\Temp\python-deps-win\
+  #   4. PowerShell provisioner installs Python + pip wheels from local files
+  # This ensures SSM associations can run Ansible playbooks post-deployment
+  # without requiring internet access on the deployed instance.
+  # =============================================================================
+  provisioner "file" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    source      = "${path.root}/../tools/python-deps-win"
+    destination = "C:/Windows/Temp/python-deps-win"
+  }
+
+  provisioner "powershell" {
+    only = [
+      "amazon-ebs.hardened-windows-2016-hvm",
+      "amazon-ebs.hardened-windows-2019-hvm",
+      "amazon-ebs.hardened-windows-2022-hvm"
+    ]
+    inline = [
+      "$ErrorActionPreference = 'Stop'",
+      "Write-Host '=== Installing Python 3.11 + Ansible (offline) ==='",
+      "",
+      "$depsDir = 'C:\\Windows\\Temp\\python-deps-win'",
+      "$pyInstaller = Join-Path $depsDir 'python-3.11.9-amd64.exe'",
+      "",
+      "# Verify offline deps were uploaded",
+      "if (-not (Test-Path $depsDir)) {",
+      "  Write-Host 'ERROR: python-deps-win directory not found at C:\\Windows\\Temp\\'",
+      "  Write-Host 'Ensure the Docker image includes the Windows Python deps.'",
+      "  exit 1",
+      "}",
+      "Write-Host \"  Offline deps directory: $depsDir\"",
+      "Get-ChildItem $depsDir | ForEach-Object { Write-Host \"    $($_.Name) ($([math]::Round($_.Length/1MB, 1)) MB)\" }",
+      "",
+      "# Install Python from the pre-staged installer",
+      "if (-not (Test-Path $pyInstaller)) {",
+      "  Write-Host \"ERROR: Python installer not found: $pyInstaller\"",
+      "  exit 1",
+      "}",
+      "Write-Host 'Installing Python from offline installer...'",
+      "Start-Process -Wait -FilePath $pyInstaller -ArgumentList '/quiet', 'InstallAllUsers=1', 'PrependPath=1', 'Include_pip=1', 'Include_test=0'",
+      "",
+      "# Refresh PATH to pick up new install",
+      "$env:PATH = [System.Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('PATH', 'User')",
+      "",
+      "if (-not (Get-Command python -ErrorAction SilentlyContinue)) {",
+      "  Write-Host 'ERROR: Python not found after installation'",
+      "  exit 1",
+      "}",
+      "Write-Host \"  Python installed: $(python --version 2>&1)\"",
+      "",
+      "# Install ansible-core + pywinrm from offline wheels",
+      "Write-Host 'Installing ansible-core and pywinrm from offline wheels...'",
+      "$wheels = Get-ChildItem -Path $depsDir -Filter '*.whl' | Select-Object -ExpandProperty FullName",
+      "if ($wheels.Count -eq 0) {",
+      "  Write-Host 'WARNING: No .whl files found in deps directory, falling back to pip install from PyPI...'",
+      "  python -m pip install --upgrade pip 2>&1 | Write-Host",
+      "  python -m pip install ansible-core pywinrm 2>&1 | Write-Host",
+      "} else {",
+      "  Write-Host \"  Found $($wheels.Count) wheel files\"",
+      "  python -m pip install --no-index --find-links $depsDir ansible-core pywinrm 2>&1 | Write-Host",
+      "}",
+      "",
+      "# Ensure ansible-playbook is in PATH",
+      "$scriptsDir = python -c \"import sys, os; print(os.path.join(sys.prefix, 'Scripts'))\"",
+      "$env:PATH = \"$scriptsDir;$env:PATH\"",
+      "if (-not (Get-Command ansible-playbook -ErrorAction SilentlyContinue)) {",
+      "  Write-Host 'ERROR: ansible-playbook not found after pip install'",
+      "  exit 1",
+      "}",
+      "Write-Host \"  Ansible installed: $(ansible-playbook --version | Select-Object -First 1)\"",
+      "",
+      "# Cleanup installer (keep wheels for potential re-use)",
+      "Remove-Item -Force $pyInstaller -ErrorAction SilentlyContinue",
+      "Write-Host '=== Python and Ansible installation complete (offline) ==='",
+    ]
   }
 
   provisioner "file" {
@@ -1274,8 +1360,8 @@ build {
   provisioner "shell" {
     pause_before        = "45s"
     start_retry_timeout = "5m"
-    only = ["amazon-ebs.hardened-ol-8-hvm"]
-    execute_command = "sudo -E bash '{{.Path}}'"
+    only                = ["amazon-ebs.hardened-ol-8-hvm"]
+    execute_command     = "sudo -E bash '{{.Path}}'"
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
@@ -1351,13 +1437,13 @@ build {
   }
 
   provisioner "ansible" {
-    pause_before         = "30s"
-    timeout              = "30m"
-    only                 = ["amazon-ebs.hardened-windows-2016-hvm"]
-    roles_path           = "${path.root}/ansible/roles"
-    playbook_file        = "${path.root}/ansible/windows-2016-stig-playbook.yml"
-    use_proxy            = false
-    user = "TempPackerUser"
+    pause_before  = "30s"
+    timeout       = "30m"
+    only          = ["amazon-ebs.hardened-windows-2016-hvm"]
+    roles_path    = "${path.root}/ansible/roles"
+    playbook_file = "${path.root}/ansible/windows-2016-stig-playbook.yml"
+    use_proxy     = false
+    user          = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
       "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16_so_000010': false, 'wn16_so_000020': false, 'wn16_so_000030': false, 'wn16_00_000450': false, 'wn16_cc_000010': false, 'wn16_cc_000020': false, 'wn16stig_newadministratorname': 'maintuser'}"
@@ -1365,13 +1451,13 @@ build {
   }
 
   provisioner "ansible" {
-    pause_before = "30s"
-    timeout      = "30m"
-    only = ["amazon-ebs.hardened-windows-2019-hvm"]
-    roles_path = "${path.root}/ansible/roles"
+    pause_before  = "30s"
+    timeout       = "30m"
+    only          = ["amazon-ebs.hardened-windows-2019-hvm"]
+    roles_path    = "${path.root}/ansible/roles"
     playbook_file = "${path.root}/ansible/windows-2019-stig-playbook.yml"
     use_proxy     = false
-    user = "TempPackerUser"
+    user          = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
       "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn19_cc_000470': false, 'wn19_cc_000500': false, 'wn19_so_000010': false, 'wn19_so_000020': false, 'wn19_so_000030': false, 'wn19_00_000450': false, 'wn19_cc_000010': false, 'wn19_cc_000020': false, 'wn19stig_newadministratorname': 'maintuser'}"
@@ -1379,13 +1465,13 @@ build {
   }
 
   provisioner "ansible" {
-    pause_before = "30s"
-    timeout      = "30m"
-    only = ["amazon-ebs.hardened-windows-2022-hvm"]
-    roles_path = "${path.root}/ansible/roles"
+    pause_before  = "30s"
+    timeout       = "30m"
+    only          = ["amazon-ebs.hardened-windows-2022-hvm"]
+    roles_path    = "${path.root}/ansible/roles"
     playbook_file = "${path.root}/ansible/windows-2022-stig-playbook.yml"
     use_proxy     = false
-    user = "TempPackerUser"
+    user          = "TempPackerUser"
     extra_arguments = [
       "--connection", "winrm",
       "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_system_vendor': 'NA', 'ansible_virtualization_type': 'hvm', 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'win_skip_for_test': false, 'wn22_ac_000010': false, 'wn22_cc_000470': false, 'wn22_cc_000500': false, 'wn22_so_000010': false, 'wn22_so_000020': false, 'wn22_so_000030': false, 'wn22_00_000450': false, 'wn22_cc_000010': false, 'wn22_cc_000020': false, 'wn22stig_newadministratorname': 'maintuser'}"
