@@ -234,12 +234,6 @@ variable "aws_vpc_endpoint_ec2" {
   default     = null
 }
 
-variable "aws_s3_bucket" {
-  description = "S3 bucket name for build artifacts (Python deps, STIG playbooks)"
-  type        = string
-  default     = ""
-}
-
 variable "aws_vpc_endpoint_s3" {
   description = "VPC endpoint DNS name for S3 service (Offline environments)"
   type        = string
@@ -1026,97 +1020,6 @@ build {
     ]
     source      = "${path.root}/scripts/post-stig-2022.ps1"
     destination = "C:/Windows/Temp/post-stig.ps1"
-  }
-
-  # =============================================================================
-  # WINDOWS PYTHON + ANSIBLE INSTALLATION (S3 offline / air-gap compatible)
-  # Mirrors the Linux offline approach:
-  #   1. Docker image pre-downloads Python installer + Windows .whl files
-  #   2. Build workflow zips them and uploads to S3
-  #   3. PowerShell provisioner downloads zip from S3, extracts, and installs
-  # This ensures SSM associations can run Ansible playbooks post-deployment
-  # without requiring internet access on the deployed instance.
-  # =============================================================================
-  provisioner "powershell" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    inline = [
-      "$ErrorActionPreference = 'Stop'",
-      "Write-Host '=== Installing Python 3.11 + Ansible (S3 offline) ==='",
-      "",
-      "$bucket = '${var.aws_s3_bucket}'",
-      "$s3Key  = 'ansible/python-deps-win.zip'",
-      "$zipPath = 'C:\\Windows\\Temp\\python-deps-win.zip'",
-      "$depsDir = 'C:\\Windows\\Temp\\python-deps-win'",
-      "",
-      "if (-not $bucket) {",
-      "  Write-Host 'ERROR: aws_s3_bucket variable not set. Cannot download Python deps.'",
-      "  exit 1",
-      "}",
-      "",
-      "# Download deps zip from S3 using AWS PowerShell (pre-installed on Windows AMIs)",
-      "Write-Host \"Downloading s3://$bucket/$s3Key ...\"",
-      "Import-Module AWSPowerShell -ErrorAction SilentlyContinue",
-      "Read-S3Object -BucketName $bucket -Key $s3Key -File $zipPath",
-      "if (-not (Test-Path $zipPath)) {",
-      "  Write-Host \"ERROR: Failed to download python-deps-win.zip from S3\"",
-      "  exit 1",
-      "}",
-      "Write-Host \"  Downloaded: $([math]::Round((Get-Item $zipPath).Length / 1MB, 1)) MB\"",
-      "",
-      "# Extract",
-      "New-Item -ItemType Directory -Path $depsDir -Force | Out-Null",
-      "Expand-Archive -Path $zipPath -DestinationPath $depsDir -Force",
-      "Remove-Item -Force $zipPath",
-      "Write-Host '  Extracted deps:'",
-      "Get-ChildItem $depsDir | ForEach-Object { Write-Host \"    $($_.Name) ($([math]::Round($_.Length/1MB, 1)) MB)\" }",
-      "",
-      "# Install Python from the pre-staged installer",
-      "$pyInstaller = Join-Path $depsDir 'python-3.11.9-amd64.exe'",
-      "if (-not (Test-Path $pyInstaller)) {",
-      "  Write-Host \"ERROR: Python installer not found: $pyInstaller\"",
-      "  exit 1",
-      "}",
-      "Write-Host 'Installing Python from offline installer...'",
-      "Start-Process -Wait -FilePath $pyInstaller -ArgumentList '/quiet', 'InstallAllUsers=1', 'PrependPath=1', 'Include_pip=1', 'Include_test=0'",
-      "",
-      "# Refresh PATH to pick up new install",
-      "$env:PATH = [System.Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('PATH', 'User')",
-      "",
-      "if (-not (Get-Command python -ErrorAction SilentlyContinue)) {",
-      "  Write-Host 'ERROR: Python not found after installation'",
-      "  exit 1",
-      "}",
-      "Write-Host \"  Python installed: $(python --version 2>&1)\"",
-      "",
-      "# Install ansible-core + pywinrm from offline wheels",
-      "Write-Host 'Installing ansible-core and pywinrm from offline wheels...'",
-      "$wheels = Get-ChildItem -Path $depsDir -Filter '*.whl' | Select-Object -ExpandProperty FullName",
-      "if ($wheels.Count -eq 0) {",
-      "  Write-Host 'WARNING: No .whl files found in deps directory, falling back to pip install from PyPI...'",
-      "  python -m pip install --upgrade pip 2>&1 | Write-Host",
-      "  python -m pip install ansible-core pywinrm 2>&1 | Write-Host",
-      "} else {",
-      "  Write-Host \"  Found $($wheels.Count) wheel files\"",
-      "  python -m pip install --no-index --find-links $depsDir ansible-core pywinrm 2>&1 | Write-Host",
-      "}",
-      "",
-      "# Ensure ansible-playbook is in PATH",
-      "$scriptsDir = python -c \"import sys, os; print(os.path.join(sys.prefix, 'Scripts'))\"",
-      "$env:PATH = \"$scriptsDir;$env:PATH\"",
-      "if (-not (Get-Command ansible-playbook -ErrorAction SilentlyContinue)) {",
-      "  Write-Host 'ERROR: ansible-playbook not found after pip install'",
-      "  exit 1",
-      "}",
-      "Write-Host \"  Ansible installed: $(ansible-playbook --version | Select-Object -First 1)\"",
-      "",
-      "# Cleanup",
-      "Remove-Item -Recurse -Force $depsDir -ErrorAction SilentlyContinue",
-      "Write-Host '=== Python and Ansible installation complete (S3 offline) ==='",
-    ]
   }
 
   provisioner "file" {

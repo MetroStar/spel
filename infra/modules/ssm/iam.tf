@@ -115,6 +115,17 @@ resource "aws_iam_role_policy" "ssm_instance_core" {
         ]
       },
       {
+        Sid    = "S3STIGDownloads"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = [
+          "${local.arn_prefix}:s3:::aws-windows-downloads-${local.region}/STIG/*",
+          "${local.arn_prefix}:s3:::aws-windows-downloads/STIG/*"
+        ]
+      },
+      {
         Sid    = "S3OutputBucket"
         Effect = "Allow"
         Action = [

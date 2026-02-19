@@ -221,28 +221,6 @@ RUN mkdir -p ${PYTHON_DEPS_PATH} \
     && ls -lh ${PYTHON_DEPS_PATH} \
     && du -sh ${PYTHON_DEPS_PATH}
 
-# =============================================================================
-# Download Python installer and wheels for Windows EC2 offline installation
-# The Python installer + pip wheels are uploaded to the Windows EC2 instance
-# and installed there (for STIG playbooks that run locally via SSM)
-# =============================================================================
-ENV PYTHON_WIN_DEPS_PATH=/opt/python-deps-win
-RUN mkdir -p ${PYTHON_WIN_DEPS_PATH} \
-    && echo "=== Downloading Python installer and wheels for Windows EC2 ===" \
-    && curl -fsSL -o ${PYTHON_WIN_DEPS_PATH}/python-3.11.9-amd64.exe \
-        "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" \
-    && python3 -m pip download \
-        --dest ${PYTHON_WIN_DEPS_PATH} \
-        --platform win_amd64 \
-        --python-version 3.11 \
-        --only-binary=:all: \
-        ansible-core \
-        pywinrm \
-        sspilib \
-    && echo "Downloaded Windows Python deps:" \
-    && ls -lh ${PYTHON_WIN_DEPS_PATH} \
-    && du -sh ${PYTHON_WIN_DEPS_PATH}
-
 # =============================================================================# Download Ansible collection tarballs for EC2 offline installation
 # These are uploaded to EC2 and installed with ansible-galaxy
 # =============================================================================
@@ -424,27 +402,6 @@ if [ "${SKIP_WORKSPACE_CHECK}" = "false" ]; then
     fi
 
     # =============================================================================
-    # Copy baked-in Windows Python deps to workspace location
-    # Packer file provisioner uploads tools/python-deps-win/ to Windows EC2
-    # =============================================================================
-    PYTHON_WIN_DEPS_DEST="${WORKSPACE}/tools/python-deps-win"
-    if [ -d "${PYTHON_WIN_DEPS_PATH}" ]; then
-        echo "Populating Windows Python deps in workspace..."
-        mkdir -p "${PYTHON_WIN_DEPS_DEST}"
-        for f in "${PYTHON_WIN_DEPS_PATH}"/*; do
-            if [ -f "$f" ]; then
-                fname=$(basename "$f")
-                target="${PYTHON_WIN_DEPS_DEST}/${fname}"
-                if [ ! -e "$target" ]; then
-                    cp "$f" "$target"
-                fi
-            fi
-        done
-        echo "  Windows deps available: $(ls ${PYTHON_WIN_DEPS_DEST}/ 2>/dev/null | wc -l) files"
-        echo ""
-    fi
-
-    # =============================================================================
     # Symlink/copy baked-in Ansible collection tarballs to workspace location
     # Packer file provisioner uploads spel/ansible/collections/ to EC2
     # =============================================================================
@@ -514,7 +471,6 @@ ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
     ANSIBLE_ROLES_PATH=/opt/ansible/roles \
     SPEL_OFFLINE_PACKAGES=/opt/offline-packages \
     PYTHON_DEPS_PATH=/opt/python-deps \
-    PYTHON_WIN_DEPS_PATH=/opt/python-deps-win \
     ANSIBLE_COLLECTIONS_TARBALLS=/opt/ansible-collections-tarballs \
     AMIGEN8_PATH=/opt/amigen8 \
     AMIGEN9_PATH=/opt/amigen9 \
@@ -590,9 +546,6 @@ COPY --from=builder /opt/offline-packages /opt/offline-packages
 
 # Copy Python wheels for EC2 offline installation (Linux)
 COPY --from=builder /opt/python-deps /opt/python-deps
-
-# Copy Python installer and wheels for Windows EC2 offline installation
-COPY --from=builder /opt/python-deps-win /opt/python-deps-win
 
 # Copy Ansible collection tarballs for EC2 offline installation
 COPY --from=builder /opt/ansible-collections-tarballs /opt/ansible-collections-tarballs

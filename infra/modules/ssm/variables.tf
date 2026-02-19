@@ -74,9 +74,10 @@ variable "enable_inventory" {
 variable "enable_stig_enforcement" {
   description = <<-EOT
     Create State Manager associations to enforce STIG hardening on a schedule.
-    Requires Ansible playbook packages to be uploaded to the S3 bucket
-    (at the paths specified by ansible_s3_key, windows_stig_s3_key, and
-    stig_al2023_s3_key). CI/CD pipelines handle upload automatically.
+    Linux associations require Ansible playbook packages uploaded to the S3
+    bucket (at the paths specified by ansible_s3_key and stig_al2023_s3_key).
+    Windows associations use the AWS-managed AWSEC2-ConfigureSTIG document.
+    CI/CD pipelines handle upload automatically.
   EOT
   type        = bool
   default     = true
@@ -194,48 +195,14 @@ variable "oscap_profile" {
   default     = "xccdf_org.ssgproject.content_profile_stig"
 }
 
-variable "windows_stig_s3_key" {
-  description = "S3 key (path) for the Windows STIG playbook .zip package containing per-version playbooks"
+variable "windows_stig_level" {
+  description = "STIG severity level for Windows instances using the AWS-managed AWSEC2-ConfigureSTIG document. Valid values: High, Medium, Low."
   type        = string
-  default     = "ansible/windows-stig-playbook.zip"
-}
+  default     = "High"
 
-variable "windows_stig_extra_variables" {
-  description = <<-EOT
-    Extra variables passed to the Windows Ansible STIG playbooks.
-    Combines all version-specific overrides — Ansible roles ignore unknown vars.
-    WinRM/Packer-specific vars are omitted (SSM runs Ansible locally).
-    Passed via ExtraVariables in key=value format (scalars only).
-
-    IMPORTANT: Do NOT put control-disable overrides (e.g. wn16_cc_000500=false)
-    here. The key=value format passes all values as strings, and the string
-    "false" is TRUTHY in Jinja2's when: conditions — so it would ENABLE the
-    control instead of disabling it. All control-disable vars must go in the
-    Windows playbook's vars: section (YAML booleans).
-
-    Only truthy/string values and non-boolean configuration belong here.
-  EOT
-  type        = map(string)
-  default = {
-    # Common Windows STIG vars — string config values (not boolean toggles)
-    SSM                           = "true"
-    ansible_windows_domain_role   = "Standalone"
-    ansible_windows_domain_member = "false"
-    ansible_system_vendor         = "NA"
-    ansible_virtualization_type   = "hvm"
-    win_skip_for_test             = "false"
-
-    # Non-boolean overrides
-    wn16_00_000030_pass_age           = "60"
-    wn16stig_newadministratorname     = "maintuser"
-    wn19stig_newadministratorname     = "maintuser"
-    wn22stig_newadministratorname     = "maintuser"
-
-    # NOTE: Control-disable vars (wn16_cc_000500, wn19_so_000010, etc.)
-    # have been moved out of ExtraVariables because string "false" is
-    # truthy in Jinja2. They must be set as YAML booleans in the Windows
-    # playbook's vars: section, same as the EL STIG controls in site.yml.
-    # See: tests/package-ansible-stig.sh for the EL equivalent.
+  validation {
+    condition     = contains(["High", "Medium", "Low"], var.windows_stig_level)
+    error_message = "windows_stig_level must be one of: High, Medium, Low."
   }
 }
 

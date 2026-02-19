@@ -75,11 +75,6 @@ output "ssm_document_oscap_name" {
   value       = module.ssm.ssm_document_oscap_name
 }
 
-output "ssm_document_windows_ansible_name" {
-  description = "Name of the Windows Ansible SSM document"
-  value       = module.ssm.ssm_document_windows_ansible_name
-}
-
 output "caller_policy_arn" {
   description = "ARN of the IAM policy for CI runners to invoke SSM operations"
   value       = module.ssm.caller_policy_arn

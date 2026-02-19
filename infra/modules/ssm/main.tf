@@ -29,7 +29,4 @@ locals {
   el_extra_vars = join(" ", [
     for k, v in var.stig_extra_variables : "${k}=${v}"
   ])
-  windows_extra_vars = join(" ", [
-    for k, v in var.windows_stig_extra_variables : "${k}=${v}"
-  ])
 }

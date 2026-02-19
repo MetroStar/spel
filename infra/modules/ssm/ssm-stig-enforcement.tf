@@ -17,7 +17,8 @@
 #    Runs daily before maintenance windows.
 #
 # 4. Windows Server STIG Enforcement (2016/2019/2022):
-#    Uses AWS-ApplyAnsiblePlaybooks with per-version playbooks.
+#    Uses the AWS-managed AWSEC2-ConfigureSTIG SSM document.
+#    Auto-detects OS, downloads STIG scripts from AWS S3 buckets.
 #    Targets instances tagged StigPlatform = Win2016 | Win2019 | Win2022.
 #
 # All associations are gated by their respective enable_* variables.
@@ -138,59 +139,44 @@ resource "aws_ssm_association" "ssm_agent_update" {
 }
 
 # -----------------------------------------------------------------------------
-# 4. Windows Server STIG Enforcement via Ansible Lockdown
+# 4. Windows Server STIG Enforcement via AWSEC2-ConfigureSTIG
 # -----------------------------------------------------------------------------
-# Per-version associations using AWS-ApplyAnsiblePlaybooks to enforce
-# Windows Server STIG hardening. Each version has a separate playbook file
-# but all share the same S3 package and combined extra variables.
+# Uses the AWS-managed AWSEC2-ConfigureSTIG SSM Command document to apply
+# STIG hardening to Windows Server instances. This document:
+#   - Auto-detects the Windows version and applies appropriate settings
+#   - Downloads STIG scripts from AWS's regional S3 buckets
+#     (s3://aws-windows-downloads-<region>/STIG/Windows/Latest/)
+#   - Covers: OS, .NET Framework, Windows Firewall, IE11, Edge, Defender
+#   - Updated quarterly by AWS with latest STIG versions
+#   - No custom code, Python, or Ansible required on the instance
 #
-# WinRM/Packer-specific vars (winrm_password, ansible_port, etc.) are
-# omitted — SSM runs Ansible locally on the instance, not via WinRM.
+# This is the same mechanism used for AL2023 Linux STIG (LinuxAWSConfigureSTIG)
+# but for Windows. Requires s3:GetObject on aws-windows-downloads* buckets
+# (added in iam.tf).
 #
 # Targets instances by tag: StigPlatform = Win2016 | Win2019 | Win2022
 # -----------------------------------------------------------------------------
 
-locals {
-  windows_stig_versions = var.enable_stig_enforcement && var.enable_state_manager ? {
-    win2016 = {
-      tag_value     = "Win2016"
-      playbook_file = "windows-2016-stig-playbook.yml"
-    }
-    win2019 = {
-      tag_value     = "Win2019"
-      playbook_file = "windows-2019-stig-playbook.yml"
-    }
-    win2022 = {
-      tag_value     = "Win2022"
-      playbook_file = "windows-2022-stig-playbook.yml"
-    }
-  } : {}
-}
-
 resource "aws_ssm_association" "stig_enforce_windows" {
-  for_each = local.windows_stig_versions
+  count = var.enable_stig_enforcement && var.enable_state_manager ? 1 : 0
 
-  name                = aws_ssm_document.windows_ansible.name
-  association_name    = "${var.name_prefix}-stig-enforce-${each.key}"
+  name                = "AWSEC2-ConfigureSTIG"
+  association_name    = "${var.name_prefix}-stig-enforce-windows"
   schedule_expression = var.stig_enforcement_schedule
   max_concurrency     = var.patch_max_concurrency
   max_errors          = var.patch_max_errors
 
   targets {
     key    = "tag:StigPlatform"
-    values = [each.value.tag_value]
+    values = ["Win2016", "Win2019", "Win2022"]
   }
 
   parameters = {
-    SourceUrl      = "https://${aws_s3_bucket.ssm.bucket_regional_domain_name}/${var.windows_stig_s3_key}"
-    PlaybookFile   = each.value.playbook_file
-    ExtraVariables = local.windows_extra_vars
-    Check          = "False"
-    Verbose        = "-v"
+    Level = var.windows_stig_level
   }
 
   output_location {
     s3_bucket_name = aws_s3_bucket.ssm.id
-    s3_key_prefix  = "ssm-output/stig-enforce-${each.key}"
+    s3_key_prefix  = "ssm-output/stig-enforce-windows"
   }
 }
