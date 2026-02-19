@@ -324,6 +324,25 @@ jobs:
           echo "  [OK] s3://${S3_BUCKET}/ansible/windows-stig-playbook.zip"
           rm -rf "$WIN_STAGING"
 
+          # Package Windows Python deps (installer + wheels) and upload
+          echo ""
+          echo "--- Packaging Windows Python deps ---"
+          WIN_PYTHON_STAGING=$(mktemp -d)
+          CID=$(docker create "spel-builder:${IMAGE_TAG}" /bin/true)
+          docker cp "${CID}:/opt/python-deps-win/." "$WIN_PYTHON_STAGING/" 2>/dev/null && \
+            echo "  [OK] Extracted python-deps-win from image" || \
+            echo "  [WARN] python-deps-win not found in image"
+          docker rm "$CID" > /dev/null
+          if [ "$(ls -A "$WIN_PYTHON_STAGING" 2>/dev/null)" ]; then
+            (cd "$WIN_PYTHON_STAGING" && zip -qr "${GITHUB_WORKSPACE}/dist/python-deps-win.zip" .)
+            aws s3 cp "${GITHUB_WORKSPACE}/dist/python-deps-win.zip" \
+              "s3://${S3_BUCKET}/ansible/python-deps-win.zip"
+            echo "  [OK] s3://${S3_BUCKET}/ansible/python-deps-win.zip"
+          else
+            echo "  [WARN] No Windows Python deps found, skipping upload"
+          fi
+          rm -rf "$WIN_PYTHON_STAGING"
+
           echo ""
           echo "=== Playbook Upload Complete ==="
 
@@ -415,12 +434,14 @@ jobs:
           SG_ID="${{ needs.infra.outputs.security_group_id }}"
           INSTANCE_PROFILE="${{ needs.infra.outputs.instance_profile }}"
           KMS_KEY_ID="${{ needs.infra.outputs.kms_key_id }}"
+          S3_BUCKET="${{ needs.infra.outputs.s3_bucket_name }}"
           
           [[ -n "${VPC_ID}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_vpc_id="${VPC_ID}")
           [[ -n "${SUBNET_ID}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_subnet_id="${SUBNET_ID}")
           [[ -n "${SG_ID}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_security_group_id="${SG_ID}")
           [[ -n "${KMS_KEY_ID}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_kms_key_id="${KMS_KEY_ID}")
           [[ -n "${INSTANCE_PROFILE}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_iam_instance_profile="${INSTANCE_PROFILE}")
+          [[ -n "${S3_BUCKET}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_aws_s3_bucket="${S3_BUCKET}")
           [[ -n "${{ github.event.inputs.repo_mirror_baseurl }}" ]] && DOCKER_ENV_ARGS+=(-e PKR_VAR_amigen_repo_mirror_baseurl="${{ github.event.inputs.repo_mirror_baseurl }}")
           
           # Add air-gapped mode settings (enables all air-gapped flags at once)

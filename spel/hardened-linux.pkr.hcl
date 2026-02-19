@@ -234,6 +234,12 @@ variable "aws_vpc_endpoint_ec2" {
   default     = null
 }
 
+variable "aws_s3_bucket" {
+  description = "S3 bucket name for build artifacts (Python deps, STIG playbooks)"
+  type        = string
+  default     = ""
+}
+
 variable "aws_vpc_endpoint_s3" {
   description = "VPC endpoint DNS name for S3 service (Offline environments)"
   type        = string
@@ -1023,25 +1029,14 @@ build {
   }
 
   # =============================================================================
-  # WINDOWS PYTHON + ANSIBLE INSTALLATION (offline / air-gap compatible)
+  # WINDOWS PYTHON + ANSIBLE INSTALLATION (S3 offline / air-gap compatible)
   # Mirrors the Linux offline approach:
   #   1. Docker image pre-downloads Python installer + Windows .whl files
-  #   2. Entrypoint copies them to workspace tools/python-deps-win/
-  #   3. Packer file provisioner uploads to C:\Windows\Temp\python-deps-win\
-  #   4. PowerShell provisioner installs Python + pip wheels from local files
+  #   2. Build workflow zips them and uploads to S3
+  #   3. PowerShell provisioner downloads zip from S3, extracts, and installs
   # This ensures SSM associations can run Ansible playbooks post-deployment
   # without requiring internet access on the deployed instance.
   # =============================================================================
-  provisioner "file" {
-    only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
-      "amazon-ebs.hardened-windows-2019-hvm",
-      "amazon-ebs.hardened-windows-2022-hvm"
-    ]
-    source      = "${path.root}/../tools/python-deps-win"
-    destination = "C:/Windows/Temp/python-deps-win"
-  }
-
   provisioner "powershell" {
     only = [
       "amazon-ebs.hardened-windows-2016-hvm",
@@ -1050,21 +1045,36 @@ build {
     ]
     inline = [
       "$ErrorActionPreference = 'Stop'",
-      "Write-Host '=== Installing Python 3.11 + Ansible (offline) ==='",
+      "Write-Host '=== Installing Python 3.11 + Ansible (S3 offline) ==='",
       "",
+      "$bucket = '${var.aws_s3_bucket}'",
+      "$s3Key  = 'ansible/python-deps-win.zip'",
+      "$zipPath = 'C:\\Windows\\Temp\\python-deps-win.zip'",
       "$depsDir = 'C:\\Windows\\Temp\\python-deps-win'",
-      "$pyInstaller = Join-Path $depsDir 'python-3.11.9-amd64.exe'",
       "",
-      "# Verify offline deps were uploaded",
-      "if (-not (Test-Path $depsDir)) {",
-      "  Write-Host 'ERROR: python-deps-win directory not found at C:\\Windows\\Temp\\'",
-      "  Write-Host 'Ensure the Docker image includes the Windows Python deps.'",
+      "if (-not $bucket) {",
+      "  Write-Host 'ERROR: aws_s3_bucket variable not set. Cannot download Python deps.'",
       "  exit 1",
       "}",
-      "Write-Host \"  Offline deps directory: $depsDir\"",
+      "",
+      "# Download deps zip from S3",
+      "Write-Host \"Downloading s3://$bucket/$s3Key ...\"",
+      "aws s3 cp \"s3://$bucket/$s3Key\" $zipPath --quiet",
+      "if (-not (Test-Path $zipPath)) {",
+      "  Write-Host \"ERROR: Failed to download python-deps-win.zip from S3\"",
+      "  exit 1",
+      "}",
+      "Write-Host \"  Downloaded: $((Get-Item $zipPath).Length / 1MB) MB\"",
+      "",
+      "# Extract",
+      "New-Item -ItemType Directory -Path $depsDir -Force | Out-Null",
+      "Expand-Archive -Path $zipPath -DestinationPath $depsDir -Force",
+      "Remove-Item -Force $zipPath",
+      "Write-Host '  Extracted deps:'",
       "Get-ChildItem $depsDir | ForEach-Object { Write-Host \"    $($_.Name) ($([math]::Round($_.Length/1MB, 1)) MB)\" }",
       "",
       "# Install Python from the pre-staged installer",
+      "$pyInstaller = Join-Path $depsDir 'python-3.11.9-amd64.exe'",
       "if (-not (Test-Path $pyInstaller)) {",
       "  Write-Host \"ERROR: Python installer not found: $pyInstaller\"",
       "  exit 1",
@@ -1102,9 +1112,9 @@ build {
       "}",
       "Write-Host \"  Ansible installed: $(ansible-playbook --version | Select-Object -First 1)\"",
       "",
-      "# Cleanup installer (keep wheels for potential re-use)",
-      "Remove-Item -Force $pyInstaller -ErrorAction SilentlyContinue",
-      "Write-Host '=== Python and Ansible installation complete (offline) ==='",
+      "# Cleanup",
+      "Remove-Item -Recurse -Force $depsDir -ErrorAction SilentlyContinue",
+      "Write-Host '=== Python and Ansible installation complete (S3 offline) ==='",
     ]
   }
 
