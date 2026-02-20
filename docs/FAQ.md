@@ -55,7 +55,7 @@ A: The images include foundational STIG hardening that must be in place "from bi
 -   EFI/SecureBoot support is included
 
 For post-deployment STIG enforcement, the project includes SSM State Manager
-associations (deployed via the `infra/` Terraform module) that automatically
+associations (deployed via the `infra/` OpenTofu module) that automatically
 apply STIG hardening on a schedule:
 
 -   **EL8/EL9**: Ansible Lockdown roles (RHEL8-STIG, RHEL9-STIG)

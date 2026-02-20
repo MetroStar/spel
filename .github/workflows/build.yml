@@ -12,9 +12,9 @@
 #        aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
 #
 # INFRASTRUCTURE:
-#   Infrastructure is managed by infra-setup.yml via Terraform. This workflow
+#   Infrastructure is managed by infra-setup.yml via OpenTofu. This workflow
 #   automatically calls infra-setup.yml with action=apply before every build.
-#   Terraform apply is idempotent — it creates infra if missing, no-op if exists.
+#   OpenTofu apply is idempotent — it creates infra if missing, no-op if exists.
 #
 # WORKFLOW:
 #   1. infra job: Ensure infrastructure exists (calls infra-setup.yml)
@@ -124,7 +124,7 @@ permissions:
 
 jobs:
   # ==========================================================================
-  # Infrastructure Job — ensure persistent infra exists via Terraform
+  # Infrastructure Job — ensure persistent infra exists via OpenTofu
   # ==========================================================================
   infra:
     name: Ensure Infrastructure

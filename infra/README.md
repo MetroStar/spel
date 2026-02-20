@@ -1,9 +1,9 @@
 # SPEL Infrastructure — Root Module
 
-Terraform root module that provisions all AWS infrastructure required for
-[SPEL](../README.md) AMI builds. A single `terraform apply` stands up
+OpenTofu root module that provisions all AWS infrastructure required for
+[SPEL](../README.md) AMI builds. A single `tofu apply` stands up
 networking, IAM, and Systems Manager (SSM) resources; a single
-`terraform destroy` tears everything down.
+`tofu destroy` tears everything down.
 
 ## Architecture
 
@@ -63,7 +63,7 @@ Override defaults with flags:
 | `--region` | `$AWS_DEFAULT_REGION` or `us-east-1` | AWS region |
 | `--bucket` | `${PREFIX}-ssm-tfstate-${ACCOUNT_ID}` | S3 bucket name |
 | `--table` | `${PREFIX}-ssm-tflock` | DynamoDB table name |
-| `--key` | `ssm-infra/terraform.tfstate` | State file key path |
+| `--key` | `ssm-infra/opentofu.tfstate` | State file key path |
 
 Alternatively, copy `backend.tf.example` to `backend.tf` and fill in
 values manually.
@@ -71,9 +71,9 @@ values manually.
 ### 2. Initialise and Apply
 
 ```bash
-terraform init
-terraform plan -var name_prefix=spel
-terraform apply -var name_prefix=spel
+tofu init
+tofu plan -var name_prefix=spel
+tofu apply -var name_prefix=spel
 ```
 
 ### 3. Use Outputs in Packer Builds
@@ -81,10 +81,10 @@ terraform apply -var name_prefix=spel
 The root module exports the values Packer and CI pipelines need:
 
 ```bash
-export SUBNET_ID=$(terraform output -raw subnet_id)
-export VPC_ID=$(terraform output -raw vpc_id)
-export SECURITY_GROUP_ID=$(terraform output -raw security_group_id)
-export INSTANCE_PROFILE=$(terraform output -raw instance_profile_name)
+export SUBNET_ID=$(tofu output -raw subnet_id)
+export VPC_ID=$(tofu output -raw vpc_id)
+export SECURITY_GROUP_ID=$(tofu output -raw security_group_id)
+export INSTANCE_PROFILE=$(tofu output -raw instance_profile_name)
 ```
 
 ## Inputs
@@ -107,7 +107,7 @@ export INSTANCE_PROFILE=$(terraform output -raw instance_profile_name)
 | `create_kms_key` | `bool` | `true` | Create a new KMS CMK for SSM encryption |
 | `kms_key_arn` | `string` | `""` | ARN of an existing KMS key (when `create_kms_key = false`) |
 | `alert_email` | `string` | `""` | Email for SNS alert notifications (empty = skip subscription) |
-| `tags` | `map(string)` | `{}` | Additional tags merged with `Project=SPEL` and `ManagedBy=terraform` |
+| `tags` | `map(string)` | `{}` | Additional tags merged with `Project=SPEL` and `ManagedBy=opentofu` |
 
 ## Outputs
 

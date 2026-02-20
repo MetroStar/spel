@@ -1,18 +1,18 @@
 #!/bin/bash
-# Bootstrap Terraform S3 + DynamoDB backend for SSM infrastructure module
+# Bootstrap OpenTofu S3 + DynamoDB backend for SSM infrastructure module
 # Usage: source bootstrap-backend.sh [OPTIONS]
 #
 # This script idempotently creates the S3 bucket and DynamoDB table needed
-# for the Terraform remote backend, then generates a backend.tf file.
+# for the OpenTofu remote backend, then generates a backend.tf file.
 # Designed to be called from CI/CD pipelines (GitHub Actions, GitLab CI)
-# before `terraform init`.
+# before `tofu init`.
 #
 # Options:
 #   --prefix PREFIX     Resource name prefix (default: spel-offline)
 #   --region REGION     AWS region (default: $AWS_DEFAULT_REGION or us-east-1)
 #   --bucket NAME       Override S3 bucket name (default: ${PREFIX}-ssm-tfstate-${ACCOUNT_ID})
 #   --table NAME        Override DynamoDB table name (default: ${PREFIX}-ssm-tflock)
-#   --key PATH          State file key path (default: ssm-infra/terraform.tfstate)
+#   --key PATH          State file key path (default: ssm-infra/opentofu.tfstate)
 #
 # After running, an auto-generated backend.tf will be present in the current
 # directory. The script also exports:
@@ -30,7 +30,7 @@ PREFIX="${INFRA_PREFIX:-spel-offline}"
 REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}"
 BUCKET_OVERRIDE=""
 TABLE_OVERRIDE=""
-STATE_KEY="ssm-infra/terraform.tfstate"
+STATE_KEY="ssm-infra/opentofu.tfstate"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -53,7 +53,7 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 BUCKET="${BUCKET_OVERRIDE:-${PREFIX}-ssm-tfstate-${ACCOUNT_ID}}"
 TABLE="${TABLE_OVERRIDE:-${PREFIX}-ssm-tflock}"
 
-echo "=== Bootstrapping Terraform Backend ==="
+echo "=== Bootstrapping OpenTofu Backend ==="
 echo "  Region:  $REGION"
 echo "  Bucket:  $BUCKET"
 echo "  Table:   $TABLE"
@@ -125,7 +125,7 @@ else
     --key-schema AttributeName=LockID,KeyType=HASH \
     --billing-mode PAY_PER_REQUEST \
     --region "$REGION" \
-    --tags Key=Project,Value=SPEL Key=ManagedBy,Value=terraform-bootstrap >/dev/null
+    --tags Key=Project,Value=SPEL Key=ManagedBy,Value=opentofu-bootstrap >/dev/null
 
   echo "Waiting for table to become active..."
   aws dynamodb wait table-exists --table-name "$TABLE" --region "$REGION"
@@ -159,6 +159,6 @@ export TF_BACKEND_REGION="$REGION"
 export TF_BACKEND_KEY="$STATE_KEY"
 
 echo ""
-echo "=== Terraform Backend Ready ==="
-echo "  Run:  terraform init -input=false"
+echo "=== OpenTofu Backend Ready ==="
+echo "  Run:  tofu init -input=false"
 echo ""

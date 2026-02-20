@@ -72,7 +72,7 @@ The SPEL CI/CD pipeline uses a **Docker-based build system** where all dependenc
 │  │                                                                      │   │
 │  │  Stage 1: import - Import Docker image from tarball                  │   │
 │  │  Stage 2: infra  - Provision persistent AWS infrastructure via        │   │
-│  │                    Terraform (one-time, from .gitlab/infra.gitlab-ci)  │   │
+│  │                    OpenTofu (one-time, from .gitlab/infra.gitlab-ci)   │   │
 │  │  Stage 3: build  - Build AMIs using Docker container                 │   │
 │  │  Stage 4: test   - Test AMIs (optional)                              │   │
 │  │                                                                      │   │
@@ -208,9 +208,9 @@ The IAM role or user that **runs Packer** (the credentials passed to the Docker 
 
 > **Note**: This policy is for the credentials that **execute Packer**, not the EC2 instance profile. The instance profile permissions are created by the `infra:create` job in GitLab CI (or by the `infra` job in GitHub Actions, which calls `infra-setup.yml`).
 
-#### 3. Terraform Execution IAM Permissions
+#### 3. OpenTofu Execution IAM Permissions
 
-The IAM role also needs permissions to manage infrastructure via Terraform. The `infra-setup.yml` workflow (and GitLab's `infra:create` job) runs `terraform apply` to create VPCs, subnets, security groups, IAM roles, KMS keys, and SSM resources. Add these permissions to the same role:
+The IAM role also needs permissions to manage infrastructure via OpenTofu. The `infra-setup.yml` workflow (and GitLab's `infra:create` job) runs `tofu apply` to create VPCs, subnets, security groups, IAM roles, KMS keys, and SSM resources. Add these permissions to the same role:
 
 ```json
 {
@@ -474,11 +474,11 @@ The IAM role also needs permissions to manage infrastructure via Terraform. The 
 }
 ```
 
-> **Note**: This policy covers Terraform state backend (S3 + DynamoDB), networking, IAM, KMS, SSM (documents, associations, patch baselines, maintenance windows, DHMC), CloudWatch (logs, metric filters, alarms), SNS, and STS resources created by the `infra/` root module. For GovCloud, the ARN partition resolves automatically.
+> **Note**: This policy covers OpenTofu state backend (S3 + DynamoDB), networking, IAM, KMS, SSM (documents, associations, patch baselines, maintenance windows, DHMC), CloudWatch (logs, metric filters, alarms), SNS, and STS resources created by the `infra/` root module. For GovCloud, the ARN partition resolves automatically.
 
 #### 4. EC2 Instance Profile Permissions (Created by Pipeline)
 
-The Terraform root module at `infra/` creates an instance profile with minimal permissions for the Packer-launched EC2 instances:
+The OpenTofu root module at `infra/` creates an instance profile with minimal permissions for the Packer-launched EC2 instances:
 
 - **SSM Access**: For Session Manager connectivity (if using SSH via SSM)
 - **S3 Access**: To AWS-managed SSM buckets for agent operation
@@ -545,7 +545,7 @@ aws iam create-role \
   --assume-role-policy-document file://trust-policy.json \
   --max-session-duration 21600
 
-# Attach the Packer and Terraform permissions (from sections 2 and 3 above)
+# Attach the Packer and OpenTofu permissions (from sections 2 and 3 above)
 aws iam put-role-policy \
   --role-name Packer_Amazon \
   --policy-name PackerBuildPolicy \
@@ -553,8 +553,8 @@ aws iam put-role-policy \
 
 aws iam put-role-policy \
   --role-name Packer_Amazon \
-  --policy-name TerraformInfraPolicy \
-  --policy-document file://terraform-policy.json
+  --policy-name OpenTofuInfraPolicy \
+  --policy-document file://opentofu-policy.json
 ```
 
 > **Security**: The `sub` condition restricts which repository (and optionally branch) can assume the role. Use `repo:OWNER/REPO:ref:refs/heads/BRANCH` to restrict to a specific branch, or `repo:OWNER/REPO:*` to allow any branch.
@@ -774,7 +774,7 @@ The GitLab CI pipeline has 4 stages:
 | Stage | Purpose | Trigger | Duration |
 |-------|---------|---------|----------|
 | **import** | Import Docker image from tarball | Manual | 2-3 min |
-| **infra** | Provision persistent AWS infrastructure via Terraform (one-time) | Manual | 2-3 min |
+| **infra** | Provision persistent AWS infrastructure via OpenTofu (one-time) | Manual | 2-3 min |
 | **build** | Build AMIs using Docker container | Manual | 2-5 hr/OS |
 | **test** | Test AMIs on different instance types (optional) | Manual | 5-15 min |
 
@@ -796,8 +796,8 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 |----------|-------------|---------|
 | `AWS_SESSION_TOKEN` | STS session token | (none) |
 | `PKR_VAR_aws_region` | AWS region | `us-gov-east-1` |
-| `PKR_VAR_aws_vpc_id` | VPC ID for builds | (from Terraform) |
-| `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (from Terraform) |
+| `PKR_VAR_aws_vpc_id` | VPC ID for builds | (from OpenTofu) |
+| `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_kms_key_id` | KMS key ARN for CMK-encrypted AMIs | (none) |
 | `INFRA_PREFIX` | Prefix for created resources | `spel` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
@@ -852,7 +852,7 @@ cp spel-builder-*.tar.gz /transfer/
 **Step 3: Create AWS infrastructure (one-time)**
 
 1. In the same pipeline, click **▶** on `infra:create`
-2. Wait for completion — this single Terraform job provisions all infrastructure (VPC, subnets, security groups, IAM roles, KMS, SSM)
+2. Wait for completion — this single OpenTofu job provisions all infrastructure (VPC, subnets, security groups, IAM roles, KMS, SSM)
 3. Infrastructure outputs are exported as `infra.env` dotenv artifact for build jobs
 
 **Step 4: Build AMIs**
@@ -894,7 +894,7 @@ import:docker:
 
 #### infra:create
 
-Provisions all AWS infrastructure via the Terraform root module at `infra/`:
+Provisions all AWS infrastructure via the OpenTofu root module at `infra/`:
 
 - **VPC** with DNS enabled
 - **Internet Gateway** (required for RHUI access)

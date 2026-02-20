@@ -16,13 +16,13 @@ and transferred to the air-gapped GitLab environment.
 
 **Key Features**:
 - Imports pre-built Docker image from tarball
-- Provisions persistent AWS infrastructure via Terraform (one-time, from `.gitlab/infra.gitlab-ci.yml`)
+- Provisions persistent AWS infrastructure via OpenTofu (one-time, from `.gitlab/infra.gitlab-ci.yml`)
 - Builds SPEL images for Linux and Windows operating systems
 - All dependencies are baked into the Docker image (no internet required)
 
 **Stages**:
 1. `import` - Import Docker image from tarball
-2. `infra` - Provision persistent AWS infrastructure via Terraform (one-time, from `.gitlab/infra.gitlab-ci.yml`)
+2. `infra` - Provision persistent AWS infrastructure via OpenTofu (one-time, from `.gitlab/infra.gitlab-ci.yml`)
 3. `build` - Build AMIs using Docker container
 4. `test` - Test AMIs on different instance types (optional)
 

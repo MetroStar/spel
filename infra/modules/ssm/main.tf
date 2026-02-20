@@ -19,7 +19,7 @@ locals {
 
   # Common tags applied to all resources
   common_tags = merge(var.tags, {
-    ManagedBy = "terraform"
+    ManagedBy = "opentofu"
     Module    = "spel-ssm"
   })
 

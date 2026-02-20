@@ -25,6 +25,7 @@ FROM registry1.dso.mil/ironbank/opensource/rockylinux/rockylinux9:9.7 AS builder
 
 # Build arguments
 ARG PACKER_VERSION=1.11.2
+ARG OPENTOFU_VERSION=1.9.0
 ARG ANSIBLE_VERSION=">=2.14.0,<2.19.0"
 
 # Environment variables for build
@@ -45,6 +46,7 @@ RUN dnf install -y --allowerasing \
         tar \
         gzip \
         unzip \
+        zip \
         curl \
         wget \
         findutils \
@@ -256,6 +258,21 @@ RUN echo "=== Installing AWS CLI v2 ===" \
     && rm -rf /tmp/aws \
     && aws --version
 
+# =============================================================================
+# Install OpenTofu (for infrastructure management on air-gapped runners)
+# Baked into the image so it can be extracted via `docker cp` onto runners
+# that don't have internet access to download it.
+# =============================================================================
+RUN echo "=== Installing OpenTofu ${OPENTOFU_VERSION} ===" \
+    && cd /tmp \
+    && curl -fsSLO "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_linux_amd64.zip" \
+    && curl -fsSLO "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_SHA256SUMS" \
+    && grep "linux_amd64.zip" "tofu_${OPENTOFU_VERSION}_SHA256SUMS" | sha256sum -c - \
+    && unzip -q "tofu_${OPENTOFU_VERSION}_linux_amd64.zip" -d /usr/local/bin/ \
+    && chmod +x /usr/local/bin/tofu \
+    && rm -f tofu_${OPENTOFU_VERSION}_* \
+    && tofu version
+
 # Create entrypoint script in builder
 RUN cat > /opt/entrypoint.sh << 'EOF'
 #!/bin/bash
@@ -263,6 +280,7 @@ set -e
 
 echo "=== SPEL Build Container ==="
 echo "Packer: $(packer version | head -1)"
+echo "OpenTofu: $(tofu version 2>/dev/null | head -1 || echo 'not available')"
 echo "Ansible: $(ansible --version | head -1)"
 echo "Python: $(python3 --version)"
 echo ""
@@ -481,6 +499,9 @@ ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
 # Copy Packer binary
 COPY --from=builder /usr/local/bin/packer /usr/local/bin/packer
 
+# Copy OpenTofu binary (for air-gapped runner extraction via docker cp)
+COPY --from=builder /usr/local/bin/tofu /usr/local/bin/tofu
+
 # Copy AWS CLI v2 (entire install directory with bundled Python)
 COPY --from=builder /opt/aws-cli /opt/aws-cli
 
@@ -563,6 +584,7 @@ COPY --from=builder /usr/bin/git /usr/bin/git
 COPY --from=builder /usr/bin/curl /usr/bin/curl
 COPY --from=builder /usr/bin/jq /usr/bin/jq
 COPY --from=builder /usr/bin/unzip /usr/bin/unzip
+COPY --from=builder /usr/bin/zip /usr/bin/zip
 COPY --from=builder /usr/bin/find /usr/bin/find
 COPY --from=builder /usr/bin/xargs /usr/bin/xargs
 COPY --from=builder /usr/bin/which /usr/bin/which

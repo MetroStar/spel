@@ -1,17 +1,20 @@
 # =============================================================================
-# GitLab CI/CD — Infrastructure Management (Terraform)
+# GitLab CI/CD — Infrastructure Management (OpenTofu)
 # =============================================================================
 # Manages all persistent SPEL AWS infrastructure via the consolidated
-# Terraform root module at infra/.
+# OpenTofu root module at infra/.
 #
 # Included by .gitlab-ci.yml via:
 #   include:
 #     - local: '.gitlab/infra.gitlab-ci.yml'
 #
 # JOBS:
-#   infra:plan    — Preview Terraform changes (manual)
-#   infra:create  — Apply Terraform to create/update infra (manual)
-#   infra:destroy — Destroy all Terraform-managed infra (manual)
+#   infra:plan    — Preview OpenTofu changes (manual)
+#   infra:create  — Apply OpenTofu to create/update infra (manual)
+#   infra:destroy — Destroy all OpenTofu-managed infra (manual)
+#
+# On air-gapped runners, tofu/aws/jq/zip are extracted from the spel-builder
+# Docker image via infra/extract-tools.sh.
 # =============================================================================
 
 # Plan infrastructure changes (dry run)
@@ -20,6 +23,9 @@ infra:plan:
   script:
     - echo "=== Planning Infrastructure Changes ==="
     - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    # Extract CLI tools from Docker image if missing (air-gapped runners)
+    - source infra/extract-tools.sh "${DOCKER_IMAGE_TAG:-latest}"
 
     - |
       TF_CMD=""
@@ -70,12 +76,15 @@ infra:plan:
       when: manual
     - when: never
 
-# Create or update all persistent infrastructure (single terraform apply)
+# Create or update all persistent infrastructure (single tofu apply)
 infra:create:
   stage: infra
   script:
-    - echo "=== Creating All Infrastructure via Terraform ==="
+    - echo "=== Creating All Infrastructure via OpenTofu ==="
     - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    # Extract CLI tools from Docker image if missing (air-gapped runners)
+    - source infra/extract-tools.sh "${DOCKER_IMAGE_TAG:-latest}"
 
     - |
       TF_CMD=""
@@ -216,12 +225,15 @@ infra:create:
     - if: '$CREATE_INFRASTRUCTURE == "true"'
       when: manual
 
-# Destroy all persistent infrastructure (single terraform destroy)
+# Destroy all persistent infrastructure (single tofu destroy)
 infra:destroy:
   stage: infra
   script:
-    - echo "=== Destroying All Infrastructure via Terraform ==="
+    - echo "=== Destroying All Infrastructure via OpenTofu ==="
     - export AWS_DEFAULT_REGION="${PKR_VAR_aws_region}"
+
+    # Extract CLI tools from Docker image if missing (air-gapped runners)
+    - source infra/extract-tools.sh "${DOCKER_IMAGE_TAG:-latest}"
 
     - |
       TF_CMD=""
@@ -243,7 +255,7 @@ infra:destroy:
 
       echo ""
       echo "=== Destroying All Infrastructure ==="
-      echo "WARNING: This will remove ALL Terraform-managed SPEL resources."
+      echo "WARNING: This will remove ALL OpenTofu-managed SPEL resources."
       echo ""
 
       $TF_CMD destroy -auto-approve -input=false

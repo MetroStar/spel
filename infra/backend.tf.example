@@ -26,20 +26,20 @@
 #   export AWS_USE_FIPS_ENDPOINT=true
 #
 # CI pipelines initialize with -backend-config flags:
-#   terraform init \
-#     -backend-config="bucket=spel-ssm-terraform-state" \
-#     -backend-config="key=ci/terraform.tfstate" \
+#   tofu init \
+#     -backend-config="bucket=spel-ssm-opentofu-state" \
+#     -backend-config="key=ci/opentofu.tfstate" \
 #     -backend-config="region=us-gov-west-1" \
-#     -backend-config="dynamodb_table=spel-ssm-terraform-locks"
+#     -backend-config="dynamodb_table=spel-ssm-opentofu-locks"
 # =============================================================================
 
 terraform {
   backend "s3" {
     # These values should be customized per environment.
-    # They can also be provided via -backend-config flags during terraform init.
+    # They can also be provided via -backend-config flags during tofu init.
 
     bucket         = "REPLACE-WITH-YOUR-STATE-BUCKET"
-    key            = "ssm-infra/terraform.tfstate"
+    key            = "ssm-infra/opentofu.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "REPLACE-WITH-YOUR-LOCK-TABLE"

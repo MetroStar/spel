@@ -19,7 +19,7 @@
 #      - DOCKER_IMAGE_PATH (path to spel-builder-*.tar.gz)
 #
 # INFRASTRUCTURE:
-#   Infrastructure is managed by .gitlab/infra.gitlab-ci.yml via Terraform.
+#   Infrastructure is managed by .gitlab/infra.gitlab-ci.yml via OpenTofu.
 #   Run infra:create once before the first build to provision VPC, IAM, KMS, etc.
 #   Infrastructure is persistent and reused across all builds.
 #

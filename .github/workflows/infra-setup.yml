@@ -1,15 +1,15 @@
 # =============================================================================
 # Infrastructure Setup for SPEL Builds
 # =============================================================================
-# This workflow manages ALL SPEL AWS infrastructure using a single Terraform
-# root module (infra/). One `terraform apply` creates everything; one
-# `terraform destroy` tears it all down.
+# This workflow manages ALL SPEL AWS infrastructure using a single OpenTofu
+# root module (infra/). One `tofu apply` creates everything; one
+# `tofu destroy` tears it all down.
 #
 # Infrastructure is persistent — created once and reused across builds.
 # build.yml calls this workflow automatically via workflow_call to ensure
-# infrastructure exists before every build (terraform apply is idempotent).
+# infrastructure exists before every build (tofu apply is idempotent).
 #
-# RESOURCES CREATED (via Terraform modules):
+# RESOURCES CREATED (via OpenTofu modules):
 #   Networking (modules/networking):
 #     - VPC with DNS support/hostnames enabled
 #     - Subnet with auto-assign public IP (or private if using VPC endpoints)
@@ -32,6 +32,8 @@
 # USAGE:
 #   Manual: Run with action="plan" to review, "apply" to create, "destroy" to teardown
 #   Automatic: build.yml calls this with action="apply" before every build
+#
+# NOTE: Uses OpenTofu (MPL-licensed) via opentofu/setup-opentofu action.
 # =============================================================================
 
 name: Infrastructure Setup
@@ -181,10 +183,11 @@ jobs:
           role-session-name: spel-infra-setup
           role-duration-seconds: 3600
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
         with:
-          terraform_wrapper: false
+          tofu_version: 1.9.0
+          tofu_wrapper: false
 
       - name: Bootstrap backend
         working-directory: infra
@@ -195,9 +198,9 @@ jobs:
             --prefix "spel" \
             --region "${{ inputs.aws_region }}"
 
-      - name: Terraform init
+      - name: OpenTofu init
         working-directory: infra
-        run: terraform init -input=false
+        run: tofu init -input=false
 
       - name: Check infrastructure status
         if: inputs.action == 'status'
@@ -207,13 +210,13 @@ jobs:
           echo ""
 
           # Try to read state — if no state exists, report "not deployed"
-          if terraform show -json 2>/dev/null | jq -e '.values.root_module' &>/dev/null; then
+          if tofu show -json 2>/dev/null | jq -e '.values.root_module' &>/dev/null; then
             echo "Infrastructure is deployed."
             echo ""
             echo "=== Current Outputs ==="
-            terraform output || true
+            tofu output || true
           else
-            echo "No Terraform state found — infrastructure has not been deployed."
+            echo "No state found — infrastructure has not been deployed."
             echo ""
             echo "Run this workflow with action='apply' to create infrastructure."
           fi
@@ -241,30 +244,30 @@ jobs:
           echo "=== Generated tfvars ==="
           cat ci.auto.tfvars
 
-      - name: Terraform plan
+      - name: OpenTofu plan
         if: inputs.action == 'plan' || inputs.action == 'apply'
         working-directory: infra
         run: |
-          terraform plan -input=false -out=tfplan
+          tofu plan -input=false -out=tfplan
           echo ""
           echo "=== Plan Summary ==="
-          terraform show -no-color tfplan | tail -5
+          tofu show -no-color tfplan | tail -5
 
-      - name: Terraform apply
+      - name: OpenTofu apply
         if: inputs.action == 'apply'
         working-directory: infra
         run: |
-          terraform apply -auto-approve -input=false tfplan
+          tofu apply -auto-approve -input=false tfplan
           echo ""
           echo "=== Infrastructure Created ==="
-          terraform output
+          tofu output
 
-      - name: Terraform destroy
+      - name: OpenTofu destroy
         if: inputs.action == 'destroy'
         working-directory: infra
         run: |
           echo "::warning::Destroying ALL infrastructure in ${{ inputs.aws_region }}"
-          terraform destroy -auto-approve -input=false
+          tofu destroy -auto-approve -input=false
           echo ""
           echo "=== Infrastructure Destroyed ==="
 
@@ -273,12 +276,12 @@ jobs:
         id: outputs
         working-directory: infra
         run: |
-          VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
-          SUBNET_ID=$(terraform output -raw subnet_id 2>/dev/null || echo "")
-          SG_ID=$(terraform output -raw security_group_id 2>/dev/null || echo "")
-          PROFILE=$(terraform output -raw instance_profile_name 2>/dev/null || echo "")
-          KMS_ARN=$(terraform output -raw kms_key_arn 2>/dev/null || echo "")
-          S3_BUCKET=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "")
+          VPC_ID=$(tofu output -raw vpc_id 2>/dev/null || echo "")
+          SUBNET_ID=$(tofu output -raw subnet_id 2>/dev/null || echo "")
+          SG_ID=$(tofu output -raw security_group_id 2>/dev/null || echo "")
+          PROFILE=$(tofu output -raw instance_profile_name 2>/dev/null || echo "")
+          KMS_ARN=$(tofu output -raw kms_key_arn 2>/dev/null || echo "")
+          S3_BUCKET=$(tofu output -raw s3_bucket_name 2>/dev/null || echo "")
 
           echo "vpc_id=${VPC_ID}" >> $GITHUB_OUTPUT
           echo "subnet_id=${SUBNET_ID}" >> $GITHUB_OUTPUT
@@ -308,7 +311,7 @@ jobs:
           if [ "${{ inputs.action }}" = "apply" ]; then
             cat >> $GITHUB_STEP_SUMMARY << 'SUBHEADER'
 
-          ### Terraform Outputs
+          ### OpenTofu Outputs
 
           Use these values in the build.yml workflow:
 
@@ -316,12 +319,12 @@ jobs:
           |-------|-------|
           SUBHEADER
 
-            # Populate from Terraform outputs
-            VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "n/a")
-            SUBNET_ID=$(terraform output -raw subnet_id 2>/dev/null || echo "n/a")
-            SG_ID=$(terraform output -raw security_group_id 2>/dev/null || echo "n/a")
-            PROFILE=$(terraform output -raw instance_profile_name 2>/dev/null || echo "n/a")
-            KMS_ARN=$(terraform output -raw kms_key_arn 2>/dev/null || echo "n/a")
+            # Populate from OpenTofu outputs
+            VPC_ID=$(tofu output -raw vpc_id 2>/dev/null || echo "n/a")
+            SUBNET_ID=$(tofu output -raw subnet_id 2>/dev/null || echo "n/a")
+            SG_ID=$(tofu output -raw security_group_id 2>/dev/null || echo "n/a")
+            PROFILE=$(tofu output -raw instance_profile_name 2>/dev/null || echo "n/a")
+            KMS_ARN=$(tofu output -raw kms_key_arn 2>/dev/null || echo "n/a")
 
             cat >> $GITHUB_STEP_SUMMARY << EOF
           | aws_vpc_id | \`${VPC_ID}\` |

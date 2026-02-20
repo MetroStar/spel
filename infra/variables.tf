@@ -139,6 +139,6 @@ variable "tags" {
 locals {
   common_tags = merge(var.tags, {
     Project   = "SPEL"
-    ManagedBy = "terraform"
+    ManagedBy = "opentofu"
   })
 }
