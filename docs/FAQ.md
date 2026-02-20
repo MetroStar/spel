@@ -1,39 +1,42 @@
 ### Q: What OSes are currently supported?
 
-A: The following OSes are supported via spel:
+A: The following OSes are currently supported via spel:
 
-- RHEL 7
-- CentOS 7
+**Linux:**
 - RHEL 8
-- CentOS 8-Stream
 - Oracle Linux 8
+- RHEL 9
+- Oracle Linux 9
+- CentOS Stream 9
+- Amazon Linux 2023
 
-Other ELx derivatives may work but have not been specifically tested.
+**Windows:**
+- Windows Server 2016
+- Windows Server 2019
+- Windows Server 2022
+
+Other ELx derivatives (Rocky, Alma) may work but have not been specifically tested.
+
+**Deprecated (end-of-life):**
+- RHEL 7 / CentOS 7 (EOL June 2024)
+- CentOS 8 Stream (EOL September 2024)
 
 ### Q: Is RHEL or CentOS 8 Supported
 
-A: Currently, three EL8 distros are explicitly supported
+A: Yes. Three EL8 distros are supported:
 
-- Red Hat Enterpise Linux (RHEL) 8
-- CentOSS 8 _Stream_
+- Red Hat Enterprise Linux (RHEL) 8
 - Oracle Linux (OL) 8
 
-The spel AMIs have a couple of design-dependencies:
+CentOS 8 Stream reached end-of-life in September 2024 and is no longer actively supported.
 
-- Our primary development-platform is CentOS, not RHEL. Automation is written for CentOS, first. It is then ported and verified to work on RHEL. Finally (with the EL8+ release), it is ported and verified to work on OL.
-- We try to make the Red Hat, CentOS and Oracle Linux images we publish as close to identical as their respective package repositories allow them to be. Until we have both the Red Hat _and_ CentOS.Org (and, now, Oracle Linux) flavors of a given release available, we don't update or extend our automation
-- Because we try to provide a similar degree of AWS functionality to spel AMIs as is found in Amazon Linux AMIs, the spel AMIs require the ability to port the AWS utilities to RHEL and CentOS. Historically, the ability to so port has been contingent on EPEL-hosted packages.
+EL9 is also fully supported:
 
-Resultant of the above, we will not attempt support for EL8 until CentOS.Org has published a "final" AMI and until Fedora has made ("final") EPEL 8 repositories available. Status for both projects may be tracked at:
+- Red Hat Enterprise Linux (RHEL) 9
+- Oracle Linux (OL) 9
+- CentOS Stream 9
 
-- CentOS 8 [build-status](https://wiki.centos.org/About/Building_8)
-- EPEL 8 [support-status](https://fedoraproject.org/wiki/EPEL#What_packages_and_versions_are_available_in_EPEL.3F)
-
-Notes:
-1. EPEL dependency is AWS-only
-2. EPEL dependency may be removed in later ELx versions as baked-in packages' dependencies permit
-
-Note: Initial functionality for any given ELx build orchestrated by spel starts with an amigen project. Functionality for EL8 will be trackable within the [amigen8 project](/MetroStar/amigen8).
+Note: Initial functionality for any given ELx build orchestrated by spel starts with an amigen project. EL8 functionality is tracked in [amigen8](https://github.com/MetroStar/amigen8) and EL9 in [amigen9](https://github.com/MetroStar/amigen9).
 
 ### Q: What happened to support for EL6?
 
@@ -43,15 +46,28 @@ While it's possible that this automation can continue to be used to create new E
 
 ### Q: Are the images STIG-hardened?
 
-A: No. The only STIG-related hardening is:
+A: The images include foundational STIG hardening that must be in place "from birth":
 
 -   The images' root device is pre-partitioned to allow the various
     "`${DIRECTORY}` must be on its own filesystem" scan-tests to pass
--   Red Hat and CentOS 7.x images are FIPS-enabled
+-   SELinux is activated with user-confinement for the default user
+-   FIPS mode is enabled (EL8/EL9)
+-   EFI/SecureBoot support is included
 
-### Q: Why aren't the images STIG-hardened?
+For post-deployment STIG enforcement, the project includes SSM State Manager
+associations (deployed via the `infra/` Terraform module) that automatically
+apply STIG hardening on a schedule:
 
-A. As of the writing of this FAQ answer:
+-   **EL8/EL9**: Ansible Lockdown roles (RHEL8-STIG, RHEL9-STIG)
+-   **AL2023**: Native AWS STIG enforcement script
+-   **Windows**: AWS-managed `AWSEC2-ConfigureSTIG` SSM document
+
+See the [SSM module README](../infra/modules/ssm/README.md) for details on
+STIG enforcement associations.
+
+### Q: Why aren't the images fully STIG-hardened at build time?
+
+A. Full STIG hardening at build time would be impractical because:
 
 -   Images are published in the following repositories
     -   Amazon Machine Image in AWS commercial region us-east-1

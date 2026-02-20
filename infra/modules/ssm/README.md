@@ -18,7 +18,7 @@ Architecture: **one deployment per AWS account** (not per-AMI). SSM resources pe
 | IAM Caller Policy | Permissions for CI/humans to invoke SSM operations | Always created |
 | SSM Documents | Custom `RunOpenSCAPScan` + Session Manager preferences (`SSM-SessionManagerRunShell`) | Always / `enable_session_manager` |
 | SSM Associations | Ansible STIG check-mode, OpenSCAP scan, Software Inventory (compliance verification) | `enable_state_manager`, `enable_inventory` |
-| STIG Enforcement | Ansible Lockdown (EL + Windows) + native script (AL2023) enforce mode | `enable_stig_enforcement` |
+| STIG Enforcement | Ansible Lockdown (EL) + native script (AL2023) + AWSEC2-ConfigureSTIG (Windows) enforce mode | `enable_stig_enforcement` |
 | SSM Agent Update | Automatic SSM agent updates (daily, before patch window) | `enable_ssm_agent_update` |
 | DHMC | Default Host Management Configuration — auto-registers all EC2 instances with SSM | `enable_dhmc` |
 | Patch Baselines | Linux + Windows STIG-aligned baselines | `enable_patch_manager` |
@@ -208,7 +208,7 @@ SSM associations use **platform-specific targeting** via the `StigPlatform` tag 
 | **EL STIG check-mode** | `StigPlatform` | `EL8`, `EL9` | Same playbook in `--check` mode |
 | **OpenSCAP scan** | `StigPlatform` | `EL8`, `EL9` | OpenSCAP content is Linux-specific |
 | **AL2023 enforcement** | `StigPlatform` | `AL2023` | AL2023 uses its own native script |
-| **Windows enforcement** | `StigPlatform` | `Win2016`, `Win2019`, `Win2022` | Per-version Windows playbooks |
+| **Windows enforcement** | `StigPlatform` | `Win2016`, `Win2019`, `Win2022` | AWS-managed AWSEC2-ConfigureSTIG document |
 | **SSM agent update** | `StigManaged` | `true` | All platforms need agent updates |
 | **Software inventory** | `StigManaged` | `true` | Collect inventory from all platforms |
 
@@ -254,8 +254,7 @@ stig-playbook.zip
 ├── boot-fips-wrapper.sh    # EL8 FIPS boot repair script
 ├── roles/
 │   ├── RHEL8-STIG/         # Ansible Lockdown RHEL8 STIG role
-│   ├── RHEL9-STIG/         # Ansible Lockdown RHEL9 STIG role
-│   └── AL2023-STIG/        # AL2023 STIG role (based on RHEL9)
+│   └── RHEL9-STIG/         # Ansible Lockdown RHEL9 STIG role
 ├── collections/            # Pre-packaged Ansible collections (if present)
 └── requirements.yml        # Collection metadata
 ```
@@ -279,7 +278,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 | `enable_state_manager` | Create State Manager associations | `bool` | `true` | no |
 | `enable_patch_manager` | Create patch baselines + maintenance windows | `bool` | `true` | no |
 | `enable_inventory` | Create inventory association | `bool` | `true` | no |
-| `enable_stig_enforcement` | Enable STIG enforcement (Ansible Lockdown for EL, native script for AL2023) | `bool` | `true` | no |
+| `enable_stig_enforcement` | Enable STIG enforcement (Ansible Lockdown for EL, native script for AL2023, AWSEC2-ConfigureSTIG for Windows) | `bool` | `true` | no |
 | `enable_ssm_agent_update` | Enable automatic SSM agent updates | `bool` | `true` | no |
 | `enable_dhmc` | Enable Default Host Management Configuration (auto-registers all instances) | `bool` | `true` | no |
 | `install_dependencies` | Let SSM install Ansible via pip (set false for air-gapped) | `bool` | `false` | no |
@@ -296,7 +295,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 | `stig_enforcement_schedule` | Schedule for STIG enforcement runs | `string` | `rate(7 days)` | no |
 | `ansible_timeout` | Timeout in seconds for Ansible STIG playbook execution via SSM | `number` | `7200` | no |
 | `stig_al2023_s3_key` | S3 key for AL2023 STIG script package | `string` | `ansible/al2023-stig-script.zip` | no |
-| `windows_stig_s3_key` | S3 key for Windows STIG playbook package | `string` | `ansible/windows-stig-playbook.zip` | no |
+| `windows_stig_level` | STIG severity level for Windows (AWSEC2-ConfigureSTIG) | `string` | `High` | no |
 | `ssm_agent_update_schedule` | Schedule for SSM agent updates | `string` | `cron(0 3 ? * * *)` | no |
 | `tags` | Additional tags | `map(string)` | `{}` | no |
 

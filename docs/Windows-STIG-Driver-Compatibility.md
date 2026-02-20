@@ -56,11 +56,9 @@ The following drivers are essential for booting on AWS Nitro-based instances:
 
 1. **Pre-Build**: Run `Get-WindowsDriver -Online -All | Where-Object { $_.OriginalFileName -like '*ena*' -or $_.OriginalFileName -like '*nvme*' }`
 
-2. **Post-STIG**: Check `C:\PostSTIG.log` for driver verification output
+2. **Post-STIG**: Windows STIG enforcement uses the AWS-managed `AWSEC2-ConfigureSTIG` SSM document. Check SSM RunCommand output and `C:\ProgramData\Amazon\SSM\Logs` for STIG application results.
 
-3. **Post-DISM**: Cleanup script now logs before/after driver comparison
-
-4. **Test AMI**: Use `tests/test-windows-instance-types.sh` to verify boot across Nitro generations
+3. **Test AMI**: Use `tests/test-windows-instance-types.sh` to verify boot across Nitro generations
 
 ## Registry Keys to Check
 

@@ -482,7 +482,7 @@ The Terraform root module at `infra/` creates an instance profile with minimal p
 
 - **SSM Access**: For Session Manager connectivity (if using SSH via SSM)
 - **S3 Access**: To AWS-managed SSM buckets for agent operation
-- **S3 Build Artifacts**: `s3:GetObject` and `s3:ListBucket` on the SPEL SSM bucket for downloading build artifacts (Python deps, STIG playbooks) during AMI builds
+- **S3 Build Artifacts**: `s3:GetObject` and `s3:ListBucket` on the SPEL SSM bucket for downloading build artifacts (STIG playbooks, AL2023 STIG scripts) during AMI builds
 - **CloudWatch Logs**: For optional logging
 
 These are created automatically when you run the `infra:create` job (GitLab) or when `build.yml` calls `infra-setup.yml` (GitHub Actions).
