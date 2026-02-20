@@ -146,7 +146,7 @@ infra:create:
         ROLES_DIR="${CI_PROJECT_DIR}/spel/ansible/roles"
         mkdir -p "$ROLES_DIR"
         CID=$(docker create "spel-builder:${DOCKER_TAG}" /bin/true)
-        for ROLE in RHEL8-STIG RHEL9-STIG Windows-2016-STIG Windows-2019-STIG Windows-2022-STIG; do
+        for ROLE in RHEL8-STIG RHEL9-STIG; do
           docker cp "${CID}:/opt/ansible/roles/${ROLE}" "$ROLES_DIR/" 2>/dev/null && \
             echo "  [OK] Extracted ${ROLE}" || \
             echo "  [WARN] ${ROLE} not found in image"
@@ -167,22 +167,41 @@ infra:create:
           "s3://${S3_BUCKET}/ansible/stig-playbook.zip"
         echo "  [OK] s3://${S3_BUCKET}/ansible/stig-playbook.zip"
 
-        # Package Windows STIG playbooks
+        # Package AL2023 STIG script and upload
         echo ""
-        echo "--- Packaging Windows STIG playbooks ---"
-        WIN_STAGING=$(mktemp -d)
-        mkdir -p "$WIN_STAGING/roles"
-        for ROLE in Windows-2016-STIG Windows-2019-STIG Windows-2022-STIG; do
-          [ -d "$ROLES_DIR/$ROLE" ] && cp -a "$ROLES_DIR/$ROLE" "$WIN_STAGING/roles/"
-        done
-        for PB in windows-2016-stig-playbook.yml windows-2019-stig-playbook.yml windows-2022-stig-playbook.yml; do
-          [ -f "${CI_PROJECT_DIR}/spel/ansible/$PB" ] && cp "${CI_PROJECT_DIR}/spel/ansible/$PB" "$WIN_STAGING/"
-        done
-        (cd "$WIN_STAGING" && zip -qr "${CI_PROJECT_DIR}/dist/windows-stig-playbook.zip" .)
-        aws s3 cp "${CI_PROJECT_DIR}/dist/windows-stig-playbook.zip" \
-          "s3://${S3_BUCKET}/ansible/windows-stig-playbook.zip"
-        echo "  [OK] s3://${S3_BUCKET}/ansible/windows-stig-playbook.zip"
-        rm -rf "$WIN_STAGING"
+        echo "--- Packaging AL2023 STIG script ---"
+        AL2023_STAGING=$(mktemp -d)
+        # Extract the base64-encoded AWS STIG tarball from the Docker image
+        CID=$(docker create "spel-builder:${DOCKER_TAG}" /bin/true)
+        docker cp "${CID}:/opt/offline-packages/LinuxAWSConfigureSTIG.tgz.b64" "$AL2023_STAGING/" 2>/dev/null && \
+          echo "  [OK] Extracted LinuxAWSConfigureSTIG.tgz.b64" || \
+          { echo "  [ERROR] LinuxAWSConfigureSTIG.tgz.b64 not found in image"; docker rm "$CID" > /dev/null; exit 1; }
+        docker rm "$CID" > /dev/null
+        # Decode and extract the STIG script
+        base64 -d "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz.b64" > "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz"
+        tar xzf "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz" -C "$AL2023_STAGING"
+        rm -f "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz" "$AL2023_STAGING/LinuxAWSConfigureSTIG.tgz.b64"
+        # Create wrapper script that the SSM association calls
+        printf '%s\n' '#!/bin/bash' \
+          'set -eu' \
+          'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"' \
+          'if [[ -d "$SCRIPT_DIR/linux_stigs" && -f "$SCRIPT_DIR/linux_stigs/main.sh" ]]; then' \
+          '  chmod +x "$SCRIPT_DIR/linux_stigs/main.sh"' \
+          '  "$SCRIPT_DIR/linux_stigs/main.sh" -d "$SCRIPT_DIR/linux_stigs/" -l High -h yes -s yes' \
+          'else' \
+          '  echo "ERROR: linux_stigs/main.sh not found in $SCRIPT_DIR"' \
+          '  ls -la "$SCRIPT_DIR/" 2>/dev/null' \
+          '  exit 1' \
+          'fi' > "$AL2023_STAGING/apply-stig.sh"
+        chmod +x "$AL2023_STAGING/apply-stig.sh"
+        (cd "$AL2023_STAGING" && zip -qr "${CI_PROJECT_DIR}/dist/al2023-stig-script.zip" .)
+        aws s3 cp "${CI_PROJECT_DIR}/dist/al2023-stig-script.zip" \
+          "s3://${S3_BUCKET}/ansible/al2023-stig-script.zip"
+        echo "  [OK] s3://${S3_BUCKET}/ansible/al2023-stig-script.zip"
+        rm -rf "$AL2023_STAGING"
+
+        # NOTE: Windows STIG enforcement uses the AWS-managed AWSEC2-ConfigureSTIG
+        # SSM document, so no Windows playbook upload to S3 is needed.
 
         echo ""
         echo "=== Playbook Upload Complete ==="

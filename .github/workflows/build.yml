@@ -253,7 +253,7 @@ jobs:
           ROLES_DIR="${GITHUB_WORKSPACE}/spel/ansible/roles"
           mkdir -p "$ROLES_DIR"
           CID=$(docker create "spel-builder:${IMAGE_TAG}" /bin/true)
-          for ROLE in RHEL8-STIG RHEL9-STIG Windows-2016-STIG Windows-2019-STIG Windows-2022-STIG; do
+          for ROLE in RHEL8-STIG RHEL9-STIG; do
             docker cp "${CID}:/opt/ansible/roles/${ROLE}" "$ROLES_DIR/" 2>/dev/null && \
               echo "  [OK] Extracted ${ROLE}" || \
               echo "  [WARN] ${ROLE} not found in image"
@@ -307,22 +307,8 @@ jobs:
           echo "  [OK] s3://${S3_BUCKET}/ansible/al2023-stig-script.zip"
           rm -rf "$AL2023_STAGING"
 
-          # Package Windows STIG playbooks
-          echo ""
-          echo "--- Packaging Windows STIG playbooks ---"
-          WIN_STAGING=$(mktemp -d)
-          mkdir -p "$WIN_STAGING/roles"
-          for ROLE in Windows-2016-STIG Windows-2019-STIG Windows-2022-STIG; do
-            [ -d "$ROLES_DIR/$ROLE" ] && cp -a "$ROLES_DIR/$ROLE" "$WIN_STAGING/roles/"
-          done
-          for PB in windows-2016-stig-playbook.yml windows-2019-stig-playbook.yml windows-2022-stig-playbook.yml; do
-            [ -f "${GITHUB_WORKSPACE}/spel/ansible/$PB" ] && cp "${GITHUB_WORKSPACE}/spel/ansible/$PB" "$WIN_STAGING/"
-          done
-          (cd "$WIN_STAGING" && zip -qr "${GITHUB_WORKSPACE}/dist/windows-stig-playbook.zip" .)
-          aws s3 cp "${GITHUB_WORKSPACE}/dist/windows-stig-playbook.zip" \
-            "s3://${S3_BUCKET}/ansible/windows-stig-playbook.zip"
-          echo "  [OK] s3://${S3_BUCKET}/ansible/windows-stig-playbook.zip"
-          rm -rf "$WIN_STAGING"
+          # NOTE: Windows STIG enforcement uses the AWS-managed AWSEC2-ConfigureSTIG
+          # SSM document, so no Windows playbook upload to S3 is needed.
 
           echo ""
           echo "=== Playbook Upload Complete ==="

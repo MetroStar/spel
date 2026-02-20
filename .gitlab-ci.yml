@@ -316,6 +316,7 @@ import:docker:
         -e "PKR_VAR_aws_ami_groups=${PKR_VAR_aws_ami_groups:-[]}"
         -e "PKR_VAR_aws_vpc_id=${PKR_VAR_aws_vpc_id:-}"
         -e "PKR_VAR_aws_subnet_id=${PKR_VAR_aws_subnet_id:-}"
+        -e "PKR_VAR_aws_security_group_id=${PKR_VAR_aws_security_group_id:-}"
         -e "PKR_VAR_iam_instance_profile=${PKR_VAR_iam_instance_profile:-}"
         -e "PKR_VAR_amigen_repo_mirror_baseurl=${REPO_MIRROR_BASEURL:-}"
         -e "PACKER_LOG=1"
