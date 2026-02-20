@@ -206,6 +206,12 @@ variable "windows_stig_level" {
   }
 }
 
+variable "windows_admin_username" {
+  description = "Name for the built-in Administrator account (SID-500) on Windows instances. AWSEC2-ConfigureSTIG resets the Local Security Policy admin rename, undoing the AMI builds rename from Administrator to maintuser. The custom wrapper document re-applies this rename after each STIG enforcement run."
+  type        = string
+  default     = "maintuser"
+}
+
 variable "target_tag_key" {
   description = "EC2 instance tag key used to target SSM associations. Hardened AMIs are tagged with StigManaged=true."
   type        = string

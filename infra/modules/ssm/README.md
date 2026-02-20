@@ -16,7 +16,7 @@ Architecture: **one deployment per AWS account** (not per-AMI). SSM resources pe
 | VPC Endpoints | `ssm`, `ssmmessages`, `ec2messages`, `logs`, `kms` (Interface) + `s3` (Gateway) | `enable_vpc_endpoints` |
 | IAM Instance Profile | EC2 role with SSM, S3, CloudWatch, KMS, Parameter Store permissions | `create_instance_profile` |
 | IAM Caller Policy | Permissions for CI/humans to invoke SSM operations | Always created |
-| SSM Documents | Custom `RunOpenSCAPScan` + Session Manager preferences (`SSM-SessionManagerRunShell`) | Always / `enable_session_manager` |
+| SSM Documents | Custom `RunOpenSCAPScan` + `WindowsSTIGEnforce` + Session Manager preferences | Always / `enable_session_manager` |
 | SSM Associations | Ansible STIG check-mode, OpenSCAP scan, Software Inventory (compliance verification) | `enable_state_manager`, `enable_inventory` |
 | STIG Enforcement | Ansible Lockdown (EL) + native script (AL2023) + AWSEC2-ConfigureSTIG (Windows) enforce mode | `enable_stig_enforcement` |
 | SSM Agent Update | Automatic SSM agent updates (daily, before patch window) | `enable_ssm_agent_update` |
@@ -208,7 +208,7 @@ SSM associations use **platform-specific targeting** via the `StigPlatform` tag 
 | **EL STIG check-mode** | `StigPlatform` | `EL8`, `EL9` | Same playbook in `--check` mode |
 | **OpenSCAP scan** | `StigPlatform` | `EL8`, `EL9` | OpenSCAP content is Linux-specific |
 | **AL2023 enforcement** | `StigPlatform` | `AL2023` | AL2023 uses its own native script |
-| **Windows enforcement** | `StigPlatform` | `Win2016`, `Win2019`, `Win2022` | AWS-managed AWSEC2-ConfigureSTIG document |
+| **Windows enforcement** | `StigPlatform` | `Win2016`, `Win2019`, `Win2022` | Custom wrapper: AWSEC2-ConfigureSTIG + admin rename (SID-500 → maintuser) |
 | **SSM agent update** | `StigManaged` | `true` | All platforms need agent updates |
 | **Software inventory** | `StigManaged` | `true` | Collect inventory from all platforms |
 
@@ -296,6 +296,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 | `ansible_timeout` | Timeout in seconds for Ansible STIG playbook execution via SSM | `number` | `7200` | no |
 | `stig_al2023_s3_key` | S3 key for AL2023 STIG script package | `string` | `ansible/al2023-stig-script.zip` | no |
 | `windows_stig_level` | STIG severity level for Windows (AWSEC2-ConfigureSTIG) | `string` | `High` | no |
+| `windows_admin_username` | Name for the built-in Administrator account (SID-500) on Windows | `string` | `maintuser` | no |
 | `ssm_agent_update_schedule` | Schedule for SSM agent updates | `string` | `cron(0 3 ? * * *)` | no |
 | `tags` | Additional tags | `map(string)` | `{}` | no |
 
@@ -311,6 +312,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 | `caller_policy_arn` | CI/human caller policy ARN |
 | `session_manager_document_name` | Session Manager preferences document |
 | `ssm_document_oscap_name` | OpenSCAP SSM document name |
+| `ssm_document_windows_stig_enforce_name` | Windows STIG enforce SSM document name |
 | `linux_patch_baseline_id` | Linux STIG patch baseline ID |
 | `linux_maintenance_window_id` | Linux maintenance window ID |
 | `stig_enforce_el_association_id` | EL STIG enforcement association ID |

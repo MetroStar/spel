@@ -100,6 +100,16 @@ output "ssm_document_oscap_arn" {
   value       = aws_ssm_document.oscap_scan.arn
 }
 
+output "ssm_document_windows_stig_enforce_name" {
+  description = "Name of the custom SSM document for Windows STIG enforcement with admin rename"
+  value       = aws_ssm_document.windows_stig_enforce.name
+}
+
+output "ssm_document_windows_stig_enforce_arn" {
+  description = "ARN of the custom SSM document for Windows STIG enforcement with admin rename"
+  value       = aws_ssm_document.windows_stig_enforce.arn
+}
+
 output "session_manager_document_name" {
   description = "Name of the Session Manager preferences document"
   value       = var.enable_session_manager ? aws_ssm_document.session_manager_prefs[0].name : null

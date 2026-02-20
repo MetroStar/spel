@@ -17,8 +17,9 @@
 #    Runs daily before maintenance windows.
 #
 # 4. Windows Server STIG Enforcement (2016/2019/2022):
-#    Uses the AWS-managed AWSEC2-ConfigureSTIG SSM document.
-#    Auto-detects OS, downloads STIG scripts from AWS S3 buckets.
+#    Wraps the AWS-managed AWSEC2-ConfigureSTIG via a custom SSM document.
+#    Adds a post-STIG step to restore the built-in admin rename
+#    (SID-500 → maintuser) that ConfigureSTIG resets via Local Security Policy.
 #    Targets instances tagged StigPlatform = Win2016 | Win2019 | Win2022.
 #
 # All associations are gated by their respective enable_* variables.
@@ -139,20 +140,20 @@ resource "aws_ssm_association" "ssm_agent_update" {
 }
 
 # -----------------------------------------------------------------------------
-# 4. Windows Server STIG Enforcement via AWSEC2-ConfigureSTIG
+# 4. Windows Server STIG Enforcement (AWSEC2-ConfigureSTIG + Admin Rename)
 # -----------------------------------------------------------------------------
-# Uses the AWS-managed AWSEC2-ConfigureSTIG SSM Command document to apply
-# STIG hardening to Windows Server instances. This document:
-#   - Auto-detects the Windows version and applies appropriate settings
-#   - Downloads STIG scripts from AWS's regional S3 buckets
-#     (s3://aws-windows-downloads-<region>/STIG/Windows/Latest/)
-#   - Covers: OS, .NET Framework, Windows Firewall, IE11, Edge, Defender
-#   - Updated quarterly by AWS with latest STIG versions
-#   - No custom code, Python, or Ansible required on the instance
+# Uses a custom wrapper document that:
+#   Step 1: Runs the AWS-managed AWSEC2-ConfigureSTIG document via
+#           aws:runDocument to apply DISA STIG hardening.
+#   Step 2: Restores the built-in Administrator rename (SID-500 → maintuser).
+#           AWSEC2-ConfigureSTIG resets the Local Security Policy setting
+#           "Accounts: Rename administrator account", which undoes the AMI
+#           build's rename. This step re-applies it via secedit + Rename-LocalUser.
 #
-# This is the same mechanism used for AL2023 Linux STIG (LinuxAWSConfigureSTIG)
-# but for Windows. Requires s3:GetObject on aws-windows-downloads* buckets
-# (added in iam.tf).
+# The wrapper document auto-detects the Windows version (via ConfigureSTIG)
+# and downloads STIG scripts from AWS's regional S3 buckets
+# (s3://aws-windows-downloads-<region>/STIG/Windows/Latest/).
+# Requires s3:GetObject on aws-windows-downloads* buckets (added in iam.tf).
 #
 # Targets instances by tag: StigPlatform = Win2016 | Win2019 | Win2022
 # -----------------------------------------------------------------------------
@@ -160,7 +161,7 @@ resource "aws_ssm_association" "ssm_agent_update" {
 resource "aws_ssm_association" "stig_enforce_windows" {
   count = var.enable_stig_enforcement && var.enable_state_manager ? 1 : 0
 
-  name                = "AWSEC2-ConfigureSTIG"
+  name                = aws_ssm_document.windows_stig_enforce.name
   association_name    = "${var.name_prefix}-stig-enforce-windows"
   schedule_expression = var.stig_enforcement_schedule
   max_concurrency     = var.patch_max_concurrency
@@ -172,7 +173,8 @@ resource "aws_ssm_association" "stig_enforce_windows" {
   }
 
   parameters = {
-    Level = var.windows_stig_level
+    Level         = var.windows_stig_level
+    AdminUsername = var.windows_admin_username
   }
 
   output_location {

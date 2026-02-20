@@ -7,11 +7,13 @@
 #    and data stream, uploads results to S3. Works on both RHEL 8/9 and
 #    Oracle Linux 8/9.
 #
-# 2. Session Manager Preferences: Configures Session Manager with KMS
-#    encryption, S3/CloudWatch logging, and STIG-aligned idle timeout.
+# 2. Windows STIG Enforce: Wraps the AWS-managed AWSEC2-ConfigureSTIG
+#    document, then restores the built-in admin rename (SID-500 → maintuser).
+#    AWSEC2-ConfigureSTIG resets the NewAdministratorName Local Security
+#    Policy, undoing the rename applied during the AMI build.
 #
-# NOTE: Windows Server STIG enforcement uses the AWS-managed
-# AWSEC2-ConfigureSTIG document (no custom SSM document required).
+# 3. Session Manager Preferences: Configures Session Manager with KMS
+#    encryption, S3/CloudWatch logging, and STIG-aligned idle timeout.
 # =============================================================================
 
 resource "aws_ssm_document" "oscap_scan" {
@@ -173,7 +175,127 @@ resource "aws_ssm_document" "oscap_scan" {
 }
 
 # -----------------------------------------------------------------------------
-# 2. Session Manager Preferences
+# 2. Windows STIG Enforce (AWSEC2-ConfigureSTIG + Admin Rename)
+# -----------------------------------------------------------------------------
+# Wraps the AWS-managed AWSEC2-ConfigureSTIG document in a two-step Command
+# document:
+#
+#   Step 1 — aws:runDocument → AWSEC2-ConfigureSTIG
+#     Applies DISA STIG hardening (OS, .NET, Firewall, Defender, etc.).
+#     Downloads STIG scripts from AWS's regional S3 buckets.
+#
+#   Step 2 — aws:runPowerShellScript → Restore admin rename
+#     AWSEC2-ConfigureSTIG resets the Local Security Policy setting
+#     "Accounts: Rename administrator account", which reverts the AMI
+#     build's rename of the SID-500 account from Administrator → maintuser.
+#     This step re-applies the rename via both secedit (persistent policy)
+#     and Rename-LocalUser (immediate SAM update).
+#
+# This ensures the built-in admin stays named "maintuser" (or whatever
+# AdminUsername is set to) across STIG enforcement cycles.
+# -----------------------------------------------------------------------------
+
+resource "aws_ssm_document" "windows_stig_enforce" {
+  name            = "${var.name_prefix}-WindowsSTIGEnforce"
+  document_type   = "Command"
+  document_format = "YAML"
+
+  content = yamlencode({
+    schemaVersion = "2.2"
+    description   = "Apply AWSEC2-ConfigureSTIG then restore built-in admin rename (SID-500 to maintuser)"
+    parameters = {
+      Level = {
+        type          = "String"
+        description   = "STIG severity level"
+        default       = "High"
+        allowedValues = ["High", "Medium", "Low"]
+      }
+      AdminUsername = {
+        type        = "String"
+        description = "Name for the built-in Administrator account (SID-500)"
+        default     = "maintuser"
+      }
+    }
+    mainSteps = [
+      {
+        action = "aws:runDocument"
+        name   = "ApplyAWSConfigureSTIG"
+        precondition = {
+          StringEquals = ["platformType", "Windows"]
+        }
+        inputs = {
+          documentType = "SSMDocument"
+          documentPath = "AWSEC2-ConfigureSTIG"
+          documentParameters = jsonencode({
+            Level = "{{ Level }}"
+          })
+        }
+      },
+      {
+        action = "aws:runPowerShellScript"
+        name   = "RestoreAdminRename"
+        precondition = {
+          StringEquals = ["platformType", "Windows"]
+        }
+        inputs = {
+          timeoutSeconds = "120"
+          runCommand = [
+            "$adminName = '{{ AdminUsername }}'",
+            "",
+            "# Find built-in Administrator (SID-500)",
+            "$builtinAdmin = Get-LocalUser | Where-Object { $_.SID.Value -match '-500$' }",
+            "",
+            "if (-not $builtinAdmin) {",
+            "    Write-Warning 'Could not find built-in administrator account (SID ending in -500)'",
+            "    exit 0",
+            "}",
+            "",
+            "$currentName = $builtinAdmin.Name",
+            "Write-Output \"Current built-in admin name: $currentName\"",
+            "",
+            "# Set via Local Security Policy (secedit) to persist across policy refreshes",
+            "$tempDir = Join-Path $env:TEMP 'stig-admin-fixup'",
+            "$null = New-Item -ItemType Directory -Path $tempDir -Force",
+            "$cfgFile = Join-Path $tempDir 'secpol.cfg'",
+            "$dbFile = Join-Path $tempDir 'secpol.sdb'",
+            "",
+            "# Export current security policy",
+            "secedit /export /cfg $cfgFile /quiet",
+            "",
+            "# Update the NewAdministratorName setting",
+            "$content = Get-Content $cfgFile -Raw",
+            "$pattern = 'NewAdministratorName\\s*=\\s*\"[^\"]*\"'",
+            "$replacement = 'NewAdministratorName = \"' + $adminName + '\"'",
+            "$content = [regex]::Replace($content, $pattern, $replacement)",
+            "$content | Set-Content $cfgFile",
+            "",
+            "# Apply the updated policy",
+            "secedit /configure /db $dbFile /cfg $cfgFile /areas SECURITYPOLICY /quiet",
+            "",
+            "# Direct immediate rename",
+            "if ($currentName -ne $adminName) {",
+            "    Rename-LocalUser -SID $builtinAdmin.SID -NewName $adminName",
+            "    Write-Output \"Renamed '$currentName' to '$adminName'\"",
+            "} else {",
+            "    Write-Output \"Already named '$adminName' - no action needed\"",
+            "}",
+            "",
+            "# Cleanup",
+            "Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue",
+            "Write-Output \"Admin account secured as '$adminName'\""
+          ]
+        }
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    Name = "${var.name_prefix}-WindowsSTIGEnforce"
+  })
+}
+
+# -----------------------------------------------------------------------------
+# 3. Session Manager Preferences
 # -----------------------------------------------------------------------------
 # Configures Session Manager with:
 #   - KMS encryption for session data (STIG V-72057 / AC-17)

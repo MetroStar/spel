@@ -60,7 +60,7 @@ apply STIG hardening on a schedule:
 
 -   **EL8/EL9**: Ansible Lockdown roles (RHEL8-STIG, RHEL9-STIG)
 -   **AL2023**: Native AWS STIG enforcement script
--   **Windows**: AWS-managed `AWSEC2-ConfigureSTIG` SSM document
+-   **Windows**: Custom wrapper around AWS-managed `AWSEC2-ConfigureSTIG` (also restores the built-in admin rename SID-500 → `maintuser`)
 
 See the [SSM module README](../infra/modules/ssm/README.md) for details on
 STIG enforcement associations.
