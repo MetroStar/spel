@@ -146,6 +146,8 @@ and required security-group rules.
 
 - [SSM Module README](modules/ssm/README.md) — full SSM resource
   reference, STIG association details, and troubleshooting
+- [Manual SSM Setup](../docs/Manual-SSM-Setup.md) — step-by-step AWS CLI
+  guide for provisioning all SSM resources without OpenTofu (air-gapped)
 - [CI/CD Setup](../docs/CI-CD-Setup.md) — CodeBuild / GitLab CI
   pipeline configuration and IAM requirements
 - [SPEL README](../README.md) — project overview and AMI build process
