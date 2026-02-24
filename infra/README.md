@@ -12,7 +12,7 @@ infra/
 ├── main.tf                  # Wires the three submodules together
 ├── variables.tf             # Root-level inputs (networking + SSM toggles)
 ├── outputs.tf               # Values consumed by Packer / CI pipelines
-├── versions.tf              # Terraform / OpenTofu >= 1.0, AWS >= 5.0
+├── versions.tf              # OpenTofu >= 1.0, AWS >= 5.0
 ├── backend.tf.example       # Copy → backend.tf and customise
 ├── bootstrap-backend.sh     # Idempotent S3+DynamoDB backend bootstrap
 └── modules/
@@ -35,7 +35,7 @@ infra/
 
 | Requirement | Minimum Version |
 |-------------|-----------------|
-| Terraform _or_ OpenTofu | >= 1.0 |
+| OpenTofu | >= 1.0 |
 | AWS Provider | >= 5.0 |
 | Random Provider | >= 3.0 |
 | AWS CLI | v2 (for backend bootstrapping) |

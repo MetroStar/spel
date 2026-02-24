@@ -217,7 +217,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "TerraformNetworking",
+      "Sid": "TofuNetworking",
       "Effect": "Allow",
       "Action": [
         "ec2:CreateVpc",
@@ -263,7 +263,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
       "Resource": "*"
     },
     {
-      "Sid": "TerraformIAM",
+      "Sid": "TofuIAM",
       "Effect": "Allow",
       "Action": [
         "iam:CreateRole",
@@ -307,7 +307,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
       "Resource": "*"
     },
     {
-      "Sid": "TerraformKMS",
+      "Sid": "TofuKMS",
       "Effect": "Allow",
       "Action": [
         "kms:CreateKey",
@@ -333,7 +333,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
       "Resource": "*"
     },
     {
-      "Sid": "TerraformSSM",
+      "Sid": "TofuSSM",
       "Effect": "Allow",
       "Action": [
         "ssm:*Association",
@@ -346,7 +346,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
       "Resource": "*"
     },
     {
-      "Sid": "TerraformS3",
+      "Sid": "TofuS3",
       "Effect": "Allow",
       "Action": [
         "s3:CreateBucket",
@@ -386,7 +386,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
       ]
     },
     {
-      "Sid": "TerraformDynamoDB",
+      "Sid": "TofuDynamoDB",
       "Effect": "Allow",
       "Action": [
         "dynamodb:CreateTable",
@@ -399,7 +399,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
       "Resource": "arn:*:dynamodb:*:*:table/spel-*"
     },
     {
-      "Sid": "TerraformCloudWatch",
+      "Sid": "TofuCloudWatch",
       "Effect": "Allow",
       "Action": [
         "logs:CreateLogGroup",
@@ -426,7 +426,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
       "Resource": "*"
     },
     {
-      "Sid": "TerraformSNS",
+      "Sid": "TofuSNS",
       "Effect": "Allow",
       "Action": [
         "sns:CreateTopic",
@@ -443,7 +443,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
       "Resource": "*"
     },
     {
-      "Sid": "TerraformAutoTagging",
+      "Sid": "TofuAutoTagging",
       "Effect": "Allow",
       "Action": [
         "events:DeleteRule",

@@ -1,6 +1,6 @@
 # SPEL SSM Infrastructure Module
 
-Terraform/OpenTofu module for deploying SSM infrastructure to support STIG-hardened AMIs built by [SPEL](../../README.md). Compatible with both HashiCorp Terraform (>= 1.0) and OpenTofu (>= 1.0).
+OpenTofu module for deploying SSM infrastructure to support STIG-hardened AMIs built by [SPEL](../../README.md). Compatible with OpenTofu (>= 1.0).
 
 ## Overview
 
@@ -123,26 +123,26 @@ Teardown: **Actions → Infrastructure Setup → Run workflow → destroy** (req
 
 | Job | Purpose |
 |-----|---------|  
-| `infra:create` | Deploy all infrastructure including SSM via Terraform (manual trigger, from `.gitlab/infra.gitlab-ci.yml`) |
-| `infra:destroy` | Teardown all Terraform-managed infrastructure (manual trigger, from `.gitlab/infra.gitlab-ci.yml`) |
+| `infra:create` | Deploy all infrastructure including SSM via OpenTofu (manual trigger, from `.gitlab/infra.gitlab-ci.yml`) |
+| `infra:destroy` | Teardown all OpenTofu-managed infrastructure (manual trigger, from `.gitlab/infra.gitlab-ci.yml`) |
 
-All SSM infrastructure is persistent by default — provisioned via the Terraform root module at `infra/`.
+All SSM infrastructure is persistent by default — provisioned via the OpenTofu root module at `infra/`.
 
 ## Backend Setup
 
-**CI/CD pipelines handle this automatically** — both GitHub Actions (`infra-setup.yml`) and GitLab CI (`infra:create` job) call `bootstrap-backend.sh` which idempotently creates the S3 bucket, DynamoDB table, and `backend.tf` before running `terraform init`.
+**CI/CD pipelines handle this automatically** — both GitHub Actions (`infra-setup.yml`) and GitLab CI (`infra:create` job) call `bootstrap-backend.sh` which idempotently creates the S3 bucket, DynamoDB table, and `backend.tf` before running `tofu init`.
 
 For manual / local use:
 
 ```bash
 # Automatic (recommended)
 source ./bootstrap-backend.sh --prefix spel-prod --region us-gov-west-1
-terraform init -input=false
+tofu init -input=false
 
 # Manual
 # 1. Copy backend.tf.example to backend.tf and fill in values
 # 2. Create S3 bucket and DynamoDB table (see comments in the example file)
-# 3. terraform init
+# 3. tofu init
 ```
 
 ## GovCloud

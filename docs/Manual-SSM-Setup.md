@@ -1,7 +1,7 @@
 # Manual SSM Setup for Air-Gapped Environments
 
 Step-by-step guide to provisioning all SSM infrastructure **without
-OpenTofu/Terraform**. This replicates everything in the
+OpenTofu**. This replicates everything in the
 [`infra/modules/ssm/`](../infra/modules/ssm/) module using AWS CLI
 commands.
 

@@ -4,7 +4,7 @@ This document explains the GitHub Actions workflow defined in `build.yml`, detai
 
 ## GitHub Actions Workflow: `build.yml`
 
-The `build.yml` workflow automates building STIGed AMIs (Amazon Machine Images) for the SPEL project. It uses a **two-job architecture**: an `infra` job ensures persistent AWS infrastructure exists via Terraform, followed by a `build` job that runs Packer inside a pre-built Docker container.
+The `build.yml` workflow automates building STIGed AMIs (Amazon Machine Images) for the SPEL project. It uses a **two-job architecture**: an `infra` job ensures persistent AWS infrastructure exists via OpenTofu, followed by a `build` job that runs Packer inside a pre-built Docker container.
 
 ### Workflow Triggers
 
@@ -17,7 +17,7 @@ The `build.yml` workflow automates building STIGed AMIs (Amazon Machine Images) 
 
 ### Job 1: Ensure Infrastructure (`infra`)
 
-Calls `infra-setup.yml` via `workflow_call` with `action: apply` and the specified `infra_prefix` (default: `spel`). Terraform apply is idempotent — it creates infrastructure if missing, or is a no-op if it already exists.
+Calls `infra-setup.yml` via `workflow_call` with `action: apply` and the specified `infra_prefix` (default: `spel`). OpenTofu apply is idempotent — it creates infrastructure if missing, or is a no-op if it already exists.
 
 **Outputs** (auto-discovered via `workflow_call`):
 - `vpc_id` — VPC for Packer builds
@@ -56,14 +56,14 @@ Depends on `infra` job. Uses infrastructure outputs from Job 1. Runs on `ubuntu-
 |-------|-------------|---------|
 | `docker_image_artifact` | Artifact name from `offline-prepare.yml` | (required) |
 | `run_rhel9`, `run_ol9`, etc. | OS builder toggles | `false` |
-| `infra_prefix` | Infrastructure name prefix for Terraform | `spel` |
+| `infra_prefix` | Infrastructure name prefix for OpenTofu | `spel` |
 | `airgap_mode` | Enable air-gapped build settings | `false` |
 | `repo_mirror_baseurl` | Local YUM mirror URL for air-gapped builds | (empty) |
 
 ## AWS Credentials Configuration
 
 AWS credentials are configured via OIDC to allow the workflow to interact with AWS services without storing secrets. The credentials are necessary for:
-- Running Terraform to ensure infrastructure exists (infra job)
+- Running OpenTofu to ensure infrastructure exists (infra job)
 - Authenticating with AWS for Packer operations (build job)
 - Assuming the required IAM role for accessing resources
 

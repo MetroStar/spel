@@ -1,73 +1,79 @@
-# How to contribute
+# How to Contribute
 
-This project originated as an engine for driving the [amigen6](https://github.com/ferricoxide/amigen6.git) and [amigen7](https://github.com/ferricoxide/amigen7.git) tool-sets. The initial objective was to ease and speed the creation of AWS AMIs so that the task:
+SPEL (STIG-Partitioned Enterprise Linux) produces hardened AMIs for AWS using
+a Docker-based build system driven by Packer and the
+[amigen8](https://github.com/MetroStar/amigen8) /
+[amigen9](https://github.com/MetroStar/amigen9) tool-sets. The project
+currently supports:
 
-* could be turned over to less-experienced staff
-* increase the velocity of AMI-releases
-* increase the AMI release-proliferations (addition of RHEL to the original CentOS-focused releases)
-* increase the number of AWS regions supported (from just us-east-1 to all of the CONUS regions - including GovCloud)
+* EL8 (RHEL 8, Oracle Linux 8)
+* EL9 (RHEL 9, Oracle Linux 9, CentOS Stream 9)
+* Amazon Linux 2023
+* Windows Server 2016 / 2019 / 2022 (STIG-hardened)
+* VirtualBox, VMware, Azure, and OpenStack image variants
 
-Since then, the objective has been expanded to include:
+Contributions that improve the build system, add OS support, fix bugs, or
+enhance documentation are welcome. Please open an
+[issue](https://github.com/MetroStar/spel/issues/new) to discuss larger
+changes before investing significant effort.
 
-* generation of VirtualBox images
-* generation of VMware templates
-* generation of Azure images
-* generation of OpenStack images
-* publishing of VirtualBox and VMware images to Vagrant Cloud
+## Development Setup
 
-Where all of the above images are notionally-identical but for their respective deployment contexts. "Notionally-identical" also means that produced Red Hat and CentOS images' RPM-manifests and storage-layouts are the same within a given release-cycle.
+1. Clone the repository and check out the `nipr` branch:
 
-The fruits of this automation-effort are openly provided on an "as-is" basis. Individuals who have stumbled on this project and find deficiencies in it are invited to help us enhance the project for broader usability. This can be done by opening issues against the project or, even better, offering enhancements via Pull Requests:
+    ```bash
+    git clone https://github.com/MetroStar/spel.git
+    cd spel && git checkout nipr
+    ```
 
-* Please open an issue to identify "missing" deployment contexts
-* Please open pull requests - referencing the previously-opened issue - when ready to provide automation for new contexts.
+2. Build the Docker builder image (requires Docker):
 
+    ```bash
+    make docker/build
+    ```
+
+3. Run a local AMI build (requires AWS credentials):
+
+    ```bash
+    make build
+    ```
+
+See the top-level [README](../README.md) for full build prerequisites and
+variable references.
 
 ## Testing
 
-In progress...
+When submitting a PR the following checks run automatically:
 
-Currently, this project links to a couple of services. When submitting a PR:
-* Basic lints will be performed against any shell script
-* Basic lints will be performed against any Packer templates
-* Offered content will be tested by a CodeCommit pipeline that ensures that modifications continue to produce functional AMIs
-* Documentation will be tested for recency.
-    Note: if the associated Travis CI job fails with a message like:
-    ~~~
-    Error: spel/README.md is out of date
-    make: *** [/home/travis/build/MetroStar/spel/tardigrade-ci/Makefile:463: docs/lint/spel/README.md] Error 1
-    The command "make -f Makefile.tardigrade-ci lint" exited with 2.
-    ~~~
-    It will be necesary to execute:
-    ~~~
-    make -f Makefile.tardigrade-ci docs/generate
-    ~~~
-    In your branch's project-root (and then commit any changes) in order to clear it.
+* **GitHub Actions** — the `build.yml` workflow provisions infrastructure via
+  OpenTofu (`infra` job) and then runs Packer inside the Docker builder
+  container (`build` job). See [`.github/build.md`](../.github/build.md) for
+  details.
+* **Shell linting** — basic lints are performed against shell scripts.
+* **Packer validation** — Packer templates are validated for syntax errors.
 
-
-
+For air-gapped / GovCloud builds an equivalent GitLab CI pipeline is available
+(see [`.gitlab/README.md`](../.gitlab/README.md)).
 
 ## Submitting Changes
 
-Please send a GitHub Pull Request with a clear list of what changes are being offered (read more about [pull requests](http://help.github.com/pull-requests/)).
+Please send a GitHub Pull Request with a clear description of the changes.
+Reference any related issues in the PR body.
 
-Please ensure that the commits bundled in the PR are performed with clear and concise commit messages. One-line messages are fine for small changes, but bigger changes should look like this:
+Commit messages should be clear and concise. One-line messages are fine for
+small changes; larger changes should follow this pattern:
 
     $ git commit -m "A brief summary of the commit
-    > 
+    >
     > A paragraph describing what changed and its impact."
 
-Also: even if the PR doesn't otherwise include documentation-updates, ensure that the project's documentation adequately up to date. Run `make docs/generate` in the project-root. Typically, this will only update the top-level README. 
+If the PR touches infrastructure or build logic, please also update the
+relevant documentation under `docs/`.
 
-Note: Depending how old your branch is, it may also be necessary to run `make terraform-docs/install` before running `make docs/generate`. If running `make docs/generate` doesn't result in `git` seeing an updated README, update your terraform-docs module.
+## Coding Conventions
 
-## Coding conventions
-
-To be written...
-
-* Anything not otherwise specified - either explicitly as above or implicitly via pre-existing code - pick an element-style and be consistent with it .
-
-
-## Additonal Notes
-
-To be written...
+* **Shell** — use `bash` with `set -euo pipefail`. Follow the style of
+  existing scripts in `build/` and the amigenN repositories.
+* **Packer** — use HCL2 format. Keep variables documented.
+* **OpenTofu / HCL** — follow the conventions in `infra/`.
+* When in doubt, match the style of surrounding code and be consistent.
