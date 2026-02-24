@@ -424,6 +424,13 @@ instances have no internet access.
 > Corresponds to:
 > [`modules/ssm/vpc-endpoints.tf`](../infra/modules/ssm/vpc-endpoints.tf)
 
+> **Note — Packer endpoints**: If you are running Packer builds without
+> an Internet Gateway, you also need Interface endpoints for **EC2** and
+> **STS**. The OpenTofu networking module creates these when
+> `enable_packer_endpoints = true`. To create them manually, add `ec2`
+> and `sts` to the Interface Endpoints loop below (or create them in a
+> separate security group as the OpenTofu module does).
+
 ```bash
 # Security group for VPC endpoints
 ENDPOINT_SG=$(aws ec2 create-security-group \

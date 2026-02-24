@@ -134,9 +134,16 @@ aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
 ### Build Can't Access Repositories
 
 ```bash
-# Verify VPC has Internet Gateway (required for RHUI)
+# IGW-enabled (default): verify Internet Gateway
 aws ec2 describe-internet-gateways \
   --filters "Name=attachment.vpc-id,Values=vpc-xxxxx"
+
+# Air-gapped (no IGW): verify VPC endpoints for Packer and SSM
+aws ec2 describe-vpc-endpoints \
+  --filters "Name=vpc-id,Values=vpc-xxxxx" \
+  --query 'VpcEndpoints[].ServiceName'
+# Expected: ec2, sts, ssm, ssmmessages, ec2messages, logs, kms, s3
+# Also ensure REPO_MIRROR_BASEURL is set to your local mirror
 ```
 
 ## Quick Commands

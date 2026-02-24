@@ -800,6 +800,8 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_kms_key_id` | KMS key ARN for CMK-encrypted AMIs | (none) |
 | `INFRA_PREFIX` | Prefix for created resources | `spel` |
+| `ENABLE_INTERNET_GATEWAY` | Create IGW and default route (`false` for air-gapped) | `true` |
+| `ENABLE_PACKER_ENDPOINTS` | Create EC2 + STS VPC endpoints (`true` for air-gapped) | `false` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
 | `RUN_RHEL8` | Build RHEL 8 | `false` |
 | `RUN_OL9` | Build Oracle Linux 9 | `false` |
@@ -897,14 +899,15 @@ import:docker:
 Provisions all AWS infrastructure via the OpenTofu root module at `infra/`:
 
 - **VPC** with DNS enabled
-- **Internet Gateway** (required for RHUI access)
-- **Public Subnet**
-- **Route Table** with IGW route
-- **Security Group** (SSH/WinRM access)
+- **Internet Gateway** (conditional — disabled when `ENABLE_INTERNET_GATEWAY=false`)
+- **Subnet** (public IPs when IGW enabled, private when disabled)
+- **Route Table** (always created; default route only when IGW enabled)
+- **Security Group** (SSH/WinRM — `0.0.0.0/0` when IGW enabled, VPC CIDR when disabled)
+- **VPC Endpoints for Packer** — EC2 + STS (when `ENABLE_PACKER_ENDPOINTS=true`)
 - **IAM Role** with EC2 permissions
 - **Instance Profile** for Packer builders
 - **KMS Key** for encrypted AMIs
-- **SSM infrastructure** (VPC endpoints, documents, etc.)
+- **SSM infrastructure** (VPC endpoints for SSM/S3/KMS/Logs, documents, etc.)
 
 Defined in `.gitlab/infra.gitlab-ci.yml` and included by `.gitlab-ci.yml`.
 
@@ -1004,7 +1007,7 @@ export AWS_SESSION_TOKEN="..."
 
 **Problem**: Packer instance can't reach RHUI repositories.
 
-**Solution**:
+**Solution** (IGW-enabled environments):
 ```bash
 # Verify VPC has Internet Gateway
 aws ec2 describe-internet-gateways \
@@ -1016,6 +1019,17 @@ aws ec2 describe-route-tables \
 
 # Security group must allow outbound HTTPS (443)
 aws ec2 describe-security-groups --group-ids sg-xxxxx
+```
+
+**Solution** (air-gapped / no IGW):
+```bash
+# Verify VPC endpoints exist for Packer (ec2, sts) and SSM (ssm, s3, etc.)
+aws ec2 describe-vpc-endpoints \
+  --filters "Name=vpc-id,Values=vpc-xxxxx" \
+  --query 'VpcEndpoints[].ServiceName'
+
+# Ensure ENABLE_INTERNET_GATEWAY=false and ENABLE_PACKER_ENDPOINTS=true
+# Ensure a local repo mirror is configured via REPO_MIRROR_BASEURL
 ```
 
 ### Debugging
