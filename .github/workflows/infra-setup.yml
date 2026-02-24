@@ -13,8 +13,9 @@
 #   Networking (modules/networking):
 #     - VPC with DNS support/hostnames enabled
 #     - Subnet with auto-assign public IP (or private if using VPC endpoints)
-#     - Internet Gateway + route table (conditional on public subnet)
-#     - Security group allowing SSH + WinRM from anywhere (Packer on GitHub Actions)
+#     - Internet Gateway + route table (conditional — disabled for air-gapped)
+#     - VPC endpoints for EC2 + STS (optional — enabled for air-gapped)
+#     - Security group allowing SSH + WinRM (scoped to VPC CIDR when air-gapped)
 #   IAM (modules/iam):
 #     - IAM role and instance profile for Packer-launched instances
 #     - SSM agent communication policies
@@ -81,6 +82,16 @@ on:
         required: false
         type: boolean
         default: true
+      enable_internet_gateway:
+        description: "Create Internet Gateway (disable for air-gapped builds)"
+        required: false
+        type: boolean
+        default: true
+      enable_packer_endpoints:
+        description: "Create VPC endpoints for EC2 + STS (required when IGW disabled)"
+        required: false
+        type: boolean
+        default: false
       destroy_confirmation:
         description: "Type 'destroy' to confirm teardown (required for destroy)"
         required: false
@@ -121,6 +132,16 @@ on:
         required: false
         type: boolean
         default: true
+      enable_internet_gateway:
+        description: "Create Internet Gateway (disable for air-gapped builds)"
+        required: false
+        type: boolean
+        default: true
+      enable_packer_endpoints:
+        description: "Create VPC endpoints for EC2 + STS (required when IGW disabled)"
+        required: false
+        type: boolean
+        default: false
       destroy_confirmation:
         description: "Type 'destroy' to confirm teardown"
         required: false
@@ -229,7 +250,9 @@ jobs:
           name_prefix             = "spel"
           vpc_cidr                = "${{ inputs.vpc_cidr }}"
           subnet_cidr             = "${{ inputs.subnet_cidr }}"
-          public_subnet           = true
+          public_subnet           = ${{ inputs.enable_internet_gateway }}
+          enable_internet_gateway = ${{ inputs.enable_internet_gateway }}
+          enable_packer_endpoints = ${{ inputs.enable_packer_endpoints }}
           enable_vpc_endpoints    = true
           enable_session_manager  = ${{ inputs.enable_session_manager }}
           enable_patch_manager    = ${{ inputs.enable_patch_manager }}

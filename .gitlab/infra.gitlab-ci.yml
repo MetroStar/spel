@@ -49,7 +49,9 @@ infra:plan:
       name_prefix             = "${INFRA_PREFIX}"
       vpc_cidr                = "10.0.0.0/16"
       subnet_cidr             = "10.0.1.0/24"
-      public_subnet           = true
+      public_subnet           = ${ENABLE_INTERNET_GATEWAY:-true}
+      enable_internet_gateway = ${ENABLE_INTERNET_GATEWAY:-true}
+      enable_packer_endpoints = ${ENABLE_PACKER_ENDPOINTS:-false}
       enable_vpc_endpoints    = true
       enable_session_manager  = true
       enable_patch_manager    = true
@@ -108,7 +110,9 @@ infra:create:
       name_prefix             = "${INFRA_PREFIX}"
       vpc_cidr                = "10.0.0.0/16"
       subnet_cidr             = "10.0.1.0/24"
-      public_subnet           = true
+      public_subnet           = ${ENABLE_INTERNET_GATEWAY:-true}
+      enable_internet_gateway = ${ENABLE_INTERNET_GATEWAY:-true}
+      enable_packer_endpoints = ${ENABLE_PACKER_ENDPOINTS:-false}
       enable_vpc_endpoints    = true
       enable_session_manager  = true
       enable_patch_manager    = true

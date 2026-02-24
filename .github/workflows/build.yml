@@ -132,6 +132,8 @@ jobs:
     with:
       action: apply
       aws_region: us-east-1
+      enable_internet_gateway: ${{ !inputs.airgap_mode }}
+      enable_packer_endpoints: ${{ inputs.airgap_mode }}
     secrets: inherit
 
   # ==========================================================================
