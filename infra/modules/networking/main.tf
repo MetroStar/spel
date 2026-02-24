@@ -40,11 +40,11 @@ resource "aws_subnet" "this" {
 }
 
 # -----------------------------------------------------------------------------
-# Internet Gateway + Route (only for public subnets)
+# Internet Gateway (only when enabled)
 # -----------------------------------------------------------------------------
 
 resource "aws_internet_gateway" "this" {
-  count  = var.public_subnet ? 1 : 0
+  count  = var.enable_internet_gateway ? 1 : 0
   vpc_id = aws_vpc.this.id
 
   tags = merge(var.tags, {
@@ -52,8 +52,12 @@ resource "aws_internet_gateway" "this" {
   })
 }
 
+# -----------------------------------------------------------------------------
+# Route Table (always created — needed by the S3 gateway endpoint in the SSM
+# module even when there is no internet gateway)
+# -----------------------------------------------------------------------------
+
 resource "aws_route_table" "this" {
-  count  = var.public_subnet ? 1 : 0
   vpc_id = aws_vpc.this.id
 
   tags = merge(var.tags, {
@@ -62,16 +66,15 @@ resource "aws_route_table" "this" {
 }
 
 resource "aws_route" "default" {
-  count                  = var.public_subnet ? 1 : 0
-  route_table_id         = aws_route_table.this[0].id
+  count                  = var.enable_internet_gateway ? 1 : 0
+  route_table_id         = aws_route_table.this.id
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.this[0].id
 }
 
 resource "aws_route_table_association" "this" {
-  count          = var.public_subnet ? 1 : 0
   subnet_id      = aws_subnet.this.id
-  route_table_id = aws_route_table.this[0].id
+  route_table_id = aws_route_table.this.id
 }
 
 # -----------------------------------------------------------------------------
@@ -93,9 +96,9 @@ resource "aws_security_group_rule" "ssh_ingress" {
   from_port         = 22
   to_port           = 22
   protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
+  cidr_blocks       = [var.enable_internet_gateway ? "0.0.0.0/0" : var.vpc_cidr]
   security_group_id = aws_security_group.packer.id
-  description       = "SSH from anywhere (Packer connects from GitHub Actions)"
+  description       = var.enable_internet_gateway ? "SSH from anywhere (Packer connects from GitHub Actions)" : "SSH from within the VPC (air-gapped)"
 }
 
 resource "aws_security_group_rule" "winrm_ingress" {
@@ -103,9 +106,9 @@ resource "aws_security_group_rule" "winrm_ingress" {
   from_port         = 5986
   to_port           = 5986
   protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
+  cidr_blocks       = [var.enable_internet_gateway ? "0.0.0.0/0" : var.vpc_cidr]
   security_group_id = aws_security_group.packer.id
-  description       = "WinRM-HTTPS from anywhere (Packer connects from GitHub Actions)"
+  description       = var.enable_internet_gateway ? "WinRM-HTTPS from anywhere (Packer connects from GitHub Actions)" : "WinRM-HTTPS from within the VPC (air-gapped)"
 }
 
 resource "aws_security_group_rule" "egress_all" {
@@ -116,4 +119,55 @@ resource "aws_security_group_rule" "egress_all" {
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.packer.id
   description       = "Allow all outbound"
+}
+
+# -----------------------------------------------------------------------------
+# VPC Endpoints — Packer API access (ec2 + sts)
+# Only needed when the internet gateway is disabled. Packer calls
+# RunInstances, CreateImage, etc. via the EC2 endpoint and
+# AssumeRole / GetCallerIdentity via the STS endpoint.
+# -----------------------------------------------------------------------------
+
+locals {
+  packer_endpoint_services = var.enable_packer_endpoints ? toset([
+    "com.amazonaws.${data.aws_region.current.id}.ec2",
+    "com.amazonaws.${data.aws_region.current.id}.sts",
+  ]) : toset([])
+}
+
+resource "aws_security_group" "packer_endpoints" {
+  count       = var.enable_packer_endpoints ? 1 : 0
+  name        = "${var.name_prefix}-packer-ep-sg"
+  description = "Allow HTTPS from the VPC to Packer VPC endpoints (ec2, sts)"
+  vpc_id      = aws_vpc.this.id
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-packer-ep-sg"
+  })
+}
+
+resource "aws_security_group_rule" "packer_endpoints_ingress" {
+  count             = var.enable_packer_endpoints ? 1 : 0
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = [var.vpc_cidr]
+  security_group_id = aws_security_group.packer_endpoints[0].id
+  description       = "HTTPS from VPC to Packer endpoints"
+}
+
+resource "aws_vpc_endpoint" "packer" {
+  for_each = local.packer_endpoint_services
+
+  vpc_id              = aws_vpc.this.id
+  service_name        = each.value
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = [aws_subnet.this.id]
+  security_group_ids  = [aws_security_group.packer_endpoints[0].id]
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-${element(split(".", each.value), length(split(".", each.value)) - 1)}-ep"
+  })
 }

@@ -17,14 +17,14 @@ infra/
 ├── bootstrap-backend.sh     # Idempotent S3+DynamoDB backend bootstrap
 └── modules/
     ├── iam/                 # Packer builder IAM role + instance profile
-    ├── networking/          # VPC, subnet, IGW, security group
+    ├── networking/          # VPC, subnet, IGW, security group, Packer endpoints
     └── ssm/                 # SSM documents, associations, endpoints, KMS, S3
 ```
 
 | Submodule | Purpose |
 |-----------|---------|
 | **iam** | Creates the IAM role, inline policy, and instance profile used by Packer-launched EC2 instances. Grants SSM, S3, and CloudWatch permissions. |
-| **networking** | Creates a VPC with a single subnet (public or private), an optional internet gateway, route table, and a security group allowing SSH/WinRM ingress with unrestricted egress. |
+| **networking** | Creates a VPC with a single subnet (public or private), an optional internet gateway, route table, a security group for Packer instances (SSH/WinRM), and optional VPC endpoints for EC2 and STS (air-gapped builds). |
 | **ssm** | Deploys account-wide SSM infrastructure — VPC endpoints, KMS CMK, S3 bucket, CloudWatch log group, SSM documents (OpenSCAP, Session Manager), State Manager associations (STIG enforcement, inventory, agent update), Patch Manager baselines, DHMC, auto-tagging, and SNS alerting. See [modules/ssm/README.md](modules/ssm/README.md) for full details. |
 
 > The **iam** module creates the instance profile, and the **ssm** module
@@ -94,7 +94,9 @@ export INSTANCE_PROFILE=$(tofu output -raw instance_profile_name)
 | `name_prefix` | `string` | — (**required**) | Prefix for all resource names (alphanumeric + hyphens) |
 | `vpc_cidr` | `string` | `10.0.0.0/16` | CIDR block for the VPC |
 | `subnet_cidr` | `string` | `10.0.1.0/24` | CIDR block for the subnet |
-| `public_subnet` | `bool` | `true` | Assign public IPs and create an internet gateway |
+| `public_subnet` | `bool` | `true` | Auto-assign public IPs on launch |
+| `enable_internet_gateway` | `bool` | `true` | Create an Internet Gateway and default route. Set to `false` for air-gapped builds. |
+| `enable_packer_endpoints` | `bool` | `false` | Create VPC endpoints for EC2 and STS (required when `enable_internet_gateway = false`) |
 | `enable_vpc_endpoints` | `bool` | `true` | Create VPC endpoints for SSM (required for air-gapped networks) |
 | `enable_session_manager` | `bool` | `true` | Enable Session Manager with KMS encryption and logging |
 | `enable_state_manager` | `bool` | `true` | Create State Manager associations for scheduled scans |
@@ -130,9 +132,55 @@ export INSTANCE_PROFILE=$(tofu output -raw instance_profile_name)
 
 ## Air-Gapped / Disconnected Usage
 
-Set `public_subnet = false` and ensure `enable_vpc_endpoints = true`.
-The SSM module creates Interface endpoints for `ssm`, `ssmmessages`,
-`ec2messages`, `logs`, and `kms`, plus a Gateway endpoint for `s3`.
+To run Packer builds without an Internet Gateway, disable the IGW and
+enable VPC endpoints for all AWS API traffic:
+
+```hcl
+module "spel_infra" {
+  source = "./infra"
+
+  name_prefix             = "spel"
+  public_subnet           = false
+  enable_internet_gateway = false
+  enable_packer_endpoints = true     # EC2 + STS endpoints
+  enable_vpc_endpoints    = true     # SSM + S3 + KMS + Logs endpoints
+}
+```
+
+### What this changes
+
+| Resource | IGW enabled (default) | IGW disabled |
+|----------|----------------------|--------------|
+| Internet Gateway | Created | **Not created** |
+| Default route (`0.0.0.0/0`) | Points to IGW | **No default route** |
+| SSH / WinRM ingress | `0.0.0.0/0` | **VPC CIDR only** |
+| Packer endpoints (ec2, sts) | Not created | **Created** |
+| SSM endpoints | Per `enable_vpc_endpoints` | Per `enable_vpc_endpoints` |
+| Route table | Always created | Always created |
+
+### VPC Endpoints summary
+
+When both `enable_packer_endpoints` and `enable_vpc_endpoints` are `true`,
+the following endpoints are provisioned:
+
+| Endpoint | Type | Module |
+|----------|------|--------|
+| `ec2` | Interface | networking |
+| `sts` | Interface | networking |
+| `ssm` | Interface | ssm |
+| `ssmmessages` | Interface | ssm |
+| `ec2messages` | Interface | ssm |
+| `logs` | Interface | ssm |
+| `kms` | Interface | ssm |
+| `s3` | Gateway | ssm |
+
+### Package repositories
+
+Disabling the IGW also cuts off access to internet-hosted yum/dnf
+repositories. Supply an S3-based or internally-hosted mirror via the
+Packer `repo_mirror_baseurl` variable, or pre-populate the build
+subnet with the required packages.
+
 See the [SSM module README](modules/ssm/README.md) for endpoint details
 and required security-group rules.
 

@@ -2,13 +2,13 @@
 # SPEL Infrastructure — Root Module
 # =============================================================================
 # Orchestrates all SPEL infrastructure using submodules:
-#   - modules/networking : VPC, subnet, IGW, security group
+#   - modules/networking : VPC, subnet, IGW, security group, Packer endpoints
 #   - modules/iam        : Packer builder IAM role, policy, instance profile
 #   - modules/ssm        : SSM endpoints, KMS, S3, CloudWatch, patching
 #
-# Single `terraform apply` creates everything; single `terraform destroy`
+# Single `tofu apply` creates everything; single `tofu destroy`
 # tears it all down. Replaces the previous split between CLI scripts and
-# Terraform, consolidating all infrastructure-as-code.
+# OpenTofu, consolidating all infrastructure-as-code.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -18,11 +18,13 @@
 module "networking" {
   source = "./modules/networking"
 
-  name_prefix   = var.name_prefix
-  vpc_cidr      = var.vpc_cidr
-  subnet_cidr   = var.subnet_cidr
-  public_subnet = var.public_subnet
-  tags          = local.common_tags
+  name_prefix             = var.name_prefix
+  vpc_cidr                = var.vpc_cidr
+  subnet_cidr             = var.subnet_cidr
+  public_subnet           = var.public_subnet
+  enable_internet_gateway = var.enable_internet_gateway
+  enable_packer_endpoints = var.enable_packer_endpoints
+  tags                    = local.common_tags
 }
 
 # -----------------------------------------------------------------------------
