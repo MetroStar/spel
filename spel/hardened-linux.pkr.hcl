@@ -579,6 +579,12 @@ variable "spel_root_volume_size" {
   default     = 20
 }
 
+variable "spel_goss_binary_url" {
+  description = "URL for the Goss binary used by STIG audit. For air-gapped environments, host Goss on your internal mirror or S3. Example: https://mirror.internal.mil/tools/goss-linux-AMD64"
+  type        = string
+  default     = ""
+}
+
 variable "spel_version" {
   description = "Version appended to the name of the built images"
   type        = string
@@ -1100,6 +1106,9 @@ build {
       "amazon-ebs.hardened-amzn-2023-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
+    environment_vars = [
+      "GOSS_BINARY_URL=${var.spel_goss_binary_url}",
+    ]
     inline = [
       "echo '=== Amazon Linux 2023 STIG Hardening ===' ",
       "echo 'Using AWS STIG Script (officially maintained by AWS)...'",
@@ -1147,7 +1156,10 @@ build {
       "  if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "  mkdir -p $HOME/.ansible/roles",
       "  cp -r /tmp/AL2023-STIG $HOME/.ansible/roles/",
-      "  ansible-playbook -i localhost, -c local $HOME/.ansible/roles/AL2023-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false, \"rhel9stig_white_list_services\": [\"ssh\", \"https\"], \"rhel9stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"maintuser\", \"vagrant\", \"ssm-user\"], \"rhel9stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
+      "  EXTRA_VARS='{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false, \"rhel9stig_white_list_services\": [\"ssh\", \"https\"], \"rhel9stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"maintuser\", \"vagrant\", \"ssm-user\"], \"rhel9stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
+      "  if [ -n \"$GOSS_BINARY_URL\" ]; then echo \"Using custom Goss binary URL: $GOSS_BINARY_URL\"; EXTRA_VARS=$(echo $EXTRA_VARS | sed \"s/}$/,\\\"audit_binary\\\": \\\"$GOSS_BINARY_URL\\\", \\\"get_audit_binary_checksum\\\": false}/\"); fi",
+      "  echo \"EXTRA_VARS: $EXTRA_VARS\"",
+      "  ansible-playbook -i localhost, -c local $HOME/.ansible/roles/AL2023-STIG/site.yml -e \"$EXTRA_VARS\"",
       "fi",
       "",
       "# NOTE: OpenSCAP scan skipped - no official DISA STIG benchmark for AL2023",
@@ -1181,6 +1193,9 @@ build {
       "amazon-ebs.hardened-ol-9-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
+    environment_vars = [
+      "GOSS_BINARY_URL=${var.spel_goss_binary_url}",
+    ]
     inline = [
       "echo 'Running Ansible Lockdown'",
       "echo 'Ensuring Python 3.9 is available...'",
@@ -1194,7 +1209,10 @@ build {
       "if [ -d '/tmp/ansible-collections' ]; then for tarball in /tmp/ansible-collections/*.tar.gz; do [ -f \"$tarball\" ] && ansible-galaxy collection install \"$tarball\" --force; done; fi",
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL9-STIG $HOME/.ansible/roles/",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e '{\"system_is_ec2\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false, \"rhel9stig_white_list_services\": [\"ssh\", \"https\"], \"rhel9stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"maintuser\", \"vagrant\", \"ssm-user\"], \"rhel9stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
+      "EXTRA_VARS='{\"system_is_ec2\": true, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_09_251010\": false, \"rhel_09_251015\": false, \"rhel_09_251020\": false, \"rhel_09_251025\": false, \"rhel_09_251030\": false, \"rhel_09_251035\": false, \"rhel_09_251040\": false, \"rhel_09_251045\": false, \"rhel9stig_white_list_services\": [\"ssh\", \"https\"], \"rhel9stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"maintuser\", \"vagrant\", \"ssm-user\"], \"rhel9stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
+      "if [ -n \"$GOSS_BINARY_URL\" ]; then echo \"Using custom Goss binary URL: $GOSS_BINARY_URL\"; EXTRA_VARS=$(echo $EXTRA_VARS | sed \"s/}$/,\\\"audit_binary\\\": \\\"$GOSS_BINARY_URL\\\", \\\"get_audit_binary_checksum\\\": false}/\"); fi",
+      "echo \"EXTRA_VARS: $EXTRA_VARS\"",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL9-STIG/site.yml -e \"$EXTRA_VARS\"",
       "echo 'Installing OpenSCAP for compliance scanning...'",
       "yum install -y openscap-scanner scap-security-guide",
       "echo 'Running OpenSCAP STIG compliance scan...'",
@@ -1236,6 +1254,9 @@ build {
       "amazon-ebs.hardened-rhel-8-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
+    environment_vars = [
+      "GOSS_BINARY_URL=${var.spel_goss_binary_url}",
+    ]
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
@@ -1256,7 +1277,10 @@ build {
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "echo 'Running RHEL8-STIG playbook with Python 3.6 (for SELinux module support)...'",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"rhel_08_040136\":false, \"rhel8stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"maintuser\", \"vagrant\", \"ssm-user\"], \"rhel8stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
+      "EXTRA_VARS='{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false, \"rhel8stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"maintuser\", \"vagrant\", \"ssm-user\"], \"rhel8stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
+      "if [ -n \"$GOSS_BINARY_URL\" ]; then echo \"Using custom Goss binary URL: $GOSS_BINARY_URL\"; EXTRA_VARS=$(echo $EXTRA_VARS | sed \"s/}$/,\\\"audit_binary\\\": \\\"$GOSS_BINARY_URL\\\", \\\"get_audit_binary_checksum\\\": false}/\"); fi",
+      "echo \"EXTRA_VARS: $EXTRA_VARS\"",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e \"$EXTRA_VARS\"",
       "echo 'Installing OpenSCAP for compliance scanning...'",
       "yum install -y openscap-scanner scap-security-guide",
       "echo 'Running OpenSCAP STIG compliance scan...'",
@@ -1276,6 +1300,9 @@ build {
     start_retry_timeout = "5m"
     only                = ["amazon-ebs.hardened-ol-8-hvm"]
     execute_command     = "sudo -E bash '{{.Path}}'"
+    environment_vars = [
+      "GOSS_BINARY_URL=${var.spel_goss_binary_url}",
+    ]
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
       "echo 'Running Ansible Lockdown'",
@@ -1296,7 +1323,10 @@ build {
       "mkdir -p $HOME/.ansible/roles",
       "cp -r /tmp/RHEL8-STIG $HOME/.ansible/roles/",
       "echo 'Running RHEL8-STIG playbook with Python 3.6 (for SELinux module support)...'",
-      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e '{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"rhel_08_040136\":false, \"rhel8stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"maintuser\", \"vagrant\", \"ssm-user\"], \"rhel8stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
+      "EXTRA_VARS='{\"ansible_python_interpreter\": \"/usr/bin/python3.6\", \"system_is_ec2\": true, \"rhel8stig_copy_existing_zone\": false, \"setup_audit\": true, \"run_audit\": true, \"fetch_audit_output\": true, \"rhel_08_040136\":false, \"rhel8stig_sudoers_exclude_nopasswd_list\": [\"ec2-user\", \"maintuser\", \"vagrant\", \"ssm-user\"], \"rhel8stig_faillock_exclude_users\": [\"ec2-user\", \"ssm-user\"]}'",
+      "if [ -n \"$GOSS_BINARY_URL\" ]; then echo \"Using custom Goss binary URL: $GOSS_BINARY_URL\"; EXTRA_VARS=$(echo $EXTRA_VARS | sed \"s/}$/,\\\"audit_binary\\\": \\\"$GOSS_BINARY_URL\\\", \\\"get_audit_binary_checksum\\\": false}/\"); fi",
+      "echo \"EXTRA_VARS: $EXTRA_VARS\"",
+      "ansible-playbook -i localhost, -c local $HOME/.ansible/roles/RHEL8-STIG/site.yml -e \"$EXTRA_VARS\"",
       "echo 'Installing OpenSCAP for compliance scanning...'",
       "yum install -y openscap-scanner scap-security-guide",
       "echo 'Running OpenSCAP STIG compliance scan...'",

@@ -220,6 +220,7 @@ resource "aws_ssm_document" "windows_stig_enforce" {
       {
         action = "aws:runDocument"
         name   = "ApplyAWSConfigureSTIG"
+        onFailure = "Continue"
         precondition = {
           StringEquals = ["platformType", "Windows"]
         }

@@ -213,6 +213,9 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
 
   vars:
     system_is_ec2: true
+    setup_audit: true
+    run_audit: true
+    fetch_audit_output: true
     # SSM-specific exemptions
     rhel9stig_white_list_services:
       - ssh

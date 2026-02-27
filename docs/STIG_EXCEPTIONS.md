@@ -166,7 +166,31 @@ These controls are intentionally not implemented with documented justification.
 
 ## Compliance Reporting
 
-When generating compliance reports, use the following command to exclude known exceptions:
+SPEL AMIs use two complementary compliance scanning tools at build time:
+
+### Goss Auditing (Ansible Lockdown)
+
+Each STIG role (RHEL8-STIG, RHEL9-STIG, AL2023-STIG) includes a built-in Goss
+audit framework from [Ansible Lockdown](https://github.com/ansible-lockdown).
+Goss scans run automatically before and after remediation when `setup_audit`,
+`run_audit`, and `fetch_audit_output` are enabled, producing JSON reports that
+document the delta between pre- and post-hardening compliance posture.
+
+The role handles all setup (downloading the Goss binary, cloning audit content
+from GitHub) via its defaults (`get_audit_binary_method: download`,
+`audit_content: git`). For air-gapped environments, set the `spel_goss_binary_url`
+Packer variable to an internal mirror URL; when set, the build injects
+`audit_binary` and `get_audit_binary_checksum: false` into the role's extra vars.
+
+### OpenSCAP
+
+After Ansible Lockdown completes, an OpenSCAP scan runs using the DISA STIG
+profile from the SCAP Security Guide (`scap-security-guide` RPM). This produces
+an HTML report and XML results file at `/tmp/oscap-report.html` and
+`/tmp/oscap-results.xml`, which are downloaded as build artifacts.
+
+When generating compliance reports post-deployment, use the following command to
+exclude known exceptions:
 
 ```bash
 oscap xccdf eval \
