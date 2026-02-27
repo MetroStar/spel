@@ -264,8 +264,8 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
     # NOTE: rhel8stig_copy_existing_zone is intentionally NOT used here —
     # the SSM ExtraVariables passes it as the string "false" which is
     # truthy in Jinja2, defeating the purpose.
-    rhel_08_040090: false
-    rhel_08_040136: false
+    rhel8stig_040090: false
+    rhel8stig_040136: false
     # RHEL-08-010740 / 010741: These controls loop over EVERY user in
     # /etc/passwd (including system accounts like bin, daemon, nobody,
     # dbus, tss, etc.) and change group-ownership of their "home"
@@ -274,8 +274,8 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
     # SELinux contexts and package verification. The loop is also
     # extremely slow on EL8 (Python 3.6), causing SSM check-mode
     # associations to exceed even the 7200s timeout.
-    rhel_08_010740: false
-    rhel_08_010741: false
+    rhel8stig_010740: false
+    rhel8stig_010741: false
 PLAYBOOK_EOF
 
 echo "  [OK] site.yml"
