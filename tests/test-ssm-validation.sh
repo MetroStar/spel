@@ -143,71 +143,99 @@ test_run_command() {
     --query 'InstanceInformationList[0].PlatformType' \
     --output text 2>/dev/null || echo "Unknown")
 
-  local doc_name command_text
+  local doc_name
   if [[ "$platform_type" == "Windows" ]]; then
     doc_name="AWS-RunPowerShellScript"
-    command_text="Write-Output \"SSM-TEST-OK: $(hostname) $(Get-Date -Format o)\""
   else
     doc_name="AWS-RunShellScript"
-    command_text="echo \"SSM-TEST-OK: $(hostname) $(date -Iseconds)\""
   fi
 
-  local command_id
-  local send_err
-  send_err=$(aws ssm send-command \
-    --region "$REGION" \
-    --instance-ids "$INSTANCE_ID" \
-    --document-name "$doc_name" \
-    --parameters '{"commands":["echo SSM-TEST-OK"]}' \
-    --timeout-seconds 60 \
-    --query 'Command.CommandId' \
-    --output text 2>&1) && command_id="$send_err" || {
-      log_fail "RunCommand: Failed to send command: $send_err"
-      return 1
-    }
+  # Retry loop — first command after registration can fail while the agent
+  # finishes internal initialization
+  local max_attempts=3
+  local attempt=0
 
-  if [[ -z "$command_id" || "$command_id" == "None" ]]; then
-    log_fail "RunCommand: Failed to send command (empty command ID)"
-    return 1
-  fi
+  while [[ $attempt -lt $max_attempts ]]; do
+    attempt=$((attempt + 1))
+    [[ $attempt -gt 1 ]] && log_info "  Retry $attempt/$max_attempts (waiting 10s)..." && sleep 10
 
-  log_info "  Command sent: $command_id - waiting for result..."
+    local command_id
+    local send_err
+    send_err=$(aws ssm send-command \
+      --region "$REGION" \
+      --instance-ids "$INSTANCE_ID" \
+      --document-name "$doc_name" \
+      --parameters '{"commands":["echo SSM-TEST-OK"]}' \
+      --timeout-seconds 60 \
+      --query 'Command.CommandId' \
+      --output text 2>&1) && command_id="$send_err" || {
+        log_info "  Send failed (attempt $attempt): $send_err"
+        continue
+      }
 
-  # Poll for completion
-  local status="InProgress"
-  local wait=0
-  while [[ "$status" == "InProgress" || "$status" == "Pending" ]] && [[ $wait -lt 120 ]]; do
-    sleep 5
-    wait=$((wait + 5))
-    status=$(aws ssm get-command-invocation \
+    if [[ -z "$command_id" || "$command_id" == "None" ]]; then
+      log_info "  Empty command ID (attempt $attempt)"
+      continue
+    fi
+
+    log_info "  Command sent: $command_id - waiting for result..."
+
+    # Poll for completion
+    local status="InProgress"
+    local wait=0
+    while [[ "$status" == "InProgress" || "$status" == "Pending" ]] && [[ $wait -lt 120 ]]; do
+      sleep 5
+      wait=$((wait + 5))
+      status=$(aws ssm get-command-invocation \
+        --region "$REGION" \
+        --command-id "$command_id" \
+        --instance-id "$INSTANCE_ID" \
+        --query 'Status' \
+        --output text 2>/dev/null || echo "InProgress")
+    done
+
+    if [[ "$status" == "Success" ]]; then
+      local output
+      output=$(aws ssm get-command-invocation \
+        --region "$REGION" \
+        --command-id "$command_id" \
+        --instance-id "$INSTANCE_ID" \
+        --query 'StandardOutputContent' \
+        --output text 2>/dev/null)
+      log_pass "RunCommand: Success (attempt $attempt) - Output: $output"
+      return 0
+    fi
+
+    # Capture full diagnostic info on failure
+    local invocation_json
+    invocation_json=$(aws ssm get-command-invocation \
       --region "$REGION" \
       --command-id "$command_id" \
       --instance-id "$INSTANCE_ID" \
-      --query 'Status' \
-      --output text 2>/dev/null || echo "InProgress")
+      --output json 2>/dev/null || echo "{}")
+
+    local status_details response_code stdout_content stderr_content
+    status_details=$(echo "$invocation_json" | jq -r '.StatusDetails // "N/A"')
+    response_code=$(echo "$invocation_json" | jq -r '.ResponseCode // "N/A"')
+    stdout_content=$(echo "$invocation_json" | jq -r '.StandardOutputContent // ""')
+    stderr_content=$(echo "$invocation_json" | jq -r '.StandardErrorContent // ""')
+
+    if [[ $attempt -lt $max_attempts ]]; then
+      log_info "  Attempt $attempt failed: Status=$status, StatusDetails=$status_details, ResponseCode=$response_code"
+      [[ -n "$stderr_content" ]] && log_info "  Stderr: $stderr_content"
+      [[ -n "$stdout_content" ]] && log_info "  Stdout: $stdout_content"
+    else
+      log_fail "RunCommand: Status=$status (after $max_attempts attempts)"
+      log_fail "  StatusDetails: $status_details"
+      log_fail "  ResponseCode: $response_code"
+      [[ -n "$stderr_content" ]] && log_fail "  Stderr: $stderr_content"
+      [[ -n "$stdout_content" ]] && log_fail "  Stdout: $stdout_content"
+      return 1
+    fi
   done
 
-  if [[ "$status" == "Success" ]]; then
-    local output
-    output=$(aws ssm get-command-invocation \
-      --region "$REGION" \
-      --command-id "$command_id" \
-      --instance-id "$INSTANCE_ID" \
-      --query 'StandardOutputContent' \
-      --output text 2>/dev/null)
-    log_pass "RunCommand: Success - Output: $output"
-    return 0
-  else
-    local error_output
-    error_output=$(aws ssm get-command-invocation \
-      --region "$REGION" \
-      --command-id "$command_id" \
-      --instance-id "$INSTANCE_ID" \
-      --query 'StandardErrorContent' \
-      --output text 2>/dev/null)
-    log_fail "RunCommand: Status=$status - Error: $error_output"
-    return 1
-  fi
+  log_fail "RunCommand: All $max_attempts attempts failed"
+  return 1
 }
 
 # ============================================================================
@@ -476,6 +504,11 @@ if ! test_ssm_registration; then
   echo "================================================================"
   exit 1
 fi
+
+# Brief delay after registration — agent may be "Online" but not yet
+# ready to execute commands (internal initialization race)
+echo "[INFO]  Waiting 15s for SSM agent command subsystem to initialize..."
+sleep 15
 
 test_run_command || true
 test_session_manager || true
