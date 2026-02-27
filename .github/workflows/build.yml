@@ -111,6 +111,12 @@ on:
         required: false
         type: string
         default: ""
+      # Goss audit binary URL for air-gapped builds
+      goss_binary_url:
+        description: "Goss binary URL for air-gapped STIG auditing (e.g., https://mirror.internal.mil/tools/goss-linux-AMD64)"
+        required: false
+        type: string
+        default: ""
       # Post-build testing
       test_windows_instance_types:
         description: "Test Windows AMIs on multiple Nitro instance types after build (opt-in)"
@@ -427,6 +433,7 @@ jobs:
           [[ -n "${{ github.event.inputs.amigen9_repo_sources }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_repo_sources=${{ github.event.inputs.amigen9_repo_sources }}")
           [[ -n "${{ github.event.inputs.amigen8_extra_rpms }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_extra_rpms=${{ github.event.inputs.amigen8_extra_rpms }}")
           [[ -n "${{ github.event.inputs.amigen9_extra_rpms }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_extra_rpms=${{ github.event.inputs.amigen9_extra_rpms }}")
+          [[ -n "${{ github.event.inputs.goss_binary_url }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_spel_goss_binary_url=${{ github.event.inputs.goss_binary_url }}")
           
           docker run --rm \
             -v "$(pwd):/workspace" \

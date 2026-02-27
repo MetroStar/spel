@@ -92,6 +92,11 @@ variables:
   # Set this to use a pre-created instance profile (e.g., from infra:create job)
   # Leave empty to have Packer create a temporary one (requires IAM permissions)
   PKR_VAR_aws_iam_instance_profile: ""
+  # Goss binary URL for air-gapped STIG auditing
+  # Set this to your internal mirror URL hosting the Goss binary
+  # Example: https://mirror.internal.mil/tools/goss-linux-AMD64
+  # Leave empty to download from GitHub (requires internet access)
+  SPEL_GOSS_BINARY_URL: ""
   # Test Windows AMIs on multiple Nitro instance types after build (opt-in)
   # Set to "true" to run instance type compatibility tests
   TEST_INSTANCE_TYPES: "false"
@@ -352,6 +357,10 @@ import:docker:
         DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_extra_rpms=${AMIGEN8_EXTRA_RPMS}")
       [[ -n "${AMIGEN9_EXTRA_RPMS:-}" ]] && \
         DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_extra_rpms=${AMIGEN9_EXTRA_RPMS}")
+      
+      # Add Goss binary URL if set (for air-gapped STIG auditing)
+      [[ -n "${SPEL_GOSS_BINARY_URL:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_spel_goss_binary_url=${SPEL_GOSS_BINARY_URL}")
       
       # Add KMS key if set
       [[ -n "${PKR_VAR_aws_kms_key_id:-}" ]] && \
