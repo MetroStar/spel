@@ -702,6 +702,37 @@ on:
       run_ws2022:
         description: "Run Windows Server 2022 builder"
         type: boolean
+      # Air-gapped build configuration
+      repo_mirror_baseurl:
+        description: "Local YUM mirror URL for air-gapped builds"
+        type: string
+      airgap_mode:
+        description: "Enable air-gapped build mode"
+        type: boolean
+      amigen8_repo_names:
+        description: "Custom repo names for EL8 (JSON array)"
+        type: string
+      amigen9_repo_names:
+        description: "Custom repo names for EL9 (JSON array)"
+        type: string
+      amigen8_repo_sources:
+        description: "Repo source RPMs for EL8 (JSON array of URLs)"
+        type: string
+      amigen9_repo_sources:
+        description: "Repo source RPMs for EL9 (JSON array of URLs)"
+        type: string
+      amigen8_extra_rpms:
+        description: "Extra RPMs for EL8 (JSON array)"
+        type: string
+      amigen9_extra_rpms:
+        description: "Extra RPMs for EL9 (JSON array)"
+        type: string
+      goss_binary_url:
+        description: "Goss binary URL for air-gapped STIG auditing"
+        type: string
+      test_windows_instance_types:
+        description: "Test Windows AMIs on multiple Nitro instance types"
+        type: boolean
 ```
 
 #### Workflow Steps
@@ -824,6 +855,7 @@ These variables configure Linux builds to use local repository mirrors instead o
 | `AMIGEN9_EXTRA_RPMS` | JSON array of extra RPMs for EL9 | (none) |
 | `PKR_VAR_amigen8_repo_sources` | JSON array of EL8 repo source RPM URLs | (none) |
 | `PKR_VAR_amigen9_repo_sources` | JSON array of EL9 repo source RPM URLs | (none) |
+| `SPEL_GOSS_BINARY_URL` | URL to Goss binary for air-gapped STIG audit scans | (none) |
 
 > **Important**: For air-gapped Linux builds, you must create a repo configuration RPM
 > that installs your mirror settings into the chroot. See [Air-Gapped Linux Builds](#air-gapped-linux-builds).

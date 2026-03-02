@@ -182,6 +182,15 @@ from GitHub) via its defaults (`get_audit_binary_method: download`,
 Packer variable to an internal mirror URL; when set, the build injects
 `audit_binary` and `get_audit_binary_checksum: false` into the role's extra vars.
 
+> **Note:** Goss auditing is **disabled** for SSM check-mode runs
+> (`setup_audit: false`, `run_audit: false`, `fetch_audit_output: false` in the
+> SSM `site.yml`). The RHEL\*-STIG roles' post-audit tasks use
+> `ansible.builtin.command` to invoke Goss, which is skipped in Ansible's
+> `--check` mode, but the subsequent `"Ensure audit files readable"` file task
+> still executes and fails when the (never-created) post-scan JSON is absent.
+> This is an upstream check-mode incompatibility. Post-deployment compliance
+> verification relies on **OpenSCAP** instead (see below).
+
 ### OpenSCAP
 
 After Ansible Lockdown completes, an OpenSCAP scan runs using the DISA STIG

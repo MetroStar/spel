@@ -78,6 +78,7 @@ cp spel-builder-*.tar.gz /transfer/
 | `RUN_OL9` | Build Oracle Linux 9 | `false` |
 | `RUN_OL8` | Build Oracle Linux 8 | `false` |
 | `RUN_AMZN2023` | Build Amazon Linux 2023 | `false` |
+| `SPEL_GOSS_BINARY_URL` | Goss binary URL for air-gapped STIG audit | (none) |
 
 ## Prerequisites
 
