@@ -213,9 +213,18 @@ cat > "$STAGING/site.yml" <<'PLAYBOOK_EOF'
 
   vars:
     system_is_ec2: true
-    setup_audit: true
-    run_audit: true
-    fetch_audit_output: true
+    # Goss audit is DISABLED for SSM runs:
+    # The RHEL*-STIG roles' post-audit tasks use ansible.builtin.command
+    # (to invoke run_audit.sh / Goss), which is SKIPPED in --check mode.
+    # However, the "Ensure audit files readable" file task DOES execute
+    # in check mode and fails when the (never-created) post_scan JSON is
+    # absent.  This is an upstream check-mode incompatibility we cannot
+    # fix without forking the role.  Bake-time Goss audit (enforcement
+    # mode) continues to run via the Packer EXTRA_VARS.  OpenSCAP handles
+    # SSM compliance verification.
+    setup_audit: false
+    run_audit: false
+    fetch_audit_output: false
     # SSM-specific exemptions
     rhel9stig_white_list_services:
       - ssh
