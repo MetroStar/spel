@@ -30,7 +30,7 @@ packer {
 # Guidance on naming and organizing variables
 #
 # Variable names are prefixed by builder, or by amigen project. Any variables
-# used by many builders are prefixed with the keyword `spel`. Variables are grouped
+# used by many builders are prefixed with the keyword `granite`. Variables are grouped
 # by their prefix. Current prefixes
 # include:
 #   * aws - amazon-ebs builder
@@ -40,7 +40,7 @@ packer {
 #   * amigen - used across amigen versions ( amigen8 and amigen9)
 #   * amigen8 - amigen8 only
 #   * amigen9 - amigen9 only
-#   * spel - everything else
+#   * granite - everything else
 #
 # For variables passed to a builder argument, just apply prefix to the argument
 # name. Do not "reinterpret" the argument and create a new name. E.g. for the
@@ -112,11 +112,11 @@ variable "aws_source_ami_filter_alma9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "AlmaLinux OS 9.* x86_64-*,spel-bootstrap-alma-9*.x86_64-gp*"
+    name = "AlmaLinux OS 9.* x86_64-*,granite-bootstrap-alma-9*.x86_64-gp*"
     owners = [
       "679593333241", # Alma Commercial, https://wiki.almalinux.org/cloud/AWS.html#aws-marketplace
-      "174003430611", # SPEL Commercial, https://github.com/MetroStar/spel
-      "216406534498", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "174003430611", # Granite Commercial, https://github.com/MetroStar/granite
+      "216406534498", # Granite GovCloud, https://github.com/MetroStar/granite
     ]
   }
 }
@@ -128,11 +128,11 @@ variable "aws_source_ami_filter_centos9stream_hvm" {
     owners = list(string)
   })
   default = {
-    name = "CentOS Stream 9 x86_64 *,spel-bootstrap-centos-9stream-*.x86_64-gp*"
+    name = "CentOS Stream 9 x86_64 *,granite-bootstrap-centos-9stream-*.x86_64-gp*"
     owners = [
       "125523088429", # CentOS Commercial, https://wiki.centos.org/Cloud/AWS
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # Granite Commercial, https://github.com/MetroStar/granite
+      "317517796843", # Granite GovCloud, https://github.com/MetroStar/granite
     ]
   }
 }
@@ -144,11 +144,11 @@ variable "aws_source_ami_filter_ol8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "OL8.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-8-hvm-*.x86_64-gp*,spel-bootstrap-ol-8-*.x86_64-gp*"
+    name = "OL8.*-x86_64-HVM-*,granite-bootstrap-oraclelinux-8-hvm-*.x86_64-gp*,granite-bootstrap-ol-8-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # Granite Commercial, https://github.com/MetroStar/granite
+      "317517796843", # Granite GovCloud, https://github.com/MetroStar/granite
     ]
   }
 }
@@ -160,11 +160,11 @@ variable "aws_source_ami_filter_ol9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "OL9.*-x86_64-HVM-*,spel-bootstrap-oraclelinux-9-hvm-*.x86_64-gp*,spel-bootstrap-ol-9-*.x86_64-gp*"
+    name = "OL9.*-x86_64-HVM-*,granite-bootstrap-oraclelinux-9-hvm-*.x86_64-gp*,granite-bootstrap-ol-9-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # Granite Commercial, https://github.com/MetroStar/granite
+      "317517796843", # Granite GovCloud, https://github.com/MetroStar/granite
     ]
   }
 }
@@ -176,12 +176,12 @@ variable "aws_source_ami_filter_rhel8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "RHEL-8.*_HVM-*-x86_64-*-Hourly*-GP*,spel-bootstrap-rhel-8-*.x86_64-gp*"
+    name = "RHEL-8.*_HVM-*-x86_64-*-Hourly*-GP*,granite-bootstrap-rhel-8-*.x86_64-gp*"
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # Granite Commercial, https://github.com/MetroStar/granite
+      "317517796843", # Granite GovCloud, https://github.com/MetroStar/granite
     ]
   }
 }
@@ -193,12 +193,12 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "RHEL-9.*_HVM-*-x86_64-*-Hourly*-GP*,spel-bootstrap-rhel-9-*.x86_64-gp*"
+    name = "RHEL-9.*_HVM-*-x86_64-*-Hourly*-GP*,granite-bootstrap-rhel-9-*.x86_64-gp*"
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # Granite Commercial, https://github.com/MetroStar/granite
+      "317517796843", # Granite GovCloud, https://github.com/MetroStar/granite
     ]
   }
 }
@@ -210,11 +210,11 @@ variable "aws_source_ami_filter_rl9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "Rocky-9-EC2-Base-9.*-*.x86_64,spel-bootstrap-rl-9-*.x86_64-gp*"
+    name = "Rocky-9-EC2-Base-9.*-*.x86_64,granite-bootstrap-rl-9-*.x86_64-gp*"
     owners = [
       "792107900819", # Rocky Linux, https://rockylinux.org/download (search for "AWS" tag and click)
-      "204182206073", # SPEL Commercial, https://github.com/MetroStar/spel
-      "317517796843", # SPEL GovCloud, https://github.com/MetroStar/spel
+      "204182206073", # Granite Commercial, https://github.com/MetroStar/granite
+      "317517796843", # Granite GovCloud, https://github.com/MetroStar/granite
     ]
   }
 }
@@ -455,7 +455,7 @@ variable "amigen_amiutils_source_url" {
 }
 
 variable "amigen_aws_cfnbootstrap" {
-  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Use file:// prefix for offline/Offline builds. Defaults to spel_cfnbootstrap_source for Offline support"
+  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Use file:// prefix for offline/Offline builds. Defaults to granite_cfnbootstrap_source for Offline support"
   type        = string
   default     = ""
 }
@@ -561,7 +561,7 @@ variable "amigen8_package_manifest" {
 variable "amigen8_repo_names" {
   description = "List of yum repo names to enable in the EL8 builders and EL8 images"
   type        = list(string)
-  default     = ["spel"]
+  default     = ["granite"]
 }
 
 variable "amigen8_repo_sources" {
@@ -657,7 +657,7 @@ variable "amigen9_package_manifest_al2023" {
 variable "amigen9_repo_names" {
   description = "List of yum repo names to enable in the EL9 builders and EL9 images"
   type        = list(string)
-  default     = ["spel"]
+  default     = ["granite"]
 }
 
 variable "amigen9_repo_sources" {
@@ -726,62 +726,62 @@ variable "azure_custom_managed_image_resource_group_name_rhel8" {
 
 
 ###
-# Variables specific to spel
+# Variables specific to granite
 ###
 
-variable "spel_deprecation_lifetime" {
+variable "granite_deprecation_lifetime" {
   description = "Duration after which image will be marked deprecated. If null, image will not be marked deprecated. The accepted units are: ns, us (or µs), ms, s, m, and h. For example, one day is 24h, and one year is 8760h."
   type        = string
   default     = null
 }
 
-variable "spel_description_url" {
+variable "granite_description_url" {
   description = "URL included in the AMI description"
   type        = string
-  default     = "https://github.com/MetroStar/spel"
+  default     = "https://github.com/MetroStar/granite"
 }
 
-variable "spel_http_proxy" {
+variable "granite_http_proxy" {
   description = "Used as the value for the git config http.proxy setting in the builder nodes"
   type        = string
   default     = ""
 }
 
-variable "spel_identifier" {
+variable "granite_identifier" {
   description = "Namespace that prefixes the name of the built images"
   type        = string
 }
 
-variable "spel_root_volume_size" {
+variable "granite_root_volume_size" {
   description = "Size in GB of the root volume"
   type        = number
   default     = 20
 }
 
-variable "spel_ssh_username" {
-  description = "Name of the user for the ssh connection to the instance. Defaults to `spel`, which is set by cloud-config userdata. If your starting image does not have `cloud-init` installed, override the default user name"
+variable "granite_ssh_username" {
+  description = "Name of the user for the ssh connection to the instance. Defaults to `granite`, which is set by cloud-config userdata. If your starting image does not have `cloud-init` installed, override the default user name"
   type        = string
-  default     = "spel"
+  default     = "granite"
 }
 
-variable "spel_version" {
+variable "granite_version" {
   description = "Version appended to the name of the built images"
   type        = string
 }
 
-variable "spel_cfnbootstrap_source" {
+variable "granite_cfnbootstrap_source" {
   description = "Source URL or file path for AWS CloudFormation Bootstrap package. Use file:// for offline/Offline builds"
   type        = string
   default     = "https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz"
 }
 
-variable "spel_awscli_source" {
+variable "granite_awscli_source" {
   description = "Source URL or file path for AWS CLI v2 package. Use file:// for offline/Offline builds"
   type        = string
   default     = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
 }
 
-variable "spel_ssm_agent_source" {
+variable "granite_ssm_agent_source" {
   description = "Source URL or file path for AWS SSM Agent RPM. Use file:// for offline/Offline builds"
   type        = string
   default     = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
@@ -798,11 +798,11 @@ source "amazon-ebssurrogate" "base" {
     source_device_name    = "/dev/xvdf"
     delete_on_termination = true
     device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
-    volume_size           = var.spel_root_volume_size
+    volume_size           = var.granite_root_volume_size
     volume_type           = "gp3"
   }
   ami_groups                  = var.aws_ami_groups
-  ami_name                    = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
+  ami_name                    = "${var.granite_identifier}-${source.name}-${var.granite_version}.x86_64-gp3"
   ami_regions                 = local.effective_ami_regions
   ami_users                   = var.aws_ami_users
   ami_virtualization_type     = "hvm"
@@ -815,13 +815,13 @@ source "amazon-ebssurrogate" "base" {
   launch_block_device_mappings {
     delete_on_termination = true
     device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
-    volume_size           = var.spel_root_volume_size
+    volume_size           = var.granite_root_volume_size
     volume_type           = "gp3"
   }
   launch_block_device_mappings {
     delete_on_termination = true
     device_name           = "/dev/xvdf"
-    volume_size           = var.spel_root_volume_size
+    volume_size           = var.granite_root_volume_size
     volume_type           = "gp3"
   }
   max_retries   = 20
@@ -830,7 +830,7 @@ source "amazon-ebssurrogate" "base" {
   ssh_interface = var.aws_ssh_interface
   ssh_port      = 22
   ssh_pty       = true
-  ssh_username  = var.spel_ssh_username
+  ssh_username  = var.granite_ssh_username
   ssh_timeout   = "10m"
   ssh_key_exchange_algorithms = [
     "ecdh-sha2-nistp521",
@@ -859,15 +859,15 @@ source "azure-arm" "base" {
   image_sku                              = var.azure_image_sku
   keep_os_disk                           = var.azure_keep_os_disk
   location                               = var.azure_location
-  managed_image_name                     = "${var.spel_identifier}-${source.name}-${var.spel_version}"
+  managed_image_name                     = "${var.granite_identifier}-${source.name}-${var.granite_version}"
   managed_image_resource_group_name      = var.azure_managed_image_resource_group_name
-  os_disk_size_gb                        = var.spel_root_volume_size
+  os_disk_size_gb                        = var.granite_root_volume_size
   os_type                                = "Linux"
   private_virtual_network_with_public_ip = var.azure_private_virtual_network_with_public_ip
   ssh_port                               = 22
   ssh_pty                                = true
   ssh_timeout                            = "60m"
-  ssh_username                           = var.spel_ssh_username
+  ssh_username                           = var.granite_ssh_username
   subscription_id                        = var.azure_subscription_id
   use_azure_cli_auth                     = true
   virtual_network_name                   = var.azure_virtual_network_name
@@ -879,14 +879,14 @@ source "azure-arm" "base" {
 source "openstack" "base" {
   flavor                  = var.openstack_flavor
   floating_ip_network     = var.openstack_floating_ip_network_name
-  image_name              = "${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64"
+  image_name              = "${var.granite_identifier}-${source.name}-${var.granite_version}.x86_64"
   insecure                = var.openstack_insecure
   networks                = var.openstack_networks
   security_groups         = var.openstack_security_groups
   source_image_name       = var.openstack_source_image_name
   ssh_port                = 22
   ssh_timeout             = "30m"
-  ssh_username            = var.spel_ssh_username
+  ssh_username            = var.granite_ssh_username
   use_blockstorage_volume = "false"
   user_data_file          = "${path.root}/userdata/userdata.cloud"
 }
@@ -899,14 +899,14 @@ source "virtualbox-iso" "base" {
   guest_os_type           = "RedHat_64"
   headless                = true
   http_directory          = "${path.root}/kickstarts"
-  output_directory        = ".spel/${var.spel_version}/${var.spel_identifier}-${source.name}"
+  output_directory        = ".granite/${var.granite_version}/${var.granite_identifier}-${source.name}"
   shutdown_command        = "echo '/sbin/halt -h -p' > shutdown.sh; echo 'vagrant'|sudo -S bash 'shutdown.sh'"
   ssh_password            = "vagrant"
   ssh_port                = 22
   ssh_timeout             = "10000s"
   ssh_username            = "vagrant"
   virtualbox_version_file = ".vbox_version"
-  vm_name                 = "${var.spel_identifier}-${source.name}-${var.spel_version}"
+  vm_name                 = "${var.granite_identifier}-${source.name}-${var.granite_version}"
 }
 
 ###
@@ -948,10 +948,10 @@ locals {
   effective_rhel9_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_rhel9_hvm.owners
 
   # Template the description string
-  description = "STIG-partitioned [*NOT HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.spel_description_url}."
+  description = "STIG-partitioned [*NOT HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.granite_description_url}."
 
   # Calculate AWS AMI deprecate_at timestamp
-  aws_ami_deprecate_at = var.spel_deprecation_lifetime != null ? timeadd(local.timestamp, var.spel_deprecation_lifetime) : null
+  aws_ami_deprecate_at = var.granite_deprecation_lifetime != null ? timeadd(local.timestamp, var.granite_deprecation_lifetime) : null
 
   timestamp = timestamp()
 }
@@ -1189,12 +1189,12 @@ build {
     environment_vars = [
       "DNF_VAR_ociregion=",
       "DNF_VAR_ocidomain=oracle.com",
-      "SPEL_AMIGEN9SOURCE=${var.amigen9_source_url}",
-      "SPEL_AMIGENREPOS=${local.amigen9_repo_names}",
-      "SPEL_AMIGENREPOSRC=${local.amigen9_repo_sources}",
-      "SPEL_BUILDDEPS=dosfstools git lvm2 parted python3-pip unzip yum-utils",
-      "SPEL_EXTRARPMS=${local.amigen9_extra_rpms}",
-      "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "GRANITE_AMIGEN9SOURCE=${var.amigen9_source_url}",
+      "GRANITE_AMIGENREPOS=${local.amigen9_repo_names}",
+      "GRANITE_AMIGENREPOSRC=${local.amigen9_repo_sources}",
+      "GRANITE_BUILDDEPS=dosfstools git lvm2 parted python3-pip unzip yum-utils",
+      "GRANITE_EXTRARPMS=${local.amigen9_extra_rpms}",
+      "GRANITE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     scripts = [
@@ -1212,12 +1212,12 @@ build {
   # Want to try to run this pre-step early on AL2023
   provisioner "shell" {
     environment_vars = [
-      "SPEL_AMIGEN9SOURCE=${var.amigen9_source_url}",
-      "SPEL_AMIGENREPOS=${local.amigen9_repo_names}",
-      "SPEL_AMIGENREPOSRC=${local.amigen9_repo_sources}",
-      "SPEL_BUILDDEPS=dnf-utils dosfstools git lvm2 parted python3-pip unzip",
-      "SPEL_EXTRARPMS=${local.amigen9_extra_rpms}",
-      "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "GRANITE_AMIGEN9SOURCE=${var.amigen9_source_url}",
+      "GRANITE_AMIGENREPOS=${local.amigen9_repo_names}",
+      "GRANITE_AMIGENREPOSRC=${local.amigen9_repo_sources}",
+      "GRANITE_BUILDDEPS=dnf-utils dosfstools git lvm2 parted python3-pip unzip",
+      "GRANITE_EXTRARPMS=${local.amigen9_extra_rpms}",
+      "GRANITE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     scripts = [
@@ -1272,31 +1272,31 @@ build {
     environment_vars = [
       "DNF_VAR_ocidomain=oracle.com",
       "DNF_VAR_ociregion=",
-      "SPEL_AMIGEN8SOURCE=${var.amigen8_source_url}",
-      "SPEL_AMIGENBOOTDEVMULT=${var.amigen8_bootdev_mult}",
-      "SPEL_AMIGENBOOTDEVSZ=${var.amigen8_bootdev_size}",
-      "SPEL_AMIGENBOOTSIZE=17m",
-      "SPEL_AMIGENBRANCH=${var.amigen8_source_branch}",
-      "SPEL_AMIGENCHROOT=/mnt/ec2-root",
-      "SPEL_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
-      "SPEL_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
-      "SPEL_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
-      "SPEL_AMIGENMANFST=${var.amigen8_package_manifest}",
-      "SPEL_AMIGENPKGGRP=${local.amigen8_package_groups}",
-      "SPEL_AMIGENREPOS=${local.amigen8_repo_names}",
-      "SPEL_AMIGENREPOSRC=${local.amigen8_repo_sources}",
-      "SPEL_AMIGENROOTNM=${var.amigen8_filesystem_label}",
-      "SPEL_AMIGENSTORLAY=${local.amigen8_storage_layout}",
-      "SPEL_AMIGENVGNAME=RootVG",
-      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.spel_cfnbootstrap_source}",
-      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.spel_awscli_source}",
-      "SPEL_CLOUDPROVIDER=aws",
-      "SPEL_EXTRARPMS=${local.amigen8_extra_rpms}",
-      "SPEL_FIPSDISABLE=${var.amigen_fips_disable}",
-      "SPEL_GRUBTMOUT=${var.amigen_grub_timeout}",
-      "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
-      "SPEL_USEROOTDEVICE=false",
+      "GRANITE_AMIGEN8SOURCE=${var.amigen8_source_url}",
+      "GRANITE_AMIGENBOOTDEVMULT=${var.amigen8_bootdev_mult}",
+      "GRANITE_AMIGENBOOTDEVSZ=${var.amigen8_bootdev_size}",
+      "GRANITE_AMIGENBOOTSIZE=17m",
+      "GRANITE_AMIGENBRANCH=${var.amigen8_source_branch}",
+      "GRANITE_AMIGENCHROOT=/mnt/ec2-root",
+      "GRANITE_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
+      "GRANITE_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
+      "GRANITE_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
+      "GRANITE_AMIGENMANFST=${var.amigen8_package_manifest}",
+      "GRANITE_AMIGENPKGGRP=${local.amigen8_package_groups}",
+      "GRANITE_AMIGENREPOS=${local.amigen8_repo_names}",
+      "GRANITE_AMIGENREPOSRC=${local.amigen8_repo_sources}",
+      "GRANITE_AMIGENROOTNM=${var.amigen8_filesystem_label}",
+      "GRANITE_AMIGENSTORLAY=${local.amigen8_storage_layout}",
+      "GRANITE_AMIGENVGNAME=RootVG",
+      "GRANITE_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.granite_cfnbootstrap_source}",
+      "GRANITE_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
+      "GRANITE_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.granite_awscli_source}",
+      "GRANITE_CLOUDPROVIDER=aws",
+      "GRANITE_EXTRARPMS=${local.amigen8_extra_rpms}",
+      "GRANITE_FIPSDISABLE=${var.amigen_fips_disable}",
+      "GRANITE_GRUBTMOUT=${var.amigen_grub_timeout}",
+      "GRANITE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "GRANITE_USEROOTDEVICE=false",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     only = [
@@ -1313,34 +1313,34 @@ build {
     environment_vars = [
       "DNF_VAR_ocidomain=oracle.com",
       "DNF_VAR_ociregion=",
-      "SPEL_AMIGEN9SOURCE=${var.amigen9_source_url}",
-      "SPEL_AMIGENBOOTDEVLBL=${var.amigen9_boot_dev_label}",
-      "SPEL_AMIGENBOOTDEVSZ=${var.amigen9_boot_dev_size}",
-      "SPEL_AMIGENBOOTDEVSZMLT=${var.amigen9_boot_dev_size_mult}",
-      "SPEL_AMIGENBRANCH=${var.amigen9_source_branch}",
-      "SPEL_AMIGENCHROOT=/mnt/ec2-root",
-      "SPEL_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
-      "SPEL_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
-      "SPEL_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
-      "SPEL_AMIGENMANFST=${var.amigen9_package_manifest}",
-      "SPEL_AMIGENMANFSTAL2023=${var.amigen9_package_manifest_al2023}",
-      "SPEL_AMIGENPKGGRP=${local.amigen9_package_groups}",
-      "SPEL_AMIGENREPOS=${local.amigen9_repo_names}",
-      "SPEL_AMIGENREPOSRC=${local.amigen9_repo_sources}",
-      "SPEL_AMIGENROOTNM=${var.amigen9_filesystem_label}",
-      "SPEL_AMIGENSTORLAY=${local.amigen9_storage_layout}",
-      "SPEL_AMIGENUEFIDEVLBL=${var.amigen9_uefi_dev_label}",
-      "SPEL_AMIGENUEFIDEVSZ=${var.amigen9_uefi_dev_size}",
-      "SPEL_AMIGENVGNAME=RootVG",
-      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.spel_cfnbootstrap_source}",
-      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.spel_awscli_source}",
-      "SPEL_CLOUDPROVIDER=aws",
-      "SPEL_EXTRARPMS=${local.amigen9_extra_rpms}",
-      "SPEL_FIPSDISABLE=${var.amigen_fips_disable}",
-      "SPEL_GRUBTMOUT=${var.amigen_grub_timeout}",
-      "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
-      "SPEL_USEROOTDEVICE=false",
+      "GRANITE_AMIGEN9SOURCE=${var.amigen9_source_url}",
+      "GRANITE_AMIGENBOOTDEVLBL=${var.amigen9_boot_dev_label}",
+      "GRANITE_AMIGENBOOTDEVSZ=${var.amigen9_boot_dev_size}",
+      "GRANITE_AMIGENBOOTDEVSZMLT=${var.amigen9_boot_dev_size_mult}",
+      "GRANITE_AMIGENBRANCH=${var.amigen9_source_branch}",
+      "GRANITE_AMIGENCHROOT=/mnt/ec2-root",
+      "GRANITE_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
+      "GRANITE_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
+      "GRANITE_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
+      "GRANITE_AMIGENMANFST=${var.amigen9_package_manifest}",
+      "GRANITE_AMIGENMANFSTAL2023=${var.amigen9_package_manifest_al2023}",
+      "GRANITE_AMIGENPKGGRP=${local.amigen9_package_groups}",
+      "GRANITE_AMIGENREPOS=${local.amigen9_repo_names}",
+      "GRANITE_AMIGENREPOSRC=${local.amigen9_repo_sources}",
+      "GRANITE_AMIGENROOTNM=${var.amigen9_filesystem_label}",
+      "GRANITE_AMIGENSTORLAY=${local.amigen9_storage_layout}",
+      "GRANITE_AMIGENUEFIDEVLBL=${var.amigen9_uefi_dev_label}",
+      "GRANITE_AMIGENUEFIDEVSZ=${var.amigen9_uefi_dev_size}",
+      "GRANITE_AMIGENVGNAME=RootVG",
+      "GRANITE_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.granite_cfnbootstrap_source}",
+      "GRANITE_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
+      "GRANITE_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.granite_awscli_source}",
+      "GRANITE_CLOUDPROVIDER=aws",
+      "GRANITE_EXTRARPMS=${local.amigen9_extra_rpms}",
+      "GRANITE_FIPSDISABLE=${var.amigen_fips_disable}",
+      "GRANITE_GRUBTMOUT=${var.amigen_grub_timeout}",
+      "GRANITE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "GRANITE_USEROOTDEVICE=false",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     only = [
@@ -1359,28 +1359,28 @@ build {
   # Azure EL8 provisioners
   provisioner "shell" {
     environment_vars = [
-      "SPEL_AMIGENBRANCH=${var.amigen8_source_branch}",
-      "SPEL_AMIGENBUILDDEV=/dev/sda",
-      "SPEL_AMIGENCHROOT=/mnt/ec2-root",
-      "SPEL_AMIGENPKGGRP=${local.amigen8_package_groups}",
-      "SPEL_AMIGENREPOS=${local.amigen8_repo_names}",
-      "SPEL_AMIGENREPOSRC=${local.amigen8_repo_sources}",
-      "SPEL_AMIGEN8SOURCE=${var.amigen8_source_url}",
-      "SPEL_AMIGENSTORLAY=${local.amigen8_storage_layout}",
-      "SPEL_AMIGENVGNAME=VolGroup00",
-      "SPEL_AMIUTILSSOURCE=${var.amigen_amiutils_source_url}",
-      "SPEL_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.spel_cfnbootstrap_source}",
-      "SPEL_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "SPEL_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.spel_awscli_source}",
-      "SPEL_BOOTLABEL=/boot",
-      "SPEL_BUILDDEPS=lvm2 parted yum-utils unzip git",
-      "SPEL_BUILDNAME=${source.name}",
-      "SPEL_CLOUDPROVIDER=azure",
-      "SPEL_EXTRARPMS=${local.amigen8_extra_rpms}",
-      "SPEL_FIPSDISABLE=${var.amigen_fips_disable}",
-      "SPEL_GRUBTMOUT=${var.amigen_grub_timeout}",
-      "SPEL_HTTP_PROXY=${var.spel_http_proxy}",
-      "SPEL_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "GRANITE_AMIGENBRANCH=${var.amigen8_source_branch}",
+      "GRANITE_AMIGENBUILDDEV=/dev/sda",
+      "GRANITE_AMIGENCHROOT=/mnt/ec2-root",
+      "GRANITE_AMIGENPKGGRP=${local.amigen8_package_groups}",
+      "GRANITE_AMIGENREPOS=${local.amigen8_repo_names}",
+      "GRANITE_AMIGENREPOSRC=${local.amigen8_repo_sources}",
+      "GRANITE_AMIGEN8SOURCE=${var.amigen8_source_url}",
+      "GRANITE_AMIGENSTORLAY=${local.amigen8_storage_layout}",
+      "GRANITE_AMIGENVGNAME=VolGroup00",
+      "GRANITE_AMIUTILSSOURCE=${var.amigen_amiutils_source_url}",
+      "GRANITE_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.granite_cfnbootstrap_source}",
+      "GRANITE_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
+      "GRANITE_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.granite_awscli_source}",
+      "GRANITE_BOOTLABEL=/boot",
+      "GRANITE_BUILDDEPS=lvm2 parted yum-utils unzip git",
+      "GRANITE_BUILDNAME=${source.name}",
+      "GRANITE_CLOUDPROVIDER=azure",
+      "GRANITE_EXTRARPMS=${local.amigen8_extra_rpms}",
+      "GRANITE_FIPSDISABLE=${var.amigen_fips_disable}",
+      "GRANITE_GRUBTMOUT=${var.amigen_grub_timeout}",
+      "GRANITE_HTTP_PROXY=${var.granite_http_proxy}",
+      "GRANITE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     only = [
@@ -1407,19 +1407,19 @@ build {
 
   # Common post-processors
   provisioner "file" {
-    destination = ".spel/${var.spel_version}/${var.spel_identifier}-${source.name}.${source.type}.manifest.txt"
+    destination = ".granite/${var.granite_version}/${var.granite_identifier}-${source.name}.${source.type}.manifest.txt"
     direction   = "download"
     source      = "/tmp/manifest.txt"
   }
 
   post-processor "artifice" {
     files = [
-      ".spel/${var.spel_version}/${var.spel_identifier}-${source.name}.${source.type}.manifest.txt",
+      ".granite/${var.granite_version}/${var.granite_identifier}-${source.name}.${source.type}.manifest.txt",
     ]
   }
 
   post-processor "manifest" {
-    output = ".spel/${var.spel_version}/packer-manifest.json"
+    output = ".granite/${var.granite_version}/packer-manifest.json"
   }
 }
 
@@ -1451,14 +1451,14 @@ build {
   }
 
   provisioner "file" {
-    destination = ".spel/${var.spel_version}/${var.spel_identifier}-${source.name}.vagrant.manifest.txt"
+    destination = ".granite/${var.granite_version}/${var.granite_identifier}-${source.name}.vagrant.manifest.txt"
     direction   = "download"
     source      = "/tmp/manifest.txt"
   }
 
   post-processor "artifice" {
     files = [
-      ".spel/${var.spel_version}/${var.spel_identifier}-${source.name}.vagrant.manifest.txt",
+      ".granite/${var.granite_version}/${var.granite_identifier}-${source.name}.vagrant.manifest.txt",
     ]
   }
 
@@ -1466,13 +1466,13 @@ build {
     post-processor "vagrant" {
       compression_level   = 9
       keep_input_artifact = false
-      output              = ".spel/${var.spel_version}/${var.spel_identifier}-${source.name}.box"
+      output              = ".granite/${var.granite_version}/${var.granite_identifier}-${source.name}.box"
     }
 
     post-processor "vagrant-cloud" {
-      box_tag             = "${var.virtualbox_vagrantcloud_username}/${var.spel_identifier}-${source.name}"
+      box_tag             = "${var.virtualbox_vagrantcloud_username}/${var.granite_identifier}-${source.name}"
       keep_input_artifact = false
-      version             = " ${var.spel_version} "
+      version             = " ${var.granite_version} "
       # Lookup the description template values using source.name
       version_description = format(
         local.description,
@@ -1484,7 +1484,7 @@ build {
   }
 
   post-processor "manifest" {
-    output = ".spel/${var.spel_version}/packer-manifest.json"
+    output = ".granite/${var.granite_version}/packer-manifest.json"
   }
 }
 

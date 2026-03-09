@@ -6,15 +6,15 @@
 #
 ##############################################################################
 PROGNAME="$(basename "$0")"
-AMIGENREPOS="${SPEL_AMIGENREPOS}"
-AMIGENREPOSRC="${SPEL_AMIGENREPOSRC}"
-AMIGENSOURCE="${SPEL_AMIGEN9SOURCE:-https://github.com/MetroStar/amigen9.git}"
-EXTRARPMS="${SPEL_EXTRARPMS}"
-HTTP_PROXY="${SPEL_HTTP_PROXY}"
-USEDEFAULTREPOS="${SPEL_USEDEFAULTREPOS:-true}"
+AMIGENREPOS="${GRANITE_AMIGENREPOS}"
+AMIGENREPOSRC="${GRANITE_AMIGENREPOSRC}"
+AMIGENSOURCE="${GRANITE_AMIGEN9SOURCE:-https://github.com/MetroStar/amigen9.git}"
+EXTRARPMS="${GRANITE_EXTRARPMS}"
+HTTP_PROXY="${GRANITE_HTTP_PROXY}"
+USEDEFAULTREPOS="${GRANITE_USEDEFAULTREPOS:-true}"
 
 
-read -r -a BUILDDEPS <<< "${SPEL_BUILDDEPS:-lvm2 yum-utils unzip git dosfstools python3-pip}"
+read -r -a BUILDDEPS <<< "${GRANITE_BUILDDEPS:-lvm2 yum-utils unzip git dosfstools python3-pip}"
 
 ELBUILD="/tmp/el-build"
 

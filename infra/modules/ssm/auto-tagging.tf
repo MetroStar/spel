@@ -1,7 +1,7 @@
 # =============================================================================
 # SSM Infrastructure Module — AMI Tag Auto-Propagation
 # =============================================================================
-# Automatically propagates StigPlatform and StigManaged tags from SPEL AMIs
+# Automatically propagates StigPlatform and StigManaged tags from Granite AMIs
 # to newly launched EC2 instances. This ensures that instances launched from
 # hardened AMIs are automatically targeted by State Manager associations for
 # STIG enforcement, compliance scanning, and inventory collection.
@@ -10,7 +10,7 @@
 #   EventBridge (instance running) → Lambda → EC2 CreateTags
 #
 # The EventBridge rule triggers on EC2 instance state changes to "running".
-# A Lambda function checks the instance's source AMI for SPEL tags
+# A Lambda function checks the instance's source AMI for Granite tags
 # (StigManaged=true) and copies StigPlatform + StigManaged to the instance.
 #
 # Gated by: var.enable_auto_tagging (default: true)
@@ -74,10 +74,10 @@ def handler(event, context):
 
         ami_tags = {t['Key']: t['Value'] for t in images['Images'][0].get('Tags', [])}
 
-        # Only tag instances launched from SPEL AMIs (StigManaged=true)
+        # Only tag instances launched from Granite AMIs (StigManaged=true)
         if ami_tags.get('StigManaged') != 'true':
-            logger.info("Instance %s not from SPEL AMI (AMI %s)", instance_id, image_id)
-            return {'status': 'not a SPEL AMI'}
+            logger.info("Instance %s not from Granite AMI (AMI %s)", instance_id, image_id)
+            return {'status': 'not a Granite AMI'}
 
         # Copy StigPlatform and StigManaged tags to the instance
         tags_to_copy = []
@@ -105,7 +105,7 @@ resource "aws_lambda_function" "tag_propagation" {
   count = var.enable_auto_tagging ? 1 : 0
 
   function_name    = "${var.name_prefix}-ami-tag-propagation"
-  description      = "Propagate StigPlatform and StigManaged tags from SPEL AMIs to instances"
+  description      = "Propagate StigPlatform and StigManaged tags from Granite AMIs to instances"
   role             = aws_iam_role.tag_propagation[0].arn
   handler          = "index.handler"
   runtime          = "python3.12"
@@ -187,7 +187,7 @@ resource "aws_cloudwatch_event_rule" "instance_launch" {
   count = var.enable_auto_tagging ? 1 : 0
 
   name        = "${var.name_prefix}-ami-tag-propagation"
-  description = "Propagate SPEL AMI tags to newly launched instances"
+  description = "Propagate Granite AMI tags to newly launched instances"
 
   event_pattern = jsonencode({
     source      = ["aws.ec2"]

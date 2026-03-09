@@ -1,7 +1,7 @@
 # =============================================================================
 # GitLab CI/CD — Infrastructure Management (OpenTofu)
 # =============================================================================
-# Manages all persistent SPEL AWS infrastructure via the consolidated
+# Manages all persistent Granite AWS infrastructure via the consolidated
 # OpenTofu root module at infra/.
 #
 # Included by .gitlab-ci.yml via:
@@ -13,7 +13,7 @@
 #   infra:create  — Apply OpenTofu to create/update infra (manual)
 #   infra:destroy — Destroy all OpenTofu-managed infra (manual)
 #
-# On air-gapped runners, tofu/aws/jq/zip are extracted from the spel-builder
+# On air-gapped runners, tofu/aws/jq/zip are extracted from the granite-builder
 # Docker image via infra/extract-tools.sh.
 # =============================================================================
 
@@ -72,7 +72,7 @@ infra:plan:
       echo "=== Plan Complete ==="
       echo "Run infra:create to apply these changes."
   tags:
-    - spel-offline-runner
+    - granite-offline-runner
   rules:
     - if: '$PLAN_INFRASTRUCTURE == "true"'
       when: manual
@@ -143,7 +143,7 @@ infra:create:
       $TF_CMD output
 
     # Upload STIG playbooks to S3 — extract roles from the Docker image
-    # (no internet access needed; roles are baked into spel-builder)
+    # (no internet access needed; roles are baked into granite-builder)
     - |
       S3_BUCKET=$($TF_CMD -chdir=infra output -raw s3_bucket_name 2>/dev/null || echo "")
       if [ -z "$S3_BUCKET" ]; then
@@ -153,12 +153,12 @@ infra:create:
 
         # Resolve the Docker image tag (set by import:docker stage)
         DOCKER_TAG=${DOCKER_IMAGE_TAG:-latest}
-        echo "Extracting roles from spel-builder:${DOCKER_TAG}"
+        echo "Extracting roles from granite-builder:${DOCKER_TAG}"
 
         # Extract Ansible Lockdown roles from the Docker image
-        ROLES_DIR="${CI_PROJECT_DIR}/spel/ansible/roles"
+        ROLES_DIR="${CI_PROJECT_DIR}/granite/ansible/roles"
         mkdir -p "$ROLES_DIR"
-        CID=$(docker create "spel-builder:${DOCKER_TAG}" /bin/true)
+        CID=$(docker create "granite-builder:${DOCKER_TAG}" /bin/true)
         for ROLE in RHEL8-STIG RHEL9-STIG; do
           docker cp "${CID}:/opt/ansible/roles/${ROLE}" "$ROLES_DIR/" 2>/dev/null && \
             echo "  [OK] Extracted ${ROLE}" || \
@@ -185,7 +185,7 @@ infra:create:
         echo "--- Packaging AL2023 STIG script ---"
         AL2023_STAGING=$(mktemp -d)
         # Extract the base64-encoded AWS STIG tarball from the Docker image
-        CID=$(docker create "spel-builder:${DOCKER_TAG}" /bin/true)
+        CID=$(docker create "granite-builder:${DOCKER_TAG}" /bin/true)
         docker cp "${CID}:/opt/offline-packages/LinuxAWSConfigureSTIG.tgz.b64" "$AL2023_STAGING/" 2>/dev/null && \
           echo "  [OK] Extracted LinuxAWSConfigureSTIG.tgz.b64" || \
           { echo "  [ERROR] LinuxAWSConfigureSTIG.tgz.b64 not found in image"; docker rm "$CID" > /dev/null; exit 1; }
@@ -224,7 +224,7 @@ infra:create:
       dotenv: infra.env
     expire_in: 90 days
   tags:
-    - spel-offline-runner
+    - granite-offline-runner
   rules:
     - if: '$CREATE_INFRASTRUCTURE == "true"'
       when: manual
@@ -259,7 +259,7 @@ infra:destroy:
 
       echo ""
       echo "=== Destroying All Infrastructure ==="
-      echo "WARNING: This will remove ALL OpenTofu-managed SPEL resources."
+      echo "WARNING: This will remove ALL OpenTofu-managed Granite resources."
       echo ""
 
       $TF_CMD destroy -auto-approve -input=false
@@ -267,7 +267,7 @@ infra:destroy:
       echo ""
       echo "=== All Infrastructure Destroyed ==="
   tags:
-    - spel-offline-runner
+    - granite-offline-runner
   rules:
     - if: '$DESTROY_INFRASTRUCTURE == "true"'
       when: manual

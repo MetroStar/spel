@@ -1,9 +1,9 @@
-# Dockerfile for SPEL build environment
+# Dockerfile for Granite build environment
 # Base: Rocky Linux 9 Iron Bank (hardened, minimal image)
 # Uses multi-stage build to keep final image small (~305 MB compressed)
 #
 # Build:
-#   docker build -t spel-builder:$(date +%Y%m%d) .
+#   docker build -t granite-builder:$(date +%Y%m%d) .
 #
 # Run with bind-mounted repository:
 #   docker run --rm \
@@ -12,11 +12,11 @@
 #     -e AWS_SECRET_ACCESS_KEY \
 #     -e AWS_SESSION_TOKEN \
 #     -e AWS_DEFAULT_REGION=us-east-1 \
-#     -e SPEL_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \
-#     -e SPEL_VERSION=2025.01.1 \
-#     -e SPEL_IDENTIFIER=spel \
+#     -e GRANITE_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \
+#     -e GRANITE_VERSION=2025.01.1 \
+#     -e GRANITE_IDENTIFIER=granite \
 #     -e WINDOWS_BUILDERS="" \
-#     spel-builder:$(date +%Y%m%d) make -f Makefile.spel build
+#     granite-builder:$(date +%Y%m%d) make -f Makefile.granite build
 
 # =============================================================================
 # Stage 1: Builder - Install all dependencies
@@ -34,7 +34,7 @@ ENV PACKER_VERSION=${PACKER_VERSION} \
     PACKER_PLUGIN_PATH=/opt/packer/plugins \
     ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections \
     ANSIBLE_ROLES_PATH=/opt/ansible/roles \
-    SPEL_OFFLINE_PACKAGES=/opt/offline-packages \
+    GRANITE_OFFLINE_PACKAGES=/opt/offline-packages \
     AMIGEN8_PATH=/opt/amigen8 \
     AMIGEN9_PATH=/opt/amigen9
 
@@ -173,9 +173,9 @@ RUN mkdir -p ${ANSIBLE_ROLES_PATH} \
 # =============================================================================
 # Download offline packages
 # =============================================================================
-RUN mkdir -p ${SPEL_OFFLINE_PACKAGES} \
+RUN mkdir -p ${GRANITE_OFFLINE_PACKAGES} \
     && echo "=== Downloading offline packages ===" \
-    && cd ${SPEL_OFFLINE_PACKAGES} \
+    && cd ${GRANITE_OFFLINE_PACKAGES} \
     # AWS CLI v2
     && curl -fsSL -o awscli-exe-linux-x86_64.zip \
         "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
@@ -198,8 +198,8 @@ RUN mkdir -p ${SPEL_OFFLINE_PACKAGES} \
     && echo "Base64 encoded AWS STIG Script ($(stat -c%s LinuxAWSConfigureSTIG.tgz.b64) bytes)" \
     && rm LinuxAWSConfigureSTIG.tgz \
     && echo "Offline packages:" \
-    && ls -lh ${SPEL_OFFLINE_PACKAGES} \
-    && du -sh ${SPEL_OFFLINE_PACKAGES}
+    && ls -lh ${GRANITE_OFFLINE_PACKAGES} \
+    && du -sh ${GRANITE_OFFLINE_PACKAGES}
 
 # =============================================================================
 # Download Python wheels for EC2 offline Ansible installation
@@ -253,7 +253,7 @@ RUN echo "=== Baked-in AMIgen scripts ===" \
 # =============================================================================
 RUN echo "=== Installing AWS CLI v2 ===" \
     && cd /tmp \
-    && unzip -q ${SPEL_OFFLINE_PACKAGES}/awscli-exe-linux-x86_64.zip \
+    && unzip -q ${GRANITE_OFFLINE_PACKAGES}/awscli-exe-linux-x86_64.zip \
     && ./aws/install --install-dir /opt/aws-cli --bin-dir /usr/local/bin \
     && rm -rf /tmp/aws \
     && aws --version
@@ -278,7 +278,7 @@ RUN cat > /opt/entrypoint.sh << 'EOF'
 #!/bin/bash
 set -e
 
-echo "=== SPEL Build Container ==="
+echo "=== Granite Build Container ==="
 echo "Packer: $(packer version | head -1)"
 echo "OpenTofu: $(tofu version 2>/dev/null | head -1 || echo 'not available')"
 echo "Ansible: $(ansible --version | head -1)"
@@ -292,13 +292,13 @@ CI_ENVIRONMENT="local"
 if [ "${GITHUB_ACTIONS}" = "true" ]; then
     CI_ENVIRONMENT="GitHub Actions"
     # GitHub Actions mounts to /github/workspace by default
-    if [ -d "/github/workspace" ] && [ -f "/github/workspace/Makefile.spel" ]; then
+    if [ -d "/github/workspace" ] && [ -f "/github/workspace/Makefile.granite" ]; then
         WORKSPACE="/github/workspace"
     fi
 elif [ "${GITLAB_CI}" = "true" ]; then
     CI_ENVIRONMENT="GitLab CI"
     # GitLab CI uses CI_PROJECT_DIR
-    if [ -n "${CI_PROJECT_DIR}" ] && [ -f "${CI_PROJECT_DIR}/Makefile.spel" ]; then
+    if [ -n "${CI_PROJECT_DIR}" ] && [ -f "${CI_PROJECT_DIR}/Makefile.granite" ]; then
         WORKSPACE="${CI_PROJECT_DIR}"
     fi
 elif [ -n "${JENKINS_URL}" ]; then
@@ -311,7 +311,7 @@ echo ""
 
 # =============================================================================
 # Set AWS region for Packer
-# Makefile.spel expects PKR_VAR_aws_region or AWS_REGION (not AWS_DEFAULT_REGION)
+# Makefile.granite expects PKR_VAR_aws_region or AWS_REGION (not AWS_DEFAULT_REGION)
 # =============================================================================
 if [ -z "${PKR_VAR_aws_region}" ]; then
     if [ -n "${AWS_REGION}" ]; then
@@ -324,9 +324,9 @@ fi
 
 # Show environment configuration
 echo "Environment:"
-echo "  SPEL_IDENTIFIER: ${SPEL_IDENTIFIER:-not set}"
-echo "  SPEL_VERSION: ${SPEL_VERSION:-not set}"
-echo "  SPEL_BUILDERS: ${SPEL_BUILDERS:-not set}"
+echo "  GRANITE_IDENTIFIER: ${GRANITE_IDENTIFIER:-not set}"
+echo "  GRANITE_VERSION: ${GRANITE_VERSION:-not set}"
+echo "  GRANITE_BUILDERS: ${GRANITE_BUILDERS:-not set}"
 echo "  WINDOWS_BUILDERS: ${WINDOWS_BUILDERS:-not set}"
 echo "  AWS_REGION: ${AWS_REGION:-not set}"
 echo "  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-not set}"
@@ -338,7 +338,7 @@ echo "Baked-in Dependencies:"
 echo "  Packer plugins: ${PACKER_PLUGIN_PATH}"
 echo "  Ansible collections: ${ANSIBLE_COLLECTIONS_PATH}"
 echo "  Ansible roles: ${ANSIBLE_ROLES_PATH}"
-echo "  Offline packages: ${SPEL_OFFLINE_PACKAGES}"
+echo "  Offline packages: ${GRANITE_OFFLINE_PACKAGES}"
 echo "  Python wheels (for EC2): ${PYTHON_DEPS_PATH}"
 echo "  Collection tarballs (for EC2): ${ANSIBLE_COLLECTIONS_TARBALLS}"
 echo "  AMIgen8 scripts: ${AMIGEN8_PATH}"
@@ -369,19 +369,19 @@ esac
 
 # Check if workspace is mounted (skip for version/help commands)
 if [ "${SKIP_WORKSPACE_CHECK}" = "false" ]; then
-    if [ ! -f "${WORKSPACE}/Makefile.spel" ]; then
-        echo "ERROR: Makefile.spel not found in ${WORKSPACE}"
+    if [ ! -f "${WORKSPACE}/Makefile.granite" ]; then
+        echo "ERROR: Makefile.granite not found in ${WORKSPACE}"
         echo ""
         echo "Mount your repository to ${WORKSPACE}:"
-        echo "  docker run -v \$(pwd):/workspace spel-builder make -f Makefile.spel build"
+        echo "  docker run -v \$(pwd):/workspace granite-builder make -f Makefile.granite build"
         exit 1
     fi
 
     # =============================================================================
     # Symlink baked-in Ansible roles to workspace location
-    # Packer templates expect roles at spel/ansible/roles/<ROLE_NAME>
+    # Packer templates expect roles at granite/ansible/roles/<ROLE_NAME>
     # =============================================================================
-    ROLES_DEST="${WORKSPACE}/spel/ansible/roles"
+    ROLES_DEST="${WORKSPACE}/granite/ansible/roles"
     if [ -d "${ANSIBLE_ROLES_PATH}" ] && [ -d "${ROLES_DEST}" ]; then
         echo "Symlinking baked-in Ansible roles to workspace..."
         for role in "${ANSIBLE_ROLES_PATH}"/*; do
@@ -421,9 +421,9 @@ if [ "${SKIP_WORKSPACE_CHECK}" = "false" ]; then
 
     # =============================================================================
     # Symlink/copy baked-in Ansible collection tarballs to workspace location
-    # Packer file provisioner uploads spel/ansible/collections/ to EC2
+    # Packer file provisioner uploads granite/ansible/collections/ to EC2
     # =============================================================================
-    COLLECTIONS_DEST="${WORKSPACE}/spel/ansible/collections"
+    COLLECTIONS_DEST="${WORKSPACE}/granite/ansible/collections"
     if [ -d "${ANSIBLE_COLLECTIONS_TARBALLS}" ]; then
         echo "Populating Ansible collection tarballs in workspace..."
         mkdir -p "${COLLECTIONS_DEST}"
@@ -487,7 +487,7 @@ FROM registry1.dso.mil/ironbank/opensource/rockylinux/rockylinux9-minimal:9.7-mi
 ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
     ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections \
     ANSIBLE_ROLES_PATH=/opt/ansible/roles \
-    SPEL_OFFLINE_PACKAGES=/opt/offline-packages \
+    GRANITE_OFFLINE_PACKAGES=/opt/offline-packages \
     PYTHON_DEPS_PATH=/opt/python-deps \
     ANSIBLE_COLLECTIONS_TARBALLS=/opt/ansible-collections-tarballs \
     AMIGEN8_PATH=/opt/amigen8 \
@@ -620,9 +620,9 @@ WORKDIR ${WORKSPACE}
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command
-CMD ["make", "-f", "Makefile.spel", "build"]
+CMD ["make", "-f", "Makefile.granite", "build"]
 
 # Labels
-LABEL org.opencontainers.image.title="SPEL Builder" \
-      org.opencontainers.image.description="Build environment for SPEL AMIs with offline dependencies" \
-      org.opencontainers.image.source="https://github.com/MetroStar/spel"
+LABEL org.opencontainers.image.title="Granite Builder" \
+      org.opencontainers.image.description="Build environment for Granite AMIs with offline dependencies" \
+      org.opencontainers.image.source="https://github.com/MetroStar/granite"

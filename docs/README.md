@@ -1,4 +1,4 @@
-# SPEL Documentation Index
+# Granite Documentation Index
 
 Quick reference to all project documentation.
 

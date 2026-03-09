@@ -22,26 +22,26 @@ variable "packer_version" {
   default = ""
 }
 
-variable "spel_ci" {
+variable "granite_ci" {
   type    = bool
   default = false
 }
 
-variable "spel_identifier" {
+variable "granite_identifier" {
   type = string
 }
 
-variable "spel_repo_commit" {
+variable "granite_repo_commit" {
   type    = string
   default = "master"
 }
 
-variable "spel_repo_url" {
+variable "granite_repo_url" {
   type    = string
-  default = "https://github.com/MetroStar/spel.git"
+  default = "https://github.com/MetroStar/granite.git"
 }
 
-variable "spel_version" {
+variable "granite_version" {
   type = string
 }
 
@@ -60,7 +60,7 @@ variable "virtualbox_iso_url_centos9stream" {
 }
 
 source "amazon-ebs" "ubuntu" {
-  ami_name                    = "builder-${var.spel_identifier}-vagrant-${var.spel_version}.x86_64-gp3"
+  ami_name                    = "builder-${var.granite_identifier}-vagrant-${var.granite_version}.x86_64-gp3"
   associate_public_ip_address = true
   communicator                = "ssh"
   force_deregister            = true
@@ -97,24 +97,24 @@ build {
     environment_vars = [
       "PACKER_NO_COLOR=1",
       "PACKER_VERSION=${var.packer_version}",
-      "SPEL_CI=${var.spel_ci}",
-      "SPEL_IDENTIFIER=${var.spel_identifier}",
-      "SPEL_REPO_COMMIT=${var.spel_repo_commit}",
-      "SPEL_REPO_URL=${var.spel_repo_url}",
-      "SPEL_VERSION=${var.spel_version}",
+      "GRANITE_CI=${var.granite_ci}",
+      "GRANITE_IDENTIFIER=${var.granite_identifier}",
+      "GRANITE_REPO_COMMIT=${var.granite_repo_commit}",
+      "GRANITE_REPO_URL=${var.granite_repo_url}",
+      "GRANITE_VERSION=${var.granite_version}",
       "VAGRANT_CLOUD_TOKEN=${var.vagrant_cloud_token}",
       "VAGRANT_CLOUD_USER=${var.vagrant_cloud_user}",
       "VIRTUALBOX_ISO_URL_CENTOS9STREAM=${var.virtualbox_iso_url_centos9stream}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     scripts = [
-      "${path.root}/build-spel-vagrant.sh",
+      "${path.root}/build-granite-vagrant.sh",
     ]
   }
 
   provisioner "file" {
-    destination = ".spel/"
+    destination = ".granite/"
     direction   = "download"
-    source      = "/tmp/spel/.spel/${var.spel_version}/"
+    source      = "/tmp/granite/.granite/${var.granite_version}/"
   }
 }

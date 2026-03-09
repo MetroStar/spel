@@ -1,6 +1,6 @@
 # CI/CD Setup Guide
 
-This guide covers the CI/CD pipeline configuration for SPEL (STIG-Partitioned Enterprise Linux) AMI builds using Docker containers with baked-in dependencies.
+This guide covers the CI/CD pipeline configuration for Granite (STIG-Partitioned Enterprise Linux) AMI builds using Docker containers with baked-in dependencies.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This guide covers the CI/CD pipeline configuration for SPEL (STIG-Partitioned En
 
 ## Overview
 
-The SPEL CI/CD pipeline uses a **Docker-based build system** where all dependencies are baked into a portable container image. This approach offers several advantages:
+The Granite CI/CD pipeline uses a **Docker-based build system** where all dependencies are baked into a portable container image. This approach offers several advantages:
 
 1. **Portability**: The Docker image can be exported and transferred to air-gapped environments
 2. **Reproducibility**: All builds use identical dependency versions
@@ -43,7 +43,7 @@ The SPEL CI/CD pipeline uses a **Docker-based build system** where all dependenc
 │  │  3. Export as gzipped tarball                                        │   │
 │  │  4. Upload artifact (30-day retention)                               │   │
 │  │                                                                      │   │
-│  │  Output: spel-builder-YYYYMMDD.tar.gz (~305 MB)                      │   │
+│  │  Output: granite-builder-YYYYMMDD.tar.gz (~305 MB)                      │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                               │                                              │
 │                               ▼                                              │
@@ -86,7 +86,7 @@ The SPEL CI/CD pipeline uses a **Docker-based build system** where all dependenc
 
 ### Docker Image Contents
 
-The `spel-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes:
+The `granite-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes:
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
@@ -381,8 +381,8 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
         "s3:ListBucketVersions"
       ],
       "Resource": [
-        "arn:*:s3:::spel-*",
-        "arn:*:s3:::spel-*/*"
+        "arn:*:s3:::granite-*",
+        "arn:*:s3:::granite-*/*"
       ]
     },
     {
@@ -396,7 +396,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
         "dynamodb:DeleteItem",
         "dynamodb:TagResource"
       ],
-      "Resource": "arn:*:dynamodb:*:*:table/spel-*"
+      "Resource": "arn:*:dynamodb:*:*:table/granite-*"
     },
     {
       "Sid": "TofuCloudWatch",
@@ -482,7 +482,7 @@ The OpenTofu root module at `infra/` creates an instance profile with minimal pe
 
 - **SSM Access**: For Session Manager connectivity (if using SSH via SSM)
 - **S3 Access**: To AWS-managed SSM buckets for agent operation
-- **S3 Build Artifacts**: `s3:GetObject` and `s3:ListBucket` on the SPEL SSM bucket for downloading build artifacts (STIG playbooks, AL2023 STIG scripts) during AMI builds
+- **S3 Build Artifacts**: `s3:GetObject` and `s3:ListBucket` on the Granite SSM bucket for downloading build artifacts (STIG playbooks, AL2023 STIG scripts) during AMI builds
 - **CloudWatch Logs**: For optional logging
 
 These are created automatically when you run the `infra:create` job (GitLab) or when `build.yml` calls `infra-setup.yml` (GitHub Actions).
@@ -537,7 +537,7 @@ EOF
 
 # Replace placeholders
 sed -i 's/ACCOUNT_ID/123456789012/' trust-policy.json
-sed -i 's|OWNER/REPO|MetroStar/spel|' trust-policy.json
+sed -i 's|OWNER/REPO|MetroStar/granite|' trust-policy.json
 
 # Create the role
 aws iam create-role \
@@ -593,7 +593,7 @@ git submodule update --init --recursive
 
 **File**: `.github/workflows/offline-prepare.yml`
 
-**Purpose**: Build the SPEL Docker image with all dependencies baked in and export it as a portable tarball artifact.
+**Purpose**: Build the Granite Docker image with all dependencies baked in and export it as a portable tarball artifact.
 
 #### Trigger
 
@@ -620,7 +620,7 @@ on:
 
 3. **Build Docker image**
    - Uses `docker buildx` for efficient caching
-   - Tags image as `spel-builder:YYYYMMDD` and `spel-builder:latest`
+   - Tags image as `granite-builder:YYYYMMDD` and `granite-builder:latest`
    - Multi-stage build keeps final image size minimal
 
 4. **Verify Docker image**
@@ -635,7 +635,7 @@ on:
 6. **Upload artifact**
    - Uploads tarball, checksum, and manifest
    - 30-day retention period
-   - Artifact name: `spel-builder-YYYYMMDD`
+   - Artifact name: `granite-builder-YYYYMMDD`
 
 #### Usage
 
@@ -648,10 +648,10 @@ on:
 #### Output Artifact Contents
 
 ```
-spel-builder-YYYYMMDD/
-├── spel-builder-YYYYMMDD.tar.gz       # Docker image tarball (~305 MB)
-├── spel-builder-YYYYMMDD.tar.gz.sha256 # SHA256 checksum
-└── spel-builder-YYYYMMDD-manifest.txt  # Build manifest with tool versions
+granite-builder-YYYYMMDD/
+├── granite-builder-YYYYMMDD.tar.gz       # Docker image tarball (~305 MB)
+├── granite-builder-YYYYMMDD.tar.gz.sha256 # SHA256 checksum
+└── granite-builder-YYYYMMDD-manifest.txt  # Build manifest with tool versions
 ```
 
 ### Workflow 2: Build STIGed AMIs
@@ -665,7 +665,7 @@ spel-builder-YYYYMMDD/
 Before running this workflow:
 
 1. Run the `offline-prepare.yml` workflow first
-2. Note the artifact name (e.g., `spel-builder-20251230`)
+2. Note the artifact name (e.g., `granite-builder-20251230`)
 3. Ensure IAM role has `MaxSessionDuration >= 21600`
 
 #### Trigger
@@ -675,7 +675,7 @@ on:
   workflow_dispatch:
     inputs:
       docker_image_artifact:
-        description: "Docker image artifact name (e.g., spel-builder-20251231)"
+        description: "Docker image artifact name (e.g., granite-builder-20251231)"
         required: true
         type: string
       run_amzn2023:
@@ -763,7 +763,7 @@ on:
      - Repository mounted at `/workspace`
      - AWS credentials passed via environment variables
      - Build configuration via environment variables
-   - Executes `make -f Makefile.spel build`
+   - Executes `make -f Makefile.granite build`
 
 #### Usage
 
@@ -819,7 +819,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 |----------|-------------|---------|
 | `AWS_ACCESS_KEY_ID` | AWS access key | `AKIA...` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | `secret` |
-| `DOCKER_IMAGE_PATH` | Path to Docker tarball | `/transfer/spel-builder-*.tar.gz` |
+| `DOCKER_IMAGE_PATH` | Path to Docker tarball | `/transfer/granite-builder-*.tar.gz` |
 
 #### Optional Variables
 
@@ -830,7 +830,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | `PKR_VAR_aws_vpc_id` | VPC ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_kms_key_id` | KMS key ARN for CMK-encrypted AMIs | (none) |
-| `INFRA_PREFIX` | Prefix for created resources | `spel` |
+| `INFRA_PREFIX` | Prefix for created resources | `granite` |
 | `ENABLE_INTERNET_GATEWAY` | Create IGW and default route (`false` for air-gapped) | `true` |
 | `ENABLE_PACKER_ENDPOINTS` | Create EC2 + STS VPC endpoints (`true` for air-gapped) | `false` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
@@ -855,7 +855,7 @@ These variables configure Linux builds to use local repository mirrors instead o
 | `AMIGEN9_EXTRA_RPMS` | JSON array of extra RPMs for EL9 | (none) |
 | `PKR_VAR_amigen8_repo_sources` | JSON array of EL8 repo source RPM URLs | (none) |
 | `PKR_VAR_amigen9_repo_sources` | JSON array of EL9 repo source RPM URLs | (none) |
-| `SPEL_GOSS_BINARY_URL` | URL to Goss binary for air-gapped STIG audit scans | (none) |
+| `GRANITE_GOSS_BINARY_URL` | URL to Goss binary for air-gapped STIG audit scans | (none) |
 
 > **Important**: For air-gapped Linux builds, you must create a repo configuration RPM
 > that installs your mirror settings into the chroot. See [Air-Gapped Linux Builds](#air-gapped-linux-builds).
@@ -868,11 +868,11 @@ These variables configure Linux builds to use local repository mirrors instead o
 
 ```bash
 # On transfer workstation
-# Download artifact from GitHub Actions (spel-builder-YYYYMMDD.tar.gz)
+# Download artifact from GitHub Actions (granite-builder-YYYYMMDD.tar.gz)
 # Transfer to air-gapped environment
 
 # Place tarball in accessible location
-cp spel-builder-*.tar.gz /transfer/
+cp granite-builder-*.tar.gz /transfer/
 ```
 
 **Step 2: Run import job**
@@ -922,8 +922,8 @@ import:docker:
     - gunzip -c "${TARBALL}" | docker load
     
     # Verify image
-    - docker run --rm "spel-builder:${TAG}" packer version
-    - docker run --rm "spel-builder:${TAG}" ansible --version
+    - docker run --rm "granite-builder:${TAG}" packer version
+    - docker run --rm "granite-builder:${TAG}" ansible --version
 ```
 
 #### infra:create
@@ -959,9 +959,9 @@ build:rhel9:
         -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
         -e AWS_DEFAULT_REGION="${PKR_VAR_aws_region}" \
         -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
-        -e SPEL_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
-        "spel-builder:${DOCKER_IMAGE_TAG}" \
-        make -f Makefile.spel build
+        -e GRANITE_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
+        "granite-builder:${DOCKER_IMAGE_TAG}" \
+        make -f Makefile.granite build
 ```
 
 > **Note**: The workflow automatically sets `PKR_VAR_aws_ami_regions` to include the build region.
@@ -978,7 +978,7 @@ build:rhel9:
 **Solution**:
 ```bash
 # Verify tarball location
-ls -lh /transfer/spel-builder-*.tar.gz
+ls -lh /transfer/granite-builder-*.tar.gz
 
 # Ensure DOCKER_IMAGE_PATH variable matches actual path
 echo $DOCKER_IMAGE_PATH
@@ -996,8 +996,8 @@ echo $DOCKER_IMAGE_PATH
 # Re-transfer the tarball from GitHub Actions artifact
 
 # Verify checksum manually
-sha256sum spel-builder-*.tar.gz
-cat spel-builder-*.tar.gz.sha256
+sha256sum granite-builder-*.tar.gz
+cat granite-builder-*.tar.gz.sha256
 ```
 
 #### AWS Credentials Expire During Build
@@ -1027,7 +1027,7 @@ docker run --rm \
   -e AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY \
   -e AWS_SESSION_TOKEN \
-  spel-builder:latest aws sts get-caller-identity
+  granite-builder:latest aws sts get-caller-identity
 
 # Ensure all three variables are exported before running
 export AWS_ACCESS_KEY_ID="..."
@@ -1074,7 +1074,7 @@ docker run -it --rm \
   -v "$(pwd):/workspace" \
   -e AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY \
-  spel-builder:latest /bin/bash
+  granite-builder:latest /bin/bash
 
 # Inside container:
 packer version
@@ -1093,7 +1093,7 @@ docker run --rm \
   -v "$(pwd):/workspace" \
   -e PACKER_LOG=1 \
   -e PACKER_LOG_PATH=/workspace/packer.log \
-  spel-builder:latest make -f Makefile.spel build
+  granite-builder:latest make -f Makefile.granite build
 
 # Review log file
 cat packer.log
@@ -1136,7 +1136,7 @@ configuration RPM.
 
 ### Understanding the Build Process
 
-The SPEL build creates a chroot environment at `/mnt/ec2-root` where the AMI filesystem is built.
+The Granite build creates a chroot environment at `/mnt/ec2-root` where the AMI filesystem is built.
 This chroot is completely separate from the builder host and does **not** inherit repository
 configurations. The `OSpackages.sh` script:
 
@@ -1280,6 +1280,6 @@ The environment variable is not reaching the build script. Check that:
   - `.github/workflows/build.yml`
 - **GitLab CI Configuration**: `.gitlab-ci.yml`
 - **Build Script**: `build/build.sh`
-- **Makefile**: `Makefile.spel`
+- **Makefile**: `Makefile.granite`
 - **Quick Reference**: `docs/QUICK-REFERENCE-Optimization.md`
 - **Storage Optimization**: `docs/Storage-Optimization.md`

@@ -119,33 +119,33 @@ echo "==========STARTING BUILD=========="
 
 ANSIBLE_LOCKDOWNS=""
 
-if [[ -n "$SPEL_BUILDERS" ]]; then
+if [[ -n "$GRANITE_BUILDERS" ]]; then
     FAILED_BUILDS=()
     SUCCESS_BUILDS=()
 
-    packer init spel/minimal-linux.pkr.hcl
+    packer init granite/minimal-linux.pkr.hcl
 
     packer validate \
-        -only "${SPEL_BUILDERS:?}" \
-        -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-        -var "spel_version=${SPEL_VERSION:?}" \
-        spel/minimal-linux.pkr.hcl
+        -only "${GRANITE_BUILDERS:?}" \
+        -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
+        -var "granite_version=${GRANITE_VERSION:?}" \
+        granite/minimal-linux.pkr.hcl
 
     build_packer_templates() {
         packer build \
-            -only "${SPEL_BUILDERS:?}" \
-            -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-            -var "spel_version=${SPEL_VERSION:?}" \
+            -only "${GRANITE_BUILDERS:?}" \
+            -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
+            -var "granite_version=${GRANITE_VERSION:?}" \
             -var "aws_ami_groups=[]" \
-            spel/minimal-linux.pkr.hcl
+            granite/minimal-linux.pkr.hcl
 
         BUILDEXIT=$?
 
         FAILED_BUILDS=()
 
-        for BUILDER in ${SPEL_BUILDERS//,/ }; do
+        for BUILDER in ${GRANITE_BUILDERS//,/ }; do
             BUILD_NAME="${BUILDER//*./}"
-            AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
+            AMI_NAME="${GRANITE_IDENTIFIER}-${BUILD_NAME}-${GRANITE_VERSION}.x86_64-gp3"
             BUILDER_ENV="${BUILDER//[.-]/_}"
             BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text)
             if [[ "$BUILDER_AMI" == "None" ]]
@@ -179,19 +179,19 @@ if [[ -n "$WINDOWS_BUILDERS" ]]; then
     fi
 fi
 
-packer init spel/hardened-linux.pkr.hcl
+packer init granite/hardened-linux.pkr.hcl
 
 packer validate \
     -only "${ANSIBLE_LOCKDOWNS}" \
-    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-    -var "spel_version=${SPEL_VERSION:?}" \
-    spel/hardened-linux.pkr.hcl
+    -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
+    -var "granite_version=${GRANITE_VERSION:?}" \
+    granite/hardened-linux.pkr.hcl
 
 packer build \
     -only "${ANSIBLE_LOCKDOWNS}" \
-    -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
-    -var "spel_version=${SPEL_VERSION:?}" \
-    spel/hardened-linux.pkr.hcl
+    -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
+    -var "granite_version=${GRANITE_VERSION:?}" \
+    granite/hardened-linux.pkr.hcl
 
 LOCKEXIT=$?
 

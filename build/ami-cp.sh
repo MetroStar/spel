@@ -236,7 +236,7 @@ import_ami() {
 IFS=' ' read -r -a SUCCESS_BUILDS_ARRAY <<< "${SUCCESS_BUILDS}"
 for BUILDER in "${SUCCESS_BUILDS_ARRAY[@]}"; do
     BUILD_NAME="${BUILDER//*./}"
-    AMI_NAME="${SPEL_IDENTIFIER}-${BUILD_NAME}-${SPEL_VERSION}.x86_64-gp3"
+    AMI_NAME="${GRANITE_IDENTIFIER}-${BUILD_NAME}-${GRANITE_VERSION}.x86_64-gp3"
     BUILDER_ENV="${BUILDER//[.-]/_}"
     BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text --profile commercial)
 

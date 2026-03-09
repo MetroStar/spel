@@ -23,7 +23,7 @@ locals {
 
 resource "aws_iam_role" "packer_builder" {
   name                 = "${var.name_prefix}-packer-builder-role"
-  description          = "Role for SPEL Packer builder EC2 instances"
+  description          = "Role for Granite Packer builder EC2 instances"
   max_session_duration = 21600 # 6 hours
 
   assume_role_policy = jsonencode({

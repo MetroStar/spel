@@ -1,7 +1,7 @@
-# SPEL Infrastructure — Root Module
+# Granite Infrastructure — Root Module
 
 OpenTofu root module that provisions all AWS infrastructure required for
-[SPEL](../README.md) AMI builds. A single `tofu apply` stands up
+[Granite](../README.md) AMI builds. A single `tofu apply` stands up
 networking, IAM, and Systems Manager (SSM) resources; a single
 `tofu destroy` tears everything down.
 
@@ -52,14 +52,14 @@ DynamoDB lock table, then generates a `backend.tf` file:
 
 ```bash
 cd infra/
-source bootstrap-backend.sh --prefix spel --region us-east-1
+source bootstrap-backend.sh --prefix granite --region us-east-1
 ```
 
 Override defaults with flags:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--prefix` | `spel-offline` | Resource-name prefix |
+| `--prefix` | `granite-offline` | Resource-name prefix |
 | `--region` | `$AWS_DEFAULT_REGION` or `us-east-1` | AWS region |
 | `--bucket` | `${PREFIX}-ssm-tfstate-${ACCOUNT_ID}` | S3 bucket name |
 | `--table` | `${PREFIX}-ssm-tflock` | DynamoDB table name |
@@ -72,8 +72,8 @@ values manually.
 
 ```bash
 tofu init
-tofu plan -var name_prefix=spel
-tofu apply -var name_prefix=spel
+tofu plan -var name_prefix=granite
+tofu apply -var name_prefix=granite
 ```
 
 ### 3. Use Outputs in Packer Builds
@@ -109,7 +109,7 @@ export INSTANCE_PROFILE=$(tofu output -raw instance_profile_name)
 | `create_kms_key` | `bool` | `true` | Create a new KMS CMK for SSM encryption |
 | `kms_key_arn` | `string` | `""` | ARN of an existing KMS key (when `create_kms_key = false`) |
 | `alert_email` | `string` | `""` | Email for SNS alert notifications (empty = skip subscription) |
-| `tags` | `map(string)` | `{}` | Additional tags merged with `Project=SPEL` and `ManagedBy=opentofu` |
+| `tags` | `map(string)` | `{}` | Additional tags merged with `Project=GRANITE` and `ManagedBy=opentofu` |
 
 ## Outputs
 
@@ -136,10 +136,10 @@ To run Packer builds without an Internet Gateway, disable the IGW and
 enable VPC endpoints for all AWS API traffic:
 
 ```hcl
-module "spel_infra" {
+module "granite_infra" {
   source = "./infra"
 
-  name_prefix             = "spel"
+  name_prefix             = "granite"
   public_subnet           = false
   enable_internet_gateway = false
   enable_packer_endpoints = true     # EC2 + STS endpoints
@@ -198,4 +198,4 @@ and required security-group rules.
   guide for provisioning all SSM resources without OpenTofu (air-gapped)
 - [CI/CD Setup](../docs/CI-CD-Setup.md) — CodeBuild / GitLab CI
   pipeline configuration and IAM requirements
-- [SPEL README](../README.md) — project overview and AMI build process
+- [Granite README](../README.md) — project overview and AMI build process

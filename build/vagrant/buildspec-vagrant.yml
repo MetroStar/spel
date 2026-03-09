@@ -5,8 +5,8 @@ env:
   variables:
     PACKER_NO_COLOR: 1
   parameter-store:
-    PACKER_GITHUB_API_TOKEN: /spel/codebuild/github-access-token
-    VAGRANT_CLOUD_TOKEN: /spel/vagrantcloud/token
+    PACKER_GITHUB_API_TOKEN: /granite/codebuild/github-access-token
+    VAGRANT_CLOUD_TOKEN: /granite/vagrantcloud/token
   git-credential-helper: true
 
 phases:
@@ -23,4 +23,4 @@ phases:
 artifacts:
   files:
     - '**/*'
-  base-directory: build/vagrant/.spel
+  base-directory: build/vagrant/.granite

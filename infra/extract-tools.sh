@@ -1,10 +1,10 @@
 #!/bin/bash
 # =============================================================================
-# Extract CLI tools from spel-builder Docker image for air-gapped runners
+# Extract CLI tools from granite-builder Docker image for air-gapped runners
 # =============================================================================
 # On air-gapped runners (GitLab CI, offline environments), CLI tools like
 # OpenTofu, AWS CLI, jq, and zip may not be pre-installed. This script checks
-# for each tool and, if missing, extracts it from the spel-builder Docker image
+# for each tool and, if missing, extracts it from the granite-builder Docker image
 # which has them baked in.
 #
 # Usage:
@@ -21,7 +21,7 @@ set -euo pipefail
 
 DOCKER_TAG="${1:-${DOCKER_IMAGE_TAG:-latest}}"
 EXTRACT_BIN_DIR="${EXTRACT_BIN_DIR:-/usr/local/bin}"
-IMAGE="spel-builder:${DOCKER_TAG}"
+IMAGE="granite-builder:${DOCKER_TAG}"
 
 echo "=== Extracting CLI Tools from ${IMAGE} ==="
 

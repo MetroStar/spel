@@ -106,7 +106,7 @@ for INSTANCE_TYPE in "${INSTANCE_TYPES[@]}"; do
     --instance-type $INSTANCE_TYPE \
     --subnet-id $SUBNET_ID \
     --security-group-ids $SECURITY_GROUP \
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=spel-test-$INSTANCE_TYPE}]' \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=granite-test-$INSTANCE_TYPE}]' \
     --query Instances[0].InstanceId \
     --output text"
   

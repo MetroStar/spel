@@ -1,7 +1,7 @@
 # =============================================================================
-# SPEL Infrastructure — Root Module
+# Granite Infrastructure — Root Module
 # =============================================================================
-# Orchestrates all SPEL infrastructure using submodules:
+# Orchestrates all Granite infrastructure using submodules:
 #   - modules/networking : VPC, subnet, IGW, security group, Packer endpoints
 #   - modules/iam        : Packer builder IAM role, policy, instance profile
 #   - modules/ssm        : SSM endpoints, KMS, S3, CloudWatch, patching

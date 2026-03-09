@@ -1,5 +1,5 @@
 # =============================================================================
-# SPEL Infrastructure — Root Variables
+# Granite Infrastructure — Root Variables
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 
 variable "name_prefix" {
-  description = "Prefix for all resource names (e.g., 'spel', 'spel-ci')"
+  description = "Prefix for all resource names (e.g., 'granite', 'granite-ci')"
   type        = string
 
   validation {
@@ -150,7 +150,7 @@ variable "tags" {
 
 locals {
   common_tags = merge(var.tags, {
-    Project   = "SPEL"
+    Project   = "GRANITE"
     ManagedBy = "opentofu"
   })
 }

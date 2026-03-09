@@ -1,7 +1,7 @@
 # =============================================================================
 # Networking Module — VPC, Subnet, Internet Gateway, Security Group
 # =============================================================================
-# Creates the foundational network infrastructure for SPEL Packer builds.
+# Creates the foundational network infrastructure for Granite Packer builds.
 # Supports both commercial and GovCloud partitions.
 # =============================================================================
 
@@ -83,7 +83,7 @@ resource "aws_route_table_association" "this" {
 
 resource "aws_security_group" "packer" {
   name        = "${var.name_prefix}-packer-sg"
-  description = "Security group for SPEL Packer build instances"
+  description = "Security group for Granite Packer build instances"
   vpc_id      = aws_vpc.this.id
 
   tags = merge(var.tags, {

@@ -2,13 +2,13 @@ SHELL := /bin/bash
 
 PACKER_ZIP ?= https://releases.hashicorp.com/packer/$(PACKER_VERSION)/packer_$(PACKER_VERSION)_linux_amd64.zip
 PACKER_LOG ?= '1'
-PACKER_LOG_PATH = .spel/$(SPEL_VERSION)/packer.log
+PACKER_LOG_PATH = .granite/$(GRANITE_VERSION)/packer.log
 CHECKPOINT_DISABLE ?= '1'
-SPEL_CI ?= true
+GRANITE_CI ?= true
 BUILDER_REGION = $(or $(PKR_VAR_aws_region),$(AWS_REGION))
 export PATH := $(HOME)/bin:$(PATH)
 
-export PKR_VAR_spel_deprecation_lifetime ?= 8760h
+export PKR_VAR_granite_deprecation_lifetime ?= 8760h
 
 # The `pre_build`, `build`, and `post_build` targets all use packer in a way that
 # supports both Commercial and GovCloud partitions. For GovCloud, the `install`
@@ -17,23 +17,23 @@ export PKR_VAR_spel_deprecation_lifetime ?= 8760h
 # from the execution environment (meaning your workstation or CodeBuild).
 
 # Due to the use of an aws profile, when running interactively, it is required
-# to export AWS_PROFILE with a valid profile. For CodeBuild CI, it is set to $SPEL_IDENTIFIER,
+# to export AWS_PROFILE with a valid profile. For CodeBuild CI, it is set to $GRANITE_IDENTIFIER,
 # and `make install` will create it.
 
 .PHONY: all install pre_build build copy post_build docs
 .EXPORT_ALL_VARIABLES:
 
-$(info SPEL_IDENTIFIER=$(SPEL_IDENTIFIER))
-$(info SPEL_VERSION=$(SPEL_VERSION))
+$(info GRANITE_IDENTIFIER=$(GRANITE_IDENTIFIER))
+$(info GRANITE_VERSION=$(GRANITE_VERSION))
 
-ifndef SPEL_IDENTIFIER
-$(error SPEL_IDENTIFIER is not set)
+ifndef GRANITE_IDENTIFIER
+$(error GRANITE_IDENTIFIER is not set)
 endif
 
-ifndef SPEL_VERSION
-$(error SPEL_VERSION is not set)
+ifndef GRANITE_VERSION
+$(error GRANITE_VERSION is not set)
 else
-$(shell mkdir -p ".spel/$(SPEL_VERSION)")
+$(shell mkdir -p ".granite/$(GRANITE_VERSION)")
 endif
 
 all: build

@@ -1,8 +1,8 @@
 [![pullreminders](https://pullreminders.com/badge.svg)](https://pullreminders.com?ref=badge)
 
-# spel
+# granite
 
-STIG-Partitioned Enterprise Linux (_spel_) is a project that helps create and
+STIG-Partitioned Enterprise Linux (_granite_) is a project that helps create and
 publish Enterprise Linux images that are partitioned according to the
 [DISA STIG][0]. The resulting images also use LVM to simplify volume management.
 The images are configured with help from the scripts and packages in the
@@ -64,7 +64,7 @@ Notes on Lifecycle:
     * Further information about AWS polices for Red Hat EC2s may be found in
       AWS's [RHEL FAQ](https://aws.amazon.com/partners/redhat/faqs/)
 
-## Why spel
+## Why granite
 
 VMs' root filesystems are generally not live-repartitionable once launced from
 their images. As a result, if a STIG-scan is performed against most of the
@@ -74,7 +74,7 @@ scans will note failures for each of the various "`${DIRECTORY}` is on its own
 filesystem" tests. The images produced through this project are designed to
 ensure that these particular scan-failures do not occur.
 
-Aside from addressing the previously-noted partitioning findings, spel applies
+Aside from addressing the previously-noted partitioning findings, granite applies
 only those STIG-related hardenings that need to be in place "from birth" (i.e.,
 when a system is first created from KickStart, VM-template, Amazon Machine
 Image, etc.). This includes things like:
@@ -86,12 +86,12 @@ Image, etc.). This includes things like:
 - Support for BIOS- and/or EFI-boot modes (the latter being a requisite for use
   of [SecureBoot](https://access.redhat.com/articles/5254641))
 
-The spel-produced images are expected to act as a better starting-point in a
+The granite-produced images are expected to act as a better starting-point in a
 larger hardening process.
 
 If your organization does not already have an automated hardening process,
 please see our tool, [Watchmaker](https://github.com/MetroStar/watchmaker.git).
-This tool is meant to help spel-users (and users of other Enterprise Linux
+This tool is meant to help granite-users (and users of other Enterprise Linux
 images) by performing launch-time hardening activities.
 
 ## We have a FAQ now!
@@ -102,7 +102,7 @@ an appropriate FAQ entry.
 
 ## Default Username
 
-The default username for all spel images is `maintuser`.
+The default username for all granite images is `maintuser`.
 
 If you wish to change the default username at launch, you can do so via
 `cloud-init` with userdata[^3] something like the following. Change `<USERNAME>` to
@@ -113,7 +113,7 @@ your desired value.
 system_info:
   default_user:
     name: <USERNAME>
-    gecos: spel default user
+    gecos: granite default user
     lock_passwd: true
 ```
 
@@ -150,7 +150,7 @@ similar to:
 system_info:
   default_user:
     name: <USERNAME>
-    gecos: spel default user
+    gecos: granite default user
     lock_passwd: true
     selinux_user: unconfined_u
     sudo: ["ALL=(root) NOPASSWD:ALL"]
@@ -168,13 +168,13 @@ images.
 
 ### CI/CD Deployment Modes
 
-The SPEL build system uses a **Docker-based approach** where all dependencies are baked into a portable container image. This provides consistent, reproducible builds across different environments.
+The Granite build system uses a **Docker-based approach** where all dependencies are baked into a portable container image. This provides consistent, reproducible builds across different environments.
 
 #### Docker-Based Build System
 
 The build system consists of:
 
-1. **Docker Image**: `spel-builder:YYYYMMDD` (~305 MB gzipped, ~834 MB uncompressed)
+1. **Docker Image**: `granite-builder:YYYYMMDD` (~305 MB gzipped, ~834 MB uncompressed)
    - Based on Rocky Linux 9 (Iron Bank)
    - Includes: Packer, Ansible, AWS CLI, all plugins, roles, and collections
    - Portable: Can be transferred to air-gapped environments
@@ -247,18 +247,18 @@ _NOTE_: In all steps below, the examples use syntax that works on Linux. If you
 are running `packer` from a Windows system, simply use the appropriate syntax
 for the _relative path_ to the packer template. Most important, for Windows,
 use `.\` preceding the path to the template. E.g.
-`.\spel\minimal-linux.json`.
+`.\granite\minimal-linux.json`.
 
 1.  Clone the repository:
 
     ```bash
-    git clone https://github.com/MetroStar/spel && cd spel
+    git clone https://github.com/MetroStar/granite && cd granite
     ```
 
 2.  Validate the template (Optional):
 
     ```bash
-    packer validate spel/minimal-linux.pkr.hcl
+    packer validate granite/minimal-linux.pkr.hcl
     ```
 
     The project-included Packer HCL files have been pre-validated. If you
@@ -268,15 +268,15 @@ use `.\` preceding the path to the template. E.g.
     include the Packer version you were using when you encountered the problem.
 
 3.  Begin the build. This requires at least two variables,
-    `spel_identifier` and `spel_version`. See the section [Packer Variables](#minimal-linux-packer-variables)
+    `granite_identifier` and `granite_version`. See the section [Packer Variables](#minimal-linux-packer-variables)
     for more details.
 
     ```bash
     packer build \
-        -var 'spel_identifier=unique-project-id' \
-        -var 'spel_version=dev001' \
+        -var 'granite_identifier=unique-project-id' \
+        -var 'granite_version=dev001' \
         -var 'virtualbox_vagrantcloud_username=myvagrantclouduser' \
-        spel/minimal-linux.pkr.hcl
+        granite/minimal-linux.pkr.hcl
     ```
 
     _NOTE_: This will build images for _all_ the [builders defined in the
@@ -300,9 +300,9 @@ Linux. Similarly, the Azure builder will attempt to install the `WALinuxAgent`
 RPM into the VM-template to make the template more integratable into
 Azure-based deployments.
 
--   _Template Path_: `spel/minimal-linux.pkr.hcl`
+-   _Template Path_: `granite/minimal-linux.pkr.hcl`
 
-For all inputs to the template, see [spel/README.md](spel/README.md)
+For all inputs to the template, see [granite/README.md](granite/README.md)
 
 ### Minimal Linux Packer Builders
 
@@ -332,30 +332,30 @@ The Minimal Linux `packer` template includes the following post-provisioners:
 To build images for the AWS US GovCloud regions, `us-gov-west-1` or `us-gov-east-1`,
 it is necessary to pass several variables that are specific to the region. The
 AMI filters below have been tested and/or created in `us-gov-west-1` to work with the
-_spel_ template(s). Also, the builders should be restricted so as _not_ to build
+_granite_ template(s). Also, the builders should be restricted so as _not_ to build
 the Vagrant images.
 
 ```bash
 packer build \
-    -var 'spel_identifier=unique-project-id' \
-    -var 'spel_version=dev001' \
+    -var 'granite_identifier=unique-project-id' \
+    -var 'granite_version=dev001' \
     -var 'aws_region=us-gov-west-1' \
     -exclude 'virtualbox-iso.*' \
-    spel/minimal-linux.pkr.hcl
+    granite/minimal-linux.pkr.hcl
 ```
 
 ## Building for Microsoft Azure
 
 A source Marketplace Image Offer or Custom Image Name and Resource Group are required
-from which to start the SPEL Azure build.
+from which to start the Granite Azure build.
 
-The resultant SPEL Image will be configured to use the Azure Linux agent, [WALinuxAgent][27]
+The resultant Granite Image will be configured to use the Azure Linux agent, [WALinuxAgent][27]
 per recommended [configurations][28]. Currently, the use of cloud-init exclusively
 does not enable execution/installation of [Azure VM Extensions][30]. The below
-variables also disable FIPS mode in the resultant SPEL VHD or Image. Currently,
+variables also disable FIPS mode in the resultant Granite VHD or Image. Currently,
 the Azure Linux agent [does not support FIPS mode][29] when utilizing Azure VM
 Extensions. If no plans exist to utilize Azure VM Extensions on VMs provisioned
-from SPEL VHDs or Images, FIPS mode can be enabled, but the `waagent` configuration
+from Granite VHDs or Images, FIPS mode can be enabled, but the `waagent` configuration
 must also be modified accordingly.
 
 The variables referenced in the packer builds below should be modified with
@@ -366,8 +366,8 @@ Login to azure using the az cli. Packer will use the session setup by the az cli
 
 ```bash
 packer build \
-    -var 'spel_identifier=unique-project-id' \
-    -var 'spel_version=0.0.1' \
+    -var 'granite_identifier=unique-project-id' \
+    -var 'granite_version=0.0.1' \
     -var 'amigen_extra_rpms=["WALinuxAgent"]' \
     -var 'amigen_fips_disable=true' \
     -var 'amigen8_repo_names=["rhui-microsoft-azure-rhel8"]' \
@@ -376,7 +376,7 @@ packer build \
     -var 'azure_image_sku=8_8' \
     -var 'azure_managed_image_resource_group_name=<resource group short name>' \
     -only 'azure-arm.minimal-rhel-8-image' \
-    spel/minimal-linux.pkr.hcl
+    granite/minimal-linux.pkr.hcl
 ```
 
 ## Building for OpenStack
@@ -388,8 +388,8 @@ as _not_ to build the Vagrant images.
 ```bash
 source your_openstack_credentials_file.sh
 packer build \
-    -var 'spel_identifier=spel' \
-    -var 'spel_version=0.0.1' \
+    -var 'granite_identifier=granite' \
+    -var 'granite_version=0.0.1' \
     -var 'openstack_insecure=false' \
     -var 'openstack_flavor=your_flavor_name_for_temporary_instance' \
     -var 'openstack_floating_ip_network=your_provider_network_name' \
@@ -397,7 +397,7 @@ packer build \
     -var 'openstack_security_groups=your_security_group_name_for_temporary_instance,second_sg_name,etc.' \
     -var 'openstack_source_image_name=your_source_image_name' \
     -only 'openstack.*' \
-    spel/minimal-linux.pkr.hcl
+    granite/minimal-linux.pkr.hcl
 ```
 
 For expected values, see links below:
@@ -410,20 +410,20 @@ For expected values, see links below:
 
 ## Testing With amigen
 
-The spel automation leverages the amigen8 and amigen9 projects as a
+The granite automation leverages the amigen8 and amigen9 projects as a
 build-helpers for creation of EL8 and EL9 Amazon Machine Images (Azure
 VM-templates, etc.), respectively.  Due to the closely-coupled nature of the
 two projects, it's recommended that any changes made to amigen8 or amigen9 be
-tested with spel prior to merging changes to either project's master branch.
+tested with granite prior to merging changes to either project's master branch.
 
-To facilitate this testing, the following runtime-variables were added to spel:
+To facilitate this testing, the following runtime-variables were added to granite:
 
 - `amigen8_source_branch`
 - `amigen8_source_url`
 - `amigen9_source_branch`
 - `amigen9_source_url`
 
-Using these runtime-variables allows one to point spel to
+Using these runtime-variables allows one to point granite to
 a fork/branch of amigen8 or amigen9 during a integration-test build. To test,
 update your `packer` invocation by adding elements like:
 
@@ -491,10 +491,10 @@ packer build \
 [43]: https://almalinux.org/
 [44]: https://www.suse.com/products/suse-liberty-linux/
 [45]: https://developer.hashicorp.com/packer/guides/hcl/variables#from-environment-variables
-[46]: https://github.com/MetroStar/spel/issues/new
+[46]: https://github.com/MetroStar/granite/issues/new
 [47]: https://github.com/MetroStar/amigen9
 
-[^1]: Because spel is primarily an execution-wrapper for the amigenN projects, the "read the source" method for determining why things have changed from one spel-release to the next may require reviewing those projects' repositories
+[^1]: Because granite is primarily an execution-wrapper for the amigenN projects, the "read the source" method for determining why things have changed from one spel-release to the next may require reviewing those projects' repositories
 [^2]: The default-user is a local user (i.e., managed in `/etc/passwd`/`/etc/shadow`/`/etc/group`) that is dynamically-created at initial system-boot &ndash; using either the default-information in the `/etc/cloud/cloud.cfg` file or as overridden in a userData payload's `#cloud-config` content. Typically this user's `${HOME}/.ssh/authorized_keys` file is prepopulated with a provisioner's public SSH key.
 [^3]: Overriding attributes of the default-user _must_ be done within a `#cloud-config` directive-block. If your userData is currently bare BASH (etc.), it will be necessary to format your userData payload as mixed, multi-part MIME.
 [^4]: Use of the `PKR_VAR_` method is recommended for setting up CI/CD frameworks for producing AMIs and other supported VM-templates

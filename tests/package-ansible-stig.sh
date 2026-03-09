@@ -40,8 +40,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ROLES_DIR="$REPO_ROOT/spel/ansible/roles"
-COLLECTIONS_DIR="$REPO_ROOT/spel/ansible/collections"
+ROLES_DIR="$REPO_ROOT/granite/ansible/roles"
+COLLECTIONS_DIR="$REPO_ROOT/granite/ansible/collections"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
 mkdir -p "$OUTPUT_DIR"
@@ -97,7 +97,7 @@ if [[ -d "$ROLES_DIR/AL2023-STIG" ]] && [[ "$OS_TARGET" == "all" || "$OS_TARGET"
 fi
 
 # Stage boot-fips-wrapper.sh for EL8 FIPS boot repair
-BOOT_FIPS_WRAPPER="$REPO_ROOT/spel/scripts/boot-fips-wrapper.sh"
+BOOT_FIPS_WRAPPER="$REPO_ROOT/granite/scripts/boot-fips-wrapper.sh"
 if [[ -f "$BOOT_FIPS_WRAPPER" ]]; then
   cp "$BOOT_FIPS_WRAPPER" "$STAGING/boot-fips-wrapper.sh"
   chmod +x "$STAGING/boot-fips-wrapper.sh"

@@ -43,9 +43,9 @@ wget https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/
 These files are referenced in Packer templates via variables:
 
 ```hcl
-export PKR_VAR_spel_cfnbootstrap_source="file://$(pwd)/offline-packages/aws-cfn-bootstrap-py3-latest.tar.gz"
-export PKR_VAR_spel_awscli_source="file://$(pwd)/offline-packages/awscli-exe-linux-x86_64.zip"
-export PKR_VAR_spel_ssm_agent_source="file://$(pwd)/offline-packages/amazon-ssm-agent.rpm"
+export PKR_VAR_granite_cfnbootstrap_source="file://$(pwd)/offline-packages/aws-cfn-bootstrap-py3-latest.tar.gz"
+export PKR_VAR_granite_awscli_source="file://$(pwd)/offline-packages/awscli-exe-linux-x86_64.zip"
+export PKR_VAR_granite_ssm_agent_source="file://$(pwd)/offline-packages/amazon-ssm-agent.rpm"
 ```
 
 ## Verification

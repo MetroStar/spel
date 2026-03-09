@@ -1,10 +1,10 @@
 # Docker-Based CI/CD Quick Reference
 
-Quick reference guide for SPEL Docker-based builds.
+Quick reference guide for Granite Docker-based builds.
 
 ## Overview
 
-The SPEL build system uses Docker containers with all dependencies baked in:
+The Granite build system uses Docker containers with all dependencies baked in:
 
 | Component | Size | Purpose |
 |-----------|------|---------|
@@ -19,14 +19,14 @@ The SPEL build system uses Docker containers with all dependencies baked in:
 ```bash
 # Go to: Actions → Prepare Offline Docker Image → Run workflow
 # Wait 5-10 minutes
-# Download artifact: spel-builder-YYYYMMDD
+# Download artifact: granite-builder-YYYYMMDD
 ```
 
 ### Step 2: Build AMIs
 
 ```bash
 # Go to: Actions → Build STIGed AMI's → Run workflow
-# Enter artifact name: spel-builder-20251230
+# Enter artifact name: granite-builder-20251230
 # Select builders (run_rhel9, run_ol9, etc.)
 # Wait 2-5 hours per OS
 ```
@@ -37,7 +37,7 @@ The SPEL build system uses Docker containers with all dependencies baked in:
 
 ```bash
 # 1. Transfer Docker tarball to air-gapped environment
-cp spel-builder-*.tar.gz /transfer/
+cp granite-builder-*.tar.gz /transfer/
 
 # 2. Import Docker image
 # GitLab: CI/CD → Pipelines → Run pipeline
@@ -65,7 +65,7 @@ cp spel-builder-*.tar.gz /transfer/
 |----------|-------------|---------|
 | `AWS_ACCESS_KEY_ID` | AWS access key | `AKIA...` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | `secret...` |
-| `DOCKER_IMAGE_PATH` | Path to tarball | `/transfer/spel-builder-*.tar.gz` |
+| `DOCKER_IMAGE_PATH` | Path to tarball | `/transfer/granite-builder-*.tar.gz` |
 
 ### Optional Variables
 
@@ -78,7 +78,7 @@ cp spel-builder-*.tar.gz /transfer/
 | `RUN_OL9` | Build Oracle Linux 9 | `false` |
 | `RUN_OL8` | Build Oracle Linux 8 | `false` |
 | `RUN_AMZN2023` | Build Amazon Linux 2023 | `false` |
-| `SPEL_GOSS_BINARY_URL` | Goss binary URL for air-gapped STIG audit | (none) |
+| `GRANITE_GOSS_BINARY_URL` | Goss binary URL for air-gapped STIG audit | (none) |
 
 ## Prerequisites
 
@@ -117,10 +117,10 @@ aws iam get-role --role-name Packer_Amazon --query 'Role.MaxSessionDuration'
 
 ```bash
 # Verify tarball exists
-ls -lh /transfer/spel-builder-*.tar.gz
+ls -lh /transfer/granite-builder-*.tar.gz
 
 # Verify checksum
-sha256sum -c spel-builder-*.tar.gz.sha256
+sha256sum -c granite-builder-*.tar.gz.sha256
 ```
 
 ### AWS Credentials Expire
@@ -153,14 +153,14 @@ aws ec2 describe-vpc-endpoints \
 
 ```bash
 # Import image
-gunzip -c spel-builder-*.tar.gz | docker load
+gunzip -c granite-builder-*.tar.gz | docker load
 
 # Run interactively
 docker run -it --rm \
   -v "$(pwd):/workspace" \
   -e AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY \
-  spel-builder:latest /bin/bash
+  granite-builder:latest /bin/bash
 
 # Build AMIs
 docker run --rm \
@@ -168,16 +168,16 @@ docker run --rm \
   -e AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY \
   -e AWS_SESSION_TOKEN \
-  -e SPEL_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
-  spel-builder:latest make -f Makefile.spel build
+  -e GRANITE_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
+  granite-builder:latest make -f Makefile.granite build
 ```
 
 ### Verify Docker Image
 
 ```bash
-docker run --rm spel-builder:latest packer version
-docker run --rm spel-builder:latest ansible --version
-docker run --rm spel-builder:latest aws --version
+docker run --rm granite-builder:latest packer version
+docker run --rm granite-builder:latest ansible --version
+docker run --rm granite-builder:latest aws --version
 ```
 
 ## Storage Requirements

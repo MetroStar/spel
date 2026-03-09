@@ -63,34 +63,34 @@ variable "aws_temporary_security_group_source_cidrs" {
   default = ["0.0.0.0/0"]
 }
 
-variable "spel_amiutilsource" {
+variable "granite_amiutilsource" {
   type    = string
-  default = env("SPEL_AMIUTILSOURCE")
+  default = env("GRANITE_AMIUTILSOURCE")
 }
 
-variable "spel_disablefips" {
+variable "granite_disablefips" {
   type    = string
   default = ""
 }
 
-variable "spel_identifier" {
+variable "granite_identifier" {
   type    = string
-  default = env("SPEL_IDENTIFIER")
+  default = env("GRANITE_IDENTIFIER")
 }
 
-variable "spel_pypi_url" {
+variable "granite_pypi_url" {
   type    = string
   default = "https://pypi.org/simple"
 }
 
-variable "spel_version" {
+variable "granite_version" {
   type    = string
-  default = env("SPEL_VERSION")
+  default = env("GRANITE_VERSION")
 }
 
 source "amazon-ebs" "base" {
-  ami_description             = "This is a validation AMI for ${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
-  ami_name                    = "validation-${var.spel_identifier}-${source.name}-${var.spel_version}.x86_64-gp3"
+  ami_description             = "This is a validation AMI for ${var.granite_identifier}-${source.name}-${var.granite_version}.x86_64-gp3"
+  ami_name                    = "validation-${var.granite_identifier}-${source.name}-${var.granite_version}.x86_64-gp3"
   associate_public_ip_address = true
   communicator                = "ssh"
   ena_support                 = true
@@ -110,7 +110,7 @@ source "amazon-ebs" "base" {
   ssh_interface                         = var.aws_ssh_interface
   ssh_port                              = 22
   ssh_pty                               = true
-  ssh_username                          = "spel"
+  ssh_username                          = "granite"
   subnet_id                             = var.aws_subnet_id
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
   user_data_file                        = "${path.root}/userdata/validation.cloud"
@@ -168,14 +168,14 @@ build {
   provisioner "shell" {
     execute_command = "{{ .Vars }} sudo -E /bin/sh -ex -o pipefail '{{ .Path }}'"
     inline = [
-      "mkdir -p /tmp/spel/tests",
-      "chown -R spel:spel /tmp/spel",
+      "mkdir -p /tmp/granite/tests",
+      "chown -R granite:granite /tmp/granite",
     ]
     pause_before = "5s"
   }
 
   provisioner "file" {
-    destination  = "/tmp/spel/tests"
+    destination  = "/tmp/granite/tests"
     direction    = "upload"
     pause_before = "5s"
     source       = "tests/"
@@ -183,14 +183,14 @@ build {
 
   provisioner "shell" {
     environment_vars = [
-      "PYPI_URL=${var.spel_pypi_url}",
+      "PYPI_URL=${var.granite_pypi_url}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/sh -ex -o pipefail '{{ .Path }}'"
     inline = [
       "PYPI_URL=$${PYPI_URL:-https://pypi.org/simple}",
       "ls -alR /tmp",
       "python3 -m ensurepip",
-      "python3 -m pip install --index-url=\"$PYPI_URL\" -r /tmp/spel/tests/requirements.txt",
+      "python3 -m pip install --index-url=\"$PYPI_URL\" -r /tmp/granite/tests/requirements.txt",
       "for DEV in $(lsblk -ln | awk '/ part /{ print $1}'); do pvresize /dev/$${DEV} || true; done",
     ]
     pause_before = "5s"
@@ -199,27 +199,27 @@ build {
   provisioner "shell" {
     environment_vars = [
       "LVM_SUPPRESS_FD_WARNINGS=1",
-      "SPEL_AMIUTILSOURCE=${var.spel_amiutilsource}",
-      "SPEL_DISABLEFIPS=${var.spel_disablefips}",
+      "GRANITE_AMIUTILSOURCE=${var.granite_amiutilsource}",
+      "GRANITE_DISABLEFIPS=${var.granite_disablefips}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/sh -ex -o pipefail '{{ .Path }}'"
     inline = [
       "PATH=/usr/local/bin:\"$PATH\"",
       "export PATH",
-      "pytest --strict-markers -s -v --color=no /tmp/spel | tee /tmp/pytest.log",
+      "pytest --strict-markers -s -v --color=no /tmp/granite | tee /tmp/pytest.log",
     ]
     pause_before = "5s"
   }
 
   provisioner "file" {
-    destination = ".spel/${var.spel_version}/validation-${var.spel_identifier}-${source.name}.log"
+    destination = ".granite/${var.granite_version}/validation-${var.granite_identifier}-${source.name}.log"
     direction   = "download"
     source      = "/tmp/pytest.log"
   }
 
   post-processor "artifice" {
     files = [
-      ".spel/${var.spel_version}/validation-${var.spel_identifier}-${source.name}.log",
+      ".granite/${var.granite_version}/validation-${var.granite_identifier}-${source.name}.log",
     ]
   }
 }

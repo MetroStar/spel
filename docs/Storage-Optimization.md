@@ -1,10 +1,10 @@
 # Storage Requirements Guide
 
-This guide covers storage requirements for the Docker-based SPEL build system.
+This guide covers storage requirements for the Docker-based Granite build system.
 
 ## Docker Image Size
 
-The SPEL builder Docker image contains all dependencies baked in:
+The Granite builder Docker image contains all dependencies baked in:
 
 | Format | Size |
 |--------|------|
@@ -89,10 +89,10 @@ When transferring the Docker image tarball to air-gapped environments:
 Each Docker image build produces:
 
 ```
-spel-builder-YYYYMMDD/
-├── spel-builder-YYYYMMDD.tar.gz       # ~305 MB - Docker image
-├── spel-builder-YYYYMMDD.tar.gz.sha256 # <1 KB - Checksum
-└── spel-builder-YYYYMMDD-manifest.txt  # <2 KB - Build details
+granite-builder-YYYYMMDD/
+├── granite-builder-YYYYMMDD.tar.gz       # ~305 MB - Docker image
+├── granite-builder-YYYYMMDD.tar.gz.sha256 # <1 KB - Checksum
+└── granite-builder-YYYYMMDD-manifest.txt  # <2 KB - Build details
 ```
 
 **Total transfer size**: ~305 MB
@@ -102,11 +102,11 @@ spel-builder-YYYYMMDD/
 ### Clean Up Old Images
 
 ```bash
-# List spel-builder images
-docker images spel-builder
+# List granite-builder images
+docker images granite-builder
 
 # Remove old images
-docker rmi spel-builder:old_tag
+docker rmi granite-builder:old_tag
 
 # Remove unused Docker resources
 docker system prune

@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 
 variable "name_prefix" {
-  description = "Prefix for all resource names (e.g., 'spel-ci', 'spel-prod')"
+  description = "Prefix for all resource names (e.g., 'granite-ci', 'granite-prod')"
   type        = string
 
   validation {
@@ -134,7 +134,7 @@ variable "install_dependencies" {
     Whether to let the AWS-ApplyAnsiblePlaybooks SSM document install Ansible
     via pip/yum/apt before running playbooks.  Set to false for air-gapped
     environments where instances have no internet access — Ansible must
-    already be installed on the AMI (SPEL AMIs include ansible-core).
+    already be installed on the AMI (Granite AMIs include ansible-core).
     When true, SSM runs 'pip install ansible' which requires PyPI access.
   EOT
   type        = bool

@@ -1,7 +1,7 @@
 # =============================================================================
-# Infrastructure Setup for SPEL Builds
+# Infrastructure Setup for Granite Builds
 # =============================================================================
-# This workflow manages ALL SPEL AWS infrastructure using a single OpenTofu
+# This workflow manages ALL Granite AWS infrastructure using a single OpenTofu
 # root module (infra/). One `tofu apply` creates everything; one
 # `tofu destroy` tears it all down.
 #
@@ -201,7 +201,7 @@ jobs:
         with:
           aws-region: ${{ inputs.aws_region }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
-          role-session-name: spel-infra-setup
+          role-session-name: granite-infra-setup
           role-duration-seconds: 3600
 
       - name: Setup OpenTofu
@@ -216,7 +216,7 @@ jobs:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
         run: |
           source ./bootstrap-backend.sh \
-            --prefix "spel" \
+            --prefix "granite" \
             --region "${{ inputs.aws_region }}"
 
       - name: OpenTofu init
@@ -247,7 +247,7 @@ jobs:
         working-directory: infra
         run: |
           cat > ci.auto.tfvars <<EOF
-          name_prefix             = "spel"
+          name_prefix             = "granite"
           vpc_cidr                = "${{ inputs.vpc_cidr }}"
           subnet_cidr             = "${{ inputs.subnet_cidr }}"
           public_subnet           = ${{ inputs.enable_internet_gateway }}
@@ -327,7 +327,7 @@ jobs:
           cat >> $GITHUB_STEP_SUMMARY << EOF
           | Action | \`${{ inputs.action }}\` |
           | Region | \`${{ inputs.aws_region }}\` |
-          | Prefix | \`spel\` |
+          | Prefix | \`granite\` |
           | Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
           EOF
 

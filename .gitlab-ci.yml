@@ -1,5 +1,5 @@
 # =============================================================================
-# GitLab CI/CD Configuration for SPEL Builds (Docker-based)
+# GitLab CI/CD Configuration for Granite Builds (Docker-based)
 # =============================================================================
 # This pipeline builds STIGed AMIs using a pre-built Docker container.
 # The container has all dependencies baked in for air-gapped environments.
@@ -7,7 +7,7 @@
 # PREREQUISITES:
 #   1. Docker image tarball must be transferred to $DOCKER_IMAGE_PATH
 #      - Build using GitHub Actions: offline-prepare.yml
-#      - Export: docker save spel-builder:TAG | gzip > spel-builder-TAG.tar.gz
+#      - Export: docker save granite-builder:TAG | gzip > granite-builder-TAG.tar.gz
 #      - Transfer to runner's accessible location
 #
 #   2. GitLab Runner must have Docker installed and running
@@ -16,7 +16,7 @@
 #      - AWS_ACCESS_KEY_ID
 #      - AWS_SECRET_ACCESS_KEY
 #      - AWS_SESSION_TOKEN (optional, for OIDC/STS credentials)
-#      - DOCKER_IMAGE_PATH (path to spel-builder-*.tar.gz)
+#      - DOCKER_IMAGE_PATH (path to granite-builder-*.tar.gz)
 #
 # INFRASTRUCTURE:
 #   Infrastructure is managed by .gitlab/infra.gitlab-ci.yml via OpenTofu.
@@ -34,12 +34,12 @@ include:
   - local: '.gitlab/infra.gitlab-ci.yml'
 
 variables:
-  SPEL_IDENTIFIER: "spel"
+  GRANITE_IDENTIFIER: "granite"
   PKR_VAR_aws_region: "us-gov-west-1"
   PACKER_LOG: "1"
   CHECKPOINT_DISABLE: "1"
   # Infrastructure naming
-  INFRA_PREFIX: "spel"
+  INFRA_PREFIX: "granite"
   # Internet Gateway toggle — set to "false" for air-gapped builds
   # When false, no IGW or default route is created and SG ingress is VPC-scoped
   ENABLE_INTERNET_GATEWAY: "true"
@@ -47,7 +47,7 @@ variables:
   # Creates Interface endpoints for EC2 and STS so Packer can reach AWS APIs
   ENABLE_PACKER_ENDPOINTS: "false"
   # Docker image location (must be transferred to this path)
-  DOCKER_IMAGE_PATH: "/transfer/spel-builder-*.tar.gz"
+  DOCKER_IMAGE_PATH: "/transfer/granite-builder-*.tar.gz"
   # Local yum repository mirror for air-gapped Linux builds
   # Set this to your internal mirror URL, e.g., http://mirror.internal.mil
   # Leave empty to use default RHUI/public repositories (requires internet access)
@@ -96,7 +96,7 @@ variables:
   # Set this to your internal mirror URL hosting the Goss binary
   # Example: https://mirror.internal.mil/tools/goss-linux-AMD64
   # Leave empty to download from GitHub (requires internet access)
-  SPEL_GOSS_BINARY_URL: ""
+  GRANITE_GOSS_BINARY_URL: ""
   # Test Windows AMIs on multiple Nitro instance types after build (opt-in)
   # Set to "true" to run instance type compatibility tests
   TEST_INSTANCE_TYPES: "false"
@@ -167,16 +167,16 @@ import:docker:
           echo ""
           echo "To resolve:"
           echo "  1. Run the offline-prepare.yml workflow in GitHub Actions"
-          echo "  2. Download the spel-builder-YYYYMMDD artifact"
+          echo "  2. Download the granite-builder-YYYYMMDD artifact"
           echo "  3. Transfer files to: /transfer/"
           echo ""
           echo "For SharePoint transfer (recommended):"
-          echo "  - Transfer spel-builder-*.tar.gz.b64 (base64 encoded)"
-          echo "  - Transfer spel-builder-*.tar.gz.b64.sha256 (checksum)"
+          echo "  - Transfer granite-builder-*.tar.gz.b64 (base64 encoded)"
+          echo "  - Transfer granite-builder-*.tar.gz.b64.sha256 (checksum)"
           echo ""
           echo "For direct transfer (SCP/USB/S3):"
-          echo "  - Transfer spel-builder-*.tar.gz (binary)"
-          echo "  - Transfer spel-builder-*.tar.gz.sha256 (checksum)"
+          echo "  - Transfer granite-builder-*.tar.gz (binary)"
+          echo "  - Transfer granite-builder-*.tar.gz.sha256 (checksum)"
           echo ""
           exit 1
         fi
@@ -213,38 +213,38 @@ import:docker:
       gunzip -c "${TARBALL}" | docker load
       
       # Extract image tag from tarball name
-      IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/spel-builder-//')
+      IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/granite-builder-//')
       echo "DOCKER_IMAGE_TAG=${IMAGE_TAG}" >> import.env
       
       echo ""
       echo "=== Import Complete ==="
-      docker images spel-builder
+      docker images granite-builder
     
     # Verify the image works
     - |
       echo ""
       echo "=== Verifying Docker Image ==="
-      docker run --rm "spel-builder:${IMAGE_TAG}" packer version
-      docker run --rm "spel-builder:${IMAGE_TAG}" ansible --version
-      docker run --rm "spel-builder:${IMAGE_TAG}" aws --version
+      docker run --rm "granite-builder:${IMAGE_TAG}" packer version
+      docker run --rm "granite-builder:${IMAGE_TAG}" ansible --version
+      docker run --rm "granite-builder:${IMAGE_TAG}" aws --version
     
     # Show image details (for version tracking)
     - |
       echo ""
       echo "=== Docker Image Details ==="
-      docker inspect "spel-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
-      docker inspect "spel-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
-      docker inspect "spel-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
+      docker inspect "granite-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
+      docker inspect "granite-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
+      docker inspect "granite-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
       echo ""
       echo "Full image inspect output:"
-      docker inspect "spel-builder:${IMAGE_TAG}" | head -50
+      docker inspect "granite-builder:${IMAGE_TAG}" | head -50
       echo "==========================="
   artifacts:
     reports:
       dotenv: import.env
     expire_in: 7 days
   tags:
-    - spel-offline-runner
+    - granite-offline-runner
   rules:
     - if: '$IMPORT_DOCKER == "true"'
       when: manual
@@ -274,18 +274,18 @@ import:docker:
       if [ -n "${DOCKER_IMAGE_TAG}" ]; then
         IMAGE_TAG="${DOCKER_IMAGE_TAG}"
       else
-        # Try to find the latest spel-builder image
-        IMAGE_TAG=$(docker images spel-builder --format '{{.Tag}}' | grep -v latest | sort -r | head -1)
+        # Try to find the latest granite-builder image
+        IMAGE_TAG=$(docker images granite-builder --format '{{.Tag}}' | grep -v latest | sort -r | head -1)
         if [ -z "$IMAGE_TAG" ]; then
-          echo "ERROR: No spel-builder Docker image found!"
+          echo "ERROR: No granite-builder Docker image found!"
           echo "Run the import:docker job first, or import manually:"
-          echo "  gunzip -c spel-builder-*.tar.gz | docker load"
+          echo "  gunzip -c granite-builder-*.tar.gz | docker load"
           exit 1
         fi
       fi
       
-      echo "Using Docker image: spel-builder:${IMAGE_TAG}"
-      docker images "spel-builder:${IMAGE_TAG}"
+      echo "Using Docker image: granite-builder:${IMAGE_TAG}"
+      docker images "granite-builder:${IMAGE_TAG}"
     
     # Load infrastructure config if available (from infra:create dotenv artifact)
     - |
@@ -295,16 +295,16 @@ import:docker:
       fi
   script:
     - |
-      echo "=== Starting SPEL Build ==="
-      echo "Docker Image: spel-builder:${IMAGE_TAG}"
-      echo "SPEL_BUILDERS: ${SPEL_BUILDERS:-not set}"
+      echo "=== Starting Granite Build ==="
+      echo "Docker Image: granite-builder:${IMAGE_TAG}"
+      echo "GRANITE_BUILDERS: ${GRANITE_BUILDERS:-not set}"
       echo "WINDOWS_BUILDERS: ${WINDOWS_BUILDERS:-not set}"
       echo ""
       
       # Show image details for audit trail
       echo "=== Docker Image Details (for audit) ==="
-      docker inspect "spel-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
-      docker inspect "spel-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
+      docker inspect "granite-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
+      docker inspect "granite-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
       echo "========================================="
       echo ""
     
@@ -317,9 +317,9 @@ import:docker:
         -e "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"
         -e "AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}"
         -e "AWS_DEFAULT_REGION=${PKR_VAR_aws_region}"
-        -e "SPEL_IDENTIFIER=${SPEL_IDENTIFIER}"
-        -e "SPEL_VERSION=${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
-        -e "SPEL_BUILDERS=${SPEL_BUILDERS:-}"
+        -e "GRANITE_IDENTIFIER=${GRANITE_IDENTIFIER}"
+        -e "GRANITE_VERSION=${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
+        -e "GRANITE_BUILDERS=${GRANITE_BUILDERS:-}"
         -e "WINDOWS_BUILDERS=${WINDOWS_BUILDERS:-}"
         -e "PKR_VAR_aws_region=${PKR_VAR_aws_region}"
         -e "PKR_VAR_aws_force_deregister=${PKR_VAR_aws_force_deregister:-true}"
@@ -359,8 +359,8 @@ import:docker:
         DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_extra_rpms=${AMIGEN9_EXTRA_RPMS}")
       
       # Add Goss binary URL if set (for air-gapped STIG auditing)
-      [[ -n "${SPEL_GOSS_BINARY_URL:-}" ]] && \
-        DOCKER_ENV_ARGS+=(-e "PKR_VAR_spel_goss_binary_url=${SPEL_GOSS_BINARY_URL}")
+      [[ -n "${GRANITE_GOSS_BINARY_URL:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_granite_goss_binary_url=${GRANITE_GOSS_BINARY_URL}")
       
       # Add KMS key if set
       [[ -n "${PKR_VAR_aws_kms_key_id:-}" ]] && \
@@ -373,14 +373,14 @@ import:docker:
       docker run --rm \
         -v "${CI_PROJECT_DIR}:/workspace" \
         "${DOCKER_ENV_ARGS[@]}" \
-        "spel-builder:${IMAGE_TAG}" \
-        make -f Makefile.spel build
+        "granite-builder:${IMAGE_TAG}" \
+        make -f Makefile.granite build
   artifacts:
     paths:
-      - .spel/
+      - .granite/
     expire_in: 30 days
   tags:
-    - spel-offline-runner
+    - granite-offline-runner
   rules:
     - when: manual
 
@@ -388,27 +388,27 @@ import:docker:
 build:amzn2023:
   <<: *build_definition
   variables:
-    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm"
+    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm"
 
 build:ol9:
   <<: *build_definition
   variables:
-    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-ol-9-hvm"
+    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-ol-9-hvm"
 
 build:rhel9:
   <<: *build_definition
   variables:
-    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-rhel-9-hvm"
+    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-rhel-9-hvm"
 
 build:ol8:
   <<: *build_definition
   variables:
-    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-ol-8-hvm"
+    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-ol-8-hvm"
 
 build:rhel8:
   <<: *build_definition
   variables:
-    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-rhel-8-hvm"
+    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-rhel-8-hvm"
 
 build:windows2016:
   <<: *build_definition
@@ -429,7 +429,7 @@ build:windows2022:
 build:all:
   <<: *build_definition
   variables:
-    SPEL_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm,amazon-ebssurrogate.minimal-ol-9-hvm,amazon-ebssurrogate.minimal-rhel-9-hvm,amazon-ebssurrogate.minimal-ol-8-hvm,amazon-ebssurrogate.minimal-rhel-8-hvm"
+    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm,amazon-ebssurrogate.minimal-ol-9-hvm,amazon-ebssurrogate.minimal-rhel-9-hvm,amazon-ebssurrogate.minimal-ol-8-hvm,amazon-ebssurrogate.minimal-rhel-8-hvm"
     WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2016-hvm,amazon-ebs.hardened-windows-2019-hvm,amazon-ebs.hardened-windows-2022-hvm"
   rules:
     - if: '$CI_COMMIT_TAG'
@@ -459,10 +459,10 @@ build:all:
       fi
       
       # Find packer manifest
-      MANIFEST=$(find .spel -name 'packer-manifest.json' 2>/dev/null | head -1)
+      MANIFEST=$(find .granite -name 'packer-manifest.json' 2>/dev/null | head -1)
       if [[ -z "$MANIFEST" ]]; then
         echo "ERROR: Packer manifest not found"
-        ls -la .spel/ || true
+        ls -la .granite/ || true
         exit 1
       fi
       
@@ -501,7 +501,7 @@ build:all:
     expire_in: 7 days
     when: always
   tags:
-    - spel-offline-runner
+    - granite-offline-runner
   rules:
     - if: '$TEST_INSTANCE_TYPES == "true"'
       when: on_success
@@ -550,7 +550,7 @@ test:windows2022:
 
     # Find AMI from build manifest — filter for hardened (amazon-ebs) Linux only
     - |
-      MANIFEST=".spel/${SPEL_VERSION:-$(date +%Y.%m).1}/packer-manifest.json"
+      MANIFEST=".granite/${GRANITE_VERSION:-$(date +%Y.%m).1}/packer-manifest.json"
       if [[ ! -f "$MANIFEST" ]]; then
         echo "WARNING: Packer manifest not found - skipping SSM validation"
         exit 0
@@ -592,7 +592,7 @@ test:windows2022:
         --iam-instance-profile "Name=${PROFILE}" \
         --metadata-options "HttpEndpoint=enabled,HttpTokens=optional,HttpPutResponseHopLimit=2" \
         $USERDATA_OPTS \
-        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=spel-ssm-test-${CI_PIPELINE_ID}},{Key=Project,Value=SPEL}]" \
+        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=granite-ssm-test-${CI_PIPELINE_ID}},{Key=Project,Value=GRANITE}]" \
         --query 'Instances[0].InstanceId' --output text)
 
       echo "Launched test instance: $INSTANCE_ID"
@@ -615,7 +615,7 @@ test:windows2022:
         aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" 2>/dev/null || true
       fi
   tags:
-    - spel-offline-runner
+    - granite-offline-runner
   rules:
     - if: '$TEST_SSM == "true"'
       when: on_success
