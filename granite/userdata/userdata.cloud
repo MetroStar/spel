@@ -1,11 +1,11 @@
 #cloud-config
 
 ##############################################################################
-# Set the default cloud-init user to `spel`
+# Set the default cloud-init user to `granite`
 ##############################################################################
 user:
-  name: spel
-  gecos: spel admin account
+  name: granite
+  gecos: granite admin account
   lock_passwd: true
   sudo: "ALL=(root) NOPASSWD:ALL"
   selinux_user: unconfined_u

@@ -2,12 +2,12 @@
 
 ##############################################################################
 #
-# Set the default cloud-init user to `spel` and update packages
+# Set the default cloud-init user to `granite` and update packages
 #
 ##############################################################################
 user:
-  name: spel
-  gecos: spel admin account
+  name: granite
+  gecos: granite admin account
   lock_passwd: true
   sudo: "ALL=(root) NOPASSWD:ALL"
   selinux_user: unconfined_u
