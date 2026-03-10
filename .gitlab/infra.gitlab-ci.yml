@@ -70,13 +70,22 @@ infra:plan:
       source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
       $TF_CMD init -input=false
 
+      # Derive networking flags from AIRGAP_MODE
+      if [ "${AIRGAP_MODE:-true}" = "true" ]; then
+        _ENABLE_IGW=false
+        _ENABLE_PACKER_ENDPOINTS=true
+      else
+        _ENABLE_IGW=true
+        _ENABLE_PACKER_ENDPOINTS=false
+      fi
+
       cat > ci.auto.tfvars <<TFVARS
       name_prefix             = "${INFRA_PREFIX}"
       vpc_cidr                = "10.0.0.0/16"
       subnet_cidr             = "10.0.1.0/24"
-      public_subnet           = ${ENABLE_INTERNET_GATEWAY:-true}
-      enable_internet_gateway = ${ENABLE_INTERNET_GATEWAY:-true}
-      enable_packer_endpoints = ${ENABLE_PACKER_ENDPOINTS:-false}
+      public_subnet           = ${_ENABLE_IGW}
+      enable_internet_gateway = ${_ENABLE_IGW}
+      enable_packer_endpoints = ${_ENABLE_PACKER_ENDPOINTS}
       enable_vpc_endpoints    = true
       enable_session_manager  = true
       enable_patch_manager    = true
@@ -156,13 +165,22 @@ infra:create:
       source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
       $TF_CMD init -input=false
 
+      # Derive networking flags from AIRGAP_MODE
+      if [ "${AIRGAP_MODE:-true}" = "true" ]; then
+        _ENABLE_IGW=false
+        _ENABLE_PACKER_ENDPOINTS=true
+      else
+        _ENABLE_IGW=true
+        _ENABLE_PACKER_ENDPOINTS=false
+      fi
+
       cat > ci.auto.tfvars <<TFVARS
       name_prefix             = "${INFRA_PREFIX}"
       vpc_cidr                = "10.0.0.0/16"
       subnet_cidr             = "10.0.1.0/24"
-      public_subnet           = ${ENABLE_INTERNET_GATEWAY:-true}
-      enable_internet_gateway = ${ENABLE_INTERNET_GATEWAY:-true}
-      enable_packer_endpoints = ${ENABLE_PACKER_ENDPOINTS:-false}
+      public_subnet           = ${_ENABLE_IGW}
+      enable_internet_gateway = ${_ENABLE_IGW}
+      enable_packer_endpoints = ${_ENABLE_PACKER_ENDPOINTS}
       enable_vpc_endpoints    = true
       enable_session_manager  = true
       enable_patch_manager    = true

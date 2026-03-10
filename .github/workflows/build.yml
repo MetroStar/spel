@@ -30,6 +30,18 @@ on:
         description: "Docker image artifact name (e.g., granite-builder-20251231)"
         required: true
         type: string
+      aws_region:
+        description: "AWS region"
+        required: true
+        type: choice
+        options:
+          - us-east-1
+          - us-east-2
+          - us-west-1
+          - us-west-2
+          - us-gov-east-1
+          - us-gov-west-1
+        default: "us-east-1"
       run_amzn2023:
         description: "Run Amazon Linux 2023 builder"
         required: false
@@ -137,9 +149,8 @@ jobs:
     uses: ./.github/workflows/infra-setup.yml
     with:
       action: apply
-      aws_region: us-east-1
-      enable_internet_gateway: ${{ !inputs.airgap_mode }}
-      enable_packer_endpoints: ${{ inputs.airgap_mode }}
+      aws_region: ${{ inputs.aws_region }}
+      airgap_mode: ${{ inputs.airgap_mode }}
     secrets: inherit
 
   # ==========================================================================
@@ -244,7 +255,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: us-east-1
+          aws-region: ${{ inputs.aws_region }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
           role-session-name: granite-build
           role-duration-seconds: 21600  # 6 hours - must be <= IAM role MaxSessionDuration
@@ -364,7 +375,7 @@ jobs:
           echo "WINDOWS_BUILDERS=${windows_builders}" >> $GITHUB_ENV
           
           # Packer variables
-          echo "PKR_VAR_aws_region=us-east-1" >> $GITHUB_ENV
+          echo "PKR_VAR_aws_region=${{ inputs.aws_region }}" >> $GITHUB_ENV
           echo "PKR_VAR_aws_force_deregister=true" >> $GITHUB_ENV
           # AMIs are private by default - set PKR_VAR_aws_ami_groups='["all"]' to make public
           echo "PKR_VAR_aws_ami_groups=[]" >> $GITHUB_ENV
@@ -391,7 +402,7 @@ jobs:
             -e AWS_ACCESS_KEY_ID
             -e AWS_SECRET_ACCESS_KEY
             -e AWS_SESSION_TOKEN
-            -e AWS_DEFAULT_REGION=us-east-1
+            -e AWS_DEFAULT_REGION=${{ inputs.aws_region }}
             -e GRANITE_IDENTIFIER="${GRANITE_IDENTIFIER}"
             -e GRANITE_VERSION="${GRANITE_VERSION}"
             -e GRANITE_BUILDERS="${GRANITE_BUILDERS}"

@@ -12,9 +12,9 @@
 # RESOURCES CREATED (via OpenTofu modules):
 #   Networking (modules/networking):
 #     - VPC with DNS support/hostnames enabled
-#     - Subnet with auto-assign public IP (or private if using VPC endpoints)
-#     - Internet Gateway + route table (conditional — disabled for air-gapped)
-#     - VPC endpoints for EC2 + STS (optional — enabled for air-gapped)
+#     - Subnet with auto-assign public IP (or private if air-gapped)
+#     - Internet Gateway + route table (disabled for air-gapped builds)
+#     - VPC endpoints for EC2 + STS (enabled for air-gapped builds)
 #     - Security group allowing SSH + WinRM (scoped to VPC CIDR when air-gapped)
 #   IAM (modules/iam):
 #     - IAM role and instance profile for Packer-launched instances
@@ -24,7 +24,7 @@
 #     - S3 bucket for SSM session logs
 #     - CloudWatch log group
 #     - VPC endpoints for air-gapped connectivity
-#     - Session Manager, Patch Manager, State Manager, STIG Enforcement (configurable)
+#     - Session Manager, Patch Manager, State Manager, STIG Enforcement
 #
 # PREREQUISITES:
 #   - AWS credentials with permissions to create VPC, EC2, IAM, KMS, S3, SSM
@@ -53,9 +53,16 @@ on:
           - status
         default: plan
       aws_region:
-        description: "AWS region (e.g., us-east-1, us-gov-east-1)"
+        description: "AWS region"
         required: true
-        type: string
+        type: choice
+        options:
+          - us-east-1
+          - us-east-2
+          - us-west-1
+          - us-west-2
+          - us-gov-east-1
+          - us-gov-west-1
         default: "us-east-1"
       vpc_cidr:
         description: "VPC CIDR block"
@@ -67,28 +74,8 @@ on:
         required: false
         type: string
         default: "10.0.1.0/24"
-      enable_session_manager:
-        description: "Enable SSM Session Manager"
-        required: false
-        type: boolean
-        default: true
-      enable_patch_manager:
-        description: "Enable SSM Patch Manager"
-        required: false
-        type: boolean
-        default: true
-      enable_state_manager:
-        description: "Enable SSM State Manager associations"
-        required: false
-        type: boolean
-        default: true
-      enable_internet_gateway:
-        description: "Create Internet Gateway (disable for air-gapped builds)"
-        required: false
-        type: boolean
-        default: true
-      enable_packer_endpoints:
-        description: "Create VPC endpoints for EC2 + STS (required when IGW disabled)"
+      airgap_mode:
+        description: "Air-gapped build environment (disables IGW, enables VPC endpoints for EC2 + STS)"
         required: false
         type: boolean
         default: false
@@ -117,28 +104,8 @@ on:
         required: false
         type: string
         default: "10.0.1.0/24"
-      enable_session_manager:
-        description: "Enable SSM Session Manager"
-        required: false
-        type: boolean
-        default: true
-      enable_patch_manager:
-        description: "Enable SSM Patch Manager"
-        required: false
-        type: boolean
-        default: true
-      enable_state_manager:
-        description: "Enable SSM State Manager associations"
-        required: false
-        type: boolean
-        default: true
-      enable_internet_gateway:
-        description: "Create Internet Gateway (disable for air-gapped builds)"
-        required: false
-        type: boolean
-        default: true
-      enable_packer_endpoints:
-        description: "Create VPC endpoints for EC2 + STS (required when IGW disabled)"
+      airgap_mode:
+        description: "Air-gapped build environment (disables IGW, enables VPC endpoints for EC2 + STS)"
         required: false
         type: boolean
         default: false
@@ -250,13 +217,13 @@ jobs:
           name_prefix             = "granite"
           vpc_cidr                = "${{ inputs.vpc_cidr }}"
           subnet_cidr             = "${{ inputs.subnet_cidr }}"
-          public_subnet           = ${{ inputs.enable_internet_gateway }}
-          enable_internet_gateway = ${{ inputs.enable_internet_gateway }}
-          enable_packer_endpoints = ${{ inputs.enable_packer_endpoints }}
+          public_subnet           = ${{ !inputs.airgap_mode }}
+          enable_internet_gateway = ${{ !inputs.airgap_mode }}
+          enable_packer_endpoints = ${{ inputs.airgap_mode }}
           enable_vpc_endpoints    = true
-          enable_session_manager  = ${{ inputs.enable_session_manager }}
-          enable_patch_manager    = ${{ inputs.enable_patch_manager }}
-          enable_state_manager    = ${{ inputs.enable_state_manager }}
+          enable_session_manager  = true
+          enable_patch_manager    = true
+          enable_state_manager    = true
           enable_stig_enforcement = true
           enable_ssm_agent_update = true
           enable_dhmc             = true

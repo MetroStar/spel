@@ -53,12 +53,9 @@ variables:
   CI_AWS_OIDC_AUDIENCE: "${CI_SERVER_URL}"
   # Infrastructure naming
   INFRA_PREFIX: "granite"
-  # Internet Gateway toggle — set to "false" for air-gapped builds
-  # When false, no IGW or default route is created and SG ingress is VPC-scoped
-  ENABLE_INTERNET_GATEWAY: "true"
-  # Packer VPC endpoints — set to "true" for air-gapped builds
-  # Creates Interface endpoints for EC2 and STS so Packer can reach AWS APIs
-  ENABLE_PACKER_ENDPOINTS: "false"
+  # Air-gapped mode — disables IGW/default route, enables EC2+STS VPC endpoints,
+  # scopes SG ingress to VPC CIDR. Set to "false" for internet-connected builds.
+  AIRGAP_MODE: "true"
   # Docker image location (must be transferred to this path)
   DOCKER_IMAGE_PATH: "/transfer/granite-builder-*.tar.gz"
   # Local yum repository mirror for air-gapped Linux builds
