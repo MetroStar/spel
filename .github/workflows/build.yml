@@ -245,7 +245,8 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: us-east-1
-          role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
+          role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+          role-session-name: granite-build
           role-duration-seconds: 21600  # 6 hours - must be <= IAM role MaxSessionDuration
 
       - name: Upload STIG playbooks to S3

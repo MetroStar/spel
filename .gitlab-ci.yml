@@ -13,9 +13,16 @@
 #   2. GitLab Runner must have Docker installed and running
 #
 #   3. CI/CD Variables required:
-#      - AWS_ACCESS_KEY_ID
-#      - AWS_SECRET_ACCESS_KEY
-#      - AWS_SESSION_TOKEN (optional, for OIDC/STS credentials)
+#      AWS credentials (choose one):
+#        OPTION A — OIDC Federation (recommended, no static keys):
+#          - CI_AWS_ROLE_ARN: IAM role ARN to assume via OIDC
+#          - CI_AWS_OIDC_AUDIENCE: OIDC audience (default: GitLab instance URL)
+#          Requires GitLab 15.7+ and an IAM OIDC provider for your GitLab instance
+#        OPTION B — Static Keys:
+#          - AWS_ACCESS_KEY_ID
+#          - AWS_SECRET_ACCESS_KEY
+#          - AWS_SESSION_TOKEN (optional)
+#      Common:
 #      - DOCKER_IMAGE_PATH (path to granite-builder-*.tar.gz)
 #
 # INFRASTRUCTURE:
@@ -38,6 +45,12 @@ variables:
   PKR_VAR_aws_region: "us-gov-west-1"
   PACKER_LOG: "1"
   CHECKPOINT_DISABLE: "1"
+  # AWS authentication — choose ONE method:
+  # OIDC Federation: set CI_AWS_ROLE_ARN to the IAM role ARN (requires GitLab 15.7+
+  #   and an IAM OIDC identity provider configured for your GitLab instance)
+  # Static Keys: set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY as CI/CD variables
+  CI_AWS_ROLE_ARN: ""
+  CI_AWS_OIDC_AUDIENCE: "${CI_SERVER_URL}"
   # Infrastructure naming
   INFRA_PREFIX: "granite"
   # Internet Gateway toggle — set to "false" for air-gapped builds
@@ -257,6 +270,9 @@ import:docker:
 
 # Build template using Docker container
 .build_template: &build_definition
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: ${CI_AWS_OIDC_AUDIENCE}
   stage: build
   needs:
     - job: import:docker
@@ -292,6 +308,34 @@ import:docker:
       if [ -f "infra.env" ]; then
         echo "Loading infra.env..."
         source infra.env
+      fi
+    
+    # Acquire AWS credentials — OIDC federation or static keys
+    - |
+      if [[ -n "${CI_AWS_ROLE_ARN:-}" && -n "${GITLAB_OIDC_TOKEN:-}" ]]; then
+        echo "Acquiring AWS credentials via OIDC federation..."
+        CREDS=$(docker run --rm \
+          -e "AWS_DEFAULT_REGION=${PKR_VAR_aws_region}" \
+          -e "GITLAB_OIDC_TOKEN" \
+          -e "ROLE_ARN=${CI_AWS_ROLE_ARN}" \
+          -e "SESSION_NAME=granite-build-${CI_JOB_ID}" \
+          "granite-builder:${IMAGE_TAG}" \
+          bash -c 'aws sts assume-role-with-web-identity \
+            --role-arn "$ROLE_ARN" \
+            --role-session-name "$SESSION_NAME" \
+            --web-identity-token "$GITLAB_OIDC_TOKEN" \
+            --duration-seconds 21600 \
+            --query "Credentials.[AccessKeyId,SecretAccessKey,SessionToken]" \
+            --output text') || { echo "ERROR: OIDC role assumption failed"; exit 1; }
+        read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN <<< "$CREDS"
+        export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+        echo "OIDC credentials acquired for role: ${CI_AWS_ROLE_ARN}"
+      elif [[ -n "${AWS_ACCESS_KEY_ID:-}" ]]; then
+        echo "Using static AWS credentials"
+      else
+        echo "ERROR: No AWS credentials available."
+        echo "Set CI_AWS_ROLE_ARN for OIDC or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY for static keys."
+        exit 1
       fi
   script:
     - |

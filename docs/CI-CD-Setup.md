@@ -581,11 +581,109 @@ git submodule update --init --recursive
 ### GitLab CI Prerequisites
 
 1. **Docker**: GitLab Runner must have Docker installed and running
-2. **AWS Credentials**: Store in CI/CD variables:
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
-   - `AWS_SESSION_TOKEN` (optional, for STS credentials)
+2. **AWS Credentials** (choose one):
+   - **OIDC Federation** (recommended — no static keys):
+     - `CI_AWS_ROLE_ARN`: IAM role ARN to assume via OIDC
+     - Requires GitLab 15.7+ and an IAM OIDC identity provider (see [GitLab OIDC Identity Provider](#gitlab-oidc-identity-provider) below)
+   - **Static Keys**:
+     - `AWS_ACCESS_KEY_ID`
+     - `AWS_SECRET_ACCESS_KEY`
+     - `AWS_SESSION_TOKEN` (optional)
 3. **Transferred Tarball**: Docker image tarball must be accessible to the runner
+
+#### GitLab OIDC Identity Provider
+
+GitLab CI (15.7+) supports [OpenID Connect (OIDC)](https://docs.gitlab.com/ee/ci/cloud_services/aws/) to obtain short-lived AWS credentials. This eliminates the need for static access keys. Create the OIDC provider in each target AWS (or GovCloud) account:
+
+```bash
+# Get your GitLab instance's OIDC discovery URL
+# For gitlab.com: https://gitlab.com
+# For self-hosted: https://gitlab.example.mil
+GITLAB_URL="https://gitlab.example.mil"
+
+# Fetch the thumbprint (required for IAM)
+THUMBPRINT=$(openssl s_client -connect "${GITLAB_URL#https://}:443" -servername "${GITLAB_URL#https://}" </dev/null 2>/dev/null \
+  | openssl x509 -fingerprint -noout -sha1 \
+  | sed 's/.*=//;s/://g' \
+  | tr '[:upper:]' '[:lower:]')
+
+# Create the GitLab OIDC provider (one-time per AWS account)
+# For GovCloud, run this with GovCloud credentials
+aws iam create-open-id-connect-provider \
+  --url "${GITLAB_URL}" \
+  --client-id-list "${GITLAB_URL}" \
+  --thumbprint-list "${THUMBPRINT}"
+
+# Verify
+aws iam list-open-id-connect-providers
+```
+
+> **Note**: The `client-id-list` value must match the `aud` claim in the OIDC token, which defaults to the GitLab instance URL (`CI_SERVER_URL`). This is configured via the `CI_AWS_OIDC_AUDIENCE` variable in `.gitlab-ci.yml`.
+
+#### IAM Role for GitLab CI (OIDC)
+
+Create an IAM role that GitLab CI can assume via OIDC. The trust policy restricts access to your specific project:
+
+```bash
+# Set your values
+ACCOUNT_ID="123456789012"
+GITLAB_URL="https://gitlab.example.mil"
+GITLAB_HOST="${GITLAB_URL#https://}"  # e.g., gitlab.example.mil
+PROJECT_PATH="my-group/granite"         # your GitLab project path
+
+# For GovCloud accounts, use "aws-us-gov" partition
+PARTITION="aws-us-gov"  # or "aws" for commercial
+
+cat > trust-policy-gitlab.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:${PARTITION}:iam::${ACCOUNT_ID}:oidc-provider/${GITLAB_HOST}"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "${GITLAB_HOST}:aud": "${GITLAB_URL}"
+        },
+        "StringLike": {
+          "${GITLAB_HOST}:sub": "project_path:${PROJECT_PATH}:*"
+        }
+      }
+    }
+  ]
+}
+EOF
+
+# Create the role
+aws iam create-role \
+  --role-name Granite_Packer \
+  --assume-role-policy-document file://trust-policy-gitlab.json \
+  --max-session-duration 21600
+
+# Attach the same Packer and OpenTofu permissions (from sections 2 and 3 above)
+aws iam put-role-policy \
+  --role-name Granite_Packer \
+  --policy-name PackerBuildPolicy \
+  --policy-document file://packer-policy.json
+
+aws iam put-role-policy \
+  --role-name Granite_Packer \
+  --policy-name OpenTofuInfraPolicy \
+  --policy-document file://opentofu-policy.json
+```
+
+> **Security**: The `sub` condition restricts which GitLab project (and optionally branch/tag) can assume the role. Use `project_path:GROUP/PROJECT:ref_type:branch:ref:BRANCH` to restrict to a specific branch.
+
+#### Store Role ARN in GitLab CI/CD
+
+1. Go to **Settings** → **CI/CD** → **Variables**
+2. Add a variable named `CI_AWS_ROLE_ARN` with value `arn:aws-us-gov:iam::ACCOUNT_ID:role/Granite_Packer`
+3. Mark as **Protected** and **Masked**
+
+When `CI_AWS_ROLE_ARN` is set, the pipeline automatically uses OIDC federation. When empty (the default), it falls back to static `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` variables.
 
 ## GitHub Actions Setup
 
@@ -783,11 +881,12 @@ The workflow uses OIDC to obtain AWS credentials without storing secrets:
   uses: aws-actions/configure-aws-credentials@v4
   with:
     aws-region: us-east-1
-    role-to-assume: arn:aws:iam::199150299627:role/Packer_Amazon
+    role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
+    role-session-name: granite-build
     role-duration-seconds: 21600  # 6 hours
 ```
 
-The credentials are passed to the Docker container via environment variables:
+Store `AWS_ROLE_ARN` as a repository variable (or secret) pointing to your IAM role. The credentials are passed to the Docker container via environment variables:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_SESSION_TOKEN`
@@ -825,7 +924,8 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AWS_SESSION_TOKEN` | STS session token | (none) |
+| `CI_AWS_OIDC_AUDIENCE` | OIDC audience claim (default: GitLab instance URL) | `https://gitlab.example.mil` |
+| `AWS_SESSION_TOKEN` | STS session token (static keys only) | (none) |
 | `PKR_VAR_aws_region` | AWS region | `us-gov-east-1` |
 | `PKR_VAR_aws_vpc_id` | VPC ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (from OpenTofu) |
