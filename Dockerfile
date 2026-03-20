@@ -38,7 +38,8 @@ ENV PACKER_VERSION=${PACKER_VERSION} \
     AMIGEN9_PATH=/opt/amigen9
 
 # Install build dependencies
-RUN dnf install -y \
+# Note: --allowerasing needed because Iron Bank image has curl-minimal which conflicts with curl
+RUN dnf install -y --allowerasing \
         git \
         make \
         tar \
