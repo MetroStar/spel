@@ -208,7 +208,7 @@ SSM associations use **platform-specific targeting** via the `StigPlatform` tag 
 | **EL STIG check-mode** | `StigPlatform` | `EL8`, `EL9` | Same playbook in `--check` mode |
 | **OpenSCAP scan** | `StigPlatform` | `EL8`, `EL9` | OpenSCAP content is Linux-specific |
 | **AL2023 enforcement** | `StigPlatform` | `AL2023` | AL2023 uses its own native script |
-| **Windows enforcement** | `StigPlatform` | `Win2016`, `Win2019`, `Win2022` | Custom wrapper: AWSEC2-ConfigureSTIG + admin rename (SID-500 → maintuser) |
+| **Windows enforcement** | `StigPlatform` | `Win2019`, `Win2022` | Custom wrapper: AWSEC2-ConfigureSTIG + admin rename (SID-500 → maintuser) |
 | **SSM agent update** | `StigManaged` | `true` | All platforms need agent updates |
 | **Software inventory** | `StigManaged` | `true` | Collect inventory from all platforms |
 
@@ -227,7 +227,7 @@ In `--check` mode (compliance scans), `ansible.builtin.script` is naturally skip
 
 All Granite hardened AMIs are built with these AMI-level tags:
 - `StigManaged = "true"` — all platforms
-- `StigPlatform` — platform identifier (`EL8`, `EL9`, `AL2023`, `Win2016`, `Win2019`, `Win2022`)
+- `StigPlatform` — platform identifier (`EL8`, `EL9`, `AL2023`, `Win2019`, `Win2022`)
 
 To propagate these tags to launched instances, use **one** of:
 1. **EC2 account setting**: Enable "Copy AMI tags to instances" in EC2 → Account Settings → Default Settings

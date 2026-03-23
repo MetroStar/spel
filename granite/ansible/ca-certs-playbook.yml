@@ -41,7 +41,7 @@
         dest: C:\temp\ca_certs\
       when: ansible_os_family == "Windows"
     
-    # Reset WinRM connection to avoid Windows Server 2016 WinRM stability issues
+    # Reset WinRM connection to avoid WinRM stability issues
     # after copying many files
     - name: Reset WinRM connection
       meta: reset_connection

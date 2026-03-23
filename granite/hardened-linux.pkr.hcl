@@ -982,7 +982,7 @@ build {
     only = [
       "amazon-ebs.hardened-windows-2019-hvm"
     ]
-    source      = "${path.root}/scripts/post-stig-2016-2019.ps1"
+    source      = "${path.root}/scripts/post-stig-2019.ps1"
     destination = "C:/Windows/Temp/post-stig.ps1"
   }
 

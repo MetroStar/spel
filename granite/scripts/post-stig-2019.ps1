@@ -1,4 +1,4 @@
-# Post-STIG script for Windows Server 2016/2019
+# Post-STIG script for Windows Server 2019
 # This script is uploaded BEFORE STIG and executed AFTER STIG completes
 # It runs in background mode to avoid WinRM session issues
 # Includes Sysprep execution with shutdown for reliable instance-state polling

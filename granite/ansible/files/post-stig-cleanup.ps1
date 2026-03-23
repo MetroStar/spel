@@ -160,7 +160,7 @@ if (Test-Path $ec2LaunchV2) {
 } elseif (Test-Path $ec2LaunchV1) {
     Write-Log "Found EC2Launch v1, running sysprep..."
     try {
-        # EC2Launch v1 (Windows 2016/2019) - SysprepInstance.ps1 should shutdown by default
+        # EC2Launch v1 (Windows 2019) - SysprepInstance.ps1 should shutdown by default
         # Run synchronously to ensure it completes
         & powershell.exe -ExecutionPolicy Bypass -File $ec2LaunchV1 2>&1 | ForEach-Object { Write-Log "ec2launch: $_" }
         Write-Log "EC2Launch v1 sysprep completed (shutdown should be imminent)"
