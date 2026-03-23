@@ -2,8 +2,6 @@
 # This file installs the Ansible Lockdown roles from vendored local copies
 # For Offline air-gapped environments, roles are cloned from GitHub and committed to this repo
 roles:
-  - src: ./granite/ansible/roles/Windows-2016-STIG
-    name: Windows-2016-STIG
   - src: ./granite/ansible/roles/Windows-2019-STIG
     name: Windows-2019-STIG
   - src: ./granite/ansible/roles/Windows-2022-STIG

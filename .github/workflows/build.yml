@@ -67,11 +67,6 @@ on:
         required: false
         default: false
         type: boolean
-      run_ws2016:
-        description: "Run Windows Server 2016 builder"
-        required: false
-        default: false
-        type: boolean
       run_ws2019:
         description: "Run Windows Server 2019 builder"
         required: false
@@ -362,9 +357,6 @@ jobs:
           
           # Windows builders
           windows_builders=""
-          if [[ "${{ github.event.inputs.run_ws2016 }}" == "true" ]]; then
-            windows_builders+="amazon-ebs.hardened-windows-2016-hvm,"
-          fi
           if [[ "${{ github.event.inputs.run_ws2019 }}" == "true" ]]; then
             windows_builders+="amazon-ebs.hardened-windows-2019-hvm,"
           fi
@@ -494,9 +486,6 @@ jobs:
           if [ "${{ github.event.inputs.run_rhel8 }}" = "true" ]; then
             echo "- ✅ RHEL 8" >> $GITHUB_STEP_SUMMARY
           fi
-          if [ "${{ github.event.inputs.run_ws2016 }}" = "true" ]; then
-            echo "- ✅ Windows Server 2016" >> $GITHUB_STEP_SUMMARY
-          fi
           if [ "${{ github.event.inputs.run_ws2019 }}" = "true" ]; then
             echo "- ✅ Windows Server 2019" >> $GITHUB_STEP_SUMMARY
           fi
@@ -528,8 +517,7 @@ jobs:
       - name: Test Windows AMI Instance Type Compatibility
         if: |
           github.event.inputs.test_windows_instance_types == 'true' && 
-          (github.event.inputs.run_ws2016 == 'true' || 
-           github.event.inputs.run_ws2019 == 'true' || 
+          (github.event.inputs.run_ws2019 == 'true' ||
            github.event.inputs.run_ws2022 == 'true')
         run: |
           echo "=== Testing Windows AMI Instance Type Compatibility ==="

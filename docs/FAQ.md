@@ -11,7 +11,6 @@ A: The following OSes are currently supported via granite:
 - Amazon Linux 2023
 
 **Windows:**
-- Windows Server 2016
 - Windows Server 2019
 - Windows Server 2022
 

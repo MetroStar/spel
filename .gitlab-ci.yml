@@ -451,11 +451,6 @@ build:rhel8:
   variables:
     GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-rhel-8-hvm"
 
-build:windows2016:
-  <<: *build_definition
-  variables:
-    WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2016-hvm"
-
 build:windows2019:
   <<: *build_definition
   variables:
@@ -471,7 +466,7 @@ build:all:
   <<: *build_definition
   variables:
     GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm,amazon-ebssurrogate.minimal-ol-9-hvm,amazon-ebssurrogate.minimal-rhel-9-hvm,amazon-ebssurrogate.minimal-ol-8-hvm,amazon-ebssurrogate.minimal-rhel-8-hvm"
-    WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2016-hvm,amazon-ebs.hardened-windows-2019-hvm,amazon-ebs.hardened-windows-2022-hvm"
+    WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2019-hvm,amazon-ebs.hardened-windows-2022-hvm"
   rules:
     - if: '$CI_COMMIT_TAG'
       when: on_success
@@ -547,12 +542,6 @@ build:all:
     - if: '$TEST_INSTANCE_TYPES == "true"'
       when: on_success
     - when: never
-
-test:windows2016:
-  <<: *test_windows_definition
-  needs: ["build:windows2016"]
-  variables:
-    OS_TYPE: "windows-2016"
 
 test:windows2019:
   <<: *test_windows_definition

@@ -1324,7 +1324,7 @@ aws ssm create-association \
   --schedule-expression "${STIG_SCHEDULE}" \
   --max-concurrency "25%" \
   --max-errors "25%" \
-  --targets "Key=tag:StigPlatform,Values=Win2016,Win2019,Win2022" \
+  --targets "Key=tag:StigPlatform,Values=Win2019,Win2022" \
   --parameters "{
     \"Level\": [\"${WINDOWS_STIG_LEVEL}\"],
     \"AdminUsername\": [\"${ADMIN_USERNAME}\"]
@@ -1956,7 +1956,7 @@ must have these tags:
 | Tag | Values | Set By |
 |-----|--------|--------|
 | `StigManaged` | `true` | AMI tag → propagated by auto-tagging Lambda (§17) or launch template |
-| `StigPlatform` | `EL8`, `EL9`, `AL2023`, `Win2016`, `Win2019`, `Win2022` | AMI tag → propagated by auto-tagging Lambda (§17) or launch template |
+| `StigPlatform` | `EL8`, `EL9`, `AL2023`, `Win2019`, `Win2022` | AMI tag → propagated by auto-tagging Lambda (§17) or launch template |
 | `PatchGroup` | `${PREFIX}-linux` or `${PREFIX}-windows` | Set manually or via launch template (for patch maintenance windows) |
 
 ---
