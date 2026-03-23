@@ -48,7 +48,7 @@ mkdir -p "${CLONE_DIR}/.spel/${SPEL_VERSION:?}/"
 export PACKER_LOG=1
 export PACKER_LOG_PATH="${CLONE_DIR}/.spel/${SPEL_VERSION:?}/packer.log"
 
-packer init spel/minimal-linux.pkr.hcl
+packer init spel/minimal.pkr.hcl
 
 packer build \
     -var "virtualbox_iso_url_centos9stream=${VIRTUALBOX_ISO_URL_CENTOS9STREAM:?}" \
@@ -57,7 +57,7 @@ packer build \
     -var "spel_version=${SPEL_VERSION:?}" \
     -only "virtualbox-iso.minimal-centos-9stream" \
     -except "${EXCEPT_STEP:-}" \
-    spel/minimal-linux.pkr.hcl
+    spel/minimal.pkr.hcl
 
 # remove subdirectories from the artifact location
 find "${CLONE_DIR}/.spel/${SPEL_VERSION:?}/" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 rm -rf

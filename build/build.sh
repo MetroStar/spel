@@ -123,13 +123,13 @@ if [[ -n "$SPEL_BUILDERS" ]]; then
     FAILED_BUILDS=()
     SUCCESS_BUILDS=()
 
-    packer init spel/minimal-linux.pkr.hcl
+    packer init spel/minimal.pkr.hcl
 
     packer validate \
         -only "${SPEL_BUILDERS:?}" \
         -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
         -var "spel_version=${SPEL_VERSION:?}" \
-        spel/minimal-linux.pkr.hcl
+        spel/minimal.pkr.hcl
 
     build_packer_templates() {
         packer build \
@@ -137,7 +137,7 @@ if [[ -n "$SPEL_BUILDERS" ]]; then
             -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
             -var "spel_version=${SPEL_VERSION:?}" \
             -var "aws_ami_groups=[]" \
-            spel/minimal-linux.pkr.hcl
+            spel/minimal.pkr.hcl
 
         BUILDEXIT=$?
 
@@ -179,19 +179,19 @@ if [[ -n "$WINDOWS_BUILDERS" ]]; then
     fi
 fi
 
-packer init spel/hardened-linux.pkr.hcl
+packer init spel/hardened.pkr.hcl
 
 packer validate \
     -only "${ANSIBLE_LOCKDOWNS}" \
     -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
     -var "spel_version=${SPEL_VERSION:?}" \
-    spel/hardened-linux.pkr.hcl
+    spel/hardened.pkr.hcl
 
 packer build \
     -only "${ANSIBLE_LOCKDOWNS}" \
     -var "spel_identifier=${SPEL_IDENTIFIER:?}" \
     -var "spel_version=${SPEL_VERSION:?}" \
-    spel/hardened-linux.pkr.hcl
+    spel/hardened.pkr.hcl
 
 LOCKEXIT=$?
 
