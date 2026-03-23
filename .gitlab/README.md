@@ -245,7 +245,6 @@ The EC2 build instances need:
 - `build:ol8` - Oracle Linux 8
 
 ### Windows Builders
-- `build:windows2016` - Windows Server 2016
 - `build:windows2019` - Windows Server 2019
 - `build:windows2022` - Windows Server 2022
 

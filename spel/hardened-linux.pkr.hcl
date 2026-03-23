@@ -163,20 +163,6 @@ variable "aws_source_ami_filter_rhel9_hvm" {
   }
 }
 
-variable "aws_source_ami_filter_windows2016_hvm" {
-  description = "Object with source AMI filters for Windows Server 2016 HVM builds"
-  type = object({
-    name   = string
-    owners = list(string)
-  })
-  default = {
-    name = "Windows_Server-2016-English-Full-Base-*"
-    owners = [
-      "amazon",
-    ]
-  }
-}
-
 variable "aws_source_ami_filter_windows2019_hvm" {
   description = "Object with source AMI filters for Windows Server 2019 HVM builds"
   type = object({
@@ -690,7 +676,6 @@ locals {
   effective_ol9_owners           = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_ol9_hvm.owners
   effective_rhel8_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_rhel8_hvm.owners
   effective_rhel9_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_rhel9_hvm.owners
-  effective_windows2016_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2016_hvm.owners
   effective_windows2019_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2019_hvm.owners
   effective_windows2022_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2022_hvm.owners
 
@@ -792,20 +777,6 @@ build {
         root-device-type    = "ebs"
       }
       owners      = local.effective_rhel9_owners
-      most_recent = true
-    }
-  }
-
-  source "amazon-ebs.windows-base" {
-    ami_description = format(local.windows_description, "Windows Server 2016 AMI")
-    name            = "hardened-windows-2016-hvm"
-    source_ami_filter {
-      filters = {
-        virtualization-type = "hvm"
-        name                = var.aws_source_ami_filter_windows2016_hvm.name
-        root-device-type    = "ebs"
-      }
-      owners      = local.effective_windows2016_owners
       most_recent = true
     }
   }
@@ -935,7 +906,6 @@ build {
     pause_before  = "30s"
     timeout       = "30m"
     only          = [
-      "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm",
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
@@ -1252,20 +1222,6 @@ build {
   }
 
   provisioner "ansible" {
-    pause_before         = "30s"
-    timeout              = "30m"
-    only                 = ["amazon-ebs.hardened-windows-2016-hvm"]
-    roles_path           = "${path.root}/ansible/roles"
-    playbook_file        = "${path.root}/ansible/windows-2016-stig-playbook.yml"
-    use_proxy            = false
-    user = "TempPackerUser"
-    extra_arguments = [
-      "--connection", "winrm",
-      "--extra-vars", "{'winrm_password': 'ComplexP@ssw0rd123!', 'ansible_winrm_server_cert_validation': 'ignore', 'ansible_port': 5986, 'ansible_winrm_operation_timeout_sec': 60, 'ansible_winrm_read_timeout_sec': 70, 'ansible_windows_domain_role': 'Standalone', 'ansible_windows_domain_member': false, 'wn16_00_000030_pass_age': '60', 'win_skip_for_test': false, 'wn16_cc_000500': false, 'wn16_cc_000530': false, 'wn16_so_000010': false, 'wn16_so_000020': false, 'wn16_so_000030': false, 'wn16_00_000450': false, 'wn16_cc_000010': false, 'wn16_cc_000020': false, 'wn16stig_newadministratorname': 'maintuser'}"
-    ]
-  }
-
-  provisioner "ansible" {
     pause_before = "30s"
     timeout      = "30m"
     only = ["amazon-ebs.hardened-windows-2019-hvm"]
@@ -1297,7 +1253,6 @@ build {
   provisioner "powershell" {
     pause_before = "10s"
     only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm",
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
@@ -1345,7 +1300,6 @@ build {
 
   provisioner "file" {
     only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm",
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
@@ -1356,7 +1310,6 @@ build {
   provisioner "powershell" {
     pause_before = "30s"
     only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm",
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
@@ -1368,7 +1321,6 @@ build {
 
   provisioner "file" {
     only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm",
       "amazon-ebs.hardened-windows-2022-hvm"
     ]
@@ -1378,7 +1330,6 @@ build {
 
   provisioner "powershell" {
     only = [
-      "amazon-ebs.hardened-windows-2016-hvm",
       "amazon-ebs.hardened-windows-2019-hvm"
     ]
     inline = [

@@ -355,9 +355,6 @@ on:
       run_rhel8:
         description: "Run RHEL 8 builder"
         type: boolean
-      run_ws2016:
-        description: "Run Windows Server 2016 builder"
-        type: boolean
       run_ws2019:
         description: "Run Windows Server 2019 builder"
         type: boolean
@@ -893,7 +890,6 @@ The environment variable is not reaching the build script. Check that:
 | RHEL 8 | 45-60 min | 3-4 hr |
 | Oracle Linux 9 | 45-60 min | 3-4 hr |
 | Oracle Linux 8 | 45-60 min | 3-4 hr |
-| Windows Server 2016 | 60-90 min | 4-5 hr |
 | Windows Server 2019 | 60-90 min | 4-5 hr |
 | Windows Server 2022 | 60-90 min | 4-5 hr |
 

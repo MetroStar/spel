@@ -1,6 +1,0 @@
----
-- name: Apply Windows 2016 STIG
-  hosts: all
-  gather_facts: false
-  roles:
-    - role: Windows-2016-STIG

@@ -1,7 +1,6 @@
 # Vendored Ansible roles for offline builds
 #
 # This directory should contain cloned Git repositories of required Ansible roles:
-# - Windows-2016-STIG (from ansible-lockdown)
 # - Windows-2019-STIG (from ansible-lockdown)
 # - Windows-2022-STIG (from ansible-lockdown)
 # - AMAZON2023-CIS (from ansible-lockdown)
@@ -10,7 +9,6 @@
 #
 # To populate this directory, run from a system with internet access:
 #   cd spel/ansible/roles
-#   git clone https://github.com/ansible-lockdown/Windows-2016-STIG.git
 #   git clone https://github.com/ansible-lockdown/Windows-2019-STIG.git
 #   git clone https://github.com/ansible-lockdown/Windows-2022-STIG.git
 #   git clone https://github.com/ansible-lockdown/AMAZON2023-CIS.git

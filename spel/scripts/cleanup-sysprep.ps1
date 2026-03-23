@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Enhanced script to clean and prepare a Windows Server 2016 EC2 instance
+    Enhanced script to clean and prepare a Windows Server EC2 instance
     for AMI creation. Performs comprehensive cleaning and AWS-specific optimizations.
 
 .DESCRIPTION
@@ -40,13 +40,10 @@ trap {
 $osVersion = (Get-WmiObject -Class Win32_OperatingSystem).Version
 $osName = (Get-WmiObject -Class Win32_OperatingSystem).Caption
 $isServer2019OrLater = [Version]$osVersion -ge [Version]"10.0.17763"
-$isServer2016 = [Version]$osVersion -ge [Version]"10.0.14393" -and [Version]$osVersion -lt [Version]"10.0.17763"
 
 Write-Output "Detected OS: $osName (Version: $osVersion)"
 if ($isServer2019OrLater) {
     Write-Output "Using Windows Server 2019+ optimizations..."
-} elseif ($isServer2016) {
-    Write-Output "Using Windows Server 2016 optimizations..."
 } else {
     Write-Output "Warning: Unsupported Windows version detected!"
 }
@@ -236,18 +233,11 @@ if (Test-Path $ec2ConfigLog) {
 }
 
 # Clear EC2Launch logs (version-specific paths)
-if ($isServer2019OrLater) {
-    # EC2Launch v2 for Server 2019+
-    $ec2LaunchLogs = @(
-        "C:\ProgramData\Amazon\EC2Launch\log\*",
-        "C:\ProgramData\Amazon\EC2-Windows\Launch\Log\*"
-    )
-} else {
-    # EC2Launch v1 for Server 2016
-    $ec2LaunchLogs = @(
-        "C:\ProgramData\Amazon\EC2-Windows\Launch\Log\*"
-    )
-}
+# EC2Launch v2 log paths (Server 2019+)
+$ec2LaunchLogs = @(
+    "C:\ProgramData\Amazon\EC2Launch\log\*",
+    "C:\ProgramData\Amazon\EC2-Windows\Launch\Log\*"
+)
 
 foreach ($logPath in $ec2LaunchLogs) {
     if (Test-Path $logPath) {
@@ -482,13 +472,6 @@ try {
             Write-Verbose "Removing capability: $($capability.Name)"
             Remove-WindowsCapability -Online -Name $capability.Name -ErrorAction SilentlyContinue
         }
-    } else {
-        # Server 2016 standard approach
-        $disabledFeatures = Get-WindowsOptionalFeature -Online | Where-Object {$_.State -eq 'Disabled'}
-        foreach ($feature in $disabledFeatures) {
-            Write-Verbose "Removing feature: $($feature.FeatureName)"
-            dism.exe /Online /Quiet /Disable-Feature "/FeatureName:$($feature.FeatureName)" /Remove 2>$null
-        }
     }
 } catch {
     Write-Verbose "Could not remove all disabled features: $_"
@@ -651,13 +634,6 @@ try {
         } catch {
             Write-Verbose "Defragmentation skipped or not supported: $($_.Exception.Message)"
         }
-    } else {
-        # Server 2016 - attempt optimization but don't fail if not supported
-        try {
-            Optimize-Volume -DriveLetter C -Defrag -Verbose:$false -ErrorAction Stop
-        } catch {
-            Write-Verbose "Volume optimization not supported on this hardware: $($_.Exception.Message)"
-        }
     }
 } catch {
     Write-Verbose "Drive optimization failed: $_"
@@ -680,12 +656,6 @@ try {
         Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Network Inspection System\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
         
         # Restart service to let it download fresh definitions on first boot
-        Start-Service -Name WinDefend -ErrorAction SilentlyContinue
-    } else {
-        # Server 2016 cleanup
-        Stop-Service -Name WinDefend -Force -ErrorAction SilentlyContinue
-        Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Definition Updates\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
-        Remove-Item "$env:ProgramData\Microsoft\Windows Defender\Scans\*" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
         Start-Service -Name WinDefend -ErrorAction SilentlyContinue
     }
 } catch {
@@ -720,12 +690,6 @@ if (-not $SkipSysprep) {
                 Set-EC2LaunchConfiguration -ExecuteSysprep $true -ComputerName 'Random' -AdministratorPassword 'Random' -Schedule 
                 C:\ProgramData\Amazon\EC2-Windows\Launch\Scripts\Ec2LaunchSysprep.ps1
             }
-        } else {
-            # Windows Server 2016 uses EC2Launch v1
-            Write-Output "Using EC2Launch v1 for Windows Server 2016..."
-            Import-Module "C:\ProgramData\Amazon\EC2-Windows\Launch\Module\Ec2Launch.psd1" -ErrorAction Stop
-            Set-EC2LaunchConfiguration -ExecuteSysprep $true -ComputerName 'Random' -AdministratorPassword 'Random' -Schedule 
-            C:\ProgramData\Amazon\EC2-Windows\Launch\Scripts\Ec2LaunchSysprep.ps1
         }
     } catch {
         Write-Output "EC2Launch Sysprep failed: $_"
