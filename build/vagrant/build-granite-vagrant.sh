@@ -48,7 +48,7 @@ mkdir -p "${CLONE_DIR}/.granite/${GRANITE_VERSION:?}/"
 export PACKER_LOG=1
 export PACKER_LOG_PATH="${CLONE_DIR}/.granite/${GRANITE_VERSION:?}/packer.log"
 
-packer init granite/minimal-linux.pkr.hcl
+packer init granite/minimal.pkr.hcl
 
 packer build \
     -var "virtualbox_iso_url_centos9stream=${VIRTUALBOX_ISO_URL_CENTOS9STREAM:?}" \
@@ -57,7 +57,7 @@ packer build \
     -var "granite_version=${GRANITE_VERSION:?}" \
     -only "virtualbox-iso.minimal-centos-9stream" \
     -except "${EXCEPT_STEP:-}" \
-    granite/minimal-linux.pkr.hcl
+    granite/minimal.pkr.hcl
 
 # remove subdirectories from the artifact location
 find "${CLONE_DIR}/.granite/${GRANITE_VERSION:?}/" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 rm -rf

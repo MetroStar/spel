@@ -539,7 +539,7 @@ jobs:
             echo ""
             echo "This could mean:"
             echo "  1. The Windows build failed before creating AMI"
-            echo "  2. The manifest post-processor is missing from hardened-linux.pkr.hcl"
+            echo "  2. The manifest post-processor is missing from hardened.pkr.hcl"
             echo "  3. The build was interrupted"
             echo ""
             echo "Check the 'Build STIGed AMI's' step logs for errors."

@@ -123,13 +123,13 @@ if [[ -n "$GRANITE_BUILDERS" ]]; then
     FAILED_BUILDS=()
     SUCCESS_BUILDS=()
 
-    packer init granite/minimal-linux.pkr.hcl
+    packer init granite/minimal.pkr.hcl
 
     packer validate \
         -only "${GRANITE_BUILDERS:?}" \
         -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
         -var "granite_version=${GRANITE_VERSION:?}" \
-        granite/minimal-linux.pkr.hcl
+        granite/minimal.pkr.hcl
 
     build_packer_templates() {
         packer build \
@@ -137,7 +137,7 @@ if [[ -n "$GRANITE_BUILDERS" ]]; then
             -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
             -var "granite_version=${GRANITE_VERSION:?}" \
             -var "aws_ami_groups=[]" \
-            granite/minimal-linux.pkr.hcl
+            granite/minimal.pkr.hcl
 
         BUILDEXIT=$?
 
@@ -179,19 +179,19 @@ if [[ -n "$WINDOWS_BUILDERS" ]]; then
     fi
 fi
 
-packer init granite/hardened-linux.pkr.hcl
+packer init granite/hardened.pkr.hcl
 
 packer validate \
     -only "${ANSIBLE_LOCKDOWNS}" \
     -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
     -var "granite_version=${GRANITE_VERSION:?}" \
-    granite/hardened-linux.pkr.hcl
+    granite/hardened.pkr.hcl
 
 packer build \
     -only "${ANSIBLE_LOCKDOWNS}" \
     -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
     -var "granite_version=${GRANITE_VERSION:?}" \
-    granite/hardened-linux.pkr.hcl
+    granite/hardened.pkr.hcl
 
 LOCKEXIT=$?
 

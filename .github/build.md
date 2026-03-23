@@ -73,9 +73,9 @@ The `build/build.sh` script performs the following tasks:
 - Ensures required environment variables are set
 - Creates AWS CLI configuration files for commercial and GovCloud partitions
 - Checks and manages AMI quotas to avoid exceeding limits
-- Creates AMIs using Packer and the `granite/minimal-linux.pkr.hcl` template
+- Creates AMIs using Packer and the `granite/minimal.pkr.hcl` template
 - Retries failed builds until successful
-- Tests the built AMIs to ensure they meet the required standards using Packer and the `tests/minimal-linux.pkr.hcl` template
+- Tests the built AMIs to ensure they meet the required standards using Packer and the `tests/minimal.pkr.hcl` template
 
 ## `build/ami-cp.sh` Script
 

@@ -258,7 +258,7 @@ use `.\` preceding the path to the template. E.g.
 2.  Validate the template (Optional):
 
     ```bash
-    packer validate granite/minimal-linux.pkr.hcl
+    packer validate granite/minimal.pkr.hcl
     ```
 
     The project-included Packer HCL files have been pre-validated. If you
@@ -276,7 +276,7 @@ use `.\` preceding the path to the template. E.g.
         -var 'granite_identifier=unique-project-id' \
         -var 'granite_version=dev001' \
         -var 'virtualbox_vagrantcloud_username=myvagrantclouduser' \
-        granite/minimal-linux.pkr.hcl
+        granite/minimal.pkr.hcl
     ```
 
     _NOTE_: This will build images for _all_ the [builders defined in the
@@ -300,7 +300,7 @@ Linux. Similarly, the Azure builder will attempt to install the `WALinuxAgent`
 RPM into the VM-template to make the template more integratable into
 Azure-based deployments.
 
--   _Template Path_: `granite/minimal-linux.pkr.hcl`
+-   _Template Path_: `granite/minimal.pkr.hcl`
 
 For all inputs to the template, see [granite/README.md](granite/README.md)
 
@@ -341,7 +341,7 @@ packer build \
     -var 'granite_version=dev001' \
     -var 'aws_region=us-gov-west-1' \
     -exclude 'virtualbox-iso.*' \
-    granite/minimal-linux.pkr.hcl
+    granite/minimal.pkr.hcl
 ```
 
 ## Building for Microsoft Azure
@@ -376,7 +376,7 @@ packer build \
     -var 'azure_image_sku=8_8' \
     -var 'azure_managed_image_resource_group_name=<resource group short name>' \
     -only 'azure-arm.minimal-rhel-8-image' \
-    granite/minimal-linux.pkr.hcl
+    granite/minimal.pkr.hcl
 ```
 
 ## Building for OpenStack
@@ -397,7 +397,7 @@ packer build \
     -var 'openstack_security_groups=your_security_group_name_for_temporary_instance,second_sg_name,etc.' \
     -var 'openstack_source_image_name=your_source_image_name' \
     -only 'openstack.*' \
-    granite/minimal-linux.pkr.hcl
+    granite/minimal.pkr.hcl
 ```
 
 For expected values, see links below:
@@ -432,7 +432,7 @@ packer build \
     -var 'amigen8_source_url=https://github.com/<FORK_USER>/amigen8.git' \
     -var 'amigen8_source_branch=IssueNN' \
     ...
-    minimal-linux.pkr.hcl
+    minimal.pkr.hcl
 ```
 
 Similarly, these variables may be specified as environment variables by using [`PKR_VAR_<var_name>`][45]
@@ -445,7 +445,7 @@ export PKR_VAR_amigen8_source_branch="IssueNN"
 
 packer build \
     [...options elided...]
-    minimal-linux.pkr.hcl
+    minimal.pkr.hcl
 ```
 
 
