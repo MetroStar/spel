@@ -159,13 +159,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 1
 
       - name: Download Docker image artifact
-        uses: dawidd6/action-download-artifact@v6
+        uses: dawidd6/action-download-artifact@v19
         with:
           name: ${{ github.event.inputs.docker_image_artifact }}
           path: ./docker-image/
@@ -248,7 +248,7 @@ jobs:
           docker inspect "granite-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ inputs.aws_region }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
