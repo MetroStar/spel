@@ -221,7 +221,8 @@ RUN mkdir -p ${PYTHON_DEPS_PATH} \
     && ls -lh ${PYTHON_DEPS_PATH} \
     && du -sh ${PYTHON_DEPS_PATH}
 
-# =============================================================================# Download Ansible collection tarballs for EC2 offline installation
+# =============================================================================
+# Download Ansible collection tarballs for EC2 offline installation
 # These are uploaded to EC2 and installed with ansible-galaxy
 # =============================================================================
 ENV ANSIBLE_COLLECTIONS_TARBALLS=/opt/ansible-collections-tarballs
