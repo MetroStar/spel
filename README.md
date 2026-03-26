@@ -1,6 +1,4 @@
-[![pullreminders](https://pullreminders.com/badge.svg)](https://pullreminders.com?ref=badge)
-
-# granite
+# Granite
 
 Granite is a project that helps create and
 publish images that are partitioned according to the
@@ -64,7 +62,7 @@ Notes on Lifecycle:
     * Further information about AWS polices for Red Hat EC2s may be found in
       AWS's [RHEL FAQ](https://aws.amazon.com/partners/redhat/faqs/)
 
-## Why granite
+## Why Granite
 
 VMs' root filesystems are generally not live-repartitionable once launced from
 their images. As a result, if a STIG-scan is performed against most of the
@@ -74,26 +72,6 @@ scans will note failures for each of the various "`${DIRECTORY}` is on its own
 filesystem" tests. The images produced through this project are designed to
 ensure that these particular scan-failures do not occur.
 
-Aside from addressing the previously-noted partitioning findings, granite applies
-only those STIG-related hardenings that need to be in place "from birth" (i.e.,
-when a system is first created from KickStart, VM-template, Amazon Machine
-Image, etc.). This includes things like:
-
-- Activation of SELinux
-  - Application of SELinux user-confinement to the default-user[^2]
-  - Application of SELinux role-transition rules for the default-user
-- Activation of FIPS mode
-- Support for BIOS- and/or EFI-boot modes (the latter being a requisite for use
-  of [SecureBoot](https://access.redhat.com/articles/5254641))
-
-The granite-produced images are expected to act as a better starting-point in a
-larger hardening process.
-
-If your organization does not already have an automated hardening process,
-please see our tool, [Watchmaker](https://github.com/MetroStar/watchmaker.git).
-This tool is meant to help granite-users (and users of other Enterprise Linux
-images) by performing launch-time hardening activities.
-
 ## We have a FAQ now!
 
 We've added an [FAQ](docs/FAQ.md) to the project. Hopefully, your questions are
@@ -102,7 +80,7 @@ an appropriate FAQ entry.
 
 ## Default Username
 
-The default username for all granite images is `maintuser`.
+The default username for all Granite images is `maintuser`.
 
 If you wish to change the default username at launch, you can do so via
 `cloud-init` with userdata[^3] something like the following. Change `<USERNAME>` to
@@ -410,20 +388,20 @@ For expected values, see links below:
 
 ## Testing With amigen
 
-The granite automation leverages the amigen8 and amigen9 projects as a
+The Granite automation leverages the amigen8 and amigen9 projects as a
 build-helpers for creation of EL8 and EL9 Amazon Machine Images (Azure
 VM-templates, etc.), respectively.  Due to the closely-coupled nature of the
 two projects, it's recommended that any changes made to amigen8 or amigen9 be
-tested with granite prior to merging changes to either project's master branch.
+tested with Granite prior to merging changes to either project's master branch.
 
-To facilitate this testing, the following runtime-variables were added to granite:
+To facilitate this testing, the following runtime-variables were added to Granite:
 
 - `amigen8_source_branch`
 - `amigen8_source_url`
 - `amigen9_source_branch`
 - `amigen9_source_url`
 
-Using these runtime-variables allows one to point granite to
+Using these runtime-variables allows one to point Granite to
 a fork/branch of amigen8 or amigen9 during a integration-test build. To test,
 update your `packer` invocation by adding elements like:
 
@@ -494,7 +472,7 @@ packer build \
 [46]: https://github.com/MetroStar/granite/issues/new
 [47]: https://github.com/MetroStar/amigen9
 
-[^1]: Because granite is primarily an execution-wrapper for the amigenN projects, the "read the source" method for determining why things have changed from one spel-release to the next may require reviewing those projects' repositories
+[^1]: Because Granite is primarily an execution-wrapper for the amigen projects, the "read the source" method for determining why things have changed from one spel-release to the next may require reviewing those projects' repositories
 [^2]: The default-user is a local user (i.e., managed in `/etc/passwd`/`/etc/shadow`/`/etc/group`) that is dynamically-created at initial system-boot &ndash; using either the default-information in the `/etc/cloud/cloud.cfg` file or as overridden in a userData payload's `#cloud-config` content. Typically this user's `${HOME}/.ssh/authorized_keys` file is prepopulated with a provisioner's public SSH key.
 [^3]: Overriding attributes of the default-user _must_ be done within a `#cloud-config` directive-block. If your userData is currently bare BASH (etc.), it will be necessary to format your userData payload as mixed, multi-part MIME.
 [^4]: Use of the `PKR_VAR_` method is recommended for setting up CI/CD frameworks for producing AMIs and other supported VM-templates
