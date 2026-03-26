@@ -2,8 +2,8 @@
 
 # granite
 
-STIG-Partitioned Enterprise Linux (_granite_) is a project that helps create and
-publish Enterprise Linux images that are partitioned according to the
+Granite is a project that helps create and
+publish images that are partitioned according to the
 [DISA STIG][0]. The resulting images also use LVM to simplify volume management.
 The images are configured with help from the scripts and packages in the
 [`amigen8`][40] and [`amigen9`][47] projects[^1].
