@@ -1,0 +1,277 @@
+# =============================================================================
+# Prepare Offline Docker Image (GitLab CI)
+# =============================================================================
+# This pipeline builds the SPEL Docker image with all dependencies baked in
+# and exports it as a portable tarball artifact for use in air-gapped environments.
+#
+# This is the GitLab CI equivalent of: .github/workflows/offline-prepare.yml
+# The existing .gitlab-ci.yml is the *consumer* pipeline that imports and uses
+# the image built here. This pipeline requires internet access.
+#
+# PREREQUISITES:
+#   - Dockerfile must exist in repository root
+#   - vendor/amigen8 and vendor/amigen9 submodules must be present
+#   - CI/CD Variables (Settings → CI/CD → Variables):
+#     - IRONBANK_USERNAME: Robot account username (masked)
+#     - IRONBANK_PASSWORD: CLI token (masked, expires every 6 months)
+#     - Renewal: https://registry1.dso.mil → User Profile → CLI Token → Regenerate
+#
+# RUNNER REQUIREMENTS:
+#   - Tag: spel-prepare-runner (internet-connected)
+#   - Docker executor with privileged mode (for Docker-in-Docker), OR
+#   - Shell executor with Docker installed (comment out the services block)
+#   - Sufficient disk space for ~2 GB image build + tarball export
+#   - Admin may need to increase max_artifacts_size (default 100 MB)
+#
+# OUTPUTS:
+#   - Docker image tarball: spel-builder-YYYYMMDD.tar.gz
+#   - Artifact retention: 30 days
+#
+# USAGE:
+#   1. Trigger manually from GitLab UI: CI/CD → Pipelines → Run pipeline
+#   2. Optionally set IMAGE_TAG variable (defaults to YYYYMMDD)
+#   3. Download artifacts from the export:tarball job
+#   4. Transfer to air-gapped environment
+#   5. Import with: gunzip -c spel-builder-*.tar.gz | docker load
+#   6. Run with: docker run -v $(pwd):/workspace spel-builder:<tag> make -f Makefile.spel build
+#
+# NOTE: To use this file as the pipeline config, either:
+#   - Set CI/CD config file path to .gitlab-ci-prepare.yml in project settings, OR
+#   - Include it from .gitlab-ci.yml with: include: local: .gitlab-ci-prepare.yml
+#   - Run it manually: git push with CI_CONFIG_PATH=.gitlab-ci-prepare.yml
+# =============================================================================
+
+variables:
+  # Override this when triggering the pipeline to set a custom image tag
+  IMAGE_TAG: ""
+  IMAGE_NAME: "spel-builder"
+  # Docker-in-Docker settings
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: "1"
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  # Fetch submodules automatically (replaces actions/checkout with submodules: recursive)
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_DEPTH: "1"
+
+stages:
+  - prepare
+  - verify
+  - export
+
+# Default settings for all jobs
+default:
+  tags:
+    - spel-prepare-runner
+  # Docker-in-Docker service for building images
+  # Comment out this block if using a shell executor with Docker installed
+  services:
+    - docker:27-dind
+
+# =============================================================================
+# Prepare Stage — Build the Docker image
+# =============================================================================
+prepare:build:
+  stage: prepare
+  timeout: 30 minutes
+  script:
+    # Resolve image tag
+    - |
+      if [ -n "${IMAGE_TAG}" ]; then
+        echo "Using provided IMAGE_TAG: ${IMAGE_TAG}"
+      else
+        IMAGE_TAG="$(date +%Y%m%d)"
+        echo "No IMAGE_TAG provided, defaulting to: ${IMAGE_TAG}"
+      fi
+
+      echo "=== Build Configuration ==="
+      echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+      echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    # Verify submodules
+    - |
+      echo "=== Verifying AMIgen Submodules ==="
+
+      if [ ! -d "vendor/amigen8" ] || [ -z "$(ls -A vendor/amigen8 2>/dev/null)" ]; then
+        echo "ERROR: vendor/amigen8 submodule is missing or empty"
+        exit 1
+      fi
+
+      if [ ! -d "vendor/amigen9" ] || [ -z "$(ls -A vendor/amigen9 2>/dev/null)" ]; then
+        echo "ERROR: vendor/amigen9 submodule is missing or empty"
+        exit 1
+      fi
+
+      echo "vendor/amigen8: $(ls vendor/amigen8 | wc -l) files"
+      echo "vendor/amigen9: $(ls vendor/amigen9 | wc -l) files"
+
+    # Login to Iron Bank registry
+    - |
+      echo "=== Logging in to Iron Bank ==="
+      echo "${IRONBANK_PASSWORD}" | docker login registry1.dso.mil \
+        --username "${IRONBANK_USERNAME}" --password-stdin
+
+    # Build Docker image
+    - |
+      echo "=== Building Docker Image ==="
+      echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+      echo ""
+
+      docker build \
+        --tag "${IMAGE_NAME}:${IMAGE_TAG}" \
+        --tag "${IMAGE_NAME}:latest" \
+        --progress=plain \
+        .
+
+      echo ""
+      echo "=== Build Complete ==="
+      docker images "${IMAGE_NAME}"
+
+    # Write IMAGE_TAG to dotenv for downstream jobs
+    - echo "IMAGE_TAG=${IMAGE_TAG}" > prepare.env
+  artifacts:
+    reports:
+      dotenv: prepare.env
+    expire_in: 7 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+      when: always
+
+# =============================================================================
+# Verify Stage — Smoke-test the built image
+# =============================================================================
+verify:image:
+  stage: verify
+  needs:
+    - job: prepare:build
+      artifacts: true
+  script:
+    - |
+      echo "=== Verifying Docker Image ==="
+      echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+      echo ""
+
+    # Run quick tool verification
+    - docker run --rm "${IMAGE_NAME}:${IMAGE_TAG}" packer version
+    - docker run --rm "${IMAGE_NAME}:${IMAGE_TAG}" ansible --version
+    - docker run --rm "${IMAGE_NAME}:${IMAGE_TAG}" aws --version
+
+    # Show image details
+    - |
+      echo ""
+      echo "=== Image Details ==="
+      docker inspect "${IMAGE_NAME}:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
+      docker inspect "${IMAGE_NAME}:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
+      docker inspect "${IMAGE_NAME}:${IMAGE_TAG}" --format='Created: {{.Created}}'
+
+# =============================================================================
+# Export Stage — Save image as tarball artifact
+# =============================================================================
+export:tarball:
+  stage: export
+  needs:
+    - job: prepare:build
+      artifacts: true
+    - job: verify:image
+  script:
+    - TARBALL_NAME="${IMAGE_NAME}-${IMAGE_TAG}.tar.gz"
+    - MANIFEST_FILE="${IMAGE_NAME}-${IMAGE_TAG}-manifest.txt"
+
+    # Save and compress
+    - |
+      echo "=== Exporting Docker Image ==="
+      docker save "${IMAGE_NAME}:${IMAGE_TAG}" | gzip > "${TARBALL_NAME}"
+
+    # Generate checksum for binary tarball
+    - sha256sum "${TARBALL_NAME}" > "${TARBALL_NAME}.sha256"
+
+    # Base64 encode for SharePoint transfer compatibility
+    - |
+      echo ""
+      echo "=== Base64 encoding for SharePoint transfer ==="
+      base64 "${TARBALL_NAME}" > "${TARBALL_NAME}.b64"
+
+    # Generate checksum for base64 file
+    - sha256sum "${TARBALL_NAME}.b64" > "${TARBALL_NAME}.b64.sha256"
+
+    - |
+      echo ""
+      echo "=== Export Complete ==="
+      echo "Binary tarball (direct transfer):"
+      ls -lh "${TARBALL_NAME}"
+      ls -lh "${TARBALL_NAME}.sha256"
+      echo ""
+      echo "Base64 encoded (SharePoint transfer):"
+      ls -lh "${TARBALL_NAME}.b64"
+      ls -lh "${TARBALL_NAME}.b64.sha256"
+      echo ""
+      cat "${TARBALL_NAME}.sha256"
+      cat "${TARBALL_NAME}.b64.sha256"
+
+    # Generate manifest
+    - |
+      cat > "${MANIFEST_FILE}" << EOF
+      SPEL Builder Docker Image Manifest
+      ===================================
+
+      Image Tag: ${IMAGE_NAME}:${IMAGE_TAG}
+      Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+      Git Commit: ${CI_COMMIT_SHA}
+      Git Ref: ${CI_COMMIT_REF_NAME}
+      Pipeline ID: ${CI_PIPELINE_ID}
+      Pipeline URL: ${CI_PIPELINE_URL}
+
+      Image Details:
+      --------------
+      $(docker inspect "${IMAGE_NAME}:${IMAGE_TAG}" --format='Image ID: {{.Id}}')
+      $(docker inspect "${IMAGE_NAME}:${IMAGE_TAG}" --format='Size: {{.Size}} bytes')
+      $(docker inspect "${IMAGE_NAME}:${IMAGE_TAG}" --format='Created: {{.Created}}')
+
+      Baked-in Tools:
+      ---------------
+      Packer: $(docker run --rm "${IMAGE_NAME}:${IMAGE_TAG}" packer version 2>/dev/null | head -1)
+      Ansible: $(docker run --rm "${IMAGE_NAME}:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1)
+      Python: $(docker run --rm "${IMAGE_NAME}:${IMAGE_TAG}" python3 --version 2>/dev/null)
+      AWS CLI: $(docker run --rm "${IMAGE_NAME}:${IMAGE_TAG}" aws --version 2>/dev/null)
+
+      Tarball:
+      --------
+      $(ls -lh ${TARBALL_NAME})
+
+      SHA256 Checksum:
+      ----------------
+      $(cat ${TARBALL_NAME}.sha256)
+
+      Usage:
+      ------
+      # Import the image
+      gunzip -c ${TARBALL_NAME} | docker load
+
+      # Run a build
+      docker run --rm \\
+        -v \$(pwd):/workspace \\
+        -e AWS_ACCESS_KEY_ID \\
+        -e AWS_SECRET_ACCESS_KEY \\
+        -e AWS_DEFAULT_REGION=us-east-1 \\
+        -e SPEL_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \\
+        -e SPEL_VERSION=\$(date +%Y.%m).1 \\
+        ${IMAGE_NAME}:${IMAGE_TAG} make -f Makefile.spel build
+      EOF
+
+      cat "${MANIFEST_FILE}"
+
+  # Both formats included for different transfer scenarios:
+  # - .tar.gz: Direct transfers (GitLab→local, USB, SCP) - smaller, faster
+  # - .tar.gz.b64: SharePoint transfers (avoids binary corruption) - larger, safer
+  artifacts:
+    paths:
+      - spel-builder-*.tar.gz
+      - spel-builder-*.tar.gz.sha256
+      - spel-builder-*.tar.gz.b64
+      - spel-builder-*.tar.gz.b64.sha256
+      - spel-builder-*-manifest.txt
+    expire_in: 30 days
