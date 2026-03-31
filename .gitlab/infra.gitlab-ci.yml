@@ -68,7 +68,11 @@ infra:plan:
       cd infra
 
       source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
-      $TF_CMD init -input=false
+      for attempt in 1 2 3; do
+        echo "Attempt ${attempt}: $TF_CMD init"
+        if $TF_CMD init -input=false; then break; fi
+        if [ "$attempt" -lt 3 ]; then echo "Retrying in 15s..."; sleep 15; else echo "ERROR: init failed after 3 attempts"; exit 1; fi
+      done
 
       # Derive networking flags from AIRGAP_MODE
       if [ "${AIRGAP_MODE:-true}" = "true" ]; then
@@ -163,7 +167,11 @@ infra:create:
       cd infra
 
       source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
-      $TF_CMD init -input=false
+      for attempt in 1 2 3; do
+        echo "Attempt ${attempt}: $TF_CMD init"
+        if $TF_CMD init -input=false; then break; fi
+        if [ "$attempt" -lt 3 ]; then echo "Retrying in 15s..."; sleep 15; else echo "ERROR: init failed after 3 attempts"; exit 1; fi
+      done
 
       # Derive networking flags from AIRGAP_MODE
       if [ "${AIRGAP_MODE:-true}" = "true" ]; then
@@ -348,7 +356,12 @@ infra:destroy:
       cd infra
 
       source ./bootstrap-backend.sh --prefix "${INFRA_PREFIX}" --region "${PKR_VAR_aws_region}"
-      $TF_CMD init -input=false
+
+      for attempt in 1 2 3; do
+        echo "Attempt ${attempt}: $TF_CMD init"
+        if $TF_CMD init -input=false; then break; fi
+        if [ "$attempt" -lt 3 ]; then echo "Retrying in 15s..."; sleep 15; else echo "ERROR: init failed after 3 attempts"; exit 1; fi
+      done
 
       echo ""
       echo "=== Destroying All Infrastructure ==="

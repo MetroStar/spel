@@ -188,7 +188,21 @@ jobs:
 
       - name: OpenTofu init
         working-directory: infra
-        run: tofu init -input=false
+        run: |
+          for attempt in 1 2 3; do
+            echo "Attempt ${attempt}: tofu init"
+            if tofu init -input=false; then
+              echo "tofu init succeeded"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "tofu init failed, retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::tofu init failed after 3 attempts"
+              exit 1
+            fi
+          done
 
       - name: Check infrastructure status
         if: inputs.action == 'status'
