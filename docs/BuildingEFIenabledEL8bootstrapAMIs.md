@@ -166,7 +166,7 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
 
 3. Ensure to clone the following Git Repositories into the `root` user's `${HOME}`:
 
-    - https://github.com/MetroStar/granite
+    - https://github.com/MetroStar/chimera
     - https://github.com/MetroStar/amigen8
 
 4. Execute the "pivot-root" step
@@ -176,13 +176,13 @@ Some AMI-publishers &ndash; Red Hat and Amazon are known to do so &ndash; publis
 
         Note: because the `amigen` scripts create an SELinux-enabled operating system with pre-defined SELinux role-transitions configured into `sudo`'s configurations, it may be necessary to add the `-r unconfined_r` and `-t unconfined_t` flag-options to any use of `sudo`
 
-    3. Execute `bash <PATH_TO_GRANITE_GIT_REPO>/granite/scripts/pivot-root.sh`. If this runs successfully, you will be logged out.
+    3. Execute `bash <PATH_TO_CHIMERA_GIT_REPO>/chimera/scripts/pivot-root.sh`. If this runs successfully, you will be logged out.
 
         Note: If you observe any `permission denied` types of errors during this script's running, it is most likely because you were running under an overly-strict SELinux user-confinement. See prior note about baked-in SELinux role-transitions. Reboot the host and retry your privilege-escallation step
 
 4. Log back in to the EC2
 5. Escallate privileges to `root` (as per the "pivot-root" step
-6. Execute `bash <PATH_TO_GRANITE_GIT_REPO>/granite/scripts/free-root.sh`.
+6. Execute `bash <PATH_TO_CHIMERA_GIT_REPO>/chimera/scripts/free-root.sh`.
 7. Execute `umount /oldroot`
 8. Null the boot-disk:
 

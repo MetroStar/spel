@@ -20,16 +20,16 @@ pull_request_rules:
       - author=dependabot[bot]
       - "#approved-reviews-by>=1"
       # Must pass codebuild jobs before merge
-      - check-success = "build (granite-commercial, amazon-ebssurrogate.minimal-ol-8-hvm)"
-      - check-success = "build (granite-commercial, amazon-ebssurrogate.minimal-rhel-8-hvm)"
-      - check-success = "build (granite-commercial, amazon-ebssurrogate.minimal-centos-9stream-hvm)"
-      - check-success = "build (granite-commercial, amazon-ebssurrogate.minimal-ol-9-hvm)"
-      - check-success = "build (granite-commercial, amazon-ebssurrogate.minimal-rhel-9-hvm)"
-      - check-success = "build (granite-govcloud, amazon-ebssurrogate.minimal-ol-8-hvm)"
-      - check-success = "build (granite-govcloud, amazon-ebssurrogate.minimal-rhel-8-hvm)"
-      - check-success = "build (granite-govcloud, amazon-ebssurrogate.minimal-centos-9stream-hvm)"
-      - check-success = "build (granite-govcloud, amazon-ebssurrogate.minimal-ol-9-hvm)"
-      - check-success = "build (granite-govcloud, amazon-ebssurrogate.minimal-rhel-9-hvm)"
+      - check-success = "build (chimera-commercial, amazon-ebssurrogate.minimal-ol-8-hvm)"
+      - check-success = "build (chimera-commercial, amazon-ebssurrogate.minimal-rhel-8-hvm)"
+      - check-success = "build (chimera-commercial, amazon-ebssurrogate.minimal-centos-9stream-hvm)"
+      - check-success = "build (chimera-commercial, amazon-ebssurrogate.minimal-ol-9-hvm)"
+      - check-success = "build (chimera-commercial, amazon-ebssurrogate.minimal-rhel-9-hvm)"
+      - check-success = "build (chimera-govcloud, amazon-ebssurrogate.minimal-ol-8-hvm)"
+      - check-success = "build (chimera-govcloud, amazon-ebssurrogate.minimal-rhel-8-hvm)"
+      - check-success = "build (chimera-govcloud, amazon-ebssurrogate.minimal-centos-9stream-hvm)"
+      - check-success = "build (chimera-govcloud, amazon-ebssurrogate.minimal-ol-9-hvm)"
+      - check-success = "build (chimera-govcloud, amazon-ebssurrogate.minimal-rhel-9-hvm)"
     actions:
       merge:
         method: merge

@@ -1,10 +1,10 @@
 # STIG Exceptions and Compensating Controls
 
-This document describes STIG (Security Technical Implementation Guide) controls that are intentionally not implemented, require compensating controls, or must be configured post-deployment for Granite hardened AMIs.
+This document describes STIG (Security Technical Implementation Guide) controls that are intentionally not implemented, require compensating controls, or must be configured post-deployment for Chimera hardened AMIs.
 
 ## Overview
 
-Granite hardened AMIs are built using OpenSCAP with the DISA STIG profile. Due to the nature of cloud-based AMI builds, certain STIG controls cannot be applied at build time or require alternative implementations.
+Chimera hardened AMIs are built using OpenSCAP with the DISA STIG profile. Due to the nature of cloud-based AMI builds, certain STIG controls cannot be applied at build time or require alternative implementations.
 
 **Target Profile:** DISA STIG for RHEL 8 / RHEL 9 (and their clones: Oracle Linux, Rocky, Alma)  
 **OpenSCAP Datastream:** `ssg-ol9-ds.xml` / `ssg-rhel9-ds.xml`
@@ -60,7 +60,7 @@ These controls require Public Key Infrastructure (PKI) and smartcard reader hard
 
 ## Category 3: GUI/Desktop Environment
 
-These controls are marked "Not Applicable" because Granite AMIs are server builds without a graphical interface.
+These controls are marked "Not Applicable" because Chimera AMIs are server builds without a graphical interface.
 
 ### GNOME Desktop Controls
 All controls prefixed with `dconf_gnome_*` are not applicable:
@@ -166,7 +166,7 @@ These controls are intentionally not implemented with documented justification.
 
 ## Compliance Reporting
 
-Granite AMIs use two complementary compliance scanning tools at build time:
+Chimera AMIs use two complementary compliance scanning tools at build time:
 
 ### Goss Auditing (Ansible Lockdown)
 
@@ -178,7 +178,7 @@ document the delta between pre- and post-hardening compliance posture.
 
 The role handles all setup (downloading the Goss binary, cloning audit content
 from GitHub) via its defaults (`get_audit_binary_method: download`,
-`audit_content: git`). For air-gapped environments, set the `granite_goss_binary_url`
+`audit_content: git`). For air-gapped environments, set the `chimera_goss_binary_url`
 Packer variable to an internal mirror URL; when set, the build injects
 `audit_binary` and `get_audit_binary_checksum: false` into the role's extra vars.
 
@@ -219,7 +219,7 @@ oscap xccdf eval \
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
-| 2026-02-02 | 1.0 | Granite Team | Initial documentation |
+| 2026-02-02 | 1.0 | Chimera Team | Initial documentation |
 
 ---
 

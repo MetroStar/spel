@@ -3,10 +3,10 @@ set -eu -o pipefail
 
 echo "==========STARTING POST_BUILD=========="
 
-if [[ -n "$GRANITE_BUILDERS" ]]; then
-    for BUILDER in ${GRANITE_BUILDERS//,/ }; do
+if [[ -n "$CHIMERA_BUILDERS" ]]; then
+    for BUILDER in ${CHIMERA_BUILDERS//,/ }; do
         BUILD_NAME="${BUILDER//*./}"
-        AMI_NAME="${GRANITE_IDENTIFIER}-${BUILD_NAME}-${GRANITE_VERSION}.x86_64-gp3"
+        AMI_NAME="${CHIMERA_IDENTIFIER}-${BUILD_NAME}-${CHIMERA_VERSION}.x86_64-gp3"
         AMI_ID=$(aws ec2 describe-images --owners self --filters Name=name,Values="$AMI_NAME" --query 'Images[0].ImageId' --out text)
 
         if [[ "$AMI_ID" != "None" ]]; then

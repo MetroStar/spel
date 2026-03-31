@@ -1,11 +1,11 @@
-"""Test granite aws ami builds."""
+"""Test chimera aws ami builds."""
 
 # pylint: disable=missing-function-docstring
 import logging
 
 import pytest
 
-log = logging.getLogger("granite_validation")
+log = logging.getLogger("chimera_validation")
 log.setLevel(logging.INFO)
 
 
@@ -175,7 +175,7 @@ def test_emergency_service_override(host):  # noqa: D103
         ("ec2-utils"),
     ],
 )
-def test_granite_packages_el8(host, name):  # noqa: D103
+def test_chimera_packages_el8(host, name):  # noqa: D103
     pkg = host.package(name)
     if pkg.is_installed:
         log.info(
@@ -196,7 +196,7 @@ def test_granite_packages_el8(host, name):  # noqa: D103
         ("ec2-utils"),
     ],
 )
-def test_granite_packages_el9(host, name):  # noqa: D103
+def test_chimera_packages_el9(host, name):  # noqa: D103
     pkg = host.package(name)
     if pkg.is_installed:
         log.info(

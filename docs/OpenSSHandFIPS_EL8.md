@@ -1,6 +1,6 @@
 # OpenSSH and FIPS on EL8
 
-Red Hat 8 (and derivatives/forks) implement a new version of the OpenSSH service. The new service deprecates support for SSH keys that leverage signing-algorithms less modern than SHA2. As such, when one attempts to login to a freshly-launched, granite-BASED VM, the administator may find that the server rejects their SSH key. In order for a key to be recognized for login purposes:
+Red Hat 8 (and derivatives/forks) implement a new version of the OpenSSH service. The new service deprecates support for SSH keys that leverage signing-algorithms less modern than SHA2. As such, when one attempts to login to a freshly-launched, chimera-BASED VM, the administator may find that the server rejects their SSH key. In order for a key to be recognized for login purposes:
 
 * A SHA2 signing-method be used for all RSAv2 keys[^1]
 * RSAv2 keys should be at least 2048-bits long[^2]

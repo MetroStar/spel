@@ -1,6 +1,6 @@
 ### Q: What OSes are currently supported?
 
-A: The following OSes are currently supported via granite:
+A: The following OSes are currently supported via chimera:
 
 **Linux:**
 - RHEL 8
@@ -29,7 +29,7 @@ EL9 is also fully supported:
 - Oracle Linux (OL) 9
 - CentOS Stream 9
 
-Note: Initial functionality for any given ELx build orchestrated by granite starts with an amigen project. EL8 functionality is tracked in [amigen8](https://github.com/MetroStar/amigen8) and EL9 in [amigen9](https://github.com/MetroStar/amigen9).
+Note: Initial functionality for any given ELx build orchestrated by chimera starts with an amigen project. EL8 functionality is tracked in [amigen8](https://github.com/MetroStar/amigen8) and EL9 in [amigen9](https://github.com/MetroStar/amigen9).
 
 ### Q: Are the images STIG-hardened?
 
@@ -94,7 +94,7 @@ typically recommend our launch-driver,
 
 ### Q. Watchmaker looks promising: how do I use it?
 
-A. This FAQ is for using granite. That said Watchmaker includes a full
+A. This FAQ is for using chimera. That said Watchmaker includes a full
 [documentation set](https://watchmaker.readthedocs.io) that should help you
 with its use.
 
@@ -126,7 +126,7 @@ reprovisioning with a larger root volume is the cleanest approach. If
 reprovisioning is not practical, add a secondary drive and expand the root
 volume group onto it.
 
-### Q. My SSH keys don't work on the EL8 granite-images
+### Q. My SSH keys don't work on the EL8 chimera-images
 
 A. The version of OpenSSH server on EL8, combined with associated
 security-settings, is pickier about SSH keys used for authentication. RSAv2

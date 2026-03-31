@@ -1,7 +1,7 @@
-# Granite Infrastructure — Root Module
+# Chimera Infrastructure — Root Module
 
 OpenTofu root module that provisions all AWS infrastructure required for
-[Granite](../README.md) AMI builds. A single `tofu apply` stands up
+[Chimera](../README.md) AMI builds. A single `tofu apply` stands up
 networking, IAM, and Systems Manager (SSM) resources; a single
 `tofu destroy` tears everything down.
 
@@ -52,14 +52,14 @@ DynamoDB lock table, then generates a `backend.tf` file:
 
 ```bash
 cd infra/
-source bootstrap-backend.sh --prefix granite --region us-east-1
+source bootstrap-backend.sh --prefix chimera --region us-east-1
 ```
 
 Override defaults with flags:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--prefix` | `granite-offline` | Resource-name prefix |
+| `--prefix` | `chimera-offline` | Resource-name prefix |
 | `--region` | `$AWS_DEFAULT_REGION` or `us-east-1` | AWS region |
 | `--bucket` | `${PREFIX}-ssm-tfstate-${ACCOUNT_ID}` | S3 bucket name |
 | `--table` | `${PREFIX}-ssm-tflock` | DynamoDB table name |
@@ -72,8 +72,8 @@ values manually.
 
 ```bash
 tofu init
-tofu plan -var name_prefix=granite
-tofu apply -var name_prefix=granite
+tofu plan -var name_prefix=chimera
+tofu apply -var name_prefix=chimera
 ```
 
 ### 3. Use Outputs in Packer Builds
@@ -109,7 +109,7 @@ export INSTANCE_PROFILE=$(tofu output -raw instance_profile_name)
 | `create_kms_key` | `bool` | `true` | Create a new KMS CMK for SSM encryption |
 | `kms_key_arn` | `string` | `""` | ARN of an existing KMS key (when `create_kms_key = false`) |
 | `alert_email` | `string` | `""` | Email for SNS alert notifications (empty = skip subscription) |
-| `tags` | `map(string)` | `{}` | Additional tags merged with `Project=GRANITE` and `ManagedBy=opentofu` |
+| `tags` | `map(string)` | `{}` | Additional tags merged with `Project=CHIMERA` and `ManagedBy=opentofu` |
 
 ## Outputs
 
@@ -136,10 +136,10 @@ To run Packer builds without an Internet Gateway, disable the IGW and
 enable VPC endpoints for all AWS API traffic:
 
 ```hcl
-module "granite_infra" {
+module "chimera_infra" {
   source = "./infra"
 
-  name_prefix             = "granite"
+  name_prefix             = "chimera"
   public_subnet           = false
   enable_internet_gateway = false
   enable_packer_endpoints = true     # EC2 + STS endpoints
@@ -198,4 +198,4 @@ and required security-group rules.
   guide for provisioning all SSM resources without OpenTofu (air-gapped)
 - [CI/CD Setup](../docs/CI-CD-Setup.md) — CodeBuild / GitLab CI
   pipeline configuration and IAM requirements
-- [Granite README](../README.md) — project overview and AMI build process
+- [Chimera README](../README.md) — project overview and AMI build process

@@ -1,4 +1,4 @@
-# Granite Documentation Index
+# Chimera Documentation Index
 
 Quick reference to all project documentation.
 

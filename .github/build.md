@@ -4,7 +4,7 @@ This document explains the GitHub Actions workflow defined in `build.yml`, detai
 
 ## GitHub Actions Workflow: `build.yml`
 
-The `build.yml` workflow automates building STIGed AMIs (Amazon Machine Images) for the Granite project. It uses a **two-job architecture**: an `infra` job ensures persistent AWS infrastructure exists via OpenTofu, followed by a `build` job that runs Packer inside a pre-built Docker container.
+The `build.yml` workflow automates building STIGed AMIs (Amazon Machine Images) for the Chimera project. It uses a **two-job architecture**: an `infra` job ensures persistent AWS infrastructure exists via OpenTofu, followed by a `build` job that runs Packer inside a pre-built Docker container.
 
 ### Workflow Triggers
 
@@ -17,7 +17,7 @@ The `build.yml` workflow automates building STIGed AMIs (Amazon Machine Images) 
 
 ### Job 1: Ensure Infrastructure (`infra`)
 
-Calls `infra-setup.yml` via `workflow_call` with `action: apply` and the specified `infra_prefix` (default: `granite`). OpenTofu apply is idempotent — it creates infrastructure if missing, or is a no-op if it already exists.
+Calls `infra-setup.yml` via `workflow_call` with `action: apply` and the specified `infra_prefix` (default: `chimera`). OpenTofu apply is idempotent — it creates infrastructure if missing, or is a no-op if it already exists.
 
 **Outputs** (auto-discovered via `workflow_call`):
 - `vpc_id` — VPC for Packer builds
@@ -26,7 +26,7 @@ Calls `infra-setup.yml` via `workflow_call` with `action: apply` and the specifi
 - `instance_profile` — IAM instance profile for EC2
 - `kms_key_id` — KMS key for encrypted AMIs
 
-### Job 2: Build Granite AMIs (`build`)
+### Job 2: Build Chimera AMIs (`build`)
 
 Depends on `infra` job. Uses infrastructure outputs from Job 1. Runs on `ubuntu-latest` with a 6-hour timeout.
 
@@ -36,7 +36,7 @@ Depends on `infra` job. Uses infrastructure outputs from Job 1. Runs on `ubuntu-
    - Uses `actions/checkout@v4` with `submodules: recursive`
 
 2. **Download Docker Image Artifact**
-   - Uses `dawidd6/action-download-artifact@v6` to download the pre-built `granite-builder` image from a previous `offline-prepare.yml` run
+   - Uses `dawidd6/action-download-artifact@v6` to download the pre-built `chimera-builder` image from a previous `offline-prepare.yml` run
 
 3. **Import Docker Image**
    - Decodes base64 if needed, verifies SHA256 checksum, imports with `docker load`
@@ -48,7 +48,7 @@ Depends on `infra` job. Uses infrastructure outputs from Job 1. Runs on `ubuntu-
 5. **Build STIGed AMIs**
    - Runs Docker container with repository mounted at `/workspace`
    - AWS credentials and infrastructure outputs passed via environment variables (`PKR_VAR_aws_vpc_id`, `PKR_VAR_aws_subnet_id`, etc.)
-   - Executes `make -f Makefile.granite build` inside the container
+   - Executes `make -f Makefile.chimera build` inside the container
 
 ### Key Inputs
 
@@ -56,7 +56,7 @@ Depends on `infra` job. Uses infrastructure outputs from Job 1. Runs on `ubuntu-
 |-------|-------------|---------|
 | `docker_image_artifact` | Artifact name from `offline-prepare.yml` | (required) |
 | `run_rhel9`, `run_ol9`, etc. | OS builder toggles | `false` |
-| `infra_prefix` | Infrastructure name prefix for OpenTofu | `granite` |
+| `infra_prefix` | Infrastructure name prefix for OpenTofu | `chimera` |
 | `airgap_mode` | Enable air-gapped build settings | `false` |
 | `repo_mirror_baseurl` | Local YUM mirror URL for air-gapped builds | (empty) |
 
@@ -73,7 +73,7 @@ The `build/build.sh` script performs the following tasks:
 - Ensures required environment variables are set
 - Creates AWS CLI configuration files for commercial and GovCloud partitions
 - Checks and manages AMI quotas to avoid exceeding limits
-- Creates AMIs using Packer and the `granite/minimal.pkr.hcl` template
+- Creates AMIs using Packer and the `chimera/minimal.pkr.hcl` template
 - Retries failed builds until successful
 - Tests the built AMIs to ensure they meet the required standards using Packer and the `tests/minimal.pkr.hcl` template
 

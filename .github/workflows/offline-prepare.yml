@@ -1,7 +1,7 @@
 # =============================================================================
 # Prepare Offline Docker Image
 # =============================================================================
-# This workflow builds the Granite Docker image with all dependencies baked in
+# This workflow builds the Chimera Docker image with all dependencies baked in
 # and exports it as a portable tarball artifact for use in air-gapped environments.
 #
 # PREREQUISITES:
@@ -13,15 +13,15 @@
 #     - Renewal: https://registry1.dso.mil → User Profile → CLI Token → Regenerate
 #
 # OUTPUTS:
-#   - Docker image tarball: granite-builder-YYYYMMDD.tar.gz
+#   - Docker image tarball: chimera-builder-YYYYMMDD.tar.gz
 #   - Artifact retention: 30 days
 #
 # USAGE:
 #   The exported Docker image can be:
 #   1. Downloaded from GitHub Actions artifacts
 #   2. Transferred to air-gapped environment
-#   3. Imported with: gunzip -c granite-builder-*.tar.gz | docker load
-#   4. Run with: docker run -v $(pwd):/workspace granite-builder:<tag> make -f Makefile.granite build
+#   3. Imported with: gunzip -c chimera-builder-*.tar.gz | docker load
+#   4. Run with: docker run -v $(pwd):/workspace chimera-builder:<tag> make -f Makefile.chimera build
 # =============================================================================
 
 name: Prepare Offline Docker Image
@@ -61,11 +61,11 @@ jobs:
           fi
           
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
-          echo "IMAGE_NAME=granite-builder" >> $GITHUB_ENV
+          echo "IMAGE_NAME=chimera-builder" >> $GITHUB_ENV
           echo "FULL_IMAGE=${IMAGE_NAME}:${IMAGE_TAG}" >> $GITHUB_ENV
           
           echo "=== Build Configuration ==="
-          echo "Image: granite-builder:${IMAGE_TAG}"
+          echo "Image: chimera-builder:${IMAGE_TAG}"
           echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
       - name: Verify submodules
@@ -98,46 +98,46 @@ jobs:
       - name: Build Docker image
         run: |
           echo "=== Building Docker Image ==="
-          echo "Image: granite-builder:${IMAGE_TAG}"
+          echo "Image: chimera-builder:${IMAGE_TAG}"
           echo ""
           
           # Build with buildx for better caching
           docker buildx build \
-            --tag "granite-builder:${IMAGE_TAG}" \
-            --tag "granite-builder:latest" \
+            --tag "chimera-builder:${IMAGE_TAG}" \
+            --tag "chimera-builder:latest" \
             --load \
             --progress=plain \
             .
           
           echo ""
           echo "=== Build Complete ==="
-          docker images granite-builder
+          docker images chimera-builder
 
       - name: Verify Docker image
         run: |
           echo "=== Verifying Docker Image ==="
           
           # Run quick verification
-          docker run --rm "granite-builder:${IMAGE_TAG}" packer version
-          docker run --rm "granite-builder:${IMAGE_TAG}" ansible --version
-          docker run --rm "granite-builder:${IMAGE_TAG}" aws --version
+          docker run --rm "chimera-builder:${IMAGE_TAG}" packer version
+          docker run --rm "chimera-builder:${IMAGE_TAG}" ansible --version
+          docker run --rm "chimera-builder:${IMAGE_TAG}" aws --version
           
           # Show image details
           echo ""
           echo "=== Image Details ==="
-          docker inspect "granite-builder:${IMAGE_TAG}" --format='{{.Id}}' | head -c 20
+          docker inspect "chimera-builder:${IMAGE_TAG}" --format='{{.Id}}' | head -c 20
           echo ""
-          docker inspect "granite-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
-          docker inspect "granite-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
+          docker inspect "chimera-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
+          docker inspect "chimera-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
 
       - name: Export Docker image as tarball
         run: |
           echo "=== Exporting Docker Image ==="
           
-          TARBALL_NAME="granite-builder-${IMAGE_TAG}.tar.gz"
+          TARBALL_NAME="chimera-builder-${IMAGE_TAG}.tar.gz"
           
           # Save and compress
-          docker save "granite-builder:${IMAGE_TAG}" | gzip > "${TARBALL_NAME}"
+          docker save "chimera-builder:${IMAGE_TAG}" | gzip > "${TARBALL_NAME}"
           
           # Generate checksum for binary tarball
           sha256sum "${TARBALL_NAME}" > "${TARBALL_NAME}.sha256"
@@ -163,13 +163,13 @@ jobs:
 
       - name: Generate manifest
         run: |
-          MANIFEST_FILE="granite-builder-${IMAGE_TAG}-manifest.txt"
+          MANIFEST_FILE="chimera-builder-${IMAGE_TAG}-manifest.txt"
           
           cat > "${MANIFEST_FILE}" << EOF
-          Granite Builder Docker Image Manifest
+          Chimera Builder Docker Image Manifest
           ===================================
           
-          Image Tag: granite-builder:${IMAGE_TAG}
+          Image Tag: chimera-builder:${IMAGE_TAG}
           Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
           Git Commit: ${GITHUB_SHA}
           Git Ref: ${GITHUB_REF}
@@ -177,29 +177,29 @@ jobs:
           
           Image Details:
           --------------
-          $(docker inspect "granite-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}')
-          $(docker inspect "granite-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes')
-          $(docker inspect "granite-builder:${IMAGE_TAG}" --format='Created: {{.Created}}')
+          $(docker inspect "chimera-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}')
+          $(docker inspect "chimera-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes')
+          $(docker inspect "chimera-builder:${IMAGE_TAG}" --format='Created: {{.Created}}')
           
           Baked-in Tools:
           ---------------
-          Packer: $(docker run --rm "granite-builder:${IMAGE_TAG}" packer version 2>/dev/null | head -1)
-          Ansible: $(docker run --rm "granite-builder:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1)
-          Python: $(docker run --rm "granite-builder:${IMAGE_TAG}" python3 --version 2>/dev/null)
-          AWS CLI: $(docker run --rm "granite-builder:${IMAGE_TAG}" aws --version 2>/dev/null)
+          Packer: $(docker run --rm "chimera-builder:${IMAGE_TAG}" packer version 2>/dev/null | head -1)
+          Ansible: $(docker run --rm "chimera-builder:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1)
+          Python: $(docker run --rm "chimera-builder:${IMAGE_TAG}" python3 --version 2>/dev/null)
+          AWS CLI: $(docker run --rm "chimera-builder:${IMAGE_TAG}" aws --version 2>/dev/null)
           
           Tarball:
           --------
-          $(ls -lh granite-builder-${IMAGE_TAG}.tar.gz)
+          $(ls -lh chimera-builder-${IMAGE_TAG}.tar.gz)
           
           SHA256 Checksum:
           ----------------
-          $(cat granite-builder-${IMAGE_TAG}.tar.gz.sha256)
+          $(cat chimera-builder-${IMAGE_TAG}.tar.gz.sha256)
           
           Usage:
           ------
           # Import the image
-          gunzip -c granite-builder-${IMAGE_TAG}.tar.gz | docker load
+          gunzip -c chimera-builder-${IMAGE_TAG}.tar.gz | docker load
           
           # Run a build
           docker run --rm \\
@@ -207,9 +207,9 @@ jobs:
             -e AWS_ACCESS_KEY_ID \\
             -e AWS_SECRET_ACCESS_KEY \\
             -e AWS_DEFAULT_REGION=us-east-1 \\
-            -e GRANITE_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \\
-            -e GRANITE_VERSION=\$(date +%Y.%m).1 \\
-            granite-builder:${IMAGE_TAG} make -f Makefile.granite build
+            -e CHIMERA_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \\
+            -e CHIMERA_VERSION=\$(date +%Y.%m).1 \\
+            chimera-builder:${IMAGE_TAG} make -f Makefile.chimera build
           EOF
           
           cat "${MANIFEST_FILE}"
@@ -217,16 +217,16 @@ jobs:
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v6
         with:
-          name: granite-builder-${{ env.IMAGE_TAG }}
+          name: chimera-builder-${{ env.IMAGE_TAG }}
           # Both formats included for different transfer scenarios:
           # - .tar.gz: Direct transfers (GitHub→local, USB, SCP) - smaller, faster
           # - .tar.gz.b64: SharePoint transfers (avoids binary corruption) - larger, safer
           path: |
-            granite-builder-${{ env.IMAGE_TAG }}.tar.gz
-            granite-builder-${{ env.IMAGE_TAG }}.tar.gz.sha256
-            granite-builder-${{ env.IMAGE_TAG }}.tar.gz.b64
-            granite-builder-${{ env.IMAGE_TAG }}.tar.gz.b64.sha256
-            granite-builder-${{ env.IMAGE_TAG }}-manifest.txt
+            chimera-builder-${{ env.IMAGE_TAG }}.tar.gz
+            chimera-builder-${{ env.IMAGE_TAG }}.tar.gz.sha256
+            chimera-builder-${{ env.IMAGE_TAG }}.tar.gz.b64
+            chimera-builder-${{ env.IMAGE_TAG }}.tar.gz.b64.sha256
+            chimera-builder-${{ env.IMAGE_TAG }}-manifest.txt
           retention-days: 30
           compression-level: 0  # Already gzipped
 
@@ -234,23 +234,23 @@ jobs:
         if: always()
         run: |
           cat >> $GITHUB_STEP_SUMMARY << EOF
-          ## Granite Docker Image Build Summary
+          ## Chimera Docker Image Build Summary
           
           | Property | Value |
           |----------|-------|
-          | Image Tag | \`granite-builder:${IMAGE_TAG}\` |
+          | Image Tag | \`chimera-builder:${IMAGE_TAG}\` |
           | Build Date | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
           | Git Commit | \`${GITHUB_SHA:0:8}\` |
-          | Tarball Size | $(ls -lh granite-builder-${IMAGE_TAG}.tar.gz 2>/dev/null | awk '{print $5}' || echo 'N/A') |
+          | Tarball Size | $(ls -lh chimera-builder-${IMAGE_TAG}.tar.gz 2>/dev/null | awk '{print $5}' || echo 'N/A') |
           
           ### Baked-in Tools
-          - **Packer**: $(docker run --rm "granite-builder:${IMAGE_TAG}" packer version 2>/dev/null | head -1 || echo 'N/A')
-          - **Ansible**: $(docker run --rm "granite-builder:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1 || echo 'N/A')
-          - **Python**: $(docker run --rm "granite-builder:${IMAGE_TAG}" python3 --version 2>/dev/null || echo 'N/A')
-          - **AWS CLI**: $(docker run --rm "granite-builder:${IMAGE_TAG}" aws --version 2>/dev/null || echo 'N/A')
+          - **Packer**: $(docker run --rm "chimera-builder:${IMAGE_TAG}" packer version 2>/dev/null | head -1 || echo 'N/A')
+          - **Ansible**: $(docker run --rm "chimera-builder:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1 || echo 'N/A')
+          - **Python**: $(docker run --rm "chimera-builder:${IMAGE_TAG}" python3 --version 2>/dev/null || echo 'N/A')
+          - **AWS CLI**: $(docker run --rm "chimera-builder:${IMAGE_TAG}" aws --version 2>/dev/null || echo 'N/A')
           
           ### Artifact
-          Download the \`granite-builder-${IMAGE_TAG}\` artifact to get:
+          Download the \`chimera-builder-${IMAGE_TAG}\` artifact to get:
           - Docker image tarball (portable, air-gap compatible)
           - SHA256 checksum for verification
           - Build manifest with usage instructions
@@ -258,6 +258,6 @@ jobs:
           ### Next Steps
           1. Download the artifact from this workflow run
           2. Transfer to your build environment
-          3. Import: \`gunzip -c granite-builder-${IMAGE_TAG}.tar.gz | docker load\`
+          3. Import: \`gunzip -c chimera-builder-${IMAGE_TAG}.tar.gz | docker load\`
           4. Run builds using the \`build.yml\` workflow or manually with docker run
           EOF

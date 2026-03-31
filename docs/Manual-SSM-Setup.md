@@ -51,7 +51,7 @@ reference them by name.
 ```bash
 # ── Required ──────────────────────────────────────────────────────────
 export AWS_REGION="us-east-1"        # or us-gov-west-1 for GovCloud
-export PREFIX="granite"                 # resource name prefix
+export PREFIX="chimera"                 # resource name prefix
 export VPC_ID="vpc-XXXXXXXXX"        # your existing VPC
 export SUBNET_IDS="subnet-AAA subnet-BBB"  # private subnets (space-separated)
 export VPC_CIDR="10.0.0.0/16"       # VPC CIDR block
@@ -161,7 +161,7 @@ KMS_KEY_ID=$(aws kms create-key \
   --policy file:///tmp/kms-policy.json \
   --tags TagKey=Name,TagValue="${PREFIX}-ssm-key" \
          TagKey=ManagedBy,TagValue=manual \
-         TagKey=Module,TagValue=granite-ssm \
+         TagKey=Module,TagValue=chimera-ssm \
   --query KeyMetadata.KeyId --output text)
 
 KMS_KEY_ARN=$(aws kms describe-key --key-id "$KMS_KEY_ID" \
@@ -384,7 +384,7 @@ aws s3api put-bucket-logging \
 aws logs create-log-group \
   --log-group-name "/ssm/${PREFIX}" \
   --kms-key-id "$KMS_KEY_ARN" \
-  --tags Name="${PREFIX}-ssm-logs",ManagedBy=manual,Module=granite-ssm
+  --tags Name="${PREFIX}-ssm-logs",ManagedBy=manual,Module=chimera-ssm
 
 aws logs put-retention-policy \
   --log-group-name "/ssm/${PREFIX}" \
@@ -398,7 +398,7 @@ SNS_TOPIC_ARN=$(aws sns create-topic \
   --attributes "KmsMasterKeyId=${KMS_KEY_ARN}" \
   --tags Key=Name,Value="${PREFIX}-ssm-alerts" \
          Key=ManagedBy,Value=manual \
-         Key=Module,Value=granite-ssm \
+         Key=Module,Value=chimera-ssm \
   --query TopicArn --output text)
 
 echo "SNS Topic: $SNS_TOPIC_ARN"
@@ -440,7 +440,7 @@ ENDPOINT_SG=$(aws ec2 create-security-group \
   --tag-specifications "ResourceType=security-group,Tags=[
     {Key=Name,Value=${PREFIX}-ssm-endpoints-sg},
     {Key=ManagedBy,Value=manual},
-    {Key=Module,Value=granite-ssm}]" \
+    {Key=Module,Value=chimera-ssm}]" \
   --query GroupId --output text)
 
 aws ec2 authorize-security-group-ingress \
@@ -471,7 +471,7 @@ for SERVICE in ssm ssmmessages ec2messages logs kms; do
     --tag-specifications "ResourceType=vpc-endpoint,Tags=[
       {Key=Name,Value=${PREFIX}-${SERVICE}-endpoint},
       {Key=ManagedBy,Value=manual},
-      {Key=Module,Value=granite-ssm}]"
+      {Key=Module,Value=chimera-ssm}]"
 done
 ```
 
@@ -491,7 +491,7 @@ aws ec2 create-vpc-endpoint \
   --tag-specifications "ResourceType=vpc-endpoint,Tags=[
     {Key=Name,Value=${PREFIX}-s3-endpoint},
     {Key=ManagedBy,Value=manual},
-    {Key=Module,Value=granite-ssm}]"
+    {Key=Module,Value=chimera-ssm}]"
 ```
 
 ---
@@ -523,7 +523,7 @@ aws iam create-role \
   --role-name "${PREFIX}-ssm-instance-role" \
   --assume-role-policy-document file:///tmp/ec2-trust.json \
   --tags Key=Name,Value="${PREFIX}-ssm-instance-role" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 
 # Inline policy — SSM core, messaging, S3, CloudWatch, KMS
 cat > /tmp/ssm-instance-policy.json << POLICY
@@ -650,7 +650,7 @@ aws iam put-role-policy \
 aws iam create-instance-profile \
   --instance-profile-name "${PREFIX}-ssm-instance-profile" \
   --tags Key=Name,Value="${PREFIX}-ssm-instance-profile" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 
 aws iam add-role-to-instance-profile \
   --instance-profile-name "${PREFIX}-ssm-instance-profile" \
@@ -685,7 +685,7 @@ aws iam create-role \
   --role-name "${PREFIX}-ssm-dhmc-role" \
   --assume-role-policy-document file:///tmp/ssm-trust.json \
   --tags Key=Name,Value="${PREFIX}-ssm-dhmc-role" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 
 # Attach AWS-managed SSM policy
 aws iam attach-role-policy \
@@ -759,7 +759,7 @@ POLICY
 
 aws iam put-role-policy \
   --role-name "${PREFIX}-ssm-dhmc-role" \
-  --policy-name "${PREFIX}-ssm-dhmc-granite" \
+  --policy-name "${PREFIX}-ssm-dhmc-chimera" \
   --policy-document file:///tmp/dhmc-policy.json
 ```
 
@@ -873,10 +873,10 @@ POLICY
 
 CALLER_POLICY_ARN=$(aws iam create-policy \
   --policy-name "${PREFIX}-ssm-caller-policy" \
-  --description "Permissions for CI runners and operators to invoke SSM operations on Granite instances" \
+  --description "Permissions for CI runners and operators to invoke SSM operations on Chimera instances" \
   --policy-document file:///tmp/caller-policy.json \
   --tags Key=Name,Value="${PREFIX}-ssm-caller-policy" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm \
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm \
   --query Policy.Arn --output text)
 
 echo "Caller Policy ARN: $CALLER_POLICY_ARN"
@@ -1043,7 +1043,7 @@ aws ssm create-document \
   --document-format YAML \
   --content file:///tmp/doc-oscap.yaml \
   --tags Key=Name,Value="${PREFIX}-RunOpenSCAPScan" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 ```
 
 ### 11b. Windows STIG Enforce Document
@@ -1139,7 +1139,7 @@ aws ssm create-document \
   --document-format YAML \
   --content file:///tmp/doc-windows-stig.yaml \
   --tags Key=Name,Value="${PREFIX}-WindowsSTIGEnforce" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 ```
 
 ---
@@ -1380,7 +1380,7 @@ LINUX_BASELINE_ID=$(aws ssm create-patch-baseline \
   }' \
   --rejected-patches-action "ALLOW_AS_DEPENDENCY" \
   --tags Key=Name,Value="${PREFIX}-linux-stig-baseline" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm \
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm \
   --query BaselineId --output text)
 
 echo "Linux Baseline: $LINUX_BASELINE_ID"
@@ -1403,7 +1403,7 @@ WINDOWS_BASELINE_ID=$(aws ssm create-patch-baseline \
     }]
   }' \
   --tags Key=Name,Value="${PREFIX}-windows-stig-baseline" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm \
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm \
   --query BaselineId --output text)
 
 echo "Windows Baseline: $WINDOWS_BASELINE_ID"
@@ -1434,7 +1434,7 @@ LINUX_MW_ID=$(aws ssm create-maintenance-window \
   --cutoff "$MAINT_WINDOW_CUTOFF" \
   --no-allow-unassociated-targets \
   --tags Key=Name,Value="${PREFIX}-linux-patch-window" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm \
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm \
   --query WindowId --output text)
 
 # Register targets
@@ -1479,7 +1479,7 @@ WINDOWS_MW_ID=$(aws ssm create-maintenance-window \
   --cutoff "$MAINT_WINDOW_CUTOFF" \
   --no-allow-unassociated-targets \
   --tags Key=Name,Value="${PREFIX}-windows-patch-window" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm \
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm \
   --query WindowId --output text)
 
 WINDOWS_MW_TARGET=$(aws ssm register-target-with-maintenance-window \
@@ -1518,7 +1518,7 @@ aws ssm register-task-with-maintenance-window \
 ## 17. Auto-Tagging (EventBridge + Lambda)
 
 Automatically propagates `StigPlatform` and `StigManaged` tags from
-Granite AMIs to newly launched EC2 instances, so State Manager associations
+Chimera AMIs to newly launched EC2 instances, so State Manager associations
 target them automatically.
 
 > Corresponds to:
@@ -1573,7 +1573,7 @@ def handler(event, context):
         ami_tags = {t['Key']: t['Value'] for t in images['Images'][0].get('Tags', [])}
 
         if ami_tags.get('StigManaged') != 'true':
-            return {'status': 'not a Granite AMI'}
+            return {'status': 'not a Chimera AMI'}
 
         tags_to_copy = []
         for key in ['StigPlatform', 'StigManaged']:
@@ -1614,7 +1614,7 @@ aws iam create-role \
   --role-name "${PREFIX}-lambda-tag-propagation" \
   --assume-role-policy-document file:///tmp/lambda-trust.json \
   --tags Key=Name,Value="${PREFIX}-lambda-tag-propagation" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 
 cat > /tmp/lambda-policy.json << POLICY
 {
@@ -1654,14 +1654,14 @@ LAMBDA_ROLE_ARN=$(aws iam get-role \
 
 aws lambda create-function \
   --function-name "${PREFIX}-ami-tag-propagation" \
-  --description "Propagate StigPlatform and StigManaged tags from Granite AMIs to instances" \
+  --description "Propagate StigPlatform and StigManaged tags from Chimera AMIs to instances" \
   --runtime python3.12 \
   --handler index.handler \
   --role "$LAMBDA_ROLE_ARN" \
   --timeout 30 \
   --memory-size 128 \
   --zip-file fileb:///tmp/tag-propagation.zip \
-  --tags Name="${PREFIX}-ami-tag-propagation",ManagedBy=manual,Module=granite-ssm
+  --tags Name="${PREFIX}-ami-tag-propagation",ManagedBy=manual,Module=chimera-ssm
 ```
 
 ### 17d. EventBridge Rule
@@ -1669,14 +1669,14 @@ aws lambda create-function \
 ```bash
 aws events put-rule \
   --name "${PREFIX}-ami-tag-propagation" \
-  --description "Propagate Granite AMI tags to newly launched instances" \
+  --description "Propagate Chimera AMI tags to newly launched instances" \
   --event-pattern '{
     "source": ["aws.ec2"],
     "detail-type": ["EC2 Instance State-change Notification"],
     "detail": {"state": ["running"]}
   }' \
   --tags Key=Name,Value="${PREFIX}-ami-tag-propagation" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 
 LAMBDA_ARN=$(aws lambda get-function \
   --function-name "${PREFIX}-ami-tag-propagation" \
@@ -1710,7 +1710,7 @@ aws logs put-metric-filter \
   --filter-name "${PREFIX}-ssm-errors" \
   --filter-pattern "?ERROR ?Failed" \
   --metric-transformations \
-    metricName="${PREFIX}-SSMErrors",metricNamespace="GRANITE/SSM",metricValue=1,defaultValue=0
+    metricName="${PREFIX}-SSMErrors",metricNamespace="CHIMERA/SSM",metricValue=1,defaultValue=0
 
 # Metric filter: Compliance failures
 aws logs put-metric-filter \
@@ -1718,7 +1718,7 @@ aws logs put-metric-filter \
   --filter-name "${PREFIX}-compliance-failures" \
   --filter-pattern "?NON_COMPLIANT ?fail" \
   --metric-transformations \
-    metricName="${PREFIX}-ComplianceFailures",metricNamespace="GRANITE/SSM",metricValue=1,defaultValue=0
+    metricName="${PREFIX}-ComplianceFailures",metricNamespace="CHIMERA/SSM",metricValue=1,defaultValue=0
 
 # Alarm: SSM errors
 aws cloudwatch put-metric-alarm \
@@ -1727,7 +1727,7 @@ aws cloudwatch put-metric-alarm \
   --comparison-operator GreaterThanThreshold \
   --evaluation-periods 1 \
   --metric-name "${PREFIX}-SSMErrors" \
-  --namespace "GRANITE/SSM" \
+  --namespace "CHIMERA/SSM" \
   --period 300 \
   --statistic Sum \
   --threshold 0 \
@@ -1735,7 +1735,7 @@ aws cloudwatch put-metric-alarm \
   --alarm-actions "$SNS_TOPIC_ARN" \
   --ok-actions "$SNS_TOPIC_ARN" \
   --tags Key=Name,Value="${PREFIX}-ssm-errors-alarm" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 
 # Alarm: Compliance failures
 aws cloudwatch put-metric-alarm \
@@ -1744,7 +1744,7 @@ aws cloudwatch put-metric-alarm \
   --comparison-operator GreaterThanThreshold \
   --evaluation-periods 1 \
   --metric-name "${PREFIX}-ComplianceFailures" \
-  --namespace "GRANITE/SSM" \
+  --namespace "CHIMERA/SSM" \
   --period 300 \
   --statistic Sum \
   --threshold 0 \
@@ -1752,7 +1752,7 @@ aws cloudwatch put-metric-alarm \
   --alarm-actions "$SNS_TOPIC_ARN" \
   --ok-actions "$SNS_TOPIC_ARN" \
   --tags Key=Name,Value="${PREFIX}-compliance-failures-alarm" \
-         Key=ManagedBy,Value=manual Key=Module,Value=granite-ssm
+         Key=ManagedBy,Value=manual Key=Module,Value=chimera-ssm
 ```
 
 ---
@@ -1913,7 +1913,7 @@ done
 
 # VPC endpoints
 for VPCE in $(aws ec2 describe-vpc-endpoints \
-  --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Module,Values=granite-ssm" \
+  --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Module,Values=chimera-ssm" \
   --query 'VpcEndpoints[*].VpcEndpointId' --output text 2>/dev/null); do
   aws ec2 delete-vpc-endpoints --vpc-endpoint-ids "$VPCE"
 done

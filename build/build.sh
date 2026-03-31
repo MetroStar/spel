@@ -119,33 +119,33 @@ echo "==========STARTING BUILD=========="
 
 ANSIBLE_LOCKDOWNS=""
 
-if [[ -n "$GRANITE_BUILDERS" ]]; then
+if [[ -n "$CHIMERA_BUILDERS" ]]; then
     FAILED_BUILDS=()
     SUCCESS_BUILDS=()
 
-    packer init granite/minimal.pkr.hcl
+    packer init chimera/minimal.pkr.hcl
 
     packer validate \
-        -only "${GRANITE_BUILDERS:?}" \
-        -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
-        -var "granite_version=${GRANITE_VERSION:?}" \
-        granite/minimal.pkr.hcl
+        -only "${CHIMERA_BUILDERS:?}" \
+        -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
+        -var "chimera_version=${CHIMERA_VERSION:?}" \
+        chimera/minimal.pkr.hcl
 
     build_packer_templates() {
         packer build \
-            -only "${GRANITE_BUILDERS:?}" \
-            -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
-            -var "granite_version=${GRANITE_VERSION:?}" \
+            -only "${CHIMERA_BUILDERS:?}" \
+            -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
+            -var "chimera_version=${CHIMERA_VERSION:?}" \
             -var "aws_ami_groups=[]" \
-            granite/minimal.pkr.hcl
+            chimera/minimal.pkr.hcl
 
         BUILDEXIT=$?
 
         FAILED_BUILDS=()
 
-        for BUILDER in ${GRANITE_BUILDERS//,/ }; do
+        for BUILDER in ${CHIMERA_BUILDERS//,/ }; do
             BUILD_NAME="${BUILDER//*./}"
-            AMI_NAME="${GRANITE_IDENTIFIER}-${BUILD_NAME}-${GRANITE_VERSION}.x86_64-gp3"
+            AMI_NAME="${CHIMERA_IDENTIFIER}-${BUILD_NAME}-${CHIMERA_VERSION}.x86_64-gp3"
             BUILDER_ENV="${BUILDER//[.-]/_}"
             BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text)
             if [[ "$BUILDER_AMI" == "None" ]]
@@ -179,19 +179,19 @@ if [[ -n "$WINDOWS_BUILDERS" ]]; then
     fi
 fi
 
-packer init granite/hardened.pkr.hcl
+packer init chimera/hardened.pkr.hcl
 
 packer validate \
     -only "${ANSIBLE_LOCKDOWNS}" \
-    -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
-    -var "granite_version=${GRANITE_VERSION:?}" \
-    granite/hardened.pkr.hcl
+    -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
+    -var "chimera_version=${CHIMERA_VERSION:?}" \
+    chimera/hardened.pkr.hcl
 
 packer build \
     -only "${ANSIBLE_LOCKDOWNS}" \
-    -var "granite_identifier=${GRANITE_IDENTIFIER:?}" \
-    -var "granite_version=${GRANITE_VERSION:?}" \
-    granite/hardened.pkr.hcl
+    -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
+    -var "chimera_version=${CHIMERA_VERSION:?}" \
+    chimera/hardened.pkr.hcl
 
 LOCKEXIT=$?
 

@@ -1,6 +1,6 @@
 # CI/CD Setup Guide
 
-This guide covers the CI/CD pipeline configuration for Granite (STIG-Partitioned Enterprise Linux) AMI builds using Docker containers with baked-in dependencies.
+This guide covers the CI/CD pipeline configuration for Chimera (STIG-Partitioned Enterprise Linux) AMI builds using Docker containers with baked-in dependencies.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This guide covers the CI/CD pipeline configuration for Granite (STIG-Partitioned
 
 ## Overview
 
-The Granite CI/CD pipeline uses a **Docker-based build system** where all dependencies are baked into a portable container image. This approach offers several advantages:
+The Chimera CI/CD pipeline uses a **Docker-based build system** where all dependencies are baked into a portable container image. This approach offers several advantages:
 
 1. **Portability**: The Docker image can be exported and transferred to air-gapped environments
 2. **Reproducibility**: All builds use identical dependency versions
@@ -43,7 +43,7 @@ The Granite CI/CD pipeline uses a **Docker-based build system** where all depend
 │  │  3. Export as gzipped tarball                                        │   │
 │  │  4. Upload artifact (30-day retention)                               │   │
 │  │                                                                      │   │
-│  │  Output: granite-builder-YYYYMMDD.tar.gz (~305 MB)                      │   │
+│  │  Output: chimera-builder-YYYYMMDD.tar.gz (~305 MB)                      │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                               │                                              │
 │                               ▼                                              │
@@ -86,7 +86,7 @@ The Granite CI/CD pipeline uses a **Docker-based build system** where all depend
 
 ### Docker Image Contents
 
-The `granite-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes:
+The `chimera-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes:
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
@@ -381,8 +381,8 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
         "s3:ListBucketVersions"
       ],
       "Resource": [
-        "arn:*:s3:::granite-*",
-        "arn:*:s3:::granite-*/*"
+        "arn:*:s3:::chimera-*",
+        "arn:*:s3:::chimera-*/*"
       ]
     },
     {
@@ -396,7 +396,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
         "dynamodb:DeleteItem",
         "dynamodb:TagResource"
       ],
-      "Resource": "arn:*:dynamodb:*:*:table/granite-*"
+      "Resource": "arn:*:dynamodb:*:*:table/chimera-*"
     },
     {
       "Sid": "TofuCloudWatch",
@@ -482,7 +482,7 @@ The OpenTofu root module at `infra/` creates an instance profile with minimal pe
 
 - **SSM Access**: For Session Manager connectivity (if using SSH via SSM)
 - **S3 Access**: To AWS-managed SSM buckets for agent operation
-- **S3 Build Artifacts**: `s3:GetObject` and `s3:ListBucket` on the Granite SSM bucket for downloading build artifacts (STIG playbooks, AL2023 STIG scripts) during AMI builds
+- **S3 Build Artifacts**: `s3:GetObject` and `s3:ListBucket` on the Chimera SSM bucket for downloading build artifacts (STIG playbooks, AL2023 STIG scripts) during AMI builds
 - **CloudWatch Logs**: For optional logging
 
 These are created automatically when you run the `infra:create` job (GitLab) or when `build.yml` calls `infra-setup.yml` (GitHub Actions).
@@ -537,7 +537,7 @@ EOF
 
 # Replace placeholders
 sed -i 's/ACCOUNT_ID/123456789012/' trust-policy.json
-sed -i 's|OWNER/REPO|MetroStar/granite|' trust-policy.json
+sed -i 's|OWNER/REPO|MetroStar/chimera|' trust-policy.json
 
 # Create the role
 aws iam create-role \
@@ -629,7 +629,7 @@ Create an IAM role that GitLab CI can assume via OIDC. The trust policy restrict
 ACCOUNT_ID="123456789012"
 GITLAB_URL="https://gitlab.example.mil"
 GITLAB_HOST="${GITLAB_URL#https://}"  # e.g., gitlab.example.mil
-PROJECT_PATH="my-group/granite"         # your GitLab project path
+PROJECT_PATH="my-group/chimera"         # your GitLab project path
 
 # For GovCloud accounts, use "aws-us-gov" partition
 PARTITION="aws-us-gov"  # or "aws" for commercial
@@ -659,18 +659,18 @@ EOF
 
 # Create the role
 aws iam create-role \
-  --role-name Granite_Packer \
+  --role-name Chimera_Packer \
   --assume-role-policy-document file://trust-policy-gitlab.json \
   --max-session-duration 21600
 
 # Attach the same Packer and OpenTofu permissions (from sections 2 and 3 above)
 aws iam put-role-policy \
-  --role-name Granite_Packer \
+  --role-name Chimera_Packer \
   --policy-name PackerBuildPolicy \
   --policy-document file://packer-policy.json
 
 aws iam put-role-policy \
-  --role-name Granite_Packer \
+  --role-name Chimera_Packer \
   --policy-name OpenTofuInfraPolicy \
   --policy-document file://opentofu-policy.json
 ```
@@ -680,7 +680,7 @@ aws iam put-role-policy \
 #### Store Role ARN in GitLab CI/CD
 
 1. Go to **Settings** → **CI/CD** → **Variables**
-2. Add a variable named `CI_AWS_ROLE_ARN` with value `arn:aws-us-gov:iam::ACCOUNT_ID:role/Granite_Packer`
+2. Add a variable named `CI_AWS_ROLE_ARN` with value `arn:aws-us-gov:iam::ACCOUNT_ID:role/Chimera_Packer`
 3. Mark as **Protected** and **Masked**
 
 When `CI_AWS_ROLE_ARN` is set, the pipeline automatically uses OIDC federation. When empty (the default), it falls back to static `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` variables.
@@ -691,7 +691,7 @@ When `CI_AWS_ROLE_ARN` is set, the pipeline automatically uses OIDC federation. 
 
 **File**: `.github/workflows/offline-prepare.yml`
 
-**Purpose**: Build the Granite Docker image with all dependencies baked in and export it as a portable tarball artifact.
+**Purpose**: Build the Chimera Docker image with all dependencies baked in and export it as a portable tarball artifact.
 
 #### Trigger
 
@@ -718,7 +718,7 @@ on:
 
 3. **Build Docker image**
    - Uses `docker buildx` for efficient caching
-   - Tags image as `granite-builder:YYYYMMDD` and `granite-builder:latest`
+   - Tags image as `chimera-builder:YYYYMMDD` and `chimera-builder:latest`
    - Multi-stage build keeps final image size minimal
 
 4. **Verify Docker image**
@@ -733,7 +733,7 @@ on:
 6. **Upload artifact**
    - Uploads tarball, checksum, and manifest
    - 30-day retention period
-   - Artifact name: `granite-builder-YYYYMMDD`
+   - Artifact name: `chimera-builder-YYYYMMDD`
 
 #### Usage
 
@@ -746,10 +746,10 @@ on:
 #### Output Artifact Contents
 
 ```
-granite-builder-YYYYMMDD/
-├── granite-builder-YYYYMMDD.tar.gz       # Docker image tarball (~305 MB)
-├── granite-builder-YYYYMMDD.tar.gz.sha256 # SHA256 checksum
-└── granite-builder-YYYYMMDD-manifest.txt  # Build manifest with tool versions
+chimera-builder-YYYYMMDD/
+├── chimera-builder-YYYYMMDD.tar.gz       # Docker image tarball (~305 MB)
+├── chimera-builder-YYYYMMDD.tar.gz.sha256 # SHA256 checksum
+└── chimera-builder-YYYYMMDD-manifest.txt  # Build manifest with tool versions
 ```
 
 ### Workflow 2: Build STIGed AMIs
@@ -763,7 +763,7 @@ granite-builder-YYYYMMDD/
 Before running this workflow:
 
 1. Run the `offline-prepare.yml` workflow first
-2. Note the artifact name (e.g., `granite-builder-20251230`)
+2. Note the artifact name (e.g., `chimera-builder-20251230`)
 3. Ensure IAM role has `MaxSessionDuration >= 21600`
 
 #### Trigger
@@ -773,7 +773,7 @@ on:
   workflow_dispatch:
     inputs:
       docker_image_artifact:
-        description: "Docker image artifact name (e.g., granite-builder-20251231)"
+        description: "Docker image artifact name (e.g., chimera-builder-20251231)"
         required: true
         type: string
       run_amzn2023:
@@ -858,7 +858,7 @@ on:
      - Repository mounted at `/workspace`
      - AWS credentials passed via environment variables
      - Build configuration via environment variables
-   - Executes `make -f Makefile.granite build`
+   - Executes `make -f Makefile.chimera build`
 
 #### Usage
 
@@ -879,7 +879,7 @@ The workflow uses OIDC to obtain AWS credentials without storing secrets:
   with:
     aws-region: us-east-1
     role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
-    role-session-name: granite-build
+    role-session-name: chimera-build
     role-duration-seconds: 21600  # 6 hours
 ```
 
@@ -915,7 +915,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 |----------|-------------|---------|
 | `AWS_ACCESS_KEY_ID` | AWS access key | `AKIA...` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | `secret` |
-| `DOCKER_IMAGE_PATH` | Path to Docker tarball | `/transfer/granite-builder-*.tar.gz` |
+| `DOCKER_IMAGE_PATH` | Path to Docker tarball | `/transfer/chimera-builder-*.tar.gz` |
 
 #### Optional Variables
 
@@ -927,7 +927,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | `PKR_VAR_aws_vpc_id` | VPC ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_kms_key_id` | KMS key ARN for CMK-encrypted AMIs | (none) |
-| `INFRA_PREFIX` | Prefix for created resources | `granite` |
+| `INFRA_PREFIX` | Prefix for created resources | `chimera` |
 | `ENABLE_INTERNET_GATEWAY` | Create IGW and default route (`false` for air-gapped) | `true` |
 | `ENABLE_PACKER_ENDPOINTS` | Create EC2 + STS VPC endpoints (`true` for air-gapped) | `false` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
@@ -952,7 +952,7 @@ These variables configure Linux builds to use local repository mirrors instead o
 | `AMIGEN9_EXTRA_RPMS` | JSON array of extra RPMs for EL9 | (none) |
 | `PKR_VAR_amigen8_repo_sources` | JSON array of EL8 repo source RPM URLs | (none) |
 | `PKR_VAR_amigen9_repo_sources` | JSON array of EL9 repo source RPM URLs | (none) |
-| `GRANITE_GOSS_BINARY_URL` | URL to Goss binary for air-gapped STIG audit scans | (none) |
+| `CHIMERA_GOSS_BINARY_URL` | URL to Goss binary for air-gapped STIG audit scans | (none) |
 
 > **Important**: For air-gapped Linux builds, you must create a repo configuration RPM
 > that installs your mirror settings into the chroot. See [Air-Gapped Linux Builds](#air-gapped-linux-builds).
@@ -965,11 +965,11 @@ These variables configure Linux builds to use local repository mirrors instead o
 
 ```bash
 # On transfer workstation
-# Download artifact from GitHub Actions (granite-builder-YYYYMMDD.tar.gz)
+# Download artifact from GitHub Actions (chimera-builder-YYYYMMDD.tar.gz)
 # Transfer to air-gapped environment
 
 # Place tarball in accessible location
-cp granite-builder-*.tar.gz /transfer/
+cp chimera-builder-*.tar.gz /transfer/
 ```
 
 **Step 2: Run import job**
@@ -1019,8 +1019,8 @@ import:docker:
     - gunzip -c "${TARBALL}" | docker load
     
     # Verify image
-    - docker run --rm "granite-builder:${TAG}" packer version
-    - docker run --rm "granite-builder:${TAG}" ansible --version
+    - docker run --rm "chimera-builder:${TAG}" packer version
+    - docker run --rm "chimera-builder:${TAG}" ansible --version
 ```
 
 #### infra:create
@@ -1056,9 +1056,9 @@ build:rhel9:
         -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
         -e AWS_DEFAULT_REGION="${PKR_VAR_aws_region}" \
         -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
-        -e GRANITE_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
-        "granite-builder:${DOCKER_IMAGE_TAG}" \
-        make -f Makefile.granite build
+        -e CHIMERA_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
+        "chimera-builder:${DOCKER_IMAGE_TAG}" \
+        make -f Makefile.chimera build
 ```
 
 > **Note**: The workflow automatically sets `PKR_VAR_aws_ami_regions` to include the build region.
@@ -1075,7 +1075,7 @@ build:rhel9:
 **Solution**:
 ```bash
 # Verify tarball location
-ls -lh /transfer/granite-builder-*.tar.gz
+ls -lh /transfer/chimera-builder-*.tar.gz
 
 # Ensure DOCKER_IMAGE_PATH variable matches actual path
 echo $DOCKER_IMAGE_PATH
@@ -1093,8 +1093,8 @@ echo $DOCKER_IMAGE_PATH
 # Re-transfer the tarball from GitHub Actions artifact
 
 # Verify checksum manually
-sha256sum granite-builder-*.tar.gz
-cat granite-builder-*.tar.gz.sha256
+sha256sum chimera-builder-*.tar.gz
+cat chimera-builder-*.tar.gz.sha256
 ```
 
 #### AWS Credentials Expire During Build
@@ -1124,7 +1124,7 @@ docker run --rm \
   -e AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY \
   -e AWS_SESSION_TOKEN \
-  granite-builder:latest aws sts get-caller-identity
+  chimera-builder:latest aws sts get-caller-identity
 
 # Ensure all three variables are exported before running
 export AWS_ACCESS_KEY_ID="..."
@@ -1171,7 +1171,7 @@ docker run -it --rm \
   -v "$(pwd):/workspace" \
   -e AWS_ACCESS_KEY_ID \
   -e AWS_SECRET_ACCESS_KEY \
-  granite-builder:latest /bin/bash
+  chimera-builder:latest /bin/bash
 
 # Inside container:
 packer version
@@ -1190,7 +1190,7 @@ docker run --rm \
   -v "$(pwd):/workspace" \
   -e PACKER_LOG=1 \
   -e PACKER_LOG_PATH=/workspace/packer.log \
-  granite-builder:latest make -f Makefile.granite build
+  chimera-builder:latest make -f Makefile.chimera build
 
 # Review log file
 cat packer.log
@@ -1233,7 +1233,7 @@ configuration RPM.
 
 ### Understanding the Build Process
 
-The Granite build creates a chroot environment at `/mnt/ec2-root` where the AMI filesystem is built.
+The Chimera build creates a chroot environment at `/mnt/ec2-root` where the AMI filesystem is built.
 This chroot is completely separate from the builder host and does **not** inherit repository
 configurations. The `OSpackages.sh` script:
 
@@ -1376,6 +1376,6 @@ The environment variable is not reaching the build script. Check that:
   - `.github/workflows/build.yml`
 - **GitLab CI Configuration**: `.gitlab-ci.yml`
 - **Build Script**: `build/build.sh`
-- **Makefile**: `Makefile.granite`
+- **Makefile**: `Makefile.chimera`
 - **Quick Reference**: `docs/QUICK-REFERENCE-Optimization.md`
 - **Storage Optimization**: `docs/Storage-Optimization.md`

@@ -6,7 +6,7 @@
 #
 # PREREQUISITES:
 #   1. Run the "Prepare Offline Docker Image" workflow first (offline-prepare.yml)
-#   2. Download the granite-builder-YYYYMMDD artifact from that workflow
+#   2. Download the chimera-builder-YYYYMMDD artifact from that workflow
 #   3. Provide the artifact name when running this workflow
 #   4. IAM role MaxSessionDuration must be >= 21600 (6 hours):
 #        aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
@@ -27,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       docker_image_artifact:
-        description: "Docker image artifact name (e.g., granite-builder-20251231)"
+        description: "Docker image artifact name (e.g., chimera-builder-20251231)"
         required: true
         type: string
       aws_region:
@@ -152,7 +152,7 @@ jobs:
   # Build Job — build STIGed AMIs using Docker container
   # ==========================================================================
   build:
-    name: Build Granite AMI's
+    name: Build Chimera AMI's
     needs: infra
     runs-on: ubuntu-latest
     timeout-minutes: 360  # 6 hours for multiple AMI builds
@@ -178,7 +178,7 @@ jobs:
           echo "=== Importing Docker Image ==="
           
           # Decode base64 file if present
-          B64_FILE=$(ls ./docker-image/granite-builder-*.tar.gz.b64 2>/dev/null | head -1)
+          B64_FILE=$(ls ./docker-image/chimera-builder-*.tar.gz.b64 2>/dev/null | head -1)
           if [ -n "$B64_FILE" ]; then
             echo "Found base64-encoded file: ${B64_FILE}"
             echo "Decoding base64 tarball..."
@@ -187,12 +187,12 @@ jobs:
           fi
           
           # Find the tarball
-          TARBALL=$(ls ./docker-image/granite-builder-*.tar.gz 2>/dev/null | head -1)
+          TARBALL=$(ls ./docker-image/chimera-builder-*.tar.gz 2>/dev/null | head -1)
           
           if [ -z "$TARBALL" ]; then
             echo "ERROR: No Docker image tarball found in artifact!"
             echo ""
-            echo "Expected file: granite-builder-*.tar.gz"
+            echo "Expected file: chimera-builder-*.tar.gz"
             echo "Artifact contents:"
             ls -la ./docker-image/
             echo ""
@@ -226,33 +226,33 @@ jobs:
           gunzip -c "${TARBALL}" | docker load
           
           # Extract the image tag from tarball name
-          IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/granite-builder-//')
+          IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/chimera-builder-//')
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
           
           echo ""
           echo "=== Import Complete ==="
-          docker images granite-builder
+          docker images chimera-builder
 
       - name: Verify Docker image
         run: |
           echo "=== Docker Image Verification ==="
           
-          docker run --rm "granite-builder:${IMAGE_TAG}" packer version
-          docker run --rm "granite-builder:${IMAGE_TAG}" ansible --version | head -3
-          docker run --rm "granite-builder:${IMAGE_TAG}" aws --version
+          docker run --rm "chimera-builder:${IMAGE_TAG}" packer version
+          docker run --rm "chimera-builder:${IMAGE_TAG}" ansible --version | head -3
+          docker run --rm "chimera-builder:${IMAGE_TAG}" aws --version
           
           echo ""
           echo "=== Image Details ==="
-          docker inspect "granite-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
-          docker inspect "granite-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
-          docker inspect "granite-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
+          docker inspect "chimera-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
+          docker inspect "chimera-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
+          docker inspect "chimera-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ inputs.aws_region }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
-          role-session-name: granite-build
+          role-session-name: chimera-build
           role-duration-seconds: 21600  # 6 hours - must be <= IAM role MaxSessionDuration
 
       - name: Upload STIG playbooks to S3
@@ -262,12 +262,12 @@ jobs:
 
           S3_BUCKET="${{ needs.infra.outputs.s3_bucket_name }}"
           echo "Target bucket: ${S3_BUCKET}"
-          echo "Extracting roles from granite-builder:${IMAGE_TAG}"
+          echo "Extracting roles from chimera-builder:${IMAGE_TAG}"
 
           # Extract Ansible Lockdown roles from the Docker image
-          ROLES_DIR="${GITHUB_WORKSPACE}/granite/ansible/roles"
+          ROLES_DIR="${GITHUB_WORKSPACE}/chimera/ansible/roles"
           mkdir -p "$ROLES_DIR"
-          CID=$(docker create "granite-builder:${IMAGE_TAG}" /bin/true)
+          CID=$(docker create "chimera-builder:${IMAGE_TAG}" /bin/true)
           for ROLE in RHEL8-STIG RHEL9-STIG; do
             docker cp "${CID}:/opt/ansible/roles/${ROLE}" "$ROLES_DIR/" 2>/dev/null && \
               echo "  [OK] Extracted ${ROLE}" || \
@@ -294,7 +294,7 @@ jobs:
           echo "--- Packaging AL2023 STIG script ---"
           AL2023_STAGING=$(mktemp -d)
           # Extract the base64-encoded AWS STIG tarball from the Docker image
-          CID=$(docker create "granite-builder:${IMAGE_TAG}" /bin/true)
+          CID=$(docker create "chimera-builder:${IMAGE_TAG}" /bin/true)
           docker cp "${CID}:/opt/offline-packages/LinuxAWSConfigureSTIG.tgz.b64" "$AL2023_STAGING/" 2>/dev/null && \
             echo "  [OK] Extracted LinuxAWSConfigureSTIG.tgz.b64" || \
             { echo "  [ERROR] LinuxAWSConfigureSTIG.tgz.b64 not found in image"; docker rm "$CID" > /dev/null; exit 1; }
@@ -332,8 +332,8 @@ jobs:
         run: |
           echo "=== Setting up Build Environment ==="
           
-          echo "GRANITE_IDENTIFIER=granite" >> $GITHUB_ENV
-          echo "GRANITE_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+          echo "CHIMERA_IDENTIFIER=chimera" >> $GITHUB_ENV
+          echo "CHIMERA_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
           
           # Build builder list from inputs
           builders=""
@@ -353,7 +353,7 @@ jobs:
             builders+="amazon-ebssurrogate.minimal-rhel-8-hvm,"
           fi
           builders="${builders%,}"
-          echo "GRANITE_BUILDERS=${builders}" >> $GITHUB_ENV
+          echo "CHIMERA_BUILDERS=${builders}" >> $GITHUB_ENV
           
           # Windows builders
           windows_builders=""
@@ -375,16 +375,16 @@ jobs:
           # Display configuration
           echo ""
           echo "Build Configuration:"
-          echo "  GRANITE_BUILDERS: ${builders:-none}"
+          echo "  CHIMERA_BUILDERS: ${builders:-none}"
           echo "  WINDOWS_BUILDERS: ${windows_builders:-none}"
-          echo "  GRANITE_VERSION: $(date +%Y.%m).1"
-          echo "  Docker Image: granite-builder:${IMAGE_TAG}"
+          echo "  CHIMERA_VERSION: $(date +%Y.%m).1"
+          echo "  Docker Image: chimera-builder:${IMAGE_TAG}"
 
       - name: Build STIGed AMI's
         run: |
-          echo "=== Starting Granite Build ==="
-          echo "Docker Image: granite-builder:${IMAGE_TAG}"
-          echo "Builders: ${GRANITE_BUILDERS}"
+          echo "=== Starting Chimera Build ==="
+          echo "Docker Image: chimera-builder:${IMAGE_TAG}"
+          echo "Builders: ${CHIMERA_BUILDERS}"
           echo "Windows Builders: ${WINDOWS_BUILDERS}"
           echo ""
           
@@ -395,9 +395,9 @@ jobs:
             -e AWS_SECRET_ACCESS_KEY
             -e AWS_SESSION_TOKEN
             -e AWS_DEFAULT_REGION=${{ inputs.aws_region }}
-            -e GRANITE_IDENTIFIER="${GRANITE_IDENTIFIER}"
-            -e GRANITE_VERSION="${GRANITE_VERSION}"
-            -e GRANITE_BUILDERS="${GRANITE_BUILDERS}"
+            -e CHIMERA_IDENTIFIER="${CHIMERA_IDENTIFIER}"
+            -e CHIMERA_VERSION="${CHIMERA_VERSION}"
+            -e CHIMERA_BUILDERS="${CHIMERA_BUILDERS}"
             -e WINDOWS_BUILDERS="${WINDOWS_BUILDERS}"
             -e PKR_VAR_aws_region="${PKR_VAR_aws_region}"
             -e PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister}"
@@ -437,25 +437,25 @@ jobs:
           [[ -n "${{ github.event.inputs.amigen9_repo_sources }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_repo_sources=${{ github.event.inputs.amigen9_repo_sources }}")
           [[ -n "${{ github.event.inputs.amigen8_extra_rpms }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_extra_rpms=${{ github.event.inputs.amigen8_extra_rpms }}")
           [[ -n "${{ github.event.inputs.amigen9_extra_rpms }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_extra_rpms=${{ github.event.inputs.amigen9_extra_rpms }}")
-          [[ -n "${{ github.event.inputs.goss_binary_url }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_granite_goss_binary_url=${{ github.event.inputs.goss_binary_url }}")
+          [[ -n "${{ github.event.inputs.goss_binary_url }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_chimera_goss_binary_url=${{ github.event.inputs.goss_binary_url }}")
           
           docker run --rm \
             -v "$(pwd):/workspace" \
             "${DOCKER_ENV_ARGS[@]}" \
-            "granite-builder:${IMAGE_TAG}" \
-            make -f Makefile.granite build
+            "chimera-builder:${IMAGE_TAG}" \
+            make -f Makefile.chimera build
 
       - name: Create build summary
         if: always()
         run: |
           cat >> $GITHUB_STEP_SUMMARY << EOF
-          ## Granite Build Summary
+          ## Chimera Build Summary
           
           ### Build Configuration
           | Property | Value |
           |----------|-------|
-          | Docker Image | \`granite-builder:${IMAGE_TAG}\` |
-          | Granite Version | \`${GRANITE_VERSION}\` |
+          | Docker Image | \`chimera-builder:${IMAGE_TAG}\` |
+          | Chimera Version | \`${CHIMERA_VERSION}\` |
           | Build Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
           | Git Commit | \`${GITHUB_SHA:0:8}\` |
           
@@ -524,18 +524,18 @@ jobs:
           echo ""
           
           # Find packer manifest
-          MANIFEST=".granite/${GRANITE_VERSION}/packer-manifest.json"
+          MANIFEST=".chimera/${CHIMERA_VERSION}/packer-manifest.json"
           if [[ ! -f "$MANIFEST" ]]; then
             echo "ERROR: Packer manifest not found at $MANIFEST"
             echo ""
-            echo "Checking .granite directory contents:"
-            ls -la .granite/ || echo "  .granite/ directory not found"
+            echo "Checking .chimera directory contents:"
+            ls -la .chimera/ || echo "  .chimera/ directory not found"
             echo ""
             echo "Checking version directory:"
-            ls -la ".granite/${GRANITE_VERSION}/" 2>/dev/null || echo "  .granite/${GRANITE_VERSION}/ not found"
+            ls -la ".chimera/${CHIMERA_VERSION}/" 2>/dev/null || echo "  .chimera/${CHIMERA_VERSION}/ not found"
             echo ""
             echo "Looking for any manifest files:"
-            find .granite -name "*.json" -o -name "*manifest*" 2>/dev/null || echo "  No manifest files found"
+            find .chimera -name "*.json" -o -name "*manifest*" 2>/dev/null || echo "  No manifest files found"
             echo ""
             echo "This could mean:"
             echo "  1. The Windows build failed before creating AMI"
@@ -603,7 +603,7 @@ jobs:
           echo "=== Testing SSM Validation on Linux AMIs ==="
           echo ""
           
-          MANIFEST=".granite/${GRANITE_VERSION}/packer-manifest.json"
+          MANIFEST=".chimera/${CHIMERA_VERSION}/packer-manifest.json"
           if [[ ! -f "$MANIFEST" ]]; then
             echo "WARNING: Packer manifest not found - skipping SSM validation"
             exit 0
@@ -671,7 +671,7 @@ jobs:
             --iam-instance-profile "Name=${INSTANCE_PROFILE}" \
             --metadata-options "HttpTokens=optional,HttpPutResponseHopLimit=2,HttpEndpoint=enabled" \
             --user-data "$SSM_USERDATA" \
-            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=granite-ssm-test-${GITHUB_RUN_ID}},{Key=Project,Value=GRANITE}]" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=chimera-ssm-test-${GITHUB_RUN_ID}},{Key=Project,Value=CHIMERA}]" \
             --query 'Instances[0].InstanceId' --output text)
           
           echo "Launched instance: $INSTANCE_ID"

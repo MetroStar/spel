@@ -5,4 +5,4 @@ Changes offered/proposed in this pull request:
 - 
 - 
 
-* New PR Alert to: @MetroStar/granite
+* New PR Alert to: @MetroStar/chimera

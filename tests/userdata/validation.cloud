@@ -2,12 +2,12 @@
 
 ##############################################################################
 #
-# Set the default cloud-init user to `granite` and update packages
+# Set the default cloud-init user to `chimera` and update packages
 #
 ##############################################################################
 user:
-  name: granite
-  gecos: granite admin account
+  name: chimera
+  gecos: chimera admin account
   lock_passwd: true
   sudo: "ALL=(root) NOPASSWD:ALL"
   selinux_user: unconfined_u

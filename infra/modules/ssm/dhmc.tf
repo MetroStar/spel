@@ -12,7 +12,7 @@
 # S3/CloudWatch/KMS access needed for STIG compliance operations.
 #
 # Prerequisites:
-#   - SSM agent must be installed on the AMI (all Granite AMIs include it)
+#   - SSM agent must be installed on the AMI (all Chimera AMIs include it)
 #   - Instance must have network access to SSM endpoints (VPC endpoints or
 #     internet gateway)
 #
@@ -61,10 +61,10 @@ resource "aws_iam_role_policy_attachment" "dhmc_core" {
 # Grant DHMC-managed instances access to S3, CloudWatch, and KMS
 # so STIG enforcement, Ansible playbooks, and logging work without
 # an instance profile.
-resource "aws_iam_role_policy" "dhmc_granite" {
+resource "aws_iam_role_policy" "dhmc_chimera" {
   count = var.enable_dhmc ? 1 : 0
 
-  name = "${var.name_prefix}-ssm-dhmc-granite"
+  name = "${var.name_prefix}-ssm-dhmc-chimera"
   role = aws_iam_role.dhmc[0].id
 
   policy = jsonencode({

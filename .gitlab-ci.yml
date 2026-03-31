@@ -1,5 +1,5 @@
 # =============================================================================
-# GitLab CI/CD Configuration for Granite Builds (Docker-based)
+# GitLab CI/CD Configuration for Chimera Builds (Docker-based)
 # =============================================================================
 # This pipeline builds STIGed AMIs using a pre-built Docker container.
 # The container has all dependencies baked in for air-gapped environments.
@@ -7,7 +7,7 @@
 # PREREQUISITES:
 #   1. Docker image tarball must be transferred to $DOCKER_IMAGE_PATH
 #      - Build using GitHub Actions: offline-prepare.yml
-#      - Export: docker save granite-builder:TAG | gzip > granite-builder-TAG.tar.gz
+#      - Export: docker save chimera-builder:TAG | gzip > chimera-builder-TAG.tar.gz
 #      - Transfer to runner's accessible location
 #
 #   2. GitLab Runner must have Docker installed and running
@@ -23,7 +23,7 @@
 #          - AWS_SECRET_ACCESS_KEY
 #          - AWS_SESSION_TOKEN (optional)
 #      Common:
-#      - DOCKER_IMAGE_PATH (path to granite-builder-*.tar.gz)
+#      - DOCKER_IMAGE_PATH (path to chimera-builder-*.tar.gz)
 #
 # INFRASTRUCTURE:
 #   Infrastructure is managed by .gitlab/infra.gitlab-ci.yml via OpenTofu.
@@ -41,7 +41,7 @@ include:
   - local: '.gitlab/infra.gitlab-ci.yml'
 
 variables:
-  GRANITE_IDENTIFIER: "granite"
+  CHIMERA_IDENTIFIER: "chimera"
   PKR_VAR_aws_region: "us-gov-west-1"
   PACKER_LOG: "1"
   CHECKPOINT_DISABLE: "1"
@@ -52,12 +52,12 @@ variables:
   CI_AWS_ROLE_ARN: ""
   CI_AWS_OIDC_AUDIENCE: "${CI_SERVER_URL}"
   # Infrastructure naming
-  INFRA_PREFIX: "granite"
+  INFRA_PREFIX: "chimera"
   # Air-gapped mode — disables IGW/default route, enables EC2+STS VPC endpoints,
   # scopes SG ingress to VPC CIDR. Set to "false" for internet-connected builds.
   AIRGAP_MODE: "true"
   # Docker image location (must be transferred to this path)
-  DOCKER_IMAGE_PATH: "/transfer/granite-builder-*.tar.gz"
+  DOCKER_IMAGE_PATH: "/transfer/chimera-builder-*.tar.gz"
   # Local yum repository mirror for air-gapped Linux builds
   # Set this to your internal mirror URL, e.g., http://mirror.internal.mil
   # Leave empty to use default RHUI/public repositories (requires internet access)
@@ -106,7 +106,7 @@ variables:
   # Set this to your internal mirror URL hosting the Goss binary
   # Example: https://mirror.internal.mil/tools/goss-linux-AMD64
   # Leave empty to download from GitHub (requires internet access)
-  GRANITE_GOSS_BINARY_URL: ""
+  CHIMERA_GOSS_BINARY_URL: ""
   # Test Windows AMIs on multiple Nitro instance types after build (opt-in)
   # Set to "true" to run instance type compatibility tests
   TEST_INSTANCE_TYPES: "false"
@@ -177,16 +177,16 @@ import:docker:
           echo ""
           echo "To resolve:"
           echo "  1. Run the offline-prepare.yml workflow in GitHub Actions"
-          echo "  2. Download the granite-builder-YYYYMMDD artifact"
+          echo "  2. Download the chimera-builder-YYYYMMDD artifact"
           echo "  3. Transfer files to: /transfer/"
           echo ""
           echo "For SharePoint transfer (recommended):"
-          echo "  - Transfer granite-builder-*.tar.gz.b64 (base64 encoded)"
-          echo "  - Transfer granite-builder-*.tar.gz.b64.sha256 (checksum)"
+          echo "  - Transfer chimera-builder-*.tar.gz.b64 (base64 encoded)"
+          echo "  - Transfer chimera-builder-*.tar.gz.b64.sha256 (checksum)"
           echo ""
           echo "For direct transfer (SCP/USB/S3):"
-          echo "  - Transfer granite-builder-*.tar.gz (binary)"
-          echo "  - Transfer granite-builder-*.tar.gz.sha256 (checksum)"
+          echo "  - Transfer chimera-builder-*.tar.gz (binary)"
+          echo "  - Transfer chimera-builder-*.tar.gz.sha256 (checksum)"
           echo ""
           exit 1
         fi
@@ -223,38 +223,38 @@ import:docker:
       gunzip -c "${TARBALL}" | docker load
       
       # Extract image tag from tarball name
-      IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/granite-builder-//')
+      IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/chimera-builder-//')
       echo "DOCKER_IMAGE_TAG=${IMAGE_TAG}" >> import.env
       
       echo ""
       echo "=== Import Complete ==="
-      docker images granite-builder
+      docker images chimera-builder
     
     # Verify the image works
     - |
       echo ""
       echo "=== Verifying Docker Image ==="
-      docker run --rm "granite-builder:${IMAGE_TAG}" packer version
-      docker run --rm "granite-builder:${IMAGE_TAG}" ansible --version
-      docker run --rm "granite-builder:${IMAGE_TAG}" aws --version
+      docker run --rm "chimera-builder:${IMAGE_TAG}" packer version
+      docker run --rm "chimera-builder:${IMAGE_TAG}" ansible --version
+      docker run --rm "chimera-builder:${IMAGE_TAG}" aws --version
     
     # Show image details (for version tracking)
     - |
       echo ""
       echo "=== Docker Image Details ==="
-      docker inspect "granite-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
-      docker inspect "granite-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
-      docker inspect "granite-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
+      docker inspect "chimera-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
+      docker inspect "chimera-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
+      docker inspect "chimera-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
       echo ""
       echo "Full image inspect output:"
-      docker inspect "granite-builder:${IMAGE_TAG}" | head -50
+      docker inspect "chimera-builder:${IMAGE_TAG}" | head -50
       echo "==========================="
   artifacts:
     reports:
       dotenv: import.env
     expire_in: 7 days
   tags:
-    - granite-offline-runner
+    - chimera-offline-runner
   rules:
     - if: '$IMPORT_DOCKER == "true"'
       when: manual
@@ -287,18 +287,18 @@ import:docker:
       if [ -n "${DOCKER_IMAGE_TAG}" ]; then
         IMAGE_TAG="${DOCKER_IMAGE_TAG}"
       else
-        # Try to find the latest granite-builder image
-        IMAGE_TAG=$(docker images granite-builder --format '{{.Tag}}' | grep -v latest | sort -r | head -1)
+        # Try to find the latest chimera-builder image
+        IMAGE_TAG=$(docker images chimera-builder --format '{{.Tag}}' | grep -v latest | sort -r | head -1)
         if [ -z "$IMAGE_TAG" ]; then
-          echo "ERROR: No granite-builder Docker image found!"
+          echo "ERROR: No chimera-builder Docker image found!"
           echo "Run the import:docker job first, or import manually:"
-          echo "  gunzip -c granite-builder-*.tar.gz | docker load"
+          echo "  gunzip -c chimera-builder-*.tar.gz | docker load"
           exit 1
         fi
       fi
       
-      echo "Using Docker image: granite-builder:${IMAGE_TAG}"
-      docker images "granite-builder:${IMAGE_TAG}"
+      echo "Using Docker image: chimera-builder:${IMAGE_TAG}"
+      docker images "chimera-builder:${IMAGE_TAG}"
     
     # Load infrastructure config if available (from infra:create dotenv artifact)
     - |
@@ -315,8 +315,8 @@ import:docker:
           -e "AWS_DEFAULT_REGION=${PKR_VAR_aws_region}" \
           -e "GITLAB_OIDC_TOKEN" \
           -e "ROLE_ARN=${CI_AWS_ROLE_ARN}" \
-          -e "SESSION_NAME=granite-build-${CI_JOB_ID}" \
-          "granite-builder:${IMAGE_TAG}" \
+          -e "SESSION_NAME=chimera-build-${CI_JOB_ID}" \
+          "chimera-builder:${IMAGE_TAG}" \
           bash -c 'aws sts assume-role-with-web-identity \
             --role-arn "$ROLE_ARN" \
             --role-session-name "$SESSION_NAME" \
@@ -336,16 +336,16 @@ import:docker:
       fi
   script:
     - |
-      echo "=== Starting Granite Build ==="
-      echo "Docker Image: granite-builder:${IMAGE_TAG}"
-      echo "GRANITE_BUILDERS: ${GRANITE_BUILDERS:-not set}"
+      echo "=== Starting Chimera Build ==="
+      echo "Docker Image: chimera-builder:${IMAGE_TAG}"
+      echo "CHIMERA_BUILDERS: ${CHIMERA_BUILDERS:-not set}"
       echo "WINDOWS_BUILDERS: ${WINDOWS_BUILDERS:-not set}"
       echo ""
       
       # Show image details for audit trail
       echo "=== Docker Image Details (for audit) ==="
-      docker inspect "granite-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
-      docker inspect "granite-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
+      docker inspect "chimera-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
+      docker inspect "chimera-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
       echo "========================================="
       echo ""
     
@@ -358,9 +358,9 @@ import:docker:
         -e "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"
         -e "AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}"
         -e "AWS_DEFAULT_REGION=${PKR_VAR_aws_region}"
-        -e "GRANITE_IDENTIFIER=${GRANITE_IDENTIFIER}"
-        -e "GRANITE_VERSION=${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
-        -e "GRANITE_BUILDERS=${GRANITE_BUILDERS:-}"
+        -e "CHIMERA_IDENTIFIER=${CHIMERA_IDENTIFIER}"
+        -e "CHIMERA_VERSION=${CI_COMMIT_TAG:-$(date +%Y.%m).1}"
+        -e "CHIMERA_BUILDERS=${CHIMERA_BUILDERS:-}"
         -e "WINDOWS_BUILDERS=${WINDOWS_BUILDERS:-}"
         -e "PKR_VAR_aws_region=${PKR_VAR_aws_region}"
         -e "PKR_VAR_aws_force_deregister=${PKR_VAR_aws_force_deregister:-true}"
@@ -400,8 +400,8 @@ import:docker:
         DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_extra_rpms=${AMIGEN9_EXTRA_RPMS}")
       
       # Add Goss binary URL if set (for air-gapped STIG auditing)
-      [[ -n "${GRANITE_GOSS_BINARY_URL:-}" ]] && \
-        DOCKER_ENV_ARGS+=(-e "PKR_VAR_granite_goss_binary_url=${GRANITE_GOSS_BINARY_URL}")
+      [[ -n "${CHIMERA_GOSS_BINARY_URL:-}" ]] && \
+        DOCKER_ENV_ARGS+=(-e "PKR_VAR_chimera_goss_binary_url=${CHIMERA_GOSS_BINARY_URL}")
       
       # Add KMS key if set
       [[ -n "${PKR_VAR_aws_kms_key_id:-}" ]] && \
@@ -414,14 +414,14 @@ import:docker:
       docker run --rm \
         -v "${CI_PROJECT_DIR}:/workspace" \
         "${DOCKER_ENV_ARGS[@]}" \
-        "granite-builder:${IMAGE_TAG}" \
-        make -f Makefile.granite build
+        "chimera-builder:${IMAGE_TAG}" \
+        make -f Makefile.chimera build
   artifacts:
     paths:
-      - .granite/
+      - .chimera/
     expire_in: 30 days
   tags:
-    - granite-offline-runner
+    - chimera-offline-runner
   rules:
     - when: manual
 
@@ -429,27 +429,27 @@ import:docker:
 build:amzn2023:
   <<: *build_definition
   variables:
-    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm"
+    CHIMERA_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm"
 
 build:ol9:
   <<: *build_definition
   variables:
-    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-ol-9-hvm"
+    CHIMERA_BUILDERS: "amazon-ebssurrogate.minimal-ol-9-hvm"
 
 build:rhel9:
   <<: *build_definition
   variables:
-    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-rhel-9-hvm"
+    CHIMERA_BUILDERS: "amazon-ebssurrogate.minimal-rhel-9-hvm"
 
 build:ol8:
   <<: *build_definition
   variables:
-    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-ol-8-hvm"
+    CHIMERA_BUILDERS: "amazon-ebssurrogate.minimal-ol-8-hvm"
 
 build:rhel8:
   <<: *build_definition
   variables:
-    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-rhel-8-hvm"
+    CHIMERA_BUILDERS: "amazon-ebssurrogate.minimal-rhel-8-hvm"
 
 build:windows2019:
   <<: *build_definition
@@ -465,7 +465,7 @@ build:windows2022:
 build:all:
   <<: *build_definition
   variables:
-    GRANITE_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm,amazon-ebssurrogate.minimal-ol-9-hvm,amazon-ebssurrogate.minimal-rhel-9-hvm,amazon-ebssurrogate.minimal-ol-8-hvm,amazon-ebssurrogate.minimal-rhel-8-hvm"
+    CHIMERA_BUILDERS: "amazon-ebssurrogate.minimal-amzn-2023-hvm,amazon-ebssurrogate.minimal-ol-9-hvm,amazon-ebssurrogate.minimal-rhel-9-hvm,amazon-ebssurrogate.minimal-ol-8-hvm,amazon-ebssurrogate.minimal-rhel-8-hvm"
     WINDOWS_BUILDERS: "amazon-ebs.hardened-windows-2019-hvm,amazon-ebs.hardened-windows-2022-hvm"
   rules:
     - if: '$CI_COMMIT_TAG'
@@ -495,10 +495,10 @@ build:all:
       fi
       
       # Find packer manifest
-      MANIFEST=$(find .granite -name 'packer-manifest.json' 2>/dev/null | head -1)
+      MANIFEST=$(find .chimera -name 'packer-manifest.json' 2>/dev/null | head -1)
       if [[ -z "$MANIFEST" ]]; then
         echo "ERROR: Packer manifest not found"
-        ls -la .granite/ || true
+        ls -la .chimera/ || true
         exit 1
       fi
       
@@ -537,7 +537,7 @@ build:all:
     expire_in: 7 days
     when: always
   tags:
-    - granite-offline-runner
+    - chimera-offline-runner
   rules:
     - if: '$TEST_INSTANCE_TYPES == "true"'
       when: on_success
@@ -580,7 +580,7 @@ test:windows2022:
 
     # Find AMI from build manifest — filter for hardened (amazon-ebs) Linux only
     - |
-      MANIFEST=".granite/${GRANITE_VERSION:-$(date +%Y.%m).1}/packer-manifest.json"
+      MANIFEST=".chimera/${CHIMERA_VERSION:-$(date +%Y.%m).1}/packer-manifest.json"
       if [[ ! -f "$MANIFEST" ]]; then
         echo "WARNING: Packer manifest not found - skipping SSM validation"
         exit 0
@@ -622,7 +622,7 @@ test:windows2022:
         --iam-instance-profile "Name=${PROFILE}" \
         --metadata-options "HttpEndpoint=enabled,HttpTokens=optional,HttpPutResponseHopLimit=2" \
         $USERDATA_OPTS \
-        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=granite-ssm-test-${CI_PIPELINE_ID}},{Key=Project,Value=GRANITE}]" \
+        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=chimera-ssm-test-${CI_PIPELINE_ID}},{Key=Project,Value=CHIMERA}]" \
         --query 'Instances[0].InstanceId' --output text)
 
       echo "Launched test instance: $INSTANCE_ID"
@@ -645,7 +645,7 @@ test:windows2022:
         aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" 2>/dev/null || true
       fi
   tags:
-    - granite-offline-runner
+    - chimera-offline-runner
   rules:
     - if: '$TEST_SSM == "true"'
       when: on_success

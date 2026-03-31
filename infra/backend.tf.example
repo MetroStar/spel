@@ -27,10 +27,10 @@
 #
 # CI pipelines initialize with -backend-config flags:
 #   tofu init \
-#     -backend-config="bucket=granite-ssm-opentofu-state" \
+#     -backend-config="bucket=chimera-ssm-opentofu-state" \
 #     -backend-config="key=ci/opentofu.tfstate" \
 #     -backend-config="region=us-gov-west-1" \
-#     -backend-config="dynamodb_table=granite-ssm-opentofu-locks"
+#     -backend-config="dynamodb_table=chimera-ssm-opentofu-locks"
 # =============================================================================
 
 terraform {

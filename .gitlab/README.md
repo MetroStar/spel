@@ -1,6 +1,6 @@
 # GitLab CI Configuration
 
-This directory contains GitLab CI pipeline configurations for the Granite project.
+This directory contains GitLab CI pipeline configurations for the Chimera project.
 
 ## Pipeline Overview
 
@@ -17,7 +17,7 @@ and transferred to the air-gapped GitLab environment.
 **Key Features**:
 - Imports pre-built Docker image from tarball
 - Provisions persistent AWS infrastructure via OpenTofu (one-time, from `.gitlab/infra.gitlab-ci.yml`)
-- Builds Granite images for Linux and Windows operating systems
+- Builds Chimera images for Linux and Windows operating systems
 - All dependencies are baked into the Docker image (no internet required)
 
 **Stages**:
@@ -34,22 +34,22 @@ and transferred to the air-gapped GitLab environment.
    ```bash
    # Run GitHub Actions: offline-prepare.yml
    # Or build locally:
-   docker build -t granite-builder:$(date +%Y%m%d) .
-   docker save granite-builder:$(date +%Y%m%d) | gzip > granite-builder-$(date +%Y%m%d).tar.gz
+   docker build -t chimera-builder:$(date +%Y%m%d) .
+   docker save chimera-builder:$(date +%Y%m%d) | gzip > chimera-builder-$(date +%Y%m%d).tar.gz
    ```
 
 2. **Transfer to Air-Gapped Environment**:
    ```bash
    # Binary format (direct transfer - smaller, faster):
-   scp granite-builder-*.tar.gz runner:/transfer/
+   scp chimera-builder-*.tar.gz runner:/transfer/
    
    # Base64 format (SharePoint - avoids corruption):
    # Upload .tar.gz.b64 to SharePoint, download in air-gap, then:
-   scp granite-builder-*.tar.gz.b64 runner:/transfer/
+   scp chimera-builder-*.tar.gz.b64 runner:/transfer/
    
    # Optional: include checksum
-   sha256sum granite-builder-*.tar.gz > granite-builder-*.tar.gz.sha256
-   scp granite-builder-*.tar.gz.sha256 runner:/transfer/
+   sha256sum chimera-builder-*.tar.gz > chimera-builder-*.tar.gz.sha256
+   scp chimera-builder-*.tar.gz.sha256 runner:/transfer/
    ```
 
 3. **Run Pipeline**:
@@ -82,14 +82,14 @@ and transferred to the air-gapped GitLab environment.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DOCKER_IMAGE_PATH` | `/transfer/granite-builder-*.tar.gz` | Path to Docker tarball |
+| `DOCKER_IMAGE_PATH` | `/transfer/chimera-builder-*.tar.gz` | Path to Docker tarball |
 | `PKR_VAR_aws_region` | `us-gov-west-1` | AWS region for builds |
 | `PKR_VAR_aws_ami_regions` | `["${PKR_VAR_aws_region}"]` | Regions to copy AMI to (defaults to build region) |
 | `REPO_MIRROR_BASEURL` | (empty) | Local yum mirror URL for air-gapped Linux builds (e.g., `http://mirror.internal.mil`) |
 | `PKR_VAR_windows_update_server` | (empty) | WSUS URL for air-gapped Windows builds (e.g., `http://wsus.internal.mil:8530`) |
 | `PKR_VAR_aws_kms_key_id` | (empty) | KMS key ARN for CMK-encrypted AMIs (e.g., `arn:aws-us-gov:kms:...`) |
-| `GRANITE_IDENTIFIER` | `granite` | AMI name prefix |
-| `INFRA_PREFIX` | `granite` | Infrastructure resource prefix |
+| `CHIMERA_IDENTIFIER` | `chimera` | AMI name prefix |
+| `INFRA_PREFIX` | `chimera` | Infrastructure resource prefix |
 
 ### Air-Gapped Linux Build Variables
 
@@ -229,7 +229,7 @@ The EC2 build instances need:
 ## Runner Requirements
 
 ### Required Tags
-- `granite-offline-runner`
+- `chimera-offline-runner`
 
 ### Runner Configuration
 - Docker executor or shell executor with Docker installed
@@ -262,7 +262,7 @@ ERROR: No Docker image tarball found!
 
 **Solution**: Transfer the Docker image tarball to the path specified by `DOCKER_IMAGE_PATH`:
 ```bash
-scp granite-builder-*.tar.gz runner:/transfer/
+scp chimera-builder-*.tar.gz runner:/transfer/
 ```
 
 ### AWS Credential Issues

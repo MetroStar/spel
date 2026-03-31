@@ -20,11 +20,11 @@ PLAT = "el9" if distro.major_version() == "2023" else "el" + distro.major_versio
 
 FIPS = (
     "fips_disabled"
-    if os.environ.get("GRANITE_DISABLEFIPS") in FIPS_DISABLED
+    if os.environ.get("CHIMERA_DISABLEFIPS") in FIPS_DISABLED
     else "fips_enabled"
 )
 AMIUTILS = (
-    "amiutils_enabled" if os.environ.get("GRANITE_AMIUTILSOURCE") else "amiutils_disabled"
+    "amiutils_enabled" if os.environ.get("CHIMERA_AMIUTILSOURCE") else "amiutils_disabled"
 )
 
 
@@ -67,4 +67,4 @@ def pytest_runtest_setup(item):
 
 def pytest_logger_stdoutloggers(item):  # pylint: disable=unused-argument
     """Configure pytest logger."""
-    return ["granite_validation"]
+    return ["chimera_validation"]

@@ -1,10 +1,10 @@
 # Storage Requirements Guide
 
-This guide covers storage requirements for the Docker-based Granite build system.
+This guide covers storage requirements for the Docker-based Chimera build system.
 
 ## Docker Image Size
 
-The Granite builder Docker image contains all dependencies baked in:
+The Chimera builder Docker image contains all dependencies baked in:
 
 | Format | Size |
 |--------|------|
@@ -89,10 +89,10 @@ When transferring the Docker image tarball to air-gapped environments:
 Each Docker image build produces:
 
 ```
-granite-builder-YYYYMMDD/
-├── granite-builder-YYYYMMDD.tar.gz       # ~305 MB - Docker image
-├── granite-builder-YYYYMMDD.tar.gz.sha256 # <1 KB - Checksum
-└── granite-builder-YYYYMMDD-manifest.txt  # <2 KB - Build details
+chimera-builder-YYYYMMDD/
+├── chimera-builder-YYYYMMDD.tar.gz       # ~305 MB - Docker image
+├── chimera-builder-YYYYMMDD.tar.gz.sha256 # <1 KB - Checksum
+└── chimera-builder-YYYYMMDD-manifest.txt  # <2 KB - Build details
 ```
 
 **Total transfer size**: ~305 MB
@@ -102,11 +102,11 @@ granite-builder-YYYYMMDD/
 ### Clean Up Old Images
 
 ```bash
-# List granite-builder images
-docker images granite-builder
+# List chimera-builder images
+docker images chimera-builder
 
 # Remove old images
-docker rmi granite-builder:old_tag
+docker rmi chimera-builder:old_tag
 
 # Remove unused Docker resources
 docker system prune

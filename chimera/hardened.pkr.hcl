@@ -18,7 +18,7 @@ packer {
 # Guidance on naming and organizing variables
 #
 # Variable names are prefixed by builder, or by amigen project. Any variables
-# used by many builders are prefixed with the keyword `granite`. Variables are grouped
+# used by many builders are prefixed with the keyword `chimera`. Variables are grouped
 # by their prefix. Current prefixes
 # include:
 #   * aws - amazon-ebs builder
@@ -28,7 +28,7 @@ packer {
 #   * amigen - used across amigen versions ( amigen8 and amigen9)
 #   * amigen8 - amigen8 only
 #   * amigen9 - amigen9 only
-#   * granite - everything else
+#   * chimera - everything else
 #
 # For variables passed to a builder argument, just apply prefix to the argument
 # name. Do not "reinterpret" the argument and create a new name. E.g. for the
@@ -86,7 +86,7 @@ variable "aws_source_ami_filter_al2023_hvm" {
     owners = list(string)
   })
   default = {
-    name = "granite-*minimal-amzn-2023-hvm-*.x86_64-gp*"
+    name = "chimera-*minimal-amzn-2023-hvm-*.x86_64-gp*"
     owners = [
       "self",
     ]
@@ -100,7 +100,7 @@ variable "aws_source_ami_filter_centos9stream_hvm" {
     owners = list(string)
   })
   default = {
-    name = "granite-*minimal-centos-9stream-hvm-*.x86_64-gp*"
+    name = "chimera-*minimal-centos-9stream-hvm-*.x86_64-gp*"
     owners = [
       "self",
     ]
@@ -114,7 +114,7 @@ variable "aws_source_ami_filter_ol8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "granite-*minimal-ol-8-hvm-*.x86_64-gp*"
+    name = "chimera-*minimal-ol-8-hvm-*.x86_64-gp*"
     owners = [
       "self",
     ]
@@ -128,7 +128,7 @@ variable "aws_source_ami_filter_ol9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "granite-*minimal-ol-9-hvm-*.x86_64-gp*"
+    name = "chimera-*minimal-ol-9-hvm-*.x86_64-gp*"
     owners = [
       "self",
     ]
@@ -142,7 +142,7 @@ variable "aws_source_ami_filter_rhel8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "granite-*minimal-rhel-8-hvm-*.x86_64-gp*"
+    name = "chimera-*minimal-rhel-8-hvm-*.x86_64-gp*"
     owners = [
       "self",
     ]
@@ -156,7 +156,7 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "granite-*minimal-rhel-9-hvm-*.x86_64-gp*"
+    name = "chimera-*minimal-rhel-9-hvm-*.x86_64-gp*"
     owners = [
       "self",
     ]
@@ -238,19 +238,19 @@ variable "aws_offline_ami_regions" {
   default     = null
 }
 
-variable "granite_cfnbootstrap_source" {
+variable "chimera_cfnbootstrap_source" {
   description = "URL or file path for CloudFormation bootstrap utilities. Use file:// prefix for local offline packages."
   type        = string
   default     = "https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz"
 }
 
-variable "granite_awscli_source" {
+variable "chimera_awscli_source" {
   description = "URL or file path for AWS CLI v2 installer. Use file:// prefix for local offline packages."
   type        = string
   default     = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
 }
 
-variable "granite_ssm_agent_source" {
+variable "chimera_ssm_agent_source" {
   description = "URL or file path for SSM Agent installer. Use file:// prefix for local offline packages."
   type        = string
   default     = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
@@ -303,19 +303,19 @@ variable "amigen_amiutils_source_url" {
 }
 
 variable "amigen_aws_cfnbootstrap" {
-  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Leave empty to use granite_cfnbootstrap_source for offline support."
+  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Leave empty to use chimera_cfnbootstrap_source for offline support."
   type        = string
   default     = ""
 }
 
 variable "amigen_aws_cliv1_source" {
-  description = "URL of the .zip bundle containing the installer for AWS CLI v1. Leave empty to use granite_awscli_source for offline support."
+  description = "URL of the .zip bundle containing the installer for AWS CLI v1. Leave empty to use chimera_awscli_source for offline support."
   type        = string
   default     = ""
 }
 
 variable "amigen_aws_cliv2_source" {
-  description = "URL of the .zip bundle containing the installer for AWS CLI v2. Leave empty to use granite_awscli_source for offline support."
+  description = "URL of the .zip bundle containing the installer for AWS CLI v2. Leave empty to use chimera_awscli_source for offline support."
   type        = string
   default     = ""
 }
@@ -533,45 +533,45 @@ variable "amigen9_uefi_dev_label" {
 
 
 ###
-# Variables specific to granite
+# Variables specific to chimera
 ###
 
-variable "granite_deprecation_lifetime" {
+variable "chimera_deprecation_lifetime" {
   description = "Duration after which image will be marked deprecated. If null, image will not be marked deprecated. The accepted units are: ns, us (or µs), ms, s, m, and h. For example, one day is 24h, and one year is 8760h."
   type        = string
   default     = null
 }
 
-variable "granite_description_url" {
+variable "chimera_description_url" {
   description = "URL included in the AMI description"
   type        = string
-  default     = "https://github.com/MetroStar/granite"
+  default     = "https://github.com/MetroStar/chimera"
 }
 
-variable "granite_http_proxy" {
+variable "chimera_http_proxy" {
   description = "Used as the value for the git config http.proxy setting in the builder nodes"
   type        = string
   default     = ""
 }
 
-variable "granite_identifier" {
+variable "chimera_identifier" {
   description = "Namespace that prefixes the name of the built images"
   type        = string
 }
 
-variable "granite_root_volume_size" {
+variable "chimera_root_volume_size" {
   description = "Size in GB of the root volume"
   type        = number
   default     = 20
 }
 
-variable "granite_goss_binary_url" {
+variable "chimera_goss_binary_url" {
   description = "URL for the Goss binary used by STIG audit. For air-gapped environments, host Goss on your internal mirror or S3. Example: https://mirror.internal.mil/tools/goss-linux-AMD64"
   type        = string
   default     = ""
 }
 
-variable "granite_version" {
+variable "chimera_version" {
   description = "Version appended to the name of the built images"
   type        = string
 }
@@ -584,7 +584,7 @@ variable "granite_version" {
 
 source "amazon-ebs" "base" {
   ami_groups                  = var.aws_ami_groups
-  ami_name                    = "${var.granite_identifier}-${source.name}-${var.granite_version}.x86_64-gp3"
+  ami_name                    = "${var.chimera_identifier}-${source.name}-${var.chimera_version}.x86_64-gp3"
   ami_regions                 = local.effective_ami_regions
   ami_users                   = var.aws_ami_users
   ami_virtualization_type     = "hvm"
@@ -622,7 +622,7 @@ source "amazon-ebs" "base" {
 
 source "amazon-ebs" "windows-base" {
   ami_groups                  = var.aws_ami_groups
-  ami_name                    = "${var.granite_identifier}-${source.name}-${var.granite_version}.x86_64-gp3"
+  ami_name                    = "${var.chimera_identifier}-${source.name}-${var.chimera_version}.x86_64-gp3"
   ami_regions                 = local.effective_ami_regions
   ami_users                   = var.aws_ami_users
   ami_virtualization_type     = "hvm"
@@ -702,11 +702,11 @@ locals {
   effective_windows2022_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2022_hvm.owners
 
   # Template the description strings
-  description         = "STIG-partitioned [*HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.granite_description_url}."
-  windows_description = "STIG-partitioned [*HARDENED*] %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.granite_description_url}."
+  description         = "STIG-partitioned [*HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.chimera_description_url}."
+  windows_description = "STIG-partitioned [*HARDENED*] %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.chimera_description_url}."
 
   # Calculate AWS AMI deprecate_at timestamp
-  aws_ami_deprecate_at = var.granite_deprecation_lifetime != null ? timeadd(local.timestamp, var.granite_deprecation_lifetime) : null
+  aws_ami_deprecate_at = var.chimera_deprecation_lifetime != null ? timeadd(local.timestamp, var.chimera_deprecation_lifetime) : null
 
   timestamp = timestamp()
 
@@ -1073,7 +1073,7 @@ build {
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     environment_vars = [
-      "GOSS_BINARY_URL=${var.granite_goss_binary_url}",
+      "GOSS_BINARY_URL=${var.chimera_goss_binary_url}",
     ]
     inline = [
       "echo '=== Amazon Linux 2023 STIG Hardening ===' ",
@@ -1160,7 +1160,7 @@ build {
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     environment_vars = [
-      "GOSS_BINARY_URL=${var.granite_goss_binary_url}",
+      "GOSS_BINARY_URL=${var.chimera_goss_binary_url}",
     ]
     inline = [
       "echo 'Running Ansible Lockdown'",
@@ -1221,7 +1221,7 @@ build {
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
     environment_vars = [
-      "GOSS_BINARY_URL=${var.granite_goss_binary_url}",
+      "GOSS_BINARY_URL=${var.chimera_goss_binary_url}",
     ]
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
@@ -1265,7 +1265,7 @@ build {
     only                = ["amazon-ebs.hardened-ol-8-hvm"]
     execute_command     = "sudo -E bash '{{.Path}}'"
     environment_vars = [
-      "GOSS_BINARY_URL=${var.granite_goss_binary_url}",
+      "GOSS_BINARY_URL=${var.chimera_goss_binary_url}",
     ]
     inline = [
       "bash /tmp/boot-fips-wrapper.sh pre",
@@ -1313,7 +1313,7 @@ build {
       "amazon-ebs.hardened-ol-8-hvm",
     ]
     source      = "/tmp/oscap-report.html"
-    destination = "${path.root}/.granite/"
+    destination = "${path.root}/.chimera/"
     direction   = "download"
   }
 
@@ -1433,6 +1433,6 @@ build {
 
   # Generate manifest for all builds (Linux and Windows)
   post-processor "manifest" {
-    output = ".granite/${var.granite_version}/packer-manifest.json"
+    output = ".chimera/${var.chimera_version}/packer-manifest.json"
   }
 }

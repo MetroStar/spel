@@ -22,26 +22,26 @@ variable "packer_version" {
   default = ""
 }
 
-variable "granite_ci" {
+variable "chimera_ci" {
   type    = bool
   default = false
 }
 
-variable "granite_identifier" {
+variable "chimera_identifier" {
   type = string
 }
 
-variable "granite_repo_commit" {
+variable "chimera_repo_commit" {
   type    = string
   default = "master"
 }
 
-variable "granite_repo_url" {
+variable "chimera_repo_url" {
   type    = string
-  default = "https://github.com/MetroStar/granite.git"
+  default = "https://github.com/MetroStar/chimera.git"
 }
 
-variable "granite_version" {
+variable "chimera_version" {
   type = string
 }
 
@@ -60,7 +60,7 @@ variable "virtualbox_iso_url_centos9stream" {
 }
 
 source "amazon-ebs" "ubuntu" {
-  ami_name                    = "builder-${var.granite_identifier}-vagrant-${var.granite_version}.x86_64-gp3"
+  ami_name                    = "builder-${var.chimera_identifier}-vagrant-${var.chimera_version}.x86_64-gp3"
   associate_public_ip_address = true
   communicator                = "ssh"
   force_deregister            = true
@@ -97,24 +97,24 @@ build {
     environment_vars = [
       "PACKER_NO_COLOR=1",
       "PACKER_VERSION=${var.packer_version}",
-      "GRANITE_CI=${var.granite_ci}",
-      "GRANITE_IDENTIFIER=${var.granite_identifier}",
-      "GRANITE_REPO_COMMIT=${var.granite_repo_commit}",
-      "GRANITE_REPO_URL=${var.granite_repo_url}",
-      "GRANITE_VERSION=${var.granite_version}",
+      "CHIMERA_CI=${var.chimera_ci}",
+      "CHIMERA_IDENTIFIER=${var.chimera_identifier}",
+      "CHIMERA_REPO_COMMIT=${var.chimera_repo_commit}",
+      "CHIMERA_REPO_URL=${var.chimera_repo_url}",
+      "CHIMERA_VERSION=${var.chimera_version}",
       "VAGRANT_CLOUD_TOKEN=${var.vagrant_cloud_token}",
       "VAGRANT_CLOUD_USER=${var.vagrant_cloud_user}",
       "VIRTUALBOX_ISO_URL_CENTOS9STREAM=${var.virtualbox_iso_url_centos9stream}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     scripts = [
-      "${path.root}/build-granite-vagrant.sh",
+      "${path.root}/build-chimera-vagrant.sh",
     ]
   }
 
   provisioner "file" {
-    destination = ".granite/"
+    destination = ".chimera/"
     direction   = "download"
-    source      = "/tmp/granite/.granite/${var.granite_version}/"
+    source      = "/tmp/chimera/.chimera/${var.chimera_version}/"
   }
 }

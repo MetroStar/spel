@@ -63,34 +63,34 @@ variable "aws_temporary_security_group_source_cidrs" {
   default = ["0.0.0.0/0"]
 }
 
-variable "granite_amiutilsource" {
+variable "chimera_amiutilsource" {
   type    = string
-  default = env("GRANITE_AMIUTILSOURCE")
+  default = env("CHIMERA_AMIUTILSOURCE")
 }
 
-variable "granite_disablefips" {
+variable "chimera_disablefips" {
   type    = string
   default = ""
 }
 
-variable "granite_identifier" {
+variable "chimera_identifier" {
   type    = string
-  default = env("GRANITE_IDENTIFIER")
+  default = env("CHIMERA_IDENTIFIER")
 }
 
-variable "granite_pypi_url" {
+variable "chimera_pypi_url" {
   type    = string
   default = "https://pypi.org/simple"
 }
 
-variable "granite_version" {
+variable "chimera_version" {
   type    = string
-  default = env("GRANITE_VERSION")
+  default = env("CHIMERA_VERSION")
 }
 
 source "amazon-ebs" "base" {
-  ami_description             = "This is a validation AMI for ${var.granite_identifier}-${source.name}-${var.granite_version}.x86_64-gp3"
-  ami_name                    = "validation-${var.granite_identifier}-${source.name}-${var.granite_version}.x86_64-gp3"
+  ami_description             = "This is a validation AMI for ${var.chimera_identifier}-${source.name}-${var.chimera_version}.x86_64-gp3"
+  ami_name                    = "validation-${var.chimera_identifier}-${source.name}-${var.chimera_version}.x86_64-gp3"
   associate_public_ip_address = true
   communicator                = "ssh"
   ena_support                 = true
@@ -110,7 +110,7 @@ source "amazon-ebs" "base" {
   ssh_interface                         = var.aws_ssh_interface
   ssh_port                              = 22
   ssh_pty                               = true
-  ssh_username                          = "granite"
+  ssh_username                          = "chimera"
   subnet_id                             = var.aws_subnet_id
   temporary_security_group_source_cidrs = var.aws_temporary_security_group_source_cidrs
   user_data_file                        = "${path.root}/userdata/validation.cloud"
@@ -168,14 +168,14 @@ build {
   provisioner "shell" {
     execute_command = "{{ .Vars }} sudo -E /bin/sh -ex -o pipefail '{{ .Path }}'"
     inline = [
-      "mkdir -p /tmp/granite/tests",
-      "chown -R granite:granite /tmp/granite",
+      "mkdir -p /tmp/chimera/tests",
+      "chown -R chimera:chimera /tmp/chimera",
     ]
     pause_before = "5s"
   }
 
   provisioner "file" {
-    destination  = "/tmp/granite/tests"
+    destination  = "/tmp/chimera/tests"
     direction    = "upload"
     pause_before = "5s"
     source       = "tests/"
@@ -183,14 +183,14 @@ build {
 
   provisioner "shell" {
     environment_vars = [
-      "PYPI_URL=${var.granite_pypi_url}",
+      "PYPI_URL=${var.chimera_pypi_url}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/sh -ex -o pipefail '{{ .Path }}'"
     inline = [
       "PYPI_URL=$${PYPI_URL:-https://pypi.org/simple}",
       "ls -alR /tmp",
       "python3 -m ensurepip",
-      "python3 -m pip install --index-url=\"$PYPI_URL\" -r /tmp/granite/tests/requirements.txt",
+      "python3 -m pip install --index-url=\"$PYPI_URL\" -r /tmp/chimera/tests/requirements.txt",
       "for DEV in $(lsblk -ln | awk '/ part /{ print $1}'); do pvresize /dev/$${DEV} || true; done",
     ]
     pause_before = "5s"
@@ -199,27 +199,27 @@ build {
   provisioner "shell" {
     environment_vars = [
       "LVM_SUPPRESS_FD_WARNINGS=1",
-      "GRANITE_AMIUTILSOURCE=${var.granite_amiutilsource}",
-      "GRANITE_DISABLEFIPS=${var.granite_disablefips}",
+      "CHIMERA_AMIUTILSOURCE=${var.chimera_amiutilsource}",
+      "CHIMERA_DISABLEFIPS=${var.chimera_disablefips}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/sh -ex -o pipefail '{{ .Path }}'"
     inline = [
       "PATH=/usr/local/bin:\"$PATH\"",
       "export PATH",
-      "pytest --strict-markers -s -v --color=no /tmp/granite | tee /tmp/pytest.log",
+      "pytest --strict-markers -s -v --color=no /tmp/chimera | tee /tmp/pytest.log",
     ]
     pause_before = "5s"
   }
 
   provisioner "file" {
-    destination = ".granite/${var.granite_version}/validation-${var.granite_identifier}-${source.name}.log"
+    destination = ".chimera/${var.chimera_version}/validation-${var.chimera_identifier}-${source.name}.log"
     direction   = "download"
     source      = "/tmp/pytest.log"
   }
 
   post-processor "artifice" {
     files = [
-      ".granite/${var.granite_version}/validation-${var.granite_identifier}-${source.name}.log",
+      ".chimera/${var.chimera_version}/validation-${var.chimera_identifier}-${source.name}.log",
     ]
   }
 }

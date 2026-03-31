@@ -1,6 +1,6 @@
-# Granite SSM Infrastructure Module
+# Chimera SSM Infrastructure Module
 
-OpenTofu module for deploying SSM infrastructure to support STIG-hardened AMIs built by [Granite](../../README.md). Compatible with OpenTofu (>= 1.0).
+OpenTofu module for deploying SSM infrastructure to support STIG-hardened AMIs built by [Chimera](../../README.md). Compatible with OpenTofu (>= 1.0).
 
 ## Overview
 
@@ -37,7 +37,7 @@ Architecture: **one deployment per AWS account** (not per-AMI). SSM resources pe
 module "ssm" {
   source = "./modules/ssm"
 
-  name_prefix = "granite-ci"
+  name_prefix = "chimera-ci"
   vpc_id      = "vpc-0123456789abcdef0"
   subnet_ids  = ["subnet-0123456789abcdef0"]
   vpc_cidr    = "10.0.0.0/16"
@@ -51,7 +51,7 @@ module "ssm" {
   enable_stig_enforcement = false  # No enforcement in CI
 
   tags = {
-    Project     = "GRANITE"
+    Project     = "CHIMERA"
     Environment = "CI"
   }
 }
@@ -63,7 +63,7 @@ module "ssm" {
 module "ssm" {
   source = "./modules/ssm"
 
-  name_prefix = "granite-prod"
+  name_prefix = "chimera-prod"
   vpc_id      = "vpc-prod-id"
   subnet_ids  = ["subnet-a", "subnet-b"]
   vpc_cidr    = "10.100.0.0/16"
@@ -84,7 +84,7 @@ module "ssm" {
   alert_email        = "ops@example.com"
 
   tags = {
-    Project     = "GRANITE"
+    Project     = "CHIMERA"
     Environment = "Production"
   }
 }
@@ -96,7 +96,7 @@ module "ssm" {
 module "ssm" {
   source = "./modules/ssm"
 
-  name_prefix    = "granite-prod"
+  name_prefix    = "chimera-prod"
   vpc_id         = "vpc-prod-id"
   subnet_ids     = ["subnet-a"]
   vpc_cidr       = "10.100.0.0/16"
@@ -136,7 +136,7 @@ For manual / local use:
 
 ```bash
 # Automatic (recommended)
-source ./bootstrap-backend.sh --prefix granite-prod --region us-gov-west-1
+source ./bootstrap-backend.sh --prefix chimera-prod --region us-gov-west-1
 tofu init -input=false
 
 # Manual
@@ -183,14 +183,14 @@ module "ssm" {
 
 Since `install_dependencies = false` (default), these must be on the AMI:
 
-| Package | Required By | Granite AMI Status |
+| Package | Required By | Chimera AMI Status |
 |---------|-------------|------------------|
 | `ansible-core` | Ansible STIG playbook execution | Pre-installed |
 | `openscap-scanner` | OpenSCAP compliance scans | Pre-installed |
 | `scap-security-guide` | SCAP data streams (benchmarks) | Pre-installed |
 | `unzip`, `wget` | SSM document dependencies | Pre-installed |
 
-All packages are pre-installed on Granite-built AMIs, so no internet access is needed at runtime.
+All packages are pre-installed on Chimera-built AMIs, so no internet access is needed at runtime.
 
 ### S3 URL format
 
@@ -225,7 +225,7 @@ In `--check` mode (compliance scans), `ansible.builtin.script` is naturally skip
 
 ### How instances get tagged
 
-All Granite hardened AMIs are built with these AMI-level tags:
+All Chimera hardened AMIs are built with these AMI-level tags:
 - `StigManaged = "true"` — all platforms
 - `StigPlatform` — platform identifier (`EL8`, `EL9`, `AL2023`, `Win2019`, `Win2022`)
 

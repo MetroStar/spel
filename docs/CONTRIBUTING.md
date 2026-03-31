@@ -1,6 +1,6 @@
 # How to Contribute
 
-Granite (STIG-Partitioned Enterprise Linux) produces hardened AMIs for AWS using
+Chimera (STIG-Partitioned Enterprise Linux) produces hardened AMIs for AWS using
 a Docker-based build system driven by Packer and the
 [amigen8](https://github.com/MetroStar/amigen8) /
 [amigen9](https://github.com/MetroStar/amigen9) tool-sets. The project
@@ -14,7 +14,7 @@ currently supports:
 
 Contributions that improve the build system, add OS support, fix bugs, or
 enhance documentation are welcome. Please open an
-[issue](https://github.com/MetroStar/granite/issues/new) to discuss larger
+[issue](https://github.com/MetroStar/chimera/issues/new) to discuss larger
 changes before investing significant effort.
 
 ## Development Setup
@@ -22,8 +22,8 @@ changes before investing significant effort.
 1. Clone the repository and check out the `nipr` branch:
 
     ```bash
-    git clone https://github.com/MetroStar/granite.git
-    cd granite && git checkout nipr
+    git clone https://github.com/MetroStar/chimera.git
+    cd chimera && git checkout nipr
     ```
 
 2. Build the Docker builder image (requires Docker):
