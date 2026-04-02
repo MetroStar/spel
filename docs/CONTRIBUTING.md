@@ -19,11 +19,11 @@ changes before investing significant effort.
 
 ## Development Setup
 
-1. Clone the repository and check out the `nipr` branch:
+1. Clone the repository and create a feature branch:
 
     ```bash
     git clone https://github.com/MetroStar/chimera.git
-    cd chimera && git checkout nipr
+    cd chimera && git checkout -b <feature-branch-name>
     ```
 
 2. Build the Docker builder image (requires Docker):
