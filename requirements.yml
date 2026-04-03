@@ -6,8 +6,6 @@ roles:
     name: Windows-2019-STIG
   - src: ./chimera/ansible/roles/Windows-2022-STIG
     name: Windows-2022-STIG
-  - src: ./chimera/ansible/roles/AMAZON2023-CIS
-    name: AMAZON2023-CIS
   - src: ./chimera/ansible/roles/RHEL8-STIG
     name: RHEL8-STIG
   - src: ./chimera/ansible/roles/RHEL9-STIG
