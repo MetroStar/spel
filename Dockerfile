@@ -382,9 +382,9 @@ if [ "${SKIP_WORKSPACE_CHECK}" = "false" ]; then
 
     # =============================================================================
     # Symlink/copy baked-in Python wheels to workspace location
-    # Packer file provisioner uploads tools/python-deps/ to EC2
+    # Packer file provisioner uploads python-deps/ to EC2
     # =============================================================================
-    PYTHON_DEPS_DEST="${WORKSPACE}/tools/python-deps"
+    PYTHON_DEPS_DEST="${WORKSPACE}/python-deps"
     if [ -d "${PYTHON_DEPS_PATH}" ]; then
         echo "Populating Python wheels in workspace..."
         mkdir -p "${PYTHON_DEPS_DEST}"

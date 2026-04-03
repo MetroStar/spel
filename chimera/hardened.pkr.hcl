@@ -966,7 +966,7 @@ build {
       "amazon-ebs.hardened-rhel-8-hvm",
       "amazon-ebs.hardened-ol-8-hvm",
     ]
-    source      = "${path.root}/../tools/python-deps"
+    source      = "${path.root}/../python-deps"
     destination = "/tmp/python-deps"
   }
 
