@@ -1366,7 +1366,7 @@ The environment variable is not reaching the build script. Check that:
   - `.github/workflows/offline-prepare.yml`
   - `.github/workflows/build.yml`
 - **GitLab CI Configuration**: `.gitlab-ci.yml`
-- **Build Script**: `build/build.sh`
+- **Build Script**: `build.sh`
 - **Makefile**: `Makefile`
 - **Quick Reference**: `docs/QUICK-REFERENCE-Optimization.md`
 - **Storage Optimization**: `docs/Storage-Optimization.md`

@@ -69,7 +69,7 @@ AWS credentials are configured via OIDC to allow the workflow to interact with A
 
 ## `build.sh` Script
 
-The `build/build.sh` script performs the following tasks:
+The `build.sh` script performs the following tasks:
 - Ensures required environment variables are set
 - Creates AWS CLI configuration files for commercial and GovCloud partitions
 - Checks and manages AMI quotas to avoid exceeding limits

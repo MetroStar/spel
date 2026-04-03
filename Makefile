@@ -27,4 +27,4 @@ build: export AWS_DEFAULT_REGION := $(BUILDER_REGION)
 build: export AWS_REGION := $(BUILDER_REGION)
 build: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
 build:
-	bash ./build/build.sh
+	bash ./build.sh
