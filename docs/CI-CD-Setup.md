@@ -849,7 +849,7 @@ on:
      - Repository mounted at `/workspace`
      - AWS credentials passed via environment variables
      - Build configuration via environment variables
-   - Executes `make -f Makefile.chimera build`
+   - Executes `make build`
 
 #### Usage
 
@@ -1049,7 +1049,7 @@ build:rhel9:
         -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
         -e CHIMERA_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
         "chimera-builder:${DOCKER_IMAGE_TAG}" \
-        make -f Makefile.chimera build
+        make build
 ```
 
 > **Note**: The workflow automatically sets `PKR_VAR_aws_ami_regions` to include the build region.
@@ -1181,7 +1181,7 @@ docker run --rm \
   -v "$(pwd):/workspace" \
   -e PACKER_LOG=1 \
   -e PACKER_LOG_PATH=/workspace/packer.log \
-  chimera-builder:latest make -f Makefile.chimera build
+  chimera-builder:latest make build
 
 # Review log file
 cat packer.log
@@ -1367,6 +1367,6 @@ The environment variable is not reaching the build script. Check that:
   - `.github/workflows/build.yml`
 - **GitLab CI Configuration**: `.gitlab-ci.yml`
 - **Build Script**: `build/build.sh`
-- **Makefile**: `Makefile.chimera`
+- **Makefile**: `Makefile`
 - **Quick Reference**: `docs/QUICK-REFERENCE-Optimization.md`
 - **Storage Optimization**: `docs/Storage-Optimization.md`

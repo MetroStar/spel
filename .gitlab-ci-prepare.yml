@@ -32,7 +32,7 @@
 #   3. Download artifacts from the export:tarball job
 #   4. Transfer to air-gapped environment
 #   5. Import with: gunzip -c chimera-builder-*.tar.gz | docker load
-#   6. Run with: docker run -v $(pwd):/workspace chimera-builder:<tag> make -f Makefile.chimera build
+#   6. Run with: docker run -v $(pwd):/workspace chimera-builder:<tag> make build
 #
 # NOTE: To use this file as the pipeline config, either:
 #   - Set CI/CD config file path to .gitlab-ci-prepare.yml in project settings, OR
@@ -238,7 +238,7 @@ export:tarball:
         -e AWS_DEFAULT_REGION=us-east-1 \\
         -e SPEL_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \\
         -e SPEL_VERSION=\$(date +%Y.%m).1 \\
-        ${IMAGE_NAME}:${IMAGE_TAG} make -f Makefile.chimera build
+        ${IMAGE_NAME}:${IMAGE_TAG} make build
       EOF
 
       cat "${MANIFEST_FILE}"

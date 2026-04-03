@@ -48,7 +48,7 @@ Depends on `infra` job. Uses infrastructure outputs from Job 1. Runs on `ubuntu-
 5. **Build STIGed AMIs**
    - Runs Docker container with repository mounted at `/workspace`
    - AWS credentials and infrastructure outputs passed via environment variables (`PKR_VAR_aws_vpc_id`, `PKR_VAR_aws_subnet_id`, etc.)
-   - Executes `make -f Makefile.chimera build` inside the container
+   - Executes `make build` inside the container
 
 ### Key Inputs
 

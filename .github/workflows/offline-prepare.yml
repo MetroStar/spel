@@ -20,7 +20,7 @@
 #   1. Downloaded from GitHub Actions artifacts
 #   2. Transferred to air-gapped environment
 #   3. Imported with: gunzip -c chimera-builder-*.tar.gz | docker load
-#   4. Run with: docker run -v $(pwd):/workspace chimera-builder:<tag> make -f Makefile.chimera build
+#   4. Run with: docker run -v $(pwd):/workspace chimera-builder:<tag> make build
 # =============================================================================
 
 name: Prepare Offline Docker Image
@@ -190,7 +190,7 @@ jobs:
             -e AWS_DEFAULT_REGION=us-east-1 \\
             -e CHIMERA_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \\
             -e CHIMERA_VERSION=\$(date +%Y.%m).1 \\
-            chimera-builder:${IMAGE_TAG} make -f Makefile.chimera build
+            chimera-builder:${IMAGE_TAG} make build
           EOF
           
           cat "${MANIFEST_FILE}"

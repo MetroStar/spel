@@ -169,7 +169,7 @@ docker run --rm \
   -e AWS_SECRET_ACCESS_KEY \
   -e AWS_SESSION_TOKEN \
   -e CHIMERA_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
-  chimera-builder:latest make -f Makefile.chimera build
+  chimera-builder:latest make build
 ```
 
 ### Verify Docker Image

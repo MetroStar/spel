@@ -16,7 +16,7 @@
 #     -e CHIMERA_VERSION=2025.01.1 \
 #     -e CHIMERA_IDENTIFIER=chimera \
 #     -e WINDOWS_BUILDERS="" \
-#     chimera-builder:$(date +%Y%m%d) make -f Makefile.chimera build
+#     chimera-builder:$(date +%Y%m%d) make build
 
 # =============================================================================
 # Stage 1: Builder - Install all dependencies
@@ -275,13 +275,13 @@ CI_ENVIRONMENT="local"
 if [ "${GITHUB_ACTIONS}" = "true" ]; then
     CI_ENVIRONMENT="GitHub Actions"
     # GitHub Actions mounts to /github/workspace by default
-    if [ -d "/github/workspace" ] && [ -f "/github/workspace/Makefile.chimera" ]; then
+    if [ -d "/github/workspace" ] && [ -f "/github/workspace/Makefile" ]; then
         WORKSPACE="/github/workspace"
     fi
 elif [ "${GITLAB_CI}" = "true" ]; then
     CI_ENVIRONMENT="GitLab CI"
     # GitLab CI uses CI_PROJECT_DIR
-    if [ -n "${CI_PROJECT_DIR}" ] && [ -f "${CI_PROJECT_DIR}/Makefile.chimera" ]; then
+    if [ -n "${CI_PROJECT_DIR}" ] && [ -f "${CI_PROJECT_DIR}/Makefile" ]; then
         WORKSPACE="${CI_PROJECT_DIR}"
     fi
 elif [ -n "${JENKINS_URL}" ]; then
@@ -294,7 +294,7 @@ echo ""
 
 # =============================================================================
 # Set AWS region for Packer
-# Makefile.chimera expects PKR_VAR_aws_region or AWS_REGION (not AWS_DEFAULT_REGION)
+# Makefile expects PKR_VAR_aws_region or AWS_REGION (not AWS_DEFAULT_REGION)
 # =============================================================================
 if [ -z "${PKR_VAR_aws_region}" ]; then
     if [ -n "${AWS_REGION}" ]; then
@@ -352,11 +352,11 @@ esac
 
 # Check if workspace is mounted (skip for version/help commands)
 if [ "${SKIP_WORKSPACE_CHECK}" = "false" ]; then
-    if [ ! -f "${WORKSPACE}/Makefile.chimera" ]; then
-        echo "ERROR: Makefile.chimera not found in ${WORKSPACE}"
+    if [ ! -f "${WORKSPACE}/Makefile" ]; then
+        echo "ERROR: Makefile not found in ${WORKSPACE}"
         echo ""
         echo "Mount your repository to ${WORKSPACE}:"
-        echo "  docker run -v \$(pwd):/workspace chimera-builder make -f Makefile.chimera build"
+        echo "  docker run -v \$(pwd):/workspace chimera-builder make build"
         exit 1
     fi
 
@@ -603,7 +603,7 @@ WORKDIR ${WORKSPACE}
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command
-CMD ["make", "-f", "Makefile.chimera", "build"]
+CMD ["make", "build"]
 
 # Labels
 LABEL org.opencontainers.image.title="Chimera Builder" \

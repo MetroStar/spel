@@ -415,7 +415,7 @@ import:docker:
         -v "${CI_PROJECT_DIR}:/workspace" \
         "${DOCKER_ENV_ARGS[@]}" \
         "chimera-builder:${IMAGE_TAG}" \
-        make -f Makefile.chimera build
+        make build
   artifacts:
     paths:
       - .chimera/

@@ -442,7 +442,7 @@ jobs:
             -v "$(pwd):/workspace" \
             "${DOCKER_ENV_ARGS[@]}" \
             "chimera-builder:${IMAGE_TAG}" \
-            make -f Makefile.chimera build
+            make build
 
       - name: Create build summary
         if: always()
