@@ -90,22 +90,6 @@ packer {
       version = ">= 1.1.0"
       source  = "github.com/hashicorp/ansible"
     }
-    azure = {
-      version = "~> 1"
-      source  = "github.com/hashicorp/azure"
-    }
-    openstack = {
-      version = "~> 1"
-      source  = "github.com/hashicorp/openstack"
-    }
-    vagrant = {
-      version = "~> 1"
-      source  = "github.com/hashicorp/vagrant"
-    }
-    virtualbox = {
-      version = ">= 1.1.1"
-      source  = "github.com/hashicorp/virtualbox"
-    }
   }
 }
 EOF
