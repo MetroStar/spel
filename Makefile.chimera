@@ -1,26 +1,13 @@
 SHELL := /bin/bash
 
-PACKER_ZIP ?= https://releases.hashicorp.com/packer/$(PACKER_VERSION)/packer_$(PACKER_VERSION)_linux_amd64.zip
 PACKER_LOG ?= '1'
 PACKER_LOG_PATH = .chimera/$(CHIMERA_VERSION)/packer.log
 CHECKPOINT_DISABLE ?= '1'
-CHIMERA_CI ?= true
 BUILDER_REGION = $(or $(PKR_VAR_aws_region),$(AWS_REGION))
-export PATH := $(HOME)/bin:$(PATH)
 
 export PKR_VAR_chimera_deprecation_lifetime ?= 8760h
 
-# The `pre_build`, `build`, and `post_build` targets all use packer in a way that
-# supports both Commercial and GovCloud partitions. For GovCloud, the `install`
-# target is used to setup an aws profile with credentials retrieved from SSM. For
-# the Commercial partition, the profile is created but the credentials are sourced
-# from the execution environment (meaning your workstation or CodeBuild).
-
-# Due to the use of an aws profile, when running interactively, it is required
-# to export AWS_PROFILE with a valid profile. For CodeBuild CI, it is set to $CHIMERA_IDENTIFIER,
-# and `make install` will create it.
-
-.PHONY: all install pre_build build copy post_build docs
+.PHONY: build
 .EXPORT_ALL_VARIABLES:
 
 $(info CHIMERA_IDENTIFIER=$(CHIMERA_IDENTIFIER))
@@ -36,27 +23,9 @@ else
 $(shell mkdir -p ".chimera/$(CHIMERA_VERSION)")
 endif
 
-all: build
-
-docs/lint:
-	$(MAKE) -f Makefile docs/lint
-
-docs/generate:
-	$(MAKE) -f Makefile docs/generate
-
-install:
-	$(MAKE) -f Makefile packer/install
-	bash -eo pipefail ./build/install.sh
-
-build copy: export AWS_DEFAULT_REGION := $(BUILDER_REGION)
-build copy: export AWS_REGION := $(BUILDER_REGION)
-
-# Set the source security group cidr
-build copy: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
-
+build: export AWS_DEFAULT_REGION := $(BUILDER_REGION)
+build: export AWS_REGION := $(BUILDER_REGION)
+build: export PKR_VAR_aws_temporary_security_group_source_cidrs = ["$(shell curl -sSL https://checkip.amazonaws.com)/32"]
 build:
 	bash ./build/build.sh
 	bash ./build/post_build.sh
-
-copy:
-	bash ./build/ami-cp.sh

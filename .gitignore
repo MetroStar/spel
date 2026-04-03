@@ -64,8 +64,6 @@ __pycache__
 *.log
 terraform.tfstate*
 go.*
-tardigrade-ci
-.tardigrade-ci
 *.pem
 
 # =========================
