@@ -8,22 +8,6 @@ packer {
       source  = "github.com/hashicorp/amazon"
       version = ">= 1.3.3"
     }
-    azure = {
-      source  = "github.com/hashicorp/azure"
-      version = "~> 1"
-    }
-    openstack = {
-      source  = "github.com/hashicorp/openstack"
-      version = "~> 1"
-    }
-    vagrant = {
-      source  = "github.com/hashicorp/vagrant"
-      version = "~> 1"
-    }
-    virtualbox = {
-      source  = "github.com/hashicorp/virtualbox"
-      version = ">= 1.1.1"
-    }
   }
 }
 
@@ -34,9 +18,6 @@ packer {
 # by their prefix. Current prefixes
 # include:
 #   * aws - amazon-ebs builder
-#   * azure - azure-arm builder
-#   * openstack - openstack builder
-#   * virtualbox - virtualbox builder
 #   * amigen - used across amigen versions ( amigen8 and amigen9)
 #   * amigen8 - amigen8 only
 #   * amigen9 - amigen9 only
@@ -117,22 +98,6 @@ variable "aws_source_ami_filter_alma9_hvm" {
       "679593333241", # Alma Commercial, https://wiki.almalinux.org/cloud/AWS.html#aws-marketplace
       "174003430611", # Chimera Commercial, https://github.com/MetroStar/chimera
       "216406534498", # Chimera GovCloud, https://github.com/MetroStar/chimera
-    ]
-  }
-}
-
-variable "aws_source_ami_filter_centos9stream_hvm" {
-  description = "Object with source AMI filters for CentOS Stream 9 HVM builds"
-  type = object({
-    name   = string
-    owners = list(string)
-  })
-  default = {
-    name = "CentOS Stream 9 x86_64 *,chimera-bootstrap-centos-9stream-*.x86_64-gp*"
-    owners = [
-      "125523088429", # CentOS Commercial, https://wiki.centos.org/Cloud/AWS
-      "204182206073", # Chimera Commercial, https://github.com/MetroStar/chimera
-      "317517796843", # Chimera GovCloud, https://github.com/MetroStar/chimera
     ]
   }
 }
@@ -288,160 +253,6 @@ variable "amigen_repo_mirror_baseurl" {
   description = "Base URL for air-gapped yum repository mirrors. When set, disables RHUI repos and configures local mirrors. Example: http://mirror.internal.mil"
   type        = string
   default     = ""
-}
-
-###
-# Variables for Azure builders
-###
-
-variable "azure_build_resource_group_name" {
-  description = "Existing resource group in which the build will run"
-  type        = string
-  default     = null
-}
-
-variable "azure_client_id" {
-  description = "Application ID of the AAD Service Principal. Requires either client_secret, client_cert_path or client_jwt to be set as well"
-  type        = string
-  default     = null
-}
-
-variable "azure_client_secret" {
-  description = "Password/secret registered for the AAD Service Principal"
-  type        = string
-  default     = null
-}
-
-variable "azure_cloud_environment_name" {
-  description = "One of Public, China, Germany, or USGovernment. Defaults to Public. Long forms such as USGovernmentCloud and AzureUSGovernmentCloud are also supported"
-  type        = string
-  default     = "Public"
-}
-
-variable "azure_image_offer" {
-  description = "Name of the publisher offer to use for your base image (Azure Marketplace Images only)"
-  type        = string
-  default     = null
-}
-
-variable "azure_image_publisher" {
-  description = "Name of the publisher to use for your base image (Azure Marketplace Images only)"
-  type        = string
-  default     = null
-}
-
-variable "azure_image_sku" {
-  description = "SKU of the image offer to use for your base image (Azure Marketplace Images only)"
-  type        = string
-  default     = null
-}
-
-variable "azure_keep_os_disk" {
-  description = "Boolean toggle whether to keep the managed disk or delete it after packer runs"
-  type        = bool
-  default     = false
-}
-
-variable "azure_location" {
-  description = "Azure datacenter in which your VM will build"
-  type        = string
-  default     = null
-}
-
-variable "azure_managed_image_resource_group_name" {
-  description = "Resource group name where the result of the Packer build will be saved. The resource group must already exist"
-  type        = string
-  default     = null
-}
-
-variable "azure_private_virtual_network_with_public_ip" {
-  description = "Boolean toggle whether a public IP will be assigned when using `azure_virtual_network_name`"
-  type        = bool
-  default     = null
-}
-
-variable "azure_subscription_id" {
-  type    = string
-  default = null
-}
-
-variable "azure_virtual_network_name" {
-  description = "Name of a pre-existing virtual network in which to run the build"
-  type        = string
-  default     = null
-}
-
-variable "azure_virtual_network_resource_group_name" {
-  description = "Name of the virtual network resource group in which to run the build"
-  type        = string
-  default     = null
-}
-
-variable "azure_virtual_network_subnet_name" {
-  description = "Name of the subnet in which to run the build"
-  type        = string
-  default     = null
-}
-
-variable "azure_vm_size" {
-  type    = string
-  default = "Standard_DS5_v2"
-}
-
-###
-# Variables for Openstack builders
-###
-
-variable "openstack_insecure" {
-  description = "Boolean whether the connection to OpenStack can be done over an insecure connection"
-  type        = bool
-  default     = false
-}
-
-variable "openstack_flavor" {
-  description = "ID, name, or full URL for the desired flavor for the server to be created"
-  type        = string
-  default     = null
-}
-
-variable "openstack_floating_ip_network_name" {
-  description = "ID or name of an external network that can be used for creation of a new floating IP"
-  type        = string
-  default     = null
-}
-
-variable "openstack_networks" {
-  description = "List of networks by UUID to attach to this instance"
-  type        = list(string)
-  default     = []
-}
-
-variable "openstack_security_groups" {
-  description = "List of security groups by name to add to this instance"
-  type        = list(string)
-  default     = []
-}
-
-variable "openstack_source_image_name" {
-  description = "Name of the base image to use"
-  type        = string
-  default     = null
-}
-
-###
-# Variables for Virtualbox/Vagrant builds
-###
-
-variable "virtualbox_iso_url_centos9stream" {
-  description = "URL to the CentOS Stream 9 .iso to use for Virtualbox builds"
-  type        = string
-  default     = "http://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/iso/CentOS-Stream-9-latest-x86_64-boot.iso"
-}
-
-variable "virtualbox_vagrantcloud_username" {
-  description = "Vagrant Cloud username, used to namespace the vagrant boxes"
-  type        = string
-  default     = null
 }
 
 ###
@@ -708,24 +519,6 @@ variable "amigen9_uefi_dev_label" {
 
 
 ###
-# Variables used for Azure-based builds
-###
-variable "azure_custom_managed_image_name_rhel8" {
-  description = "Name of a custom managed image to use as the base image for RHEL8 builds"
-  type        = string
-  default     = null
-}
-
-
-variable "azure_custom_managed_image_resource_group_name_rhel8" {
-  description = "Name of the resource group for the custom image in `azure_custom_managed_image_name_rhel8`"
-  type        = string
-  default     = null
-}
-
-
-
-###
 # Variables specific to chimera
 ###
 
@@ -847,68 +640,6 @@ source "amazon-ebssurrogate" "base" {
   user_data_file                        = "${path.root}/userdata/userdata.cloud"
 }
 
-source "azure-arm" "base" {
-  build_resource_group_name              = var.azure_build_resource_group_name
-  client_id                              = var.azure_client_id
-  client_secret                          = var.azure_client_secret
-  cloud_environment_name                 = var.azure_cloud_environment_name
-  communicator                           = "ssh"
-  custom_data_file                       = "${path.root}/userdata/userdata.cloud"
-  image_offer                            = var.azure_image_offer
-  image_publisher                        = var.azure_image_publisher
-  image_sku                              = var.azure_image_sku
-  keep_os_disk                           = var.azure_keep_os_disk
-  location                               = var.azure_location
-  managed_image_name                     = "${var.chimera_identifier}-${source.name}-${var.chimera_version}"
-  managed_image_resource_group_name      = var.azure_managed_image_resource_group_name
-  os_disk_size_gb                        = var.chimera_root_volume_size
-  os_type                                = "Linux"
-  private_virtual_network_with_public_ip = var.azure_private_virtual_network_with_public_ip
-  ssh_port                               = 22
-  ssh_pty                                = true
-  ssh_timeout                            = "60m"
-  ssh_username                           = var.chimera_ssh_username
-  subscription_id                        = var.azure_subscription_id
-  use_azure_cli_auth                     = true
-  virtual_network_name                   = var.azure_virtual_network_name
-  virtual_network_resource_group_name    = var.azure_virtual_network_resource_group_name
-  virtual_network_subnet_name            = var.azure_virtual_network_subnet_name
-  vm_size                                = var.azure_vm_size
-}
-
-source "openstack" "base" {
-  flavor                  = var.openstack_flavor
-  floating_ip_network     = var.openstack_floating_ip_network_name
-  image_name              = "${var.chimera_identifier}-${source.name}-${var.chimera_version}.x86_64"
-  insecure                = var.openstack_insecure
-  networks                = var.openstack_networks
-  security_groups         = var.openstack_security_groups
-  source_image_name       = var.openstack_source_image_name
-  ssh_port                = 22
-  ssh_timeout             = "30m"
-  ssh_username            = var.chimera_ssh_username
-  use_blockstorage_volume = "false"
-  user_data_file          = "${path.root}/userdata/userdata.cloud"
-}
-
-source "virtualbox-iso" "base" {
-  boot_wait               = "10s"
-  disk_size               = 20480
-  format                  = "ova"
-  guest_additions_path    = "VBoxGuestAdditions_{{ .Version }}.iso"
-  guest_os_type           = "RedHat_64"
-  headless                = true
-  http_directory          = "${path.root}/kickstarts"
-  output_directory        = ".chimera/${var.chimera_version}/${var.chimera_identifier}-${source.name}"
-  shutdown_command        = "echo '/sbin/halt -h -p' > shutdown.sh; echo 'vagrant'|sudo -S bash 'shutdown.sh'"
-  ssh_password            = "vagrant"
-  ssh_port                = 22
-  ssh_timeout             = "10000s"
-  ssh_username            = "vagrant"
-  virtualbox_version_file = ".vbox_version"
-  vm_name                 = "${var.chimera_identifier}-${source.name}-${var.chimera_version}"
-}
-
 ###
 # End of source blocks
 ###
@@ -941,7 +672,6 @@ locals {
   # Effective source AMI filter owners - use Offline account if specified, otherwise use commercial
   effective_al2023_owners        = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_al2023_hvm.owners
   effective_alma9_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_alma9_hvm.owners
-  effective_centos9stream_owners = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_centos9stream_hvm.owners
   effective_ol8_owners           = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_ol8_hvm.owners
   effective_ol9_owners           = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_ol9_hvm.owners
   effective_rhel8_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_rhel8_hvm.owners
@@ -988,20 +718,6 @@ build {
         root-device-type    = "ebs"
       }
       owners      = local.effective_al2023_owners
-      most_recent = true
-    }
-  }
-
-  source "amazon-ebssurrogate.base" {
-    ami_description = format(local.description, "CentOS Stream 9 AMI")
-    name            = "minimal-centos-9stream-hvm"
-    source_ami_filter {
-      filters = {
-        virtualization-type = "hvm"
-        name                = var.aws_source_ami_filter_centos9stream_hvm.name
-        root-device-type    = "ebs"
-      }
-      owners      = local.effective_centos9stream_owners
       most_recent = true
     }
   }
@@ -1076,26 +792,6 @@ build {
     }
   }
 
-  source "azure-arm.base" {
-    azure_tags = {
-      Description = format(local.description, "RHEL 8 image")
-    }
-    custom_managed_image_name                = var.azure_custom_managed_image_name_rhel8
-    custom_managed_image_resource_group_name = var.azure_custom_managed_image_resource_group_name_rhel8
-    name                                     = "minimal-rhel-8-image"
-  }
-
-  # Update the rhui-azure RPM before the broader-scope `yum udate`
-  provisioner "shell" {
-    execute_command = "{{ .Vars }} sudo -E sh -ex '{{ .Path }}'"
-    inline = [
-      "dnf update -y --disablerepo='*' --enablerepo='*microsoft*'",
-    ]
-    only = [
-      "azure-arm.minimal-rhel-8-image",
-    ]
-  }
-
   # Configure air-gapped repositories for Linux builds
   provisioner "shell" {
     environment_vars = [
@@ -1142,7 +838,6 @@ build {
     only = [
       "amazon-ebssurrogate.minimal-rhel-9-hvm",
       "amazon-ebssurrogate.minimal-rhel-8-hvm",
-      "amazon-ebssurrogate.minimal-centos-9stream-hvm",
       "amazon-ebssurrogate.minimal-ol-9-hvm",
       "amazon-ebssurrogate.minimal-ol-8-hvm",
       "amazon-ebssurrogate.minimal-alma-9-hvm",
@@ -1163,8 +858,6 @@ build {
       "amazon-ebssurrogate.minimal-rhel-8-hvm",
       "amazon-ebssurrogate.minimal-ol-9-hvm",
       "amazon-ebssurrogate.minimal-ol-8-hvm",
-      "amazon-ebssurrogate.minimal-centos-9stream-hvm",
-      "amazon-ebssurrogate.minimal-centos-8stream-hvm",
       "amazon-ebssurrogate.minimal-amzn-2023-hvm",
       "amazon-ebssurrogate.minimal-alma-9-hvm",
       "amazon-ebssurrogate.minimal-rl-9-hvm",
@@ -1202,7 +895,6 @@ build {
     ]
     only = [
       "amazon-ebssurrogate.minimal-alma-9-hvm",
-      "amazon-ebssurrogate.minimal-centos-9stream-hvm",
       "amazon-ebssurrogate.minimal-ol-9-hvm",
       "amazon-ebssurrogate.minimal-rhel-9-hvm",
       "amazon-ebssurrogate.minimal-rl-9-hvm",
@@ -1225,45 +917,6 @@ build {
     ]
     only = [
       "amazon-ebssurrogate.minimal-amzn-2023-hvm",
-    ]
-  }
-
-  provisioner "shell" {
-    environment_vars = [
-      "DNF_VAR_ociregion=",
-      "DNF_VAR_ocidomain=oracle.com",
-    ]
-    execute_command   = "{{ .Vars }} sudo -E /bin/sh '{{ .Path }}'"
-    expect_disconnect = true
-    scripts = [
-      "${path.root}/scripts/pivot-root.sh",
-    ]
-    start_retry_timeout = "15m"
-    only = [
-      "azure-arm.minimal-rhel-8-image",
-    ]
-  }
-
-  provisioner "shell" {
-    execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
-    scripts = [
-      "${path.root}/scripts/free-root.sh",
-    ]
-    only = [
-      "azure-arm.minimal-rhel-8-image",
-    ]
-  }
-
-  # Keep the unmount in a separate provisioner. This forces packer to disconnect
-  # and release the ssh session that would otherwise lock the target.
-  provisioner "shell" {
-    execute_command = "{{ .Vars }} sudo -E /bin/sh -ex '{{ .Path }}'"
-    inline = [
-      "echo Unmounting /oldroot",
-      "test $( grep -c /oldroot /proc/mounts ) -eq 0 || umount /oldroot",
-    ]
-    only = [
-      "azure-arm.minimal-rhel-8-image",
     ]
   }
 
@@ -1346,7 +999,6 @@ build {
     only = [
       "amazon-ebssurrogate.minimal-alma-9-hvm",
       "amazon-ebssurrogate.minimal-amzn-2023-hvm",
-      "amazon-ebssurrogate.minimal-centos-9stream-hvm",
       "amazon-ebssurrogate.minimal-ol-9-hvm",
       "amazon-ebssurrogate.minimal-rhel-9-hvm",
       "amazon-ebssurrogate.minimal-rl-9-hvm",
@@ -1354,55 +1006,6 @@ build {
     scripts = [
       "${path.root}/scripts/amigen9-build.sh",
     ]
-  }
-
-  # Azure EL8 provisioners
-  provisioner "shell" {
-    environment_vars = [
-      "CHIMERA_AMIGENBRANCH=${var.amigen8_source_branch}",
-      "CHIMERA_AMIGENBUILDDEV=/dev/sda",
-      "CHIMERA_AMIGENCHROOT=/mnt/ec2-root",
-      "CHIMERA_AMIGENPKGGRP=${local.amigen8_package_groups}",
-      "CHIMERA_AMIGENREPOS=${local.amigen8_repo_names}",
-      "CHIMERA_AMIGENREPOSRC=${local.amigen8_repo_sources}",
-      "CHIMERA_AMIGEN8SOURCE=${var.amigen8_source_url}",
-      "CHIMERA_AMIGENSTORLAY=${local.amigen8_storage_layout}",
-      "CHIMERA_AMIGENVGNAME=VolGroup00",
-      "CHIMERA_AMIUTILSSOURCE=${var.amigen_amiutils_source_url}",
-      "CHIMERA_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.chimera_cfnbootstrap_source}",
-      "CHIMERA_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "CHIMERA_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.chimera_awscli_source}",
-      "CHIMERA_BOOTLABEL=/boot",
-      "CHIMERA_BUILDDEPS=lvm2 parted yum-utils unzip git",
-      "CHIMERA_BUILDNAME=${source.name}",
-      "CHIMERA_CLOUDPROVIDER=azure",
-      "CHIMERA_EXTRARPMS=${local.amigen8_extra_rpms}",
-      "CHIMERA_FIPSDISABLE=${var.amigen_fips_disable}",
-      "CHIMERA_GRUBTMOUT=${var.amigen_grub_timeout}",
-      "CHIMERA_HTTP_PROXY=${var.chimera_http_proxy}",
-      "CHIMERA_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
-    ]
-    execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
-    only = [
-      "azure-arm.minimal-rhel-8-image",
-    ]
-    scripts = [
-      "${path.root}/scripts/amigen8-build.sh",
-    ]
-  }
-
-  provisioner "shell" {
-    execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E bash -ex '{{ .Path }}'"
-    inline = [
-      "chkconfig waagent on",
-      "/usr/sbin/waagent -force -deprovision",
-      "export HISTSIZE=0",
-      "sync",
-    ]
-    only = [
-      "azure-arm.minimal-rhel-8-image",
-    ]
-    skip_clean = true
   }
 
   # Common post-processors
@@ -1416,71 +1019,6 @@ build {
     files = [
       ".chimera/${var.chimera_version}/${var.chimera_identifier}-${source.name}.${source.type}.manifest.txt",
     ]
-  }
-
-  post-processor "manifest" {
-    output = ".chimera/${var.chimera_version}/packer-manifest.json"
-  }
-}
-
-# Virtualbox builds
-build {
-  source "virtualbox-iso.base" {
-    boot_command = ["<esc><wait>", "linux ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ks.centos9stream.minimal.cfg VAGRANT", "<enter><wait>"]
-    name         = "minimal-centos-9stream"
-    iso_checksum = "file:http://mirror.facebook.net/centos-stream/9-stream/BaseOS/x86_64/iso/CentOS-Stream-9-latest-x86_64-boot.iso.SHA256SUM"
-    iso_url      = var.virtualbox_iso_url_centos9stream
-  }
-
-  provisioner "file" {
-    destination = "/tmp/retry.sh"
-    source      = "${path.root}/scripts/retry.sh"
-  }
-
-  provisioner "shell" {
-    execute_command = "echo 'vagrant'|sudo -S -E /bin/bash -ex '{{ .Path }}'"
-    scripts = [
-      "${path.root}/scripts/base.sh",
-      "${path.root}/scripts/virtualbox.sh",
-      "${path.root}/scripts/vmware.sh",
-      "${path.root}/scripts/vagrant.sh",
-      "${path.root}/scripts/dep.sh",
-      "${path.root}/scripts/cleanup.sh",
-      "${path.root}/scripts/zerodisk.sh",
-    ]
-  }
-
-  provisioner "file" {
-    destination = ".chimera/${var.chimera_version}/${var.chimera_identifier}-${source.name}.vagrant.manifest.txt"
-    direction   = "download"
-    source      = "/tmp/manifest.txt"
-  }
-
-  post-processor "artifice" {
-    files = [
-      ".chimera/${var.chimera_version}/${var.chimera_identifier}-${source.name}.vagrant.manifest.txt",
-    ]
-  }
-
-  post-processors {
-    post-processor "vagrant" {
-      compression_level   = 9
-      keep_input_artifact = false
-      output              = ".chimera/${var.chimera_version}/${var.chimera_identifier}-${source.name}.box"
-    }
-
-    post-processor "vagrant-cloud" {
-      box_tag             = "${var.virtualbox_vagrantcloud_username}/${var.chimera_identifier}-${source.name}"
-      keep_input_artifact = false
-      version             = " ${var.chimera_version} "
-      # Lookup the description template values using source.name
-      version_description = format(
-        local.description,
-        {
-          "minimal-centos-9stream" = "CentOS Stream 9 image"
-        }[source.name]
-      )
-    }
   }
 
   post-processor "manifest" {

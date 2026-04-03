@@ -7,7 +7,6 @@ A: The following OSes are currently supported via chimera:
 - Oracle Linux 8
 - RHEL 9
 - Oracle Linux 9
-- CentOS Stream 9
 - Amazon Linux 2023
 
 **Windows:**
@@ -27,7 +26,6 @@ EL9 is also fully supported:
 
 - Red Hat Enterprise Linux (RHEL) 9
 - Oracle Linux (OL) 9
-- CentOS Stream 9
 
 Note: Initial functionality for any given ELx build orchestrated by chimera starts with an amigen project. EL8 functionality is tracked in [amigen8](https://github.com/MetroStar/amigen8) and EL9 in [amigen9](https://github.com/MetroStar/amigen9).
 

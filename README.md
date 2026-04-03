@@ -203,22 +203,6 @@ See [`docs/CI-CD-Setup.md`](docs/CI-CD-Setup.md) for detailed setup instructions
     credentials from the credential file or from the environment variables, or
     to retrieve them from the instance role. See the [docs][7].
 
-3.  If building VirtualBox image(s), you will need to install [VirtualBox][12]
-    and [Vagrant][13].
-
-4.  If building VMware image(s), [depending on your platform][14], you will
-    need to install either [VMware Fusion][15], [VMware Workstation Pro][16], or
-    [VMware Player][17]. For all platforms, you will also need [Vagrant][13].
-
-5.  The template(s) push the Vagrant boxes for the VirtualBox and VMware images
-to [Hashicorp Vagrant Cloud][19], which requires a [Vagrant Cloud account][21].
-
-6.  If building a VHD or Image for Azure, ensure you have [authorized access
-    to ARM][23]. The creation of destination objects and a Service Principal
-    can either be done [manually][24] or via [script][25]. If not building in
-    Public region, use of device login is not possible and a Service Principal
-    is required.
-
 ## Usage
 
 _NOTE_: In all steps below, the examples use syntax that works on Linux. If you
@@ -253,7 +237,6 @@ use `.\` preceding the path to the template. E.g.
     packer build \
         -var 'chimera_identifier=unique-project-id' \
         -var 'chimera_version=dev001' \
-        -var 'virtualbox_vagrantcloud_username=myvagrantclouduser' \
         chimera/minimal.pkr.hcl
     ```
 
@@ -262,21 +245,13 @@ use `.\` preceding the path to the template. E.g.
     see how to restrict the build to to a subset of the builders using the `-only`
     or `-except` arguments.
 
-    If building the VirtualBox or VMware images for use with Vagrant, the
-    template is configured to host the resulting images with
-    [Hashicorp Vagrant Cloud][19]. This requires passing the variable
-    `virtualbox_vagrantcloud_username` and exporting the environment variable
-    [`VAGRANT_CLOUD_TOKEN`][20].
-
 ## Minimal Linux Packer Template
 
 The Minimal Linux template builds STIG-partitioned images with a set of
 packages that correspond to the "Minimal" install option in Anaconda. Further,
 the AWS images include a handful of additional packages that are intended to
 increase functionality in EC2 and make the images more comparable with Amazon
-Linux. Similarly, the Azure builder will attempt to install the `WALinuxAgent`
-RPM into the VM-template to make the template more integratable into
-Azure-based deployments.
+Linux.
 
 -   _Template Path_: `chimera/minimal.pkr.hcl`
 
@@ -288,109 +263,40 @@ The Minimal Linux `packer` template includes the following builders:
 
 | Builder Name                                     | Description                                                      |
 |--------------------------------------------------|------------------------------------------------------------------|
-| `amazon-ebssurrogate.minimal-centos-9stream-hvm` | amazon-ebs builder for a minimal CentOS Stream 9 HVM AMI         |
+| `amazon-ebssurrogate.minimal-alma-9-hvm`         | amazon-ebs builder for a minimal Alma Linux 9 HVM AMI            |
+| `amazon-ebssurrogate.minimal-amzn-2023-hvm`      | amazon-ebs builder for a minimal Amazon Linux 2023 HVM AMI       |
 | `amazon-ebssurrogate.minimal-ol-9-hvm`           | amazon-ebs builder for a minimal Oracle Linux 9 HVM AMI          |
 | `amazon-ebssurrogate.minimal-rhel-9-hvm`         | amazon-ebs builder for a minimal RHEL 9 HVM AMI                  |
+| `amazon-ebssurrogate.minimal-rl-9-hvm`           | amazon-ebs builder for a minimal Rocky Linux 9 HVM AMI           |
 | `amazon-ebssurrogate.minimal-ol-8-hvm`           | amazon-ebs builder for a minimal Oracle Linux 8 HVM AMI          |
 | `amazon-ebssurrogate.minimal-rhel-8-hvm`         | amazon-ebs builder for a minimal RHEL 8 HVM AMI                  |
-| `virtualbox-iso.minimal-centos-9stream-image`    | virtualbox-iso builder for a minimal CentOS Stream 9 Vagrant Box |
 
 ### Minimal Linux Packer Post-Provisioners
 
 The Minimal Linux `packer` template includes the following post-provisioners:
 
--   `vagrant`: The vagrant post-provisioner creates vagrant boxes from on the
-    `virtualbox` and `vmware` images.
-
--   `vagrant-cloud`: The vagrant-cloud post-provisioners upload the vagrant
-    boxes to [Hashicorp Vagrant Cloud][19].
+-   `manifest`: The manifest post-provisioner records build artifacts.
 
 ## Building for the AWS US GovCloud Region
 
 To build images for the AWS US GovCloud regions, `us-gov-west-1` or `us-gov-east-1`,
 it is necessary to pass several variables that are specific to the region. The
 AMI filters below have been tested and/or created in `us-gov-west-1` to work with the
-_chimera_ template(s). Also, the builders should be restricted so as _not_ to build
-the Vagrant images.
+_chimera_ template(s).
 
 ```bash
 packer build \
     -var 'chimera_identifier=unique-project-id' \
     -var 'chimera_version=dev001' \
     -var 'aws_region=us-gov-west-1' \
-    -exclude 'virtualbox-iso.*' \
     chimera/minimal.pkr.hcl
 ```
-
-## Building for Microsoft Azure
-
-A source Marketplace Image Offer or Custom Image Name and Resource Group are required
-from which to start the Chimera Azure build.
-
-The resultant Chimera Image will be configured to use the Azure Linux agent, [WALinuxAgent][27]
-per recommended [configurations][28]. Currently, the use of cloud-init exclusively
-does not enable execution/installation of [Azure VM Extensions][30]. The below
-variables also disable FIPS mode in the resultant Chimera VHD or Image. Currently,
-the Azure Linux agent [does not support FIPS mode][29] when utilizing Azure VM
-Extensions. If no plans exist to utilize Azure VM Extensions on VMs provisioned
-from Chimera VHDs or Images, FIPS mode can be enabled, but the `waagent` configuration
-must also be modified accordingly.
-
-The variables referenced in the packer builds below should be modified with
-appropriate parameters for your environment. Any content between and including
-the < and > characters should be replaced.
-
-Login to azure using the az cli. Packer will use the session setup by the az cli.
-
-```bash
-packer build \
-    -var 'chimera_identifier=unique-project-id' \
-    -var 'chimera_version=0.0.1' \
-    -var 'amigen_extra_rpms=["WALinuxAgent"]' \
-    -var 'amigen_fips_disable=true' \
-    -var 'amigen8_repo_names=["rhui-microsoft-azure-rhel8"]' \
-    -var 'azure_image_offer=rhel-raw' \
-    -var 'azure_image_publisher=RedHat' \
-    -var 'azure_image_sku=8_8' \
-    -var 'azure_managed_image_resource_group_name=<resource group short name>' \
-    -only 'azure-arm.minimal-rhel-8-image' \
-    chimera/minimal.pkr.hcl
-```
-
-## Building for OpenStack
-
-To build images for an OpenStack environment, it is necessary to pass several variables
-that are specific to the environment. Also, the builders should be restricted so
-as _not_ to build the Vagrant images.
-
-```bash
-source your_openstack_credentials_file.sh
-packer build \
-    -var 'chimera_identifier=chimera' \
-    -var 'chimera_version=0.0.1' \
-    -var 'openstack_insecure=false' \
-    -var 'openstack_flavor=your_flavor_name_for_temporary_instance' \
-    -var 'openstack_floating_ip_network=your_provider_network_name' \
-    -var 'openstack_networks=your_network_id_for_temporary_instance,second_network_id,etc.' \
-    -var 'openstack_security_groups=your_security_group_name_for_temporary_instance,second_sg_name,etc.' \
-    -var 'openstack_source_image_name=your_source_image_name' \
-    -only 'openstack.*' \
-    chimera/minimal.pkr.hcl
-```
-
-For expected values, see links below:
-* [openstack_allow_insecure][34] (true|false)
-* [openstack_flavor_name][35] (string)
-* [openstack_floating_ip_network_name][36] (string)
-* [openstack_network_ids][37] (comma-separated list of strings)
-* [openstack_security_group_names][38] (comma-separated list of strings)
-* [openstack_source_image_name][39] (string)
 
 ## Testing With amigen
 
 The Chimera automation leverages the amigen8 and amigen9 projects as a
-build-helpers for creation of EL8 and EL9 Amazon Machine Images (Azure
-VM-templates, etc.), respectively.  Due to the closely-coupled nature of the
+build-helpers for creation of EL8 and EL9 Amazon Machine Images,
+respectively.  Due to the closely-coupled nature of the
 two projects, it's recommended that any changes made to amigen8 or amigen9 be
 tested with Chimera prior to merging changes to either project's master branch.
 
@@ -438,31 +344,6 @@ packer build \
 [7]: https://www.packer.io/docs/builders/amazon.html
 [10]: https://fedoraproject.org/wiki/EPEL
 [11]: https://www.packer.io/docs/builders/amazon-ebs.html
-[12]: https://www.virtualbox.org/wiki/Downloads
-[13]: https://www.vagrantup.com/downloads.html
-[14]: https://www.packer.io/docs/builders/vmware-iso.html
-[15]: https://www.vmware.com/products/fusion/overview.html
-[16]: https://www.vmware.com/products/workstation/overview.html
-[17]: https://www.vmware.com/products/player/
-[18]: https://www.packer.io/docs/builders/virtualbox-iso.html
-[19]: https://vagrantcloud.com/help/
-[20]: https://vagrantcloud.com/help/user-accounts/authentication
-[21]: https://vagrantcloud.com/account/new
-[22]: https://www.packer.io/docs/builders/azure.html
-[23]: https://www.packer.io/docs/builders/azure-setup.html
-[24]: https://www.packer.io/docs/builders/azure-setup.html#manual-setup
-[25]: https://www.packer.io/docs/builders/azure-setup.html#guided-setup
-[26]: https://azure.microsoft.com/en-us/services/managed-disks/
-[27]: https://github.com/Azure/WALinuxAgent
-[28]: https://docs.microsoft.com/en-us/azure/virtual-machines/linux/create-upload-centos#centos-70
-[29]: https://github.com/Azure/WALinuxAgent/issues/760
-[30]: https://docs.microsoft.com/en-us/azure/virtual-machines/windows/extensions-features
-[34]: https://www.packer.io/docs/builders/openstack#insecure
-[35]: https://www.packer.io/docs/builders/openstack#flavor
-[36]: https://www.packer.io/docs/builders/openstack#floating_ip_network
-[37]: https://www.packer.io/docs/builders/openstack#networks
-[38]: https://www.packer.io/docs/builders/openstack#security_groups
-[39]: https://www.packer.io/docs/builders/openstack#source_image_name
 [40]: https://github.com/MetroStar/amigen8
 [41]: https://www.oracle.com/linux/
 [42]: https://rockylinux.org/

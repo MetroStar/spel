@@ -7,10 +7,9 @@ a Docker-based build system driven by Packer and the
 currently supports:
 
 * EL8 (RHEL 8, Oracle Linux 8)
-* EL9 (RHEL 9, Oracle Linux 9, CentOS Stream 9)
+* EL9 (RHEL 9, Oracle Linux 9)
 * Amazon Linux 2023
 * Windows Server 2019 / 2022 (STIG-hardened)
-* VirtualBox, VMware, Azure, and OpenStack image variants
 
 Contributions that improve the build system, add OS support, fix bugs, or
 enhance documentation are welcome. Please open an

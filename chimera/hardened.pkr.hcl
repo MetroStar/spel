@@ -22,9 +22,6 @@ packer {
 # by their prefix. Current prefixes
 # include:
 #   * aws - amazon-ebs builder
-#   * azure - azure-arm builder
-#   * openstack - openstack builder
-#   * virtualbox - virtualbox builder
 #   * amigen - used across amigen versions ( amigen8 and amigen9)
 #   * amigen8 - amigen8 only
 #   * amigen9 - amigen9 only
@@ -87,20 +84,6 @@ variable "aws_source_ami_filter_al2023_hvm" {
   })
   default = {
     name = "chimera-*minimal-amzn-2023-hvm-*.x86_64-gp*"
-    owners = [
-      "self",
-    ]
-  }
-}
-
-variable "aws_source_ami_filter_centos9stream_hvm" {
-  description = "Object with source AMI filters for CentOS Stream 9 HVM builds"
-  type = object({
-    name   = string
-    owners = list(string)
-  })
-  default = {
-    name = "chimera-*minimal-centos-9stream-hvm-*.x86_64-gp*"
     owners = [
       "self",
     ]
@@ -693,7 +676,6 @@ locals {
 
   # Effective source AMI filter owners - use Offline account if specified, otherwise use commercial
   effective_al2023_owners        = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_al2023_hvm.owners
-  effective_centos9stream_owners = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_centos9stream_hvm.owners
   effective_ol8_owners           = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_ol8_hvm.owners
   effective_ol9_owners           = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_ol9_hvm.owners
   effective_rhel8_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_rhel8_hvm.owners
@@ -737,21 +719,6 @@ build {
         root-device-type    = "ebs"
       }
       owners      = local.effective_al2023_owners
-      most_recent = true
-    }
-  }
-
-  source "amazon-ebs.base" {
-    ami_description = format(local.description, "CentOS Stream 9 AMI")
-    name            = "hardened-centos-9stream-hvm"
-    tags            = merge(local.base_ami_tags, { StigPlatform = "EL9" })
-    source_ami_filter {
-      filters = {
-        virtualization-type = "hvm"
-        name                = var.aws_source_ami_filter_centos9stream_hvm.name
-        root-device-type    = "ebs"
-      }
-      owners      = local.effective_centos9stream_owners
       most_recent = true
     }
   }
@@ -865,7 +832,6 @@ build {
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
       "amazon-ebs.hardened-rhel-8-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-ol-8-hvm",
       "amazon-ebs.hardened-amzn-2023-hvm",
@@ -918,7 +884,6 @@ build {
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
       "amazon-ebs.hardened-rhel-8-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-ol-8-hvm",
     ]
@@ -933,7 +898,6 @@ build {
       "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-rhel-8-hvm",
       "amazon-ebs.hardened-ol-8-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm"
     ]
     playbook_file = "${path.root}/ansible/ca-certs-playbook.yml"
     use_proxy     = false
@@ -998,7 +962,6 @@ build {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
       "amazon-ebs.hardened-rhel-9-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-rhel-8-hvm",
       "amazon-ebs.hardened-ol-8-hvm",
@@ -1011,7 +974,6 @@ build {
     only = [
       "amazon-ebs.hardened-amzn-2023-hvm",
       "amazon-ebs.hardened-rhel-9-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-rhel-8-hvm",
       "amazon-ebs.hardened-ol-8-hvm",
@@ -1143,7 +1105,6 @@ build {
   provisioner "file" {
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
     ]
     source      = "${path.root}/ansible/roles/RHEL9-STIG"
@@ -1155,7 +1116,6 @@ build {
     start_retry_timeout = "5m"
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
     ]
     execute_command = "sudo -E bash '{{.Path}}'"
@@ -1307,7 +1267,6 @@ build {
   provisioner "file" {
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-rhel-8-hvm",
       "amazon-ebs.hardened-ol-8-hvm",
@@ -1334,7 +1293,6 @@ build {
     ]
     only = [
       "amazon-ebs.hardened-rhel-9-hvm",
-      "amazon-ebs.hardened-centos-9stream-hvm",
       "amazon-ebs.hardened-ol-9-hvm",
       "amazon-ebs.hardened-rhel-8-hvm",
       "amazon-ebs.hardened-ol-8-hvm",

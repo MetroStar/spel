@@ -288,13 +288,6 @@ function BuildChroot {
             bash -euxo pipefail "${ELBUILD}"/$( ComposeAWSutilsString ) || \
                 err_exit "Failure encountered with AWSutils.sh"
             ;;
-        azure)
-            (
-                export HTTP_PROXY
-                bash -euxo pipefail "${ELBUILD}/AzureUtils.sh" || \
-                    err_exit "Failure encountered with AzureUtils.sh"
-            )
-            ;;
         *)
             # Concat exit-message string
             STATUS_MSG="Unsupported value [${CLOUDPROVIDER}] for CLOUDPROVIDER."
@@ -372,14 +365,6 @@ function CollectManifest {
                 grep aws-cfn-bootstrap | tee -a /tmp/manifest.txt
             eval "$XTRACE"
         fi
-    elif [[ "${CLOUDPROVIDER}" == "azure" ]]
-    then
-        echo "Saving the waagent version to the manifest"
-        [[ -o xtrace ]] && XTRACE='set -x' || XTRACE='set +x'
-        set +x
-        (chroot "${AMIGENCHROOT}" /usr/sbin/waagent --version) 2>&1 | \
-            tee -a /tmp/manifest.txt
-        eval "$XTRACE"
     fi
 
     echo "Saving the RPM manifest"
