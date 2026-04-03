@@ -10,7 +10,6 @@
 #
 # PREREQUISITES:
 #   - Dockerfile must exist in repository root
-#   - vendor/amigen8 and vendor/amigen9 submodules must be present
 #   - CI/CD Variables (Settings → CI/CD → Variables):
 #     - IRONBANK_USERNAME: Robot account username (masked)
 #     - IRONBANK_PASSWORD: CLI token (masked, expires every 6 months)
@@ -50,9 +49,6 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_TLS_VERIFY: "1"
   DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
-  # Fetch submodules automatically (replaces actions/checkout with submodules: recursive)
-  GIT_SUBMODULE_STRATEGY: recursive
-  GIT_SUBMODULE_DEPTH: "1"
 
 stages:
   - prepare
@@ -87,23 +83,6 @@ prepare:build:
       echo "=== Build Configuration ==="
       echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
       echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-    # Verify submodules
-    - |
-      echo "=== Verifying AMIgen Submodules ==="
-
-      if [ ! -d "vendor/amigen8" ] || [ -z "$(ls -A vendor/amigen8 2>/dev/null)" ]; then
-        echo "ERROR: vendor/amigen8 submodule is missing or empty"
-        exit 1
-      fi
-
-      if [ ! -d "vendor/amigen9" ] || [ -z "$(ls -A vendor/amigen9 2>/dev/null)" ]; then
-        echo "ERROR: vendor/amigen9 submodule is missing or empty"
-        exit 1
-      fi
-
-      echo "vendor/amigen8: $(ls vendor/amigen8 | wc -l) files"
-      echo "vendor/amigen9: $(ls vendor/amigen9 | wc -l) files"
 
     # Login to Iron Bank registry
     - |

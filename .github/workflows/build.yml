@@ -161,7 +161,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          submodules: recursive
           fetch-depth: 1
 
       - name: Download Docker image artifact

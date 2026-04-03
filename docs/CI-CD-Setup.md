@@ -38,7 +38,7 @@ The Chimera CI/CD pipeline uses a **Docker-based build system** where all depend
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │ offline-prepare.yml                                                  │   │
 │  │                                                                      │   │
-│  │  1. Checkout with submodules                                         │   │
+│  │  1. Checkout repository                                              │   │
 │  │  2. Build Docker image with all dependencies                         │   │
 │  │  3. Export as gzipped tarball                                        │   │
 │  │  4. Upload artifact (30-day retention)                               │   │
@@ -570,13 +570,9 @@ The `infra-setup.yml` workflow reads the role ARN from `vars.AWS_ROLE_ARN` or `s
 
 Alternatively, store it as a **Repository secret** if you prefer to keep the account ID hidden.
 
-#### 4. Submodules
+#### 4. Vendor Scripts
 
-Ensure `vendor/amigen8` and `vendor/amigen9` submodules are initialized:
-
-```bash
-git submodule update --init --recursive
-```
+The `vendor/amigen8` and `vendor/amigen9` directories are included directly in the repository. No submodule initialization is required.
 
 ### GitLab CI Prerequisites
 
@@ -708,15 +704,10 @@ on:
 
 #### Workflow Steps
 
-1. **Checkout repository with submodules**
-   - Clones repo with `submodules: recursive`
-   - Ensures vendor/amigen8 and vendor/amigen9 are present
+1. **Checkout repository**
+   - Clones the repository
 
-2. **Verify submodules**
-   - Validates that AMIgen submodules are not empty
-   - Fails early if submodules are missing
-
-3. **Build Docker image**
+2. **Build Docker image**
    - Uses `docker buildx` for efficient caching
    - Tags image as `chimera-builder:YYYYMMDD` and `chimera-builder:latest`
    - Multi-stage build keeps final image size minimal

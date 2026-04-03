@@ -33,7 +33,7 @@ Depends on `infra` job. Uses infrastructure outputs from Job 1. Runs on `ubuntu-
 #### Steps
 
 1. **Checkout Repository**
-   - Uses `actions/checkout@v4` with `submodules: recursive`
+   - Uses `actions/checkout@v4`
 
 2. **Download Docker Image Artifact**
    - Uses `dawidd6/action-download-artifact@v6` to download the pre-built `chimera-builder` image from a previous `offline-prepare.yml` run

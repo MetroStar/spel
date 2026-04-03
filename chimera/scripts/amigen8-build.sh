@@ -860,24 +860,5 @@ if [[ "${AMIGENNOSIGNATURE}" == "true" ]]; then
         err_exit "Failed patching OSpackages.sh"
 fi
 
-# Patch OSpackages.sh to use insecure curl for HTTPS mirrors (air-gapped environments)
-# This avoids creating directories that conflict with ca-certificates/filesystem packages
-# The curl --insecure flag skips SSL verification, which is acceptable in air-gapped
-# environments where the mirror is on a trusted internal network
-err_exit "Patching OSpackages.sh to use insecure curl for air-gapped HTTPS mirrors..." NONE
-sed -i 's/curl --connect-timeout 15 -O  -sL/curl --insecure --connect-timeout 15 -O -sL/g' "${ELBUILD}/OSpackages.sh" || \
-    err_exit "Failed patching curl command"
-
-# Patch yum/dnf commands in chroot to add --nogpgcheck for air-gapped environments
-err_exit "Patching OSpackages.sh to add --nogpgcheck to yum commands..." NONE
-
-# Patch the yum commands in PrepChroot function to add --nogpgcheck
-sed -i 's/yum --disablerepo="\*" --enablerepo="${OSREPOS}"/yum --nogpgcheck --disablerepo="*" --enablerepo="${OSREPOS}"/g' "${ELBUILD}/OSpackages.sh" || \
-    err_exit "Failed patching yum commands"
-
-
-grep -n "curl.*insecure" "${ELBUILD}/OSpackages.sh" || true
-grep -n "yum.*nogpgcheck.*disablerepo" "${ELBUILD}/OSpackages.sh" || true
-
 # Execute build-tools
 BuildChroot

@@ -57,6 +57,7 @@ packer_cache
 /packer
 __pycache__
 *vendor/
+!vendor/
 *.terraform/
 .idea
 .terraform.lock.hcl
