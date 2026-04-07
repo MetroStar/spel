@@ -4,23 +4,25 @@ set -u -o pipefail
 
 echo "==========STARTING BUILD=========="
 
+CHIMERA_BUILDERS="${CHIMERA_BUILDERS:-}"
+WINDOWS_BUILDERS="${WINDOWS_BUILDERS:-}"
 ANSIBLE_LOCKDOWNS=""
+MINIMAL_AMIS=()
 
 if [[ -n "$CHIMERA_BUILDERS" ]]; then
     FAILED_BUILDS=()
     SUCCESS_BUILDS=()
-    MINIMAL_AMIS=()
 
     packer init chimera/minimal.pkr.hcl
 
     packer validate \
-        -only "${CHIMERA_BUILDERS:?}" \
+        -only "${CHIMERA_BUILDERS}" \
         -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
         -var "chimera_version=${CHIMERA_VERSION:?}" \
         chimera/minimal.pkr.hcl
 
     packer build \
-        -only "${CHIMERA_BUILDERS:?}" \
+        -only "${CHIMERA_BUILDERS}" \
         -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
         -var "chimera_version=${CHIMERA_VERSION:?}" \
         -var "aws_ami_groups=[]" \
@@ -31,15 +33,16 @@ if [[ -n "$CHIMERA_BUILDERS" ]]; then
     for BUILDER in ${CHIMERA_BUILDERS//,/ }; do
         BUILD_NAME="${BUILDER//*./}"
         AMI_NAME="${CHIMERA_IDENTIFIER}-${BUILD_NAME}-${CHIMERA_VERSION}.x86_64-gp3"
-        BUILDER_ENV="${BUILDER//[.-]/_}"
-        BUILDER_AMI=$(aws ec2 describe-images --filters Name=name,Values="$AMI_NAME" Name=creation-date,Values=$(date +%Y-%m-%dT*) --owners self --query 'Images[0].ImageId' --out text)
-        if [[ "$BUILDER_AMI" == "None" ]]
-        then
+        BUILDER_AMI=$(aws ec2 describe-images \
+            --filters Name=name,Values="$AMI_NAME" \
+            --owners self \
+            --query 'sort_by(Images,&CreationDate)[-1].ImageId' \
+            --output text)
+        if [[ "$BUILDER_AMI" == "None" || -z "$BUILDER_AMI" ]]; then
             FAILED_BUILDS+=("$BUILDER")
         else
             SUCCESS_BUILDS+=("$BUILDER")
             MINIMAL_AMIS+=("$BUILDER_AMI")
-            export "$BUILDER_ENV"="$BUILDER_AMI"
         fi
     done
 
@@ -60,6 +63,11 @@ if [[ -n "$WINDOWS_BUILDERS" ]]; then
     else
         ANSIBLE_LOCKDOWNS="${WINDOWS_BUILDERS}"
     fi
+fi
+
+if [[ -z "$ANSIBLE_LOCKDOWNS" ]]; then
+    echo "ERROR: No builders specified. Set CHIMERA_BUILDERS and/or WINDOWS_BUILDERS."
+    exit 1
 fi
 
 packer init chimera/hardened.pkr.hcl
@@ -98,3 +106,17 @@ if [[ ${#MINIMAL_AMIS[@]} -gt 0 ]]; then
     done
     echo "==========CLEANUP COMPLETE=========="
 fi
+
+# Print summary of hardened AMIs
+echo "==========BUILD SUMMARY=========="
+for BUILDER in ${ANSIBLE_LOCKDOWNS//,/ }; do
+    BUILD_NAME="${BUILDER//*./}"
+    AMI_NAME="${CHIMERA_IDENTIFIER}-${BUILD_NAME}-${CHIMERA_VERSION}.x86_64-gp3"
+    AMI_ID=$(aws ec2 describe-images \
+        --filters Name=name,Values="$AMI_NAME" \
+        --owners self \
+        --query 'sort_by(Images,&CreationDate)[-1].ImageId' \
+        --output text 2>/dev/null || echo "UNKNOWN")
+    echo "  ${AMI_NAME}: ${AMI_ID}"
+done
+echo "================================="
