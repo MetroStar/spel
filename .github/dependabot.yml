@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # OpenTofu provider versions (infra/versions.tf)
+  - package-ecosystem: terraform
+    directory: /infra
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - infrastructure
