@@ -684,7 +684,7 @@ locals {
   effective_windows2022_owners   = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_windows2022_hvm.owners
 
   # Template the description strings
-  description         = "STIG-partitioned [*HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.chimera_description_url}."
+  description         = "STIG-partitioned [*HARDENED*], LVM-enabled, %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.chimera_description_url}."
   windows_description = "STIG-partitioned [*HARDENED*] %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.chimera_description_url}."
 
   # Calculate AWS AMI deprecate_at timestamp
