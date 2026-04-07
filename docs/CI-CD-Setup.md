@@ -816,9 +816,6 @@ on:
       goss_binary_url:
         description: "Goss binary URL for air-gapped STIG auditing"
         type: string
-      test_windows_instance_types:
-        description: "Test Windows AMIs on multiple Nitro instance types"
-        type: boolean
 ```
 
 #### Workflow Steps
