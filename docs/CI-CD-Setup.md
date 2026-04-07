@@ -821,7 +821,7 @@ on:
 #### Workflow Steps
 
 1. **Download Docker image artifact**
-   - Uses `dawidd6/action-download-artifact@v6`
+   - Uses `dawidd6/action-download-artifact@v19`
    - Downloads from previous `offline-prepare.yml` run
 
 2. **Import Docker image**
@@ -834,7 +834,7 @@ on:
    - Confirms Packer, Ansible, and AWS CLI are working
 
 4. **Configure AWS credentials**
-   - Uses OIDC authentication via `aws-actions/configure-aws-credentials@v4`
+   - Uses OIDC authentication via `aws-actions/configure-aws-credentials@v6`
    - 6-hour session duration (`role-duration-seconds: 21600`)
 
 5. **Set up environment**
@@ -863,7 +863,7 @@ The workflow uses OIDC to obtain AWS credentials without storing secrets:
 
 ```yaml
 - name: Configure AWS credentials
-  uses: aws-actions/configure-aws-credentials@v4
+  uses: aws-actions/configure-aws-credentials@v6
   with:
     aws-region: us-east-1
     role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}

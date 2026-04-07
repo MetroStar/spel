@@ -33,16 +33,16 @@ Depends on `infra` job. Uses infrastructure outputs from Job 1. Runs on `ubuntu-
 #### Steps
 
 1. **Checkout Repository**
-   - Uses `actions/checkout@v4`
+   - Uses `actions/checkout@v6`
 
 2. **Download Docker Image Artifact**
-   - Uses `dawidd6/action-download-artifact@v6` to download the pre-built `chimera-builder` image from a previous `offline-prepare.yml` run
+   - Uses `dawidd6/action-download-artifact@v19` to download the pre-built `chimera-builder` image from a previous `offline-prepare.yml` run
 
 3. **Import Docker Image**
    - Decodes base64 if needed, verifies SHA256 checksum, imports with `docker load`
 
 4. **Configure AWS Credentials**
-   - Uses OIDC authentication via `aws-actions/configure-aws-credentials@v4`
+   - Uses OIDC authentication via `aws-actions/configure-aws-credentials@v6`
    - 6-hour session duration (`role-duration-seconds: 21600`)
 
 5. **Build STIGed AMIs**
@@ -69,20 +69,10 @@ AWS credentials are configured via OIDC to allow the workflow to interact with A
 
 ## `build.sh` Script
 
-The `build.sh` script performs the following tasks:
-- Ensures required environment variables are set
-- Creates AWS CLI configuration files for commercial and GovCloud partitions
-- Checks and manages AMI quotas to avoid exceeding limits
-- Creates AMIs using Packer and the `chimera/minimal.pkr.hcl` template
-- Retries failed builds until successful
-- Tests the built AMIs to ensure they meet the required standards using Packer and the `tests/minimal.pkr.hcl` template
-
-## `build/ami-cp.sh` Script
-
-The `ami-cp.sh` script handles the copying of AMIs to the AWS GovCloud regions. It performs the following tasks:
-- Imports the specified AMI to the GovCloud regions
-- Generates unique S3 bucket names for temporary storage
-- Copies the AMI from the commercial partition to the S3 bucket in the commercial partition
-- Downloads the AMI from that S3 bucket and uploads it to the S3 buckets in their respective GovCloud regions
-- Restores the AMI to the GovCloud regions and makes them public if requested
-- Cleans up temporary S3 buckets and files
+The `build.sh` script orchestrates the two-phase Packer build:
+- Validates required environment variables (`CHIMERA_IDENTIFIER`, `CHIMERA_VERSION`, `CHIMERA_BUILDERS`)
+- Runs `packer init`, `packer validate`, and `packer build` for `chimera/minimal.pkr.hcl` (base AMIs)
+- Discovers the AMI IDs produced by the minimal build
+- Maps minimal builder names to hardened builder names and combines with any `WINDOWS_BUILDERS`
+- Runs `packer init`, `packer validate`, and `packer build` for `chimera/hardened.pkr.hcl` (STIG-hardened AMIs)
+- Exits non-zero if either phase fails
