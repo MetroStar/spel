@@ -9,6 +9,7 @@ ANSIBLE_LOCKDOWNS=""
 if [[ -n "$CHIMERA_BUILDERS" ]]; then
     FAILED_BUILDS=()
     SUCCESS_BUILDS=()
+    MINIMAL_AMIS=()
 
     packer init chimera/minimal.pkr.hcl
 
@@ -37,6 +38,7 @@ if [[ -n "$CHIMERA_BUILDERS" ]]; then
             FAILED_BUILDS+=("$BUILDER")
         else
             SUCCESS_BUILDS+=("$BUILDER")
+            MINIMAL_AMIS+=("$BUILDER_AMI")
             export "$BUILDER_ENV"="$BUILDER_AMI"
         fi
     done
@@ -79,4 +81,20 @@ LOCKEXIT=$?
 if [[ $LOCKEXIT -ne 0 ]]; then
     echo "ERROR: Lockdown build failed. Scroll up past the test to see the packer error and review the build logs."
     exit $LOCKEXIT
+fi
+
+# Clean up intermediate minimal AMIs (only after successful hardened build)
+if [[ ${#MINIMAL_AMIS[@]} -gt 0 ]]; then
+    echo "==========CLEANING UP MINIMAL AMIs=========="
+    for AMI_ID in "${MINIMAL_AMIS[@]}"; do
+        echo "Deregistering minimal AMI: ${AMI_ID}"
+        SNAPSHOTS=$(aws ec2 describe-images --image-ids "$AMI_ID" --query 'Images[0].BlockDeviceMappings[*].Ebs.SnapshotId' --output text 2>/dev/null || true)
+        aws ec2 deregister-image --image-id "$AMI_ID" 2>/dev/null || true
+        for SNAP_ID in $SNAPSHOTS; do
+            [[ "$SNAP_ID" == "None" ]] && continue
+            echo "  Deleting snapshot: ${SNAP_ID}"
+            aws ec2 delete-snapshot --snapshot-id "$SNAP_ID" 2>/dev/null || true
+        done
+    done
+    echo "==========CLEANUP COMPLETE=========="
 fi
