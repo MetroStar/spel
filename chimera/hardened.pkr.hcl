@@ -1210,6 +1210,20 @@ build {
       "echo 'Running OpenSCAP STIG compliance scan...'",
       "oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_stig --results /tmp/oscap-results.xml --report /tmp/oscap-report.html /usr/share/xml/scap/ssg/content/ssg-rhel8-ds.xml || true",
       "echo 'OpenSCAP scan complete. Report saved to /tmp/oscap-report.html'",
+    ]
+  }
+
+  # Post-STIG: rebuild initramfs with FIPS and clean up cloud-init
+  # Split into its own provisioner so Packer re-establishes the SSH session
+  # after STIG hardening tightens sshd settings (ClientAliveInterval, etc.)
+  provisioner "shell" {
+    pause_before        = "30s"
+    start_retry_timeout = "5m"
+    only = [
+      "amazon-ebs.hardened-rhel-8-hvm",
+    ]
+    execute_command = "sudo -E bash '{{.Path}}'"
+    inline = [
       "bash /tmp/boot-fips-wrapper.sh post",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
@@ -1254,6 +1268,16 @@ build {
       "echo 'Running OpenSCAP STIG compliance scan...'",
       "oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_stig --results /tmp/oscap-results.xml --report /tmp/oscap-report.html /usr/share/xml/scap/ssg/content/ssg-ol8-ds.xml || true",
       "echo 'OpenSCAP scan complete. Report saved to /tmp/oscap-report.html'",
+    ]
+  }
+
+  # Post-STIG: rebuild initramfs with FIPS and clean up cloud-init (OL 8)
+  provisioner "shell" {
+    pause_before        = "30s"
+    start_retry_timeout = "5m"
+    only                = ["amazon-ebs.hardened-ol-8-hvm"]
+    execute_command     = "sudo -E bash '{{.Path}}'"
+    inline = [
       "bash /tmp/boot-fips-wrapper.sh post",
       "rm -rf /var/lib/cloud/seed/nocloud-net",
       "rm -rf /var/lib/cloud/sem",
