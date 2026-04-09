@@ -22,11 +22,11 @@ Each Linux build produces two AMIs: a **minimal** base image and a **hardened** 
 
 ## Building AMIs with GitHub Actions
 
-The GitHub Actions pipeline has three workflows that work together. All are triggered manually via `workflow_dispatch`.
+The GitHub Actions pipeline has four workflows. The three build workflows are triggered manually via `workflow_dispatch`; a fourth runs automatically to monitor credential health.
 
 ### Prerequisites
 
-1. **Iron Bank credentials** — Store `IRONBANK_USERNAME` and `IRONBANK_PASSWORD` as repository secrets. These are required to pull the Rocky Linux 9 base image used in the Docker build.
+1. **Iron Bank credentials** — Store `IRONBANK_USERNAME` and `IRONBANK_PASSWORD` as repository secrets. These are required to pull the Rocky Linux 9 base image used in the Docker build. **Iron Bank CLI tokens expire every 6 months.** The `ironbank-token-check.yml` workflow runs monthly to verify they are still valid and alerts on failure. To renew: log in to https://registry1.dso.mil → User Profile → CLI Token → Regenerate, then update the `IRONBANK_PASSWORD` secret.
 2. **AWS OIDC provider** — Configure an [IAM OIDC identity provider](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services) for GitHub Actions in your AWS account.
 3. **IAM role** — Create a role that trusts the GitHub OIDC provider with permissions for EC2, IAM, KMS, S3, SSM, and VPC. Set `MaxSessionDuration` to at least **21600** (6 hours):
    ```bash
@@ -145,9 +145,39 @@ import:docker  →  infra:create  →  build:rhel9 (or whichever OS)
 Each build is a two-phase Packer pipeline running inside the Docker container:
 
 1. **Minimal** (`chimera/minimal.pkr.hcl`) — Launches a surrogate EC2, partitions disks with LVM per STIG layout, installs a minimal OS via amigen scripts, snapshots the volume as an AMI.
-2. **Hardened** (`chimera/hardened.pkr.hcl`) — Launches instances from the minimal AMIs, applies Ansible STIG roles (Linux), AWS STIG scripts (AL2023), or Ansible lockdown roles (Windows), produces final hardened AMIs.
+2. **Hardened** (`chimera/hardened.pkr.hcl`) — Launches instances from the minimal AMIs, applies STIG hardening, and produces final hardened AMIs.
+
+After a successful hardened build, `build.sh` automatically **deregisters the intermediate minimal AMIs** and deletes their backing snapshots. Only the final hardened AMIs are retained.
+
+### Linux vs. Windows Build Architecture
+
+| | Linux | Windows |
+|---|---|---|
+| Builder type | `amazon-ebssurrogate` — builds the OS from scratch on a surrogate EC2 instance with custom LVM disk partitioning | `amazon-ebs` — launches an existing AWS-provided Windows AMI |
+| Hardening method | Ansible STIG roles (RHEL8-STIG, RHEL9-STIG) or AWS STIG script (AL2023) | SSM `AWSEC2-ConfigureSTIG` document wrapped by a custom SSM document that restores the built-in admin rename (`maintuser`) |
+| Produces | Two AMIs per OS (minimal + hardened) | One hardened AMI per OS |
 
 The Docker container (`Dockerfile`) packages Packer 1.11.2, Ansible, AWS CLI v2, and all vendored amigen scripts so that no internet access is required at build time.
+
+### Compliance Scanning
+
+Compliance is verified at build time using two tools:
+
+- **Goss** (via Ansible Lockdown roles) — Runs before and after Ansible remediation to produce JSON delta reports showing pre- and post-hardening posture. For air-gapped builds, set `chimera_goss_binary_url` to an internal mirror.
+- **OpenSCAP** — Runs after hardening using the DISA STIG profile from `scap-security-guide`. Produces `/tmp/oscap-report.html` and `/tmp/oscap-results.xml`, downloaded as build artifacts.
+
+See [docs/STIG_EXCEPTIONS.md](docs/STIG_EXCEPTIONS.md) for controls that are intentionally skipped and why.
+
+### Build Times
+
+| Operating System | Minimal Phase | Hardened Phase |
+|-----------------|---------------|----------------|
+| Amazon Linux 2023 | 30–45 min | 2–3 hr |
+| RHEL 9 / Oracle Linux 9 | 45–60 min | 3–4 hr |
+| RHEL 8 / Oracle Linux 8 | 45–60 min | 3–4 hr |
+| Windows Server 2019/2022 | N/A (uses existing AMI) | 4–5 hr |
+
+Builds that exceed 6 hours will fail due to AWS STS session expiry — ensure the IAM role's `MaxSessionDuration` is set to at least 21600.
 
 ## Infrastructure
 
@@ -155,7 +185,7 @@ The `infra/` directory contains OpenTofu modules provisioned automatically by CI
 
 - **Networking** — VPC, subnet, security group, optional internet gateway, VPC endpoints (EC2 + STS for air-gapped)
 - **IAM** — Roles and instance profiles for Packer-launched instances
-- **SSM** — KMS CMK, S3 bucket, CloudWatch log group, VPC endpoints, Session/Patch/State Manager, STIG enforcement
+- **SSM** — A full Systems Manager deployment: KMS CMK, S3 bucket, CloudWatch log group, VPC endpoints (ssm, ssmmessages, ec2messages, logs, kms, s3), Default Host Management Configuration (DHMC), Session Manager with encrypted logging, State Manager associations (STIG enforcement schedules, inventory collection, SSM Agent auto-update), Patch Manager baselines and maintenance windows, OpenSCAP and Windows STIG SSM documents, auto-tagging via EventBridge + Lambda, and SNS alerting
 
 See [infra/README.md](infra/README.md) for full input/output reference.
 
@@ -190,7 +220,6 @@ Some STIG controls cannot be applied at AMI build time. See [docs/STIG_EXCEPTION
 │   ├── hardened.pkr.hcl        Packer template: STIG-hardened AMIs
 │   ├── scripts/                Shell scripts run inside surrogate EC2s
 │   ├── ansible/                Roles (RHEL8/9-STIG, AL2023-STIG, Windows), collections, CA certs
-│   ├── kickstarts/             Kickstart configs
 │   └── userdata/               Cloud-init and userdata templates
 ├── vendor/
 │   ├── amigen8/                EL8 AMI generation scripts (DiskSetup, OSpackages, etc.)
@@ -199,11 +228,55 @@ Some STIG controls cannot be applied at AMI build time. See [docs/STIG_EXCEPTION
 ├── .github/workflows/
 │   ├── offline-prepare.yml     Step 1: Build Docker image artifact
 │   ├── infra-setup.yml         Step 2: Provision AWS infra (called by build.yml)
-│   └── build.yml               Step 3: Build AMIs
+│   ├── build.yml               Step 3: Build AMIs
+│   └── ironbank-token-check.yml  Monthly Iron Bank credential health check
 ├── .gitlab-ci.yml              Air-gapped GitLab pipeline
 ├── docs/                       Extended documentation
 └── tests/                      Validation scripts
 ```
+
+## Building Locally (Without CI/CD)
+
+You can build AMIs directly from a workstation using the Docker image. Two environment variables are **required** — the `Makefile` will refuse to run without them:
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `CHIMERA_IDENTIFIER` | Prefix for AMI names | `chimera` |
+| `CHIMERA_VERSION` | Version string embedded in AMI names | `2025.04.1` |
+
+```bash
+# Import the Docker image
+gunzip -c chimera-builder-*.tar.gz | docker load
+
+# Run a build
+docker run --rm \
+  -v "$(pwd):/workspace" \
+  -e AWS_ACCESS_KEY_ID \
+  -e AWS_SECRET_ACCESS_KEY \
+  -e AWS_SESSION_TOKEN \
+  -e AWS_DEFAULT_REGION=us-east-1 \
+  -e CHIMERA_IDENTIFIER=chimera \
+  -e CHIMERA_VERSION=2025.04.1 \
+  -e CHIMERA_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \
+  -e WINDOWS_BUILDERS="" \
+  chimera-builder:latest make build
+```
+
+The same `CHIMERA_IDENTIFIER` and `CHIMERA_VERSION` variables are used by CI/CD pipelines — they are set automatically by the workflow files.
+
+## Troubleshooting
+
+Common issues and where to find solutions:
+
+| Problem | Where to Look |
+|---------|---------------|
+| Docker import fails / checksum mismatch | [QUICK-REFERENCE](docs/QUICK-REFERENCE-Optimization.md) — "Docker Import Fails" |
+| AWS credentials expire mid-build | [QUICK-REFERENCE](docs/QUICK-REFERENCE-Optimization.md) — "AWS Credentials Expire" (ensure IAM role `MaxSessionDuration >= 21600`) |
+| Build can't reach package repos | [QUICK-REFERENCE](docs/QUICK-REFERENCE-Optimization.md) — "Build Can't Access Repositories" |
+| Full IAM policy examples (Packer + OpenTofu) | [CI-CD-Setup](docs/CI-CD-Setup.md) — "IAM Configuration" |
+| SSM infrastructure provisioning without OpenTofu | [Manual-SSM-Setup](docs/Manual-SSM-Setup.md) — step-by-step AWS CLI commands |
+| Windows driver/boot issues after STIG | [Windows-STIG-Driver-Compatibility](docs/Windows-STIG-Driver-Compatibility.md) |
+| Storage planning for runners | [Storage-Optimization](docs/Storage-Optimization.md) (~50 GB recommended free space) |
 
 ## Documentation
 
