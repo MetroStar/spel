@@ -16,6 +16,7 @@ Chimera hardened AMIs are built using OpenSCAP with the DISA STIG profile. Due t
 These controls are handled by the cloud provider or cannot be implemented in a cloud AMI context.
 
 ### Encrypt Partitions (`encrypt_partitions`)
+
 - **Status:** Not Applicable
 - **Reason:** AWS EBS volumes provide encryption at the infrastructure level. AMIs are built without LUKS encryption because:
   - AWS EBS encryption is enabled at volume creation time
@@ -24,6 +25,7 @@ These controls are handled by the cloud provider or cannot be implemented in a c
 - **Compensating Control:** Enable EBS encryption by default in AWS account settings or specify encrypted volumes at launch time
 
 ### GRUB Bootloader Password (`grub2_password`, `grub2_uefi_password`)
+
 - **Status:** Not Implemented
 - **Reason:** Cloud instances do not provide console access during boot. Setting a GRUB password would:
   - Prevent automated instance recovery
@@ -32,6 +34,7 @@ These controls are handled by the cloud provider or cannot be implemented in a c
 - **Compensating Control:** AWS Instance Metadata Service (IMDSv2) controls and IAM policies protect instance configuration
 
 ### Require Single User Mode Authentication (`require_singleuser`)
+
 - **Status:** Not Implemented
 - **Reason:** Single-user mode is not accessible in cloud environments without special recovery procedures
 - **Compensating Control:** AWS Systems Manager Session Manager provides secure authenticated access for recovery scenarios
@@ -43,8 +46,9 @@ These controls are handled by the cloud provider or cannot be implemented in a c
 These controls require Public Key Infrastructure (PKI) and smartcard reader hardware that must be configured post-deployment.
 
 ### Smartcard-Related Controls
+
 | Control ID | Description | Post-Deployment Action |
-|------------|-------------|------------------------|
+| --- | --- | --- |
 | `sssd_enable_smartcards` | Enable smartcard authentication in SSSD | Configure SSSD with CAC/PIV settings |
 | `smartcard_configure_ca` | Configure smartcard CA certificates | Import DoD/Agency CA chain |
 | `smartcard_configure_cert_checking` | Enable certificate validation | Configure OCSP/CRL checking |
@@ -52,6 +56,7 @@ These controls require Public Key Infrastructure (PKI) and smartcard reader hard
 | `package_pcsc-lite_installed` | Install PC/SC daemon | Install if smartcard auth required |
 
 **Implementation Notes:**
+
 - Smartcard authentication requires integration with an identity provider (Active Directory, FreeIPA, etc.)
 - DoD environments should follow the DoD PKI implementation guide
 - The `authselect` tool should be used to enable smartcard authentication profiles
@@ -63,7 +68,9 @@ These controls require Public Key Infrastructure (PKI) and smartcard reader hard
 These controls are marked "Not Applicable" because Chimera AMIs are server builds without a graphical interface.
 
 ### GNOME Desktop Controls
+
 All controls prefixed with `dconf_gnome_*` are not applicable:
+
 - `dconf_gnome_screensaver_lock_enabled`
 - `dconf_gnome_session_idle_delay`
 - `dconf_gnome_disable_automount`
@@ -79,9 +86,11 @@ All controls prefixed with `dconf_gnome_*` are not applicable:
 These controls require environment-specific configuration that cannot be determined at build time.
 
 ### Centralized Logging (`rsyslog_remote_tls`, `rsyslog_remote_tls_cacert`)
+
 - **Status:** Requires Post-Deployment Configuration
 - **Reason:** Log aggregation endpoints are environment-specific
 - **Implementation:**
+
   ```bash
   # /etc/rsyslog.d/remote-tls.conf
   $DefaultNetstreamDriverCAFile /etc/pki/tls/certs/ca-bundle.crt
@@ -92,11 +101,13 @@ These controls require environment-specific configuration that cannot be determi
   ```
 
 ### Time Synchronization (`chronyd_or_ntpd_specify_remote_server`)
+
 - **Status:** Configured with AWS defaults
 - **Reason:** AMI uses Amazon Time Sync Service by default (`169.254.169.123`)
 - **Post-Deployment:** Update `/etc/chrony.conf` if different NTP servers are required
 
 ### Banner Text (`banner_etc_issue`, `banner_etc_issue_net`, `banner_etc_motd`)
+
 - **Status:** Generic banner installed
 - **Reason:** Exact banner text varies by organization
 - **Post-Deployment:** Update `/etc/issue`, `/etc/issue.net`, and `/etc/motd` with organization-specific text
@@ -108,18 +119,20 @@ These controls require environment-specific configuration that cannot be determi
 These controls are marked "notchecked" by OpenSCAP and require manual verification or cannot be automatically validated.
 
 ### File Integrity Monitoring
+
 | Control | Description | Verification |
-|---------|-------------|--------------|
+| --- | --- | --- |
 | `aide_periodic_cron_checking` | AIDE runs via cron | Verify `/etc/cron.daily/aide` or systemd timer exists |
 | `aide_scan_notification` | AIDE sends scan results | Configure email/syslog notification |
 | `aide_verify_acls` | AIDE checks ACLs | Verify `acl` option in `/etc/aide.conf` |
 | `aide_verify_ext_attributes` | AIDE checks extended attributes | Verify `xattrs` option in `/etc/aide.conf` |
 
 ### Audit Configuration
-| Control | Description | Verification |
-|---------|-------------|--------------|
-| `audit_rules_*` | Various audit rules | Review `/etc/audit/rules.d/` |
-| `auditd_data_retention_*` | Log retention settings | Review `/etc/audit/auditd.conf` |
+
+| Control                    | Description                | Verification                        |
+|----------------------------|----------------------------|-------------------------------------|
+| `audit_rules_*`            | Various audit rules        | Review `/etc/audit/rules.d/`        |
+| `auditd_data_retention_*`  | Log retention settings     | Review `/etc/audit/auditd.conf`     |
 
 ---
 
@@ -136,14 +149,17 @@ These controls are intentionally not implemented with documented justification.
 - **Scope:** EL8 only. The equivalent EL9 controls do not exhibit this behavior.
 
 ### USB Storage (`kernel_module_usb-storage_disabled`)
+
 - **Status:** Not Disabled by Default
 - **Reason:** Some cloud instances may require USB passthrough for specific use cases
 - **Recommendation:** Disable in `/etc/modprobe.d/` if USB storage is not required:
+
   ```bash
   echo "install usb-storage /bin/true" > /etc/modprobe.d/usb-storage.conf
   ```
 
 ### IPv6 Controls
+
 - **Status:** IPv6 enabled but hardened
 - **Reason:** AWS VPCs support dual-stack networking; disabling IPv6 may break future functionality
 - **Implementation:** IPv6 sysctl hardening is applied; disable IPv6 entirely only if required by policy
@@ -155,7 +171,7 @@ These controls are intentionally not implemented with documented justification.
 ### Controls Recommended for Future Fixes
 
 | Priority | Control ID | Description | Effort |
-|----------|-----------|-------------|--------|
+| --- | --- | --- | --- |
 | High | `aide_build_database` | Initialize AIDE database | Low |
 | High | `accounts_password_pam_*` | PAM password complexity | Medium |
 | Medium | `sysctl_net_ipv6_*` | IPv6 hardening | Low |
@@ -217,9 +233,9 @@ oscap xccdf eval \
 
 ## Document History
 
-| Date | Version | Author | Changes |
-|------|---------|--------|---------|
-| 2026-02-02 | 1.0 | Chimera Team | Initial documentation |
+| Date       | Version | Author       | Changes                    |
+| ---------- | ------- | ------------ | -------------------------- |
+| 2026-02-02 | 1.0     | Chimera Team | Initial documentation      |
 
 ---
 

@@ -423,7 +423,7 @@ instances have no internet access.
 
 > Corresponds to:
 > [`modules/ssm/vpc-endpoints.tf`](../infra/modules/ssm/vpc-endpoints.tf)
-
+>
 > **Note — Packer endpoints**: If you are running Packer builds without
 > an Internet Gateway, you also need Interface endpoints for **EC2** and
 > **STS**. The OpenTofu networking module creates these when
@@ -1162,7 +1162,7 @@ aws s3 cp dist/al2023-stig-script.zip \
 
 The playbook zip must contain:
 
-```
+```tree
 stig-playbook.zip
 ├── site.yml                 # Wrapper (auto-detects EL8 vs EL9, includes FIPS pre/post)
 ├── boot-fips-wrapper.sh     # EL8 FIPS boot repair script
@@ -1932,7 +1932,7 @@ echo "Teardown complete. KMS key ${KMS_KEY_ID} scheduled for deletion in 30 days
 Cross-reference between this guide and the OpenTofu module files:
 
 | Section | OpenTofu File |
-|---------|---------------|
+| --- | --- |
 | §2 KMS Key | [`modules/ssm/kms.tf`](../infra/modules/ssm/kms.tf) |
 | §3 S3 Buckets | [`modules/ssm/s3.tf`](../infra/modules/ssm/s3.tf) |
 | §4 CloudWatch & SNS | [`modules/ssm/cloudwatch.tf`](../infra/modules/ssm/cloudwatch.tf) |
@@ -1954,7 +1954,7 @@ For SSM associations to target instances correctly, launched instances
 must have these tags:
 
 | Tag | Values | Set By |
-|-----|--------|--------|
+| --- | --- | --- |
 | `StigManaged` | `true` | AMI tag → propagated by auto-tagging Lambda (§17) or launch template |
 | `StigPlatform` | `EL8`, `EL9`, `AL2023`, `Win2019`, `Win2022` | AMI tag → propagated by auto-tagging Lambda (§17) or launch template |
 | `PatchGroup` | `${PREFIX}-linux` or `${PREFIX}-windows` | Set manually or via launch template (for patch maintenance windows) |

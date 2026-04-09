@@ -7,7 +7,7 @@ networking, IAM, and Systems Manager (SSM) resources; a single
 
 ## Architecture
 
-```
+```text
 infra/
 ├── main.tf                  # Wires the three submodules together
 ├── variables.tf             # Root-level inputs (networking + SSM toggles)
@@ -22,7 +22,7 @@ infra/
 ```
 
 | Submodule | Purpose |
-|-----------|---------|
+| --------- | ------- |
 | **iam** | Creates the IAM role, inline policy, and instance profile used by Packer-launched EC2 instances. Grants SSM, S3, and CloudWatch permissions. |
 | **networking** | Creates a VPC with a single subnet (public or private), an optional internet gateway, route table, a security group for Packer instances (SSH/WinRM), and optional VPC endpoints for EC2 and STS (air-gapped builds). |
 | **ssm** | Deploys account-wide SSM infrastructure — VPC endpoints, KMS CMK, S3 bucket, CloudWatch log group, SSM documents (OpenSCAP, Session Manager), State Manager associations (STIG enforcement, inventory, agent update), Patch Manager baselines, DHMC, auto-tagging, and SNS alerting. See [modules/ssm/README.md](modules/ssm/README.md) for full details. |
@@ -34,7 +34,7 @@ infra/
 ## Prerequisites
 
 | Requirement | Minimum Version |
-|-------------|-----------------|
+| ----------- | --------------- |
 | OpenTofu | >= 1.0 |
 | AWS Provider | >= 5.0 |
 | Random Provider | >= 3.0 |
@@ -58,7 +58,7 @@ source bootstrap-backend.sh --prefix chimera --region us-east-1
 Override defaults with flags:
 
 | Flag | Default | Description |
-|------|---------|-------------|
+| ------ | --------- | ----------- |
 | `--prefix` | `chimera-offline` | Resource-name prefix |
 | `--region` | `$AWS_DEFAULT_REGION` or `us-east-1` | AWS region |
 | `--bucket` | `${PREFIX}-ssm-tfstate-${ACCOUNT_ID}` | S3 bucket name |
@@ -90,7 +90,7 @@ export INSTANCE_PROFILE=$(tofu output -raw instance_profile_name)
 ## Inputs
 
 | Name | Type | Default | Description |
-|------|------|---------|-------------|
+| ------ | ------ | --------- | ------------- |
 | `name_prefix` | `string` | — (**required**) | Prefix for all resource names (alphanumeric + hyphens) |
 | `vpc_cidr` | `string` | `10.0.0.0/16` | CIDR block for the VPC |
 | `subnet_cidr` | `string` | `10.0.1.0/24` | CIDR block for the subnet |
@@ -114,7 +114,7 @@ export INSTANCE_PROFILE=$(tofu output -raw instance_profile_name)
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ------ | ----------- |
 | `vpc_id` | ID of the VPC |
 | `subnet_id` | ID of the subnet |
 | `security_group_id` | ID of the Packer security group |
@@ -150,7 +150,7 @@ module "chimera_infra" {
 ### What this changes
 
 | Resource | IGW enabled (default) | IGW disabled |
-|----------|----------------------|--------------|
+| ---------- | ---------------------- | -------------- |
 | Internet Gateway | Created | **Not created** |
 | Default route (`0.0.0.0/0`) | Points to IGW | **No default route** |
 | SSH / WinRM ingress | `0.0.0.0/0` | **VPC CIDR only** |
@@ -164,7 +164,7 @@ When both `enable_packer_endpoints` and `enable_vpc_endpoints` are `true`,
 the following endpoints are provisioned:
 
 | Endpoint | Type | Module |
-|----------|------|--------|
+| -------- | ---- | --------- |
 | `ec2` | Interface | networking |
 | `sts` | Interface | networking |
 | `ssm` | Interface | ssm |

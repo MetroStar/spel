@@ -6,17 +6,17 @@ This guide covers storage requirements for the Docker-based Chimera build system
 
 The Chimera builder Docker image contains all dependencies baked in:
 
-| Format | Size |
-|--------|------|
-| Gzipped tarball | ~305 MB |
-| Uncompressed image | ~834 MB |
+| Format              | Size    |
+| ------------------- | ------- |
+| Gzipped tarball     | ~305 MB |
+| Uncompressed image  | ~834 MB |
 
 ### What's Included
 
 The Docker image contains:
 
 | Component | Approximate Size |
-|-----------|------------------|
+| --- | --- |
 | Rocky Linux 9 base (Iron Bank) | ~200 MB |
 | Packer 1.11.2 | ~95 MB |
 | AWS CLI v2 | ~150 MB |
@@ -35,7 +35,7 @@ The Docker image contains:
 The GitHub Actions workflows automatically manage storage:
 
 | Workflow Step | Storage Used |
-|---------------|--------------|
+| --- | --- |
 | Repository checkout | ~100 MB |
 | Docker build cache | ~1-2 GB |
 | Final Docker image | ~834 MB |
@@ -50,7 +50,7 @@ The runner is ephemeral, so storage is released after workflow completion.
 For GitLab CI builds, plan for the following storage:
 
 | Component | Size |
-|-----------|------|
+| --- | --- |
 | Docker image tarball | ~305 MB |
 | Imported Docker image | ~834 MB |
 | Repository checkout | ~100 MB |
@@ -66,7 +66,7 @@ For GitLab CI builds, plan for the following storage:
 For local Docker-based builds:
 
 | Component | Size |
-|-----------|------|
+| --- | --- |
 | Docker image | ~834 MB |
 | Repository clone | ~100 MB |
 | Build workspace | 10-20 GB |
@@ -78,7 +78,7 @@ For local Docker-based builds:
 When transferring the Docker image tarball to air-gapped environments:
 
 | Transfer Medium | Considerations |
-|-----------------|----------------|
+| --- | --- |
 | USB drive | Minimum 512 MB capacity |
 | CD/DVD | Single CD is sufficient |
 | Network transfer | ~305 MB transfer |
@@ -88,7 +88,7 @@ When transferring the Docker image tarball to air-gapped environments:
 
 Each Docker image build produces:
 
-```
+```bash
 chimera-builder-YYYYMMDD/
 ├── chimera-builder-YYYYMMDD.tar.gz       # ~305 MB - Docker image
 ├── chimera-builder-YYYYMMDD.tar.gz.sha256 # <1 KB - Checksum
@@ -126,10 +126,10 @@ Each concurrent build requires additional storage. Run builds sequentially when 
 
 ## Artifact Retention
 
-| Platform | Retention | Notes |
-|----------|-----------|-------|
-| GitHub Actions | 30 days | Configurable in workflow |
-| GitLab CI | 7 days (jobs), 90 days (infra.env) | Configurable in .gitlab-ci.yml |
+| Platform       | Retention                           | Notes                              |
+|----------------|-------------------------------------|----------------------------------- |
+| GitHub Actions | 30 days                             | Configurable in workflow           |
+| GitLab CI      | 7 days (jobs), 90 days (infra.env)  | Configurable in .gitlab-ci.yml     |
 
 Adjust retention periods based on your needs and storage constraints.
 
@@ -138,7 +138,7 @@ Adjust retention periods based on your needs and storage constraints.
 The Docker-based approach simplifies storage management:
 
 | Aspect | Docker Approach | Old Archive Approach |
-|--------|-----------------|---------------------|
+| -------- | ------------------- | ----------------------- |
 | Transfer size | ~305 MB | ~1.1 GB |
 | Number of files | 3 | 7+ |
 | Extraction needed | `docker load` | Multiple extractions |

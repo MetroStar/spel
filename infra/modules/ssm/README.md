@@ -11,7 +11,7 @@ Architecture: **one deployment per AWS account** (not per-AMI). SSM resources pe
 ### Resources Created
 
 | Resource | Description | Toggle |
-|----------|-------------|--------|
+| -------- | ----------- | ------ |
 | KMS CMK | Customer-managed encryption key for S3, CloudWatch, SSM, SNS | `create_kms_key` |
 | VPC Endpoints | `ssm`, `ssmmessages`, `ec2messages`, `logs`, `kms` (Interface) + `s3` (Gateway) | `enable_vpc_endpoints` |
 | IAM Instance Profile | EC2 role with SSM, S3, CloudWatch, KMS, Parameter Store permissions | `create_instance_profile` |
@@ -111,7 +111,7 @@ module "ssm" {
 ### GitHub Actions
 
 | Workflow | Purpose |
-|----------|---------|  
+| -------- | ------- |
 | `infra-setup.yml` | Deploy/teardown all infrastructure including SSM (plan/apply/destroy) |
 | `build.yml` | Build AMIs — calls `infra-setup.yml` with `infra_prefix` to ensure infrastructure exists |
 
@@ -122,7 +122,7 @@ Teardown: **Actions → Infrastructure Setup → Run workflow → destroy** (req
 ### GitLab CI
 
 | Job | Purpose |
-|-----|---------|  
+| --- | ------- |  
 | `infra:create` | Deploy all infrastructure including SSM via OpenTofu (manual trigger, from `.gitlab/infra.gitlab-ci.yml`) |
 | `infra:destroy` | Teardown all OpenTofu-managed infrastructure (manual trigger, from `.gitlab/infra.gitlab-ci.yml`) |
 
@@ -148,6 +148,7 @@ tofu init -input=false
 ## GovCloud
 
 The module is fully GovCloud-compatible:
+
 - All ARNs use `data.aws_partition` (resolves to `aws-us-gov` automatically)
 - VPC endpoint service names use `data.aws_region` (resolves to `us-gov-west-1`, etc.)
 - S3 bucket names reference region-specific SSM buckets
@@ -159,7 +160,7 @@ The module is fully GovCloud-compatible:
 This module is designed for air-gapped environments with no internet access. All communication routes through VPC endpoints:
 
 | Service | Endpoint Type | Purpose |
-|---------|---------------|----------|
+| --------- | --------------- | --------- |
 | `ssm` | Interface | SSM agent ↔ service communication |
 | `ssmmessages` | Interface | Session Manager WebSocket channels |
 | `ec2messages` | Interface | SSM message delivery |
@@ -184,7 +185,7 @@ module "ssm" {
 Since `install_dependencies = false` (default), these must be on the AMI:
 
 | Package | Required By | Chimera AMI Status |
-|---------|-------------|------------------|
+| --------- | --------------- | --------- |
 | `ansible-core` | Ansible STIG playbook execution | Pre-installed |
 | `openscap-scanner` | OpenSCAP compliance scans | Pre-installed |
 | `scap-security-guide` | SCAP data streams (benchmarks) | Pre-installed |
@@ -203,7 +204,7 @@ SSM associations use **platform-specific targeting** via the `StigPlatform` tag 
 ### Targeting by association type
 
 | Association | Tag Key | Tag Values | Rationale |
-|-------------|---------|------------|-----------|
+| ----------- | ------- | ---------- | --------- |
 | **EL STIG enforcement** | `StigPlatform` | `EL8`, `EL9` | Linux Ansible playbook — not compatible with Windows/AL2023 |
 | **EL STIG check-mode** | `StigPlatform` | `EL8`, `EL9` | Same playbook in `--check` mode |
 | **OpenSCAP scan** | `StigPlatform` | `EL8`, `EL9` | OpenSCAP content is Linux-specific |
@@ -226,10 +227,12 @@ In `--check` mode (compliance scans), `ansible.builtin.script` is naturally skip
 ### How instances get tagged
 
 All Chimera hardened AMIs are built with these AMI-level tags:
+
 - `StigManaged = "true"` — all platforms
 - `StigPlatform` — platform identifier (`EL8`, `EL9`, `AL2023`, `Win2019`, `Win2022`)
 
 To propagate these tags to launched instances, use **one** of:
+
 1. **EC2 account setting**: Enable "Copy AMI tags to instances" in EC2 → Account Settings → Default Settings
 2. **Launch Template**: Add `TagSpecification` blocks that copy the AMI tags
 3. **Manual tagging**: Apply `StigManaged=true` and `StigPlatform=<platform>` to instances at launch
@@ -248,7 +251,7 @@ The EL STIG enforcement and check-mode associations expect a .zip archive at the
 
 The resulting zip contains:
 
-```
+```text
 stig-playbook.zip
 ├── site.yml                # Wrapper playbook (auto-detects OS, includes FIPS pre/post)
 ├── boot-fips-wrapper.sh    # EL8 FIPS boot repair script
@@ -266,7 +269,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|----------|
+| --- | --- | --- | --- | --- |
 | `name_prefix` | Prefix for all resource names | `string` | - | yes |
 | `vpc_id` | Existing VPC ID | `string` | - | yes |
 | `subnet_ids` | Subnet IDs for VPC endpoints | `list(string)` | - | yes |
@@ -303,7 +306,7 @@ When `enable_dhmc = true` (default), all EC2 instances in the account/region aut
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| --- | --- |
 | `kms_key_arn` | KMS key ARN (created or external) |
 | `kms_alias_name` | KMS key alias |
 | `vpc_endpoint_ssm_dns` | SSM VPC endpoint DNS |

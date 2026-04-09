@@ -7,7 +7,7 @@ Quick reference guide for Chimera Docker-based builds.
 The Chimera build system uses Docker containers with all dependencies baked in:
 
 | Component | Size | Purpose |
-|-----------|------|---------|
+| --- | --- | --- |
 | Docker image (gzipped) | ~305 MB | Portable tarball for transfer |
 | Docker image (uncompressed) | ~834 MB | Ready-to-run container |
 | Contains | Packer, Ansible, AWS CLI, all plugins and roles | No runtime downloads |
@@ -62,7 +62,7 @@ cp chimera-builder-*.tar.gz /transfer/
 ### Required Variables
 
 | Variable | Description | Example |
-|----------|-------------|---------|
+| --- | --- | --- |
 | `AWS_ACCESS_KEY_ID` | AWS access key | `AKIA...` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | `secret...` |
 | `DOCKER_IMAGE_PATH` | Path to tarball | `/transfer/chimera-builder-*.tar.gz` |
@@ -70,7 +70,7 @@ cp chimera-builder-*.tar.gz /transfer/
 ### Optional Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+| --- | --- | --- |
 | `AWS_SESSION_TOKEN` | STS session token | (none) |
 | `PKR_VAR_aws_region` | AWS region | `us-gov-east-1` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
@@ -95,7 +95,7 @@ aws iam get-role --role-name Packer_Amazon --query 'Role.MaxSessionDuration'
 ## Build Times
 
 | Operating System | Minimal | Hardened |
-|-----------------|---------|----------|
+| --- | --- | --- |
 | Amazon Linux 2023 | 30-45 min | 2-3 hr |
 | RHEL 9 | 45-60 min | 3-4 hr |
 | RHEL 8 | 45-60 min | 3-4 hr |
@@ -105,11 +105,11 @@ aws iam get-role --role-name Packer_Amazon --query 'Role.MaxSessionDuration'
 
 ## Pipeline Stages (GitLab CI)
 
-| Stage | Duration | Trigger | Purpose |
-|-------|----------|---------|---------|
-| import | 2-3 min | Manual | Import Docker image from tarball |
-| infra | 2-3 min | Manual | Create AWS infrastructure (one-time) |
-| build | 2-5 hr/OS | Manual | Build AMI images |
+| Stage  | Duration | Trigger | Purpose                                      |
+|--------|----------|---------|----------------------------------------------|
+| import | 2-3 min  | Manual  | Import Docker image from tarball             |
+| infra  | 2-3 min  | Manual  | Create AWS infrastructure (one-time)         |
+| build  | 2-5 hr/OS| Manual  | Build AMI images                             |
 
 ## Troubleshooting
 
@@ -183,7 +183,7 @@ docker run --rm chimera-builder:latest aws --version
 ## Storage Requirements
 
 | Component | Size |
-|-----------|------|
+| --- | --- |
 | Docker tarball (gzipped) | ~305 MB |
 | Docker image (imported) | ~834 MB |
 | Build workspace per job | 10-20 GB |

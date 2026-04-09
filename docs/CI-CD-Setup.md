@@ -11,9 +11,11 @@ This guide covers the CI/CD pipeline configuration for Chimera (STIG-Partitioned
   - [Workflow 1: Prepare Offline Docker Image](#workflow-1-prepare-offline-docker-image)
   - [Workflow 2: Build STIGed AMIs](#workflow-2-build-stiged-amis)
 - [GitLab CI Setup (Air-Gapped)](#gitlab-ci-setup-air-gapped)
+  - [Configuration File](#configuration-file)
   - [Pipeline Stages](#pipeline-stages)
-  - [Configuration](#configuration)
+  - [CI/CD Variables](#cicd-variables)
   - [Usage Workflows](#usage-workflows)
+- [Air-Gapped Linux Builds](#air-gapped-linux-builds)
 - [Troubleshooting](#troubleshooting)
 - [Best Practices](#best-practices)
 - [Performance Metrics](#performance-metrics)
@@ -30,7 +32,7 @@ The Chimera CI/CD pipeline uses a **Docker-based build system** where all depend
 
 ### Workflow Summary
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        GitHub Actions (Online)                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -89,7 +91,7 @@ The Chimera CI/CD pipeline uses a **Docker-based build system** where all depend
 The `chimera-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes:
 
 | Component | Version | Purpose |
-|-----------|---------|---------|
+| --------- | ------- | ------- |
 | Packer | 1.11.2 | AMI building automation |
 | Ansible Core | >=2.14, <2.19 | Configuration management |
 | AWS CLI v2 | Latest | AWS API interactions |
@@ -558,7 +560,7 @@ aws iam put-role-policy \
 ```
 
 > **Security**: The `sub` condition restricts which repository (and optionally branch) can assume the role. Use `repo:OWNER/REPO:ref:refs/heads/BRANCH` to restrict to a specific branch, or `repo:OWNER/REPO:*` to allow any branch.
-
+>
 > **GovCloud**: For GovCloud accounts, replace the ARN partition with `aws-us-gov` (e.g., `arn:aws-us-gov:iam::ACCOUNT_ID:oidc-provider/...`).
 
 #### 3. Store Role ARN
@@ -712,16 +714,16 @@ on:
    - Tags image as `chimera-builder:YYYYMMDD` and `chimera-builder:latest`
    - Multi-stage build keeps final image size minimal
 
-4. **Verify Docker image**
+3. **Verify Docker image**
    - Runs quick verification commands (packer version, ansible --version, aws --version)
    - Ensures all tools are properly installed
 
-5. **Export Docker image as tarball**
+4. **Export Docker image as tarball**
    - Exports with `docker save | gzip`
    - Generates SHA256 checksum file
    - Creates manifest with build details
 
-6. **Upload artifact**
+5. **Upload artifact**
    - Uploads tarball, checksum, and manifest
    - 30-day retention period
    - Artifact name: `chimera-builder-YYYYMMDD`
@@ -736,7 +738,7 @@ on:
 
 #### Output Artifact Contents
 
-```
+```text
 chimera-builder-YYYYMMDD/
 ├── chimera-builder-YYYYMMDD.tar.gz       # Docker image tarball (~305 MB)
 ├── chimera-builder-YYYYMMDD.tar.gz.sha256 # SHA256 checksum
@@ -749,7 +751,7 @@ chimera-builder-YYYYMMDD/
 
 **Purpose**: Build STIGed AMIs using the pre-built Docker container.
 
-#### Prerequisites
+#### Prerequisites for Build Workflow
 
 Before running this workflow:
 
@@ -757,7 +759,7 @@ Before running this workflow:
 2. Note the artifact name (e.g., `chimera-builder-20251230`)
 3. Ensure IAM role has `MaxSessionDuration >= 21600`
 
-#### Trigger
+#### Trigger for Build Workflow
 
 ```yaml
 on:
@@ -818,7 +820,7 @@ on:
         type: string
 ```
 
-#### Workflow Steps
+#### Workflow Steps for Build Workflow
 
 1. **Download Docker image artifact**
    - Uses `dawidd6/action-download-artifact@v19`
@@ -848,7 +850,7 @@ on:
      - Build configuration via environment variables
    - Executes `make build`
 
-#### Usage
+#### Usage for Build Workflow
 
 1. Go to **Actions** → **Build STIGed AMI's**
 2. Click **Run workflow**
@@ -872,6 +874,7 @@ The workflow uses OIDC to obtain AWS credentials without storing secrets:
 ```
 
 Store `AWS_ROLE_ARN` as a repository variable (or secret) pointing to your IAM role. The credentials are passed to the Docker container via environment variables:
+
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_SESSION_TOKEN`
@@ -887,7 +890,7 @@ Store `AWS_ROLE_ARN` as a repository variable (or secret) pointing to your IAM r
 The GitLab CI pipeline has 4 stages:
 
 | Stage | Purpose | Trigger | Duration |
-|-------|---------|---------|----------|
+| --- | --- | --- | --- |
 | **import** | Import Docker image from tarball | Manual | 2-3 min |
 | **infra** | Provision persistent AWS infrastructure via OpenTofu (one-time) | Manual | 2-3 min |
 | **build** | Build AMIs using Docker container | Manual | 2-5 hr/OS |
@@ -900,7 +903,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 #### Required Variables
 
 | Variable | Description | Example |
-|----------|-------------|---------|
+| --- | --- | --- |
 | `AWS_ACCESS_KEY_ID` | AWS access key | `AKIA...` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | `secret` |
 | `DOCKER_IMAGE_PATH` | Path to Docker tarball | `/transfer/chimera-builder-*.tar.gz` |
@@ -908,7 +911,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 #### Optional Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+| --- | --- | --- |
 | `CI_AWS_OIDC_AUDIENCE` | OIDC audience claim (default: GitLab instance URL) | `https://gitlab.example.mil` |
 | `AWS_SESSION_TOKEN` | STS session token (static keys only) | (none) |
 | `PKR_VAR_aws_region` | AWS region | `us-gov-east-1` |
@@ -929,7 +932,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 These variables configure Linux builds to use local repository mirrors instead of RHUI:
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+| --- | --- | --- |
 | `REPO_MIRROR_BASEURL` | Local yum mirror base URL | (none) |
 | `AMIGEN_CROSS_DISTRO` | Skip RHUI package auto-detection | `false` |
 | `AMIGEN_USE_DEFAULT_REPOS` | Use default RHUI repositories | `true` |
@@ -949,7 +952,7 @@ These variables configure Linux builds to use local repository mirrors instead o
 
 #### Scenario 1: Initial Setup (First Time)
 
-**Step 1: Transfer Docker image tarball**
+##### Step 1: Transfer Docker image tarball
 
 ```bash
 # On transfer workstation
@@ -960,7 +963,7 @@ These variables configure Linux builds to use local repository mirrors instead o
 cp chimera-builder-*.tar.gz /transfer/
 ```
 
-**Step 2: Run import job**
+##### Step 2: Run import job
 
 1. Go to **CI/CD** → **Pipelines** → **Run pipeline**
 2. Set variable: `IMPORT_DOCKER=true`
@@ -968,13 +971,13 @@ cp chimera-builder-*.tar.gz /transfer/
 4. Manually click **▶** on `import:docker` job
 5. Wait for import to complete (2-3 minutes)
 
-**Step 3: Create AWS infrastructure (one-time)**
+##### Step 3: Create AWS infrastructure (one-time)
 
 1. In the same pipeline, click **▶** on `infra:create`
 2. Wait for completion — this single OpenTofu job provisions all infrastructure (VPC, subnets, security groups, IAM roles, KMS, SSM)
 3. Infrastructure outputs are exported as `infra.env` dotenv artifact for build jobs
 
-**Step 4: Build AMIs**
+##### Step 4: Build AMIs
 
 1. Set build variables (e.g., `RUN_RHEL9=true`)
 2. Run pipeline
@@ -1061,6 +1064,7 @@ build:rhel9:
 **Problem**: Import job can't find the Docker image tarball.
 
 **Solution**:
+
 ```bash
 # Verify tarball location
 ls -lh /transfer/chimera-builder-*.tar.gz
@@ -1076,6 +1080,7 @@ echo $DOCKER_IMAGE_PATH
 **Problem**: SHA256 checksum doesn't match.
 
 **Solution**:
+
 ```bash
 # File may have been corrupted during transfer
 # Re-transfer the tarball from GitHub Actions artifact
@@ -1090,6 +1095,7 @@ cat chimera-builder-*.tar.gz.sha256
 **Problem**: Build fails after several hours with credential expiration error.
 
 **Solution**:
+
 ```bash
 # For GitHub Actions:
 # Ensure role-duration-seconds is set to 21600 (6 hours)
@@ -1106,6 +1112,7 @@ aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
 **Problem**: Packer fails with AWS authentication errors inside container.
 
 **Solution**:
+
 ```bash
 # Verify credentials are being passed
 docker run --rm \
@@ -1125,6 +1132,7 @@ export AWS_SESSION_TOKEN="..."
 **Problem**: Packer instance can't reach RHUI repositories.
 
 **Solution** (IGW-enabled environments):
+
 ```bash
 # Verify VPC has Internet Gateway
 aws ec2 describe-internet-gateways \
@@ -1139,6 +1147,7 @@ aws ec2 describe-security-groups --group-ids sg-xxxxx
 ```
 
 **Solution** (air-gapped / no IGW):
+
 ```bash
 # Verify VPC endpoints exist for Packer (ec2, sts) and SSM (ssm, s3, etc.)
 aws ec2 describe-vpc-endpoints \
@@ -1301,7 +1310,7 @@ cp ~/rpmbuild/RPMS/noarch/myorg-release-1.0-1.el9.noarch.rpm /path/to/mirror/rep
 Set these variables in **Settings** → **CI/CD** → **Variables**:
 
 | Variable | Value | Notes |
-|----------|-------|-------|
+| -------- | ----- | ----- |
 | `AMIGEN_CROSS_DISTRO` | `true` | Skips RHUI package auto-detection |
 | `AMIGEN_USE_DEFAULT_REPOS` | `false` | Disables default RHUI repositories |
 | `AMIGEN_REPO_NOSIGNATURE` | `true` | Allows unsigned repo RPMs |
@@ -1312,18 +1321,19 @@ Set these variables in **Settings** → **CI/CD** → **Variables**:
 
 ### Troubleshooting Air-Gapped Linux Builds
 
-**Error: "No package artifactory-rhel8 available"**
+#### Error: "No package artifactory-rhel8 available"
 
 This means cross-distro mode is not enabled. The build is trying to install packages auto-detected
 from the builder host. Verify `AMIGEN_CROSS_DISTRO=true` is set.
 
-**Error: "Failed installing staged RPMs" with signature error**
+#### Error: "Failed installing staged RPMs" with signature error
 
 The repo RPM is unsigned. Set `AMIGEN_REPO_NOSIGNATURE=true` to skip signature verification.
 
-**Debug output shows `AMIGENCROSSDISTRO=false`**
+#### Debug output shows `AMIGENCROSSDISTRO=false`
 
 The environment variable is not reaching the build script. Check that:
+
 1. `AMIGEN_CROSS_DISTRO` is set in GitLab CI/CD Variables
 2. The variable is not marked as "Protected" if running on unprotected branches
 
@@ -1332,13 +1342,13 @@ The environment variable is not reaching the build script. Check that:
 ### Build Times
 
 | Workflow | Duration |
-|----------|----------|
+| ---------- | ---------- |
 | Prepare Docker Image | 5-10 minutes |
 | Import Docker Image | 2-3 minutes |
 | Create Infrastructure | 2-3 minutes |
 
 | OS Build | Minimal | Hardened |
-|----------|---------|----------|
+| ---------- | --------- | ---------- |
 | Amazon Linux 2023 | 30-45 min | 2-3 hr |
 | RHEL 9 | 45-60 min | 3-4 hr |
 | RHEL 8 | 45-60 min | 3-4 hr |
@@ -1350,7 +1360,7 @@ The environment variable is not reaching the build script. Check that:
 ### Storage Requirements
 
 | Component | Size |
-|-----------|------|
+| ----------- | ------ |
 | Docker image (gzipped) | ~305 MB |
 | Docker image (uncompressed) | ~834 MB |
 | Build workspace per job | 10-20 GB |

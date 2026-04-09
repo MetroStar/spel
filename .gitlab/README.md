@@ -15,12 +15,14 @@ and transferred to the air-gapped GitLab environment.
 **Purpose**: Build STIGed AMIs in air-gapped AWS GovCloud environments using Docker.
 
 **Key Features**:
+
 - Imports pre-built Docker image from tarball
 - Provisions persistent AWS infrastructure via OpenTofu (one-time, from `.gitlab/infra.gitlab-ci.yml`)
 - Builds Chimera images for Linux and Windows operating systems
 - All dependencies are baked into the Docker image (no internet required)
 
 **Stages**:
+
 1. `import` - Import Docker image from tarball
 2. `infra` - Provision persistent AWS infrastructure via OpenTofu (one-time, from `.gitlab/infra.gitlab-ci.yml`)
 3. `build` - Build AMIs using Docker container
@@ -31,6 +33,7 @@ and transferred to the air-gapped GitLab environment.
 ### Initial Setup (First Time)
 
 1. **Build Docker Image** (in connected environment):
+
    ```bash
    # Run GitHub Actions: offline-prepare.yml
    # Or build locally:
@@ -39,6 +42,7 @@ and transferred to the air-gapped GitLab environment.
    ```
 
 2. **Transfer to Air-Gapped Environment**:
+
    ```bash
    # Binary format (direct transfer - smaller, faster):
    scp chimera-builder-*.tar.gz runner:/transfer/
@@ -69,7 +73,7 @@ and transferred to the air-gapped GitLab environment.
 ### Required CI/CD Variables
 
 | Variable | Description |
-|----------|-------------|
+| --------- | ----------- |
 | `AWS_ACCESS_KEY_ID` | AWS access key for Packer |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key for Packer |
 | `AWS_SESSION_TOKEN` | Optional: STS session token |
@@ -81,7 +85,7 @@ and transferred to the air-gapped GitLab environment.
 ### Optional Variables
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| --------- | --------- | ----------- |
 | `DOCKER_IMAGE_PATH` | `/transfer/chimera-builder-*.tar.gz` | Path to Docker tarball |
 | `PKR_VAR_aws_region` | `us-gov-west-1` | AWS region for builds |
 | `PKR_VAR_aws_ami_regions` | `["${PKR_VAR_aws_region}"]` | Regions to copy AMI to (defaults to build region) |
@@ -96,7 +100,7 @@ and transferred to the air-gapped GitLab environment.
 These variables are required when building Linux AMIs using local repository mirrors instead of RHUI:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| --------- | --------- | ----------- |
 | `AMIGEN_CROSS_DISTRO` | `false` | Set to `true` to skip RHUI package auto-detection (prevents rh-amazon-rhui-client install) |
 | `AMIGEN_USE_DEFAULT_REPOS` | `true` | Set to `false` to disable default RHUI repositories |
 | `AMIGEN_REPO_NOSIGNATURE` | `false` | Set to `true` to skip RPM signature check for unsigned repo RPMs |
@@ -115,7 +119,7 @@ These variables are required when building Linux AMIs using local repository mir
 The Docker image (~305 MB compressed) includes:
 
 | Component | Version | Notes |
-|-----------|---------|-------|
+| --------- | --------- | ------- |
 | Base Image | Rocky Linux 9 (Iron Bank) | Minimal footprint |
 | Packer | 1.11.2 | With all required plugins |
 | Ansible | >=2.14, <2.19 | With collections and roles |
@@ -192,7 +196,7 @@ cp ~/rpmbuild/RPMS/noarch/myorg-release-1.0-1.el8.noarch.rpm /path/to/mirror/rep
 Set these variables in your GitLab CI/CD settings:
 
 | Variable | Value |
-|----------|-------|
+| ---- | ---- |
 | `AMIGEN_CROSS_DISTRO` | `true` |
 | `AMIGEN_USE_DEFAULT_REPOS` | `false` |
 | `AMIGEN_REPO_NOSIGNATURE` | `true` |
@@ -205,10 +209,12 @@ For EL9 builds, also set `AMIGEN9_REPO_NAMES` and `PKR_VAR_amigen9_repo_sources`
 
 Linux builds may attempt to install packages from internet repositories.
 Ensure your VPC has access to:
+
 - Local YUM/DNF mirrors for RHEL, Oracle Linux, Amazon Linux
 - Or configure the EC2 instances to use internal mirrors
 
 The Docker image includes offline packages for:
+
 - AWS CLI v2
 - CloudFormation Bootstrap (cfn-init)
 - SSM Agent
@@ -216,12 +222,14 @@ The Docker image includes offline packages for:
 ### Network Requirements
 
 The GitLab Runner needs:
+
 - Docker installed and running
 - Access to the transfer directory (default: `/transfer/`)
 - Network access to AWS APIs (direct or via proxy)
 - SSH access to EC2 instances (for Packer provisioners)
 
 The EC2 build instances need:
+
 - Outbound access to AWS APIs (S3, EC2, etc.)
 - Access to package mirrors (internal or via NAT/proxy)
 - For Windows: Access to WSUS server
@@ -229,9 +237,11 @@ The EC2 build instances need:
 ## Runner Requirements
 
 ### Required Tags
+
 - `chimera-offline-runner`
 
 ### Runner Configuration
+
 - Docker executor or shell executor with Docker installed
 - Sufficient disk space (~5 GB for image import)
 - AWS credentials configured via CI/CD variables
@@ -239,6 +249,7 @@ The EC2 build instances need:
 ## Build Jobs
 
 ### Linux Builders
+
 - `build:amzn2023` - Amazon Linux 2023
 - `build:rhel9` - RHEL 9
 - `build:ol9` - Oracle Linux 9
@@ -246,39 +257,43 @@ The EC2 build instances need:
 - `build:ol8` - Oracle Linux 8
 
 ### Windows Builders
+
 - `build:windows2019` - Windows Server 2019
 - `build:windows2022` - Windows Server 2022
 
 ### Full Build
+
 - `build:all` - All Linux and Windows builders (triggered on tags)
 
 ## Troubleshooting
 
 ### Docker Import Fails
 
-```
+```text
 ERROR: No Docker image tarball found!
 ```
 
 **Solution**: Transfer the Docker image tarball to the path specified by `DOCKER_IMAGE_PATH`:
+
 ```bash
 scp chimera-builder-*.tar.gz runner:/transfer/
 ```
 
 ### AWS Credential Issues
 
-```
+```text
 Error loading credentials
 ```
 
 **Solution**: Verify CI/CD variables are set:
+
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `AWS_SESSION_TOKEN` (if using STS)
 
 ### Windows Update Timeout
 
-```
+```text
 windows-update: timeout waiting for updates
 ```
 
@@ -287,6 +302,7 @@ windows-update: timeout waiting for updates
 ### Build Timeout (6 hours)
 
 Long builds may timeout. Common causes:
+
 - Slow network to AWS
 - Large Windows updates
 - AMI copy to multiple regions
