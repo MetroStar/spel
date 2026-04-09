@@ -8,12 +8,14 @@
 If you prefer to download manually:
 
 ### 1. AWS CLI v2
+
 ```bash
 wget https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip \
   -O offline-packages/awscli-exe-linux-x86_64.zip
 ```
 
 ### 2. AWS CloudFormation Bootstrap
+
 ```bash
 wget https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz \
   -O offline-packages/aws-cfn-bootstrap-py3-latest.tar.gz
