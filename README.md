@@ -26,12 +26,14 @@ The GitHub Actions pipeline has four workflows. The three build workflows are tr
 
 ### Prerequisites
 
-1. **Iron Bank credentials** — Store `IRONBANK_USERNAME` and `IRONBANK_PASSWORD` as repository secrets. These are required to pull the Rocky Linux 9 base image used in the Docker build. **Iron Bank CLI tokens expire every 6 months.** The `ironbank-token-check.yml` workflow runs monthly to verify they are still valid and alerts on failure. To renew: log in to https://registry1.dso.mil → User Profile → CLI Token → Regenerate, then update the `IRONBANK_PASSWORD` secret.
+1. **Iron Bank credentials** — Store `IRONBANK_USERNAME` and `IRONBANK_PASSWORD` as repository secrets. These are required to pull the Rocky Linux 9 base image used in the Docker build. **Iron Bank CLI tokens expire every 6 months.** The `ironbank-token-check.yml` workflow runs monthly to verify they are still valid and alerts on failure. To renew: log in to <https://registry1.dso.mil> → User Profile → CLI Token → Regenerate, then update the `IRONBANK_PASSWORD` secret.
 2. **AWS OIDC provider** — Configure an [IAM OIDC identity provider](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services) for GitHub Actions in your AWS account.
 3. **IAM role** — Create a role that trusts the GitHub OIDC provider with permissions for EC2, IAM, KMS, S3, SSM, and VPC. Set `MaxSessionDuration` to at least **21600** (6 hours):
+
    ```bash
    aws iam update-role --role-name YourRole --max-session-duration 21600
    ```
+
 4. Store the role ARN as the `AWS_ROLE_ARN` repository secret (or however your workflow references it).
 
 ### Step 1 — Build the Docker Image (`offline-prepare.yml`)
