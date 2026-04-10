@@ -7,7 +7,7 @@ Chimera produces AMIs where every DISA STIG filesystem-separation requirement is
 ## Supported Builds
 
 | OS | Builder Name |
-|----|--------------|
+| ---- | -------------- |
 | RHEL 9 | `amazon-ebssurrogate.minimal-rhel-9-hvm` |
 | RHEL 8 | `amazon-ebssurrogate.minimal-rhel-8-hvm` |
 | Oracle Linux 9 | `amazon-ebssurrogate.minimal-ol-9-hvm` |
@@ -41,7 +41,7 @@ The GitHub Actions pipeline has four workflows. The three build workflows are tr
 Run the **Prepare Offline Docker Image** workflow. It builds the `chimera-builder` container with Packer, Ansible, AWS CLI, and all vendored scripts baked in, then exports it as a tarball artifact.
 
 | Input | Description |
-|-------|-------------|
+| ------- | ------------- |
 | `image_tag` | Docker image tag (defaults to `YYYYMMDD`) |
 
 The artifact (`chimera-builder-YYYYMMDD`) is retained for 30 days and includes both a binary tarball and a base64-encoded copy for SharePoint transfer to air-gapped environments.
@@ -51,7 +51,7 @@ The artifact (`chimera-builder-YYYYMMDD`) is retained for 30 days and includes b
 This workflow manages all AWS infrastructure via OpenTofu. `build.yml` calls it automatically before every build (`action=apply` is idempotent), but you can also run it manually to plan, apply, or destroy.
 
 | Input | Description |
-|-------|-------------|
+| ------- | ------------- |
 | `action` | `plan`, `apply`, `destroy`, or `status` |
 | `aws_region` | Target region |
 | `vpc_cidr` | VPC CIDR (default `10.0.0.0/16`) |
@@ -66,7 +66,7 @@ Resources created: VPC, subnet, security group, internet gateway (unless air-gap
 Run the **Build STIGed AMI's** workflow. It downloads the Docker image artifact from Step 1, ensures infrastructure via Step 2, and runs Packer inside the container.
 
 | Input | Description |
-|-------|-------------|
+| ------- | ------------- |
 | `docker_image_artifact` | Artifact name from Step 1 (e.g., `chimera-builder-20250101`) |
 | `aws_region` | Target region (`us-east-1`, `us-gov-west-1`, etc.) |
 | `run_amzn2023` | Build Amazon Linux 2023 |
@@ -77,7 +77,7 @@ Run the **Build STIGed AMI's** workflow. It downloads the Docker image artifact 
 **Air-gapped inputs** (set these when building in isolated networks):
 
 | Input | Description |
-|-------|-------------|
+| ------- | ------------- |
 | `airgap_mode` | Master toggle — sets `cross_distro=true`, `use_default_repos=false`, `repo_nosignature=true`, `sslverify_disable=true` |
 | `repo_mirror_baseurl` | Local YUM mirror URL (e.g., `http://mirror.internal.mil`) |
 | `amigen8_repo_names` | JSON array of EL8 repo names (e.g., `["rhel-8-baseos","rhel-8-appstream"]`) |
@@ -90,7 +90,7 @@ Run the **Build STIGed AMI's** workflow. It downloads the Docker image artifact 
 
 The GitLab CI pipeline is designed for air-gapped environments where the Docker image is pre-built and transferred offline.
 
-### Prerequisites
+### GitLab Prerequisites
 
 1. **Docker image tarball** — Build using the GitHub Actions `offline-prepare.yml` workflow (or `docker build` + `docker save` locally).
 2. **Transfer** — Copy the tarball to the GitLab runner at the path specified by `DOCKER_IMAGE_PATH` (default: `/transfer/chimera-builder-*.tar.gz`). Both binary tarballs and base64-encoded files (for SharePoint transfer) are supported.
@@ -102,7 +102,7 @@ The GitLab CI pipeline is designed for air-gapped environments where the Docker 
 ### Pipeline Stages
 
 | Stage | Job | Description |
-|-------|-----|-------------|
+| ------- | ----- | ------------- |
 | import | `import:docker` | Loads Docker image from tarball (verifies checksums) |
 | infra | `infra:create` / `infra:destroy` | OpenTofu infrastructure (from `.gitlab/infra.gitlab-ci.yml`) |
 | build | `build:amzn2023`, `build:rhel9`, etc. | Individual OS builds (manual trigger) |
@@ -114,7 +114,7 @@ The GitLab CI pipeline is designed for air-gapped environments where the Docker 
 Set these in **Settings → CI/CD → Variables** or override per-pipeline:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `PKR_VAR_aws_region` | `us-gov-west-1` | Target AWS region |
 | `DOCKER_IMAGE_PATH` | `/transfer/chimera-builder-*.tar.gz` | Path to Docker image tarball |
 | `AIRGAP_MODE` | `true` | Disables IGW, enables VPC endpoints, scopes SG to VPC CIDR |
@@ -131,7 +131,7 @@ Set these in **Settings → CI/CD → Variables** or override per-pipeline:
 
 ### Workflow
 
-```
+```text
 # On an internet-connected system:
 offline-prepare.yml  →  chimera-builder-YYYYMMDD.tar.gz
 
@@ -154,7 +154,7 @@ After a successful hardened build, `build.sh` automatically **deregisters the in
 ### Linux vs. Windows Build Architecture
 
 | | Linux | Windows |
-|---|---|---|
+| --- | --- | --- |
 | Builder type | `amazon-ebssurrogate` — builds the OS from scratch on a surrogate EC2 instance with custom LVM disk partitioning | `amazon-ebs` — launches an existing AWS-provided Windows AMI |
 | Hardening method | Ansible STIG roles (RHEL8-STIG, RHEL9-STIG) or AWS STIG script (AL2023) | SSM `AWSEC2-ConfigureSTIG` document wrapped by a custom SSM document that restores the built-in admin rename (`maintuser`) |
 | Produces | Two AMIs per OS (minimal + hardened) | One hardened AMI per OS |
@@ -173,7 +173,7 @@ See [docs/STIG_EXCEPTIONS.md](docs/STIG_EXCEPTIONS.md) for controls that are int
 ### Build Times
 
 | Operating System | Minimal Phase | Hardened Phase |
-|-----------------|---------------|----------------|
+| ----------------- | --------------- | ---------------- |
 | Amazon Linux 2023 | 30–45 min | 2–3 hr |
 | RHEL 9 / Oracle Linux 9 | 45–60 min | 3–4 hr |
 | RHEL 8 / Oracle Linux 8 | 45–60 min | 3–4 hr |
@@ -194,7 +194,7 @@ See [infra/README.md](infra/README.md) for full input/output reference.
 ## Image Defaults
 
 | Setting | Default | Notes |
-|---------|---------|-------|
+| --------- | --------- | ------- |
 | Default user | `maintuser` | Override via cloud-init `system_info.default_user.name` |
 | SELinux | Enforcing | Default user has restricted `shadow_t` access; set `selinux_user: unconfined_u` if needed (produces STIG findings) |
 | FIPS | Enabled | All Linux builds |
@@ -205,14 +205,14 @@ See [infra/README.md](infra/README.md) for full input/output reference.
 Some STIG controls cannot be applied at AMI build time. See [docs/STIG_EXCEPTIONS.md](docs/STIG_EXCEPTIONS.md) for the full list.
 
 | Control | Why | Compensating Control |
-|---------|-----|---------------------|
+| --------- | ----- | --------------------- |
 | Disk encryption | EBS provides infrastructure-layer encryption | Enable EBS default encryption in account settings |
 | GRUB password | No console access in cloud | IMDSv2 + IAM policies |
 | Smartcard/CAC auth | Requires PKI infrastructure | Configure SSSD post-deployment |
 
 ## Repository Layout
 
-```
+```text
 .
 ├── Dockerfile                 Self-contained builder image (Iron Bank Rocky Linux 9)
 ├── Makefile                   Entry point called by CI: env setup → build.sh
@@ -242,7 +242,7 @@ Some STIG controls cannot be applied at AMI build time. See [docs/STIG_EXCEPTION
 You can build AMIs directly from a workstation using the Docker image. Two environment variables are **required** — the `Makefile` will refuse to run without them:
 
 | Variable | Description | Example |
-|----------|-------------|--------|
+| ---------- | ------------- | -------- |
 | `CHIMERA_IDENTIFIER` | Prefix for AMI names | `chimera` |
 | `CHIMERA_VERSION` | Version string embedded in AMI names | `2025.04.1` |
 
@@ -271,7 +271,7 @@ The same `CHIMERA_IDENTIFIER` and `CHIMERA_VERSION` variables are used by CI/CD 
 Common issues and where to find solutions:
 
 | Problem | Where to Look |
-|---------|---------------|
+| --------- | --------------- |
 | Docker import fails / checksum mismatch | [QUICK-REFERENCE](docs/QUICK-REFERENCE-Optimization.md) — "Docker Import Fails" |
 | AWS credentials expire mid-build | [QUICK-REFERENCE](docs/QUICK-REFERENCE-Optimization.md) — "AWS Credentials Expire" (ensure IAM role `MaxSessionDuration >= 21600`) |
 | Build can't reach package repos | [QUICK-REFERENCE](docs/QUICK-REFERENCE-Optimization.md) — "Build Can't Access Repositories" |
@@ -283,7 +283,7 @@ Common issues and where to find solutions:
 ## Documentation
 
 | Document | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | [CI-CD-Setup](docs/CI-CD-Setup.md) | Full GitHub Actions and GitLab CI configuration walkthrough |
 | [QUICK-REFERENCE-Optimization](docs/QUICK-REFERENCE-Optimization.md) | Cheat sheet: variables, build times, troubleshooting |
 | [Storage-Optimization](docs/Storage-Optimization.md) | Docker image size breakdown and storage planning |
