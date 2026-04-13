@@ -240,6 +240,15 @@ jobs:
           docker inspect "chimera-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
           docker inspect "chimera-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
 
+      - name: Validate AWS role ARN
+        run: |
+          ROLE_ARN="${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}"
+          if [ -z "$ROLE_ARN" ]; then
+            echo "::error::AWS_ROLE_ARN is not set. Configure it as a repository variable (vars.AWS_ROLE_ARN) or secret (secrets.AWS_ROLE_ARN). See docs/CI-CD-Setup.md#aws-iam-configuration."
+            exit 1
+          fi
+          echo "AWS role ARN is configured"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:

@@ -50,6 +50,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up environment variables
+        id: config
         run: |
           # Use provided tag or default to date
           if [ -n "${{ github.event.inputs.image_tag }}" ]; then
@@ -60,7 +61,7 @@ jobs:
           
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
           echo "IMAGE_NAME=chimera-builder" >> $GITHUB_ENV
-          echo "FULL_IMAGE=${IMAGE_NAME}:${IMAGE_TAG}" >> $GITHUB_ENV
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
           
           echo "=== Build Configuration ==="
           echo "Image: chimera-builder:${IMAGE_TAG}"
@@ -198,16 +199,16 @@ jobs:
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v6
         with:
-          name: chimera-builder-${{ env.IMAGE_TAG }}
+          name: chimera-builder-${{ steps.config.outputs.image_tag }}
           # Both formats included for different transfer scenarios:
           # - .tar.gz: Direct transfers (GitHub→local, USB, SCP) - smaller, faster
           # - .tar.gz.b64: SharePoint transfers (avoids binary corruption) - larger, safer
           path: |
-            chimera-builder-${{ env.IMAGE_TAG }}.tar.gz
-            chimera-builder-${{ env.IMAGE_TAG }}.tar.gz.sha256
-            chimera-builder-${{ env.IMAGE_TAG }}.tar.gz.b64
-            chimera-builder-${{ env.IMAGE_TAG }}.tar.gz.b64.sha256
-            chimera-builder-${{ env.IMAGE_TAG }}-manifest.txt
+            chimera-builder-${{ steps.config.outputs.image_tag }}.tar.gz
+            chimera-builder-${{ steps.config.outputs.image_tag }}.tar.gz.sha256
+            chimera-builder-${{ steps.config.outputs.image_tag }}.tar.gz.b64
+            chimera-builder-${{ steps.config.outputs.image_tag }}.tar.gz.b64.sha256
+            chimera-builder-${{ steps.config.outputs.image_tag }}-manifest.txt
           retention-days: 30
           compression-level: 0  # Already gzipped
 
