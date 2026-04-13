@@ -79,6 +79,6 @@ The Chimera Platform capability package provides:
 
 | | |
 |---|---|
-| **Team** | *[Your team name]* |
-| **Slack** | *[#your-channel]* |
-| **Repository** | *[repo URL]* |
+| **Team** | Innovation Lab |
+| **Teams** | [Innovation Labs - DevSecOps](https://teams.microsoft.com/l/channel/19%3A516818e578954cd08225ed7b0c3c3e82%40thread.skype/DevSecOps?groupId=514c9ca3-d99b-4e8a-8779-1095ce4a3b1c&tenantId=399ed244-adb0-4a01-91a2-898d9918314a) |
+| **Repository** | https://github.com/MetroStar/chimera |
