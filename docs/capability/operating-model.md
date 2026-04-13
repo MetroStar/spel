@@ -13,12 +13,13 @@ gantt
     axisFormat %s
 
     section Day 0 — Setup
-    Provision infrastructure   :d0a, 0, 2
-    First Docker image build   :d0b, 0, 1
+    IAM + CI/CD configuration  :d0a, 0, 1
 
     section Day 1 — Build
-    First hardened AMI         :d1a, 2, 6
-    Validate + distribute      :d1b, 6, 7
+    First Docker image build   :d1a, 1, 2
+    Infra provisioned (auto)   :d1b, 2, 3
+    First hardened AMI         :d1c, 3, 6
+    Validate + distribute      :d1d, 6, 7
 
     section Day 2+ — Operate
     Scheduled STIG enforcement :d2a, 7, 30
@@ -28,18 +29,36 @@ gantt
 
 ## Day 0 — Setup
 
-**Duration**: 1–2 hours (connected) or 2–4 hours (air-gapped, including Docker import)
+**Duration**: 30–60 minutes
+
+Day 0 is the one-time manual work needed before CI/CD can take over. Infrastructure provisioning is **not** part of Day 0 — the build pipelines handle it automatically (see Day 1).
 
 ### Steps
 
-1. **Configure IAM prerequisites** (one-time per AWS account) — Create an IAM OIDC identity provider for GitHub Actions or GitLab, and an IAM role with permissions for Packer, OpenTofu, and SSM. Set `MaxSessionDuration` to at least 21600 (6 hours). Store the role ARN as a CI/CD secret. See [CI-CD-Setup — IAM Configuration](../CI-CD-Setup.md#aws-iam-configuration) for the full IAM policies.
+1. **Configure IAM prerequisites** (one-time per AWS account) — Create an IAM OIDC identity provider for GitHub Actions or GitLab, and an IAM role with permissions for Packer, OpenTofu, and SSM. Set `MaxSessionDuration` to at least 21600 (6 hours). See [CI-CD-Setup — IAM Configuration](../CI-CD-Setup.md#aws-iam-configuration) for the full IAM policies.
 
-2. **Provision infrastructure via CI/CD** — The pipelines automate backend bootstrap, tfvars generation, and `tofu apply`:
-   - **GitHub Actions**: Run the `infra-setup.yml` workflow with `action=apply` (or let `build.yml` call it automatically before the first build).
-   - **GitLab CI**: Run the `infra:create` job from `.gitlab/infra.gitlab-ci.yml`.
-   - **Alternative**: Run `tofu apply` from `infra/` locally (see [Onboarding Guide — Step 1c](onboarding-guide.md#1c-alternative-provision-via-local-cli)).
+2. **Configure CI/CD** — Store the IAM role ARN as a CI/CD secret (`AWS_ROLE_ARN` in GitHub, `CI_AWS_ROLE_ARN` in GitLab) and set any environment-specific variables (region, air-gap toggles). See the [Onboarding Guide](onboarding-guide.md) for the full walkthrough.
 
-   This creates:
+### Day 0 Outputs
+
+| Output | Used By |
+|--------|---------|
+| IAM OIDC provider | CI/CD credential exchange |
+| IAM role ARN | CI/CD secrets / variables |
+
+## Day 1 — Build
+
+**Duration**: 2–5 hours per OS (see [Build Times](../../README.md#build-times))
+
+### Steps
+
+1. **Build Docker image** (if not already available) — Run the `offline-prepare.yml` workflow. Produces `chimera-builder-YYYYMMDD.tar.gz` (~305 MB). For air-gapped environments, transfer the tarball to the GitLab runner.
+
+2. **Run AMI builds** — Trigger the build pipeline with desired OS targets. The pipeline automatically provisions infrastructure on the first run:
+   - **GitHub Actions**: `build.yml` calls `infra-setup.yml` (`action=apply`, idempotent) before building — backend bootstrap, tfvars generation, and `tofu apply` all happen automatically.
+   - **GitLab CI**: Run `infra:create` as part of the pipeline flow (idempotent; no-op if infrastructure exists).
+
+   Infrastructure created on first run includes:
    - VPC, subnet, security group, optional internet gateway
    - VPC endpoints (8 types for air-gapped SSM connectivity)
    - IAM roles and instance profiles for Packer-launched EC2 instances
@@ -52,26 +71,7 @@ gantt
    - DHMC (auto-registers all EC2 instances with SSM)
    - Auto-tagging (EventBridge + Lambda propagates AMI tags to instances)
 
-3. **Configure CI/CD** — Store AWS credentials (OIDC role ARN or static keys) and set required variables. See the [Onboarding Guide](onboarding-guide.md) for the full walkthrough.
-
-### Day 0 Outputs
-
-| Output | Used By |
-|--------|---------|
-| VPC ID, Subnet ID, Security Group ID | Packer builds |
-| Instance Profile name | Packer-launched EC2 instances |
-| KMS Key ARN | EBS encryption, S3 encryption |
-| S3 Bucket name | SSM output, compliance evidence |
-
-## Day 1 — Build
-
-**Duration**: 2–5 hours per OS (see [Build Times](../../README.md#build-times))
-
-### Steps
-
-1. **Build Docker image** (if not already available) — Run the `offline-prepare.yml` workflow. Produces `chimera-builder-YYYYMMDD.tar.gz` (~305 MB).
-
-2. **Run AMI builds** — Trigger the build pipeline with desired OS targets. The pipeline:
+   The build itself then:
    - Builds minimal AMIs (EBS surrogate: custom LVM partitioning, OS install, AWS tooling)
    - Builds hardened AMIs (launches from minimal, applies STIG lockdown via Ansible/AWS scripts)
    - Runs compliance scans (OpenSCAP + Goss) and downloads reports as artifacts
@@ -85,6 +85,7 @@ gantt
 
 | Output | Location |
 |--------|----------|
+| AWS infrastructure (VPC, IAM, SSM) | OpenTofu state (persisted in S3) |
 | Hardened AMI IDs | AWS EC2 (logged in CI/CD job summary) |
 | OpenSCAP HTML report | CI/CD build artifact |
 | Goss JSON delta | CI/CD build artifact |
@@ -186,7 +187,7 @@ Configure via `notification_email` variable in `infra/modules/ssm/variables.tf`.
 
 When deploying Chimera across multiple programs or AWS accounts:
 
-1. **One SSM infrastructure per account** — SSM resources (DHMC, associations, patch baselines) are account-wide. Run `tofu apply` once per account.
+1. **One SSM infrastructure per account** — SSM resources (DHMC, associations, patch baselines) are account-wide. The first build in each account provisions infrastructure automatically via the pipeline.
 2. **Ephemeral networking per build** — VPCs and subnets are created and destroyed per build cycle (or kept persistent if preferred). Cost is minimal.
 3. **Shared Docker image** — The same `chimera-builder` Docker image works across all accounts and programs. Build once, distribute to each environment.
 4. **Per-program STIG customization** — Override Ansible variables via `chimera/ansible/` role defaults or add program-specific exception documentation.

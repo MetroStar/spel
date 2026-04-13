@@ -170,18 +170,10 @@ Revert `requirements.yml` to previous version pins. Rebuild the Docker image.
    - **GitHub Actions**: Add a new `AWS_ROLE_ARN` secret (or use environment-scoped secrets per account).
    - **GitLab CI**: Set `CI_AWS_ROLE_ARN` as a CI/CD variable, overriding per-pipeline when targeting the new account.
 
-3. **Provision infrastructure via CI/CD**:
-   - **GitHub Actions**: Run the `infra-setup.yml` workflow with `action=apply` and the new account's `aws_region`. The workflow auto-bootstraps the state backend, generates tfvars, and runs `tofu apply`.
-   - **GitLab CI**: Set `PKR_VAR_aws_region` to the new region and run the `infra:create` job.
-   - **Alternative (local CLI)**:
-     ```bash
-     cd infra/
-     cp backend.tf.example backend.tf
-     # Edit with new account/region values
-     ./bootstrap-backend.sh
-     tofu init
-     tofu apply -var="aws_region=NEW-REGION"
-     ```
+3. **Run the first build** targeting the new account/region. Infrastructure is provisioned automatically:
+   - **GitHub Actions**: `build.yml` calls `infra-setup.yml` (`action=apply`, idempotent) — bootstraps the state backend, creates VPC/IAM/SSM resources, and proceeds to the AMI build.
+   - **GitLab CI**: Set `PKR_VAR_aws_region` to the new region and run the pipeline (`infra:create` → build jobs).
+   - **Alternative (local CLI)**: Provision infrastructure manually before building — see the [Onboarding Guide](onboarding-guide.md#provision-infrastructure-locally-optional).
 
 4. **Copy AMIs** to the new region (if AMIs already exist elsewhere):
    ```bash
@@ -198,9 +190,9 @@ Revert `requirements.yml` to previous version pins. Rebuild the Docker image.
 
 ### Verification
 
-- `tofu output` in the new account shows expected resources
 - AMIs are available in the new region
 - Instances launched in the new account register with SSM
+- `tofu output` (via `infra-setup.yml` with `action=status` or locally) shows expected resources
 
 ---
 

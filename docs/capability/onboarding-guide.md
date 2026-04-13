@@ -22,11 +22,9 @@ Before starting, confirm you have:
 - [ ] **Local YUM mirror** — URL to an internal mirror hosting RHEL/EL packages
 - [ ] **GitLab Runner** — With Docker installed, tagged `chimera-offline-runner`, and access to the `/transfer/` directory
 
-## Step 1 — Provision Infrastructure (30 minutes)
+## Step 1 — Configure IAM Prerequisites (one-time)
 
-### 1a. Configure IAM Prerequisites (one-time)
-
-Before infrastructure can be provisioned — whether by CI/CD or manually — you need an IAM role with sufficient permissions and an OIDC identity provider so the pipeline can authenticate.
+Before anything else, you need an IAM role with sufficient permissions and an OIDC identity provider so the pipeline can authenticate. Infrastructure provisioning itself is handled automatically by the build pipelines (Step 3).
 
 1. **Create an IAM OIDC identity provider** for GitHub Actions or GitLab in each target AWS account.
 2. **Create an IAM role** that trusts the OIDC provider with permissions for EC2, IAM, KMS, S3, SSM, VPC, and OpenTofu state management. Set `MaxSessionDuration` to at least **21600** (6 hours):
@@ -36,79 +34,6 @@ Before infrastructure can be provisioned — whether by CI/CD or manually — yo
 3. **Store the role ARN** as a CI/CD secret (`AWS_ROLE_ARN` in GitHub, `CI_AWS_ROLE_ARN` in GitLab).
 
 See [CI-CD-Setup — IAM Configuration](../CI-CD-Setup.md#aws-iam-configuration) for exact IAM policies (Packer execution + OpenTofu execution + instance profile).
-
-### 1b. Provision via CI/CD (recommended)
-
-The CI/CD pipelines automate backend bootstrap, tfvars generation, and `tofu apply`. No local OpenTofu installation required.
-
-**GitHub Actions** — The `infra-setup.yml` workflow handles everything. `build.yml` calls it automatically before every build (`action=apply` is idempotent), but you can also run it manually:
-
-1. Go to **Actions** → **Infrastructure Setup** → **Run workflow**
-2. Set `action` to **apply**, choose your `aws_region`, and toggle `airgap_mode` if needed
-3. Wait ~5 minutes — the workflow bootstraps the backend, generates tfvars, and runs `tofu apply`
-
-The workflow exports `vpc_id`, `subnet_id`, `security_group_id`, `instance_profile`, and `kms_key_id` as outputs, which `build.yml` consumes automatically.
-
-**GitLab CI (air-gapped)** — Run the `infra:create` job from `.gitlab/infra.gitlab-ci.yml`:
-
-1. Go to **CI/CD** → **Pipelines** → **Run pipeline**
-2. Set `CREATE_INFRASTRUCTURE=true`
-3. Click ▶ on `infra:create`
-
-The job bootstraps the backend, generates `ci.auto.tfvars` (with `AIRGAP_MODE` toggles), applies infrastructure, and exports outputs as a `dotenv` artifact for build jobs.
-
-**Feature toggles** — Both pipelines auto-generate tfvars based on `airgap_mode`. Key toggles:
-
-| Variable | Default | Air-Gapped |
-|----------|---------|------------|
-| `enable_internet_gateway` | `true` | `false` |
-| `enable_packer_endpoints` | `false` | `true` |
-| `enable_vpc_endpoints` | `true` | `true` |
-| `vpc_cidr` | `10.0.0.0/16` | (your CIDR) |
-| `subnet_cidr` | `10.0.1.0/24` | (your CIDR) |
-
-### 1c. Alternative: Provision via Local CLI
-
-If you prefer to run OpenTofu locally (e.g., for initial testing or environments without CI/CD):
-
-```bash
-cd infra/
-
-# Copy the backend template and edit with your values
-cp backend.tf.example backend.tf
-
-# Bootstrap the S3 + DynamoDB state backend (first time only)
-./bootstrap-backend.sh
-
-# Initialize, review, and apply
-tofu init
-tofu plan
-tofu apply
-```
-
-Air-gapped example:
-```bash
-tofu apply \
-  -var="enable_internet_gateway=false" \
-  -var="enable_packer_endpoints=true" \
-  -var="aws_region=us-gov-west-1"
-```
-
-### 1d. Capture Outputs
-
-CI/CD exports these automatically — build jobs receive them as workflow outputs (GitHub) or dotenv artifacts (GitLab). For local builds, run:
-
-```bash
-tofu output
-```
-
-| Output | Used For |
-|--------|----------|
-| `vpc_id` | Packer `aws_vpc_id` |
-| `subnet_id` | Packer `aws_subnet_id` |
-| `security_group_id` | Packer `aws_security_group_id` |
-| `instance_profile_name` | Packer `aws_iam_instance_profile` |
-| `kms_key_arn` | Packer `aws_kms_key_id` |
 
 ## Step 2 — Build the Docker Image
 
@@ -146,9 +71,11 @@ docker save chimera-builder:$(date +%Y%m%d) | gzip > chimera-builder-$(date +%Y%
 4. Enable one or more OS targets (e.g., `run_rhel9: true`)
 5. Click **Run workflow** and wait 2–5 hours
 
-The workflow automatically calls `infra-setup.yml` (idempotent) before building.
+`build.yml` automatically calls `infra-setup.yml` (`action=apply`, idempotent) before building. On the first run this creates all AWS infrastructure (VPC, IAM, KMS, SSM); on subsequent runs it's a no-op. Infrastructure outputs (VPC ID, subnet ID, etc.) are passed to the build job automatically.
 
 ### Option B: Connected Build (Local Docker)
+
+> **Note**: Local builds require infrastructure to already exist. Provision it first by running the `infra-setup.yml` workflow with `action=apply`, or apply manually — see [Provision Infrastructure Locally](#provision-infrastructure-locally-optional) below.
 
 ```bash
 # Import the Docker image
@@ -183,8 +110,10 @@ scp chimera-builder-*.tar.gz runner:/transfer/
 
 1. Go to **CI/CD** → **Pipelines** → **Run pipeline**
 2. Click ▶ on `import:docker` — loads the Docker image from `/transfer/`
-3. Click ▶ on `infra:create` — provisions AWS infrastructure
+3. Click ▶ on `infra:create` — provisions AWS infrastructure (idempotent; no-op if already exists)
 4. Click ▶ on the desired build job (e.g., `build:rhel9`)
+
+`infra:create` bootstraps the state backend, generates `ci.auto.tfvars` (with `AIRGAP_MODE` toggles), applies OpenTofu, and exports outputs as a `dotenv` artifact consumed by build jobs.
 
 **Required GitLab CI/CD variables:**
 
@@ -275,6 +204,57 @@ These are the top issues new teams encounter. Full details in the [Troubleshooti
 | **RPM signature verification fails** | In air-gapped environments with unsigned mirrors, set `AMIGEN_REPO_NOSIGNATURE=true` |
 | **Instance not appearing in SSM** | Check: (1) instance profile attached, (2) VPC endpoints exist (ssm, ssmmessages, ec2messages), (3) DHMC is enabled |
 | **Docker import fails on GitLab runner** | Verify tarball integrity with `sha256sum -c *.sha256`. If transferred via SharePoint (base64), ensure no line-break corruption during decode. |
+
+## Provision Infrastructure Locally (optional)
+
+If you are running local Docker builds (Option B) or need infrastructure without CI/CD, provision it manually with OpenTofu:
+
+```bash
+cd infra/
+
+# Copy the backend template and edit with your values
+cp backend.tf.example backend.tf
+
+# Bootstrap the S3 + DynamoDB state backend (first time only)
+./bootstrap-backend.sh
+
+# Initialize, review, and apply
+tofu init
+tofu plan
+tofu apply
+```
+
+Air-gapped example:
+```bash
+tofu apply \
+  -var="enable_internet_gateway=false" \
+  -var="enable_packer_endpoints=true" \
+  -var="aws_region=us-gov-west-1"
+```
+
+**Feature toggles** — Key variables for customizing the infrastructure:
+
+| Variable | Default | Air-Gapped |
+|----------|---------|------------|
+| `enable_internet_gateway` | `true` | `false` |
+| `enable_packer_endpoints` | `false` | `true` |
+| `enable_vpc_endpoints` | `true` | `true` |
+| `vpc_cidr` | `10.0.0.0/16` | (your CIDR) |
+| `subnet_cidr` | `10.0.1.0/24` | (your CIDR) |
+
+**Capture outputs** for passing to Packer:
+
+```bash
+tofu output
+```
+
+| Output | Used For |
+|--------|----------|
+| `vpc_id` | Packer `aws_vpc_id` |
+| `subnet_id` | Packer `aws_subnet_id` |
+| `security_group_id` | Packer `aws_security_group_id` |
+| `instance_profile_name` | Packer `aws_iam_instance_profile` |
+| `kms_key_arn` | Packer `aws_kms_key_id` |
 
 ## Next Steps
 
