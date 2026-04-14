@@ -1,9 +1,9 @@
-# Dockerfile for Chimera build environment
+# Dockerfile for Crucible build environment
 # Base: Rocky Linux 9 Iron Bank (hardened, minimal image)
 # Uses multi-stage build to keep final image small (~305 MB compressed)
 #
 # Build:
-#   docker build -t chimera-builder:$(date +%Y%m%d) .
+#   docker build -t crucible-builder:$(date +%Y%m%d) .
 #
 # Run with bind-mounted repository:
 #   docker run --rm \
@@ -12,11 +12,11 @@
 #     -e AWS_SECRET_ACCESS_KEY \
 #     -e AWS_SESSION_TOKEN \
 #     -e AWS_DEFAULT_REGION=us-east-1 \
-#     -e CHIMERA_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \
-#     -e CHIMERA_VERSION=2025.01.1 \
-#     -e CHIMERA_IDENTIFIER=chimera \
+#     -e CRUCIBLE_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \
+#     -e CRUCIBLE_VERSION=2025.01.1 \
+#     -e CRUCIBLE_IDENTIFIER=crucible \
 #     -e WINDOWS_BUILDERS="" \
-#     chimera-builder:$(date +%Y%m%d) make build
+#     crucible-builder:$(date +%Y%m%d) make build
 
 # =============================================================================
 # Stage 1: Builder - Install all dependencies
@@ -34,7 +34,7 @@ ENV PACKER_VERSION=${PACKER_VERSION} \
     PACKER_PLUGIN_PATH=/opt/packer/plugins \
     ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections \
     ANSIBLE_ROLES_PATH=/opt/ansible/roles \
-    CHIMERA_OFFLINE_PACKAGES=/opt/offline-packages \
+    CRUCIBLE_OFFLINE_PACKAGES=/opt/offline-packages \
     AMIGEN8_PATH=/opt/amigen8 \
     AMIGEN9_PATH=/opt/amigen9
 
@@ -155,9 +155,9 @@ RUN mkdir -p ${ANSIBLE_ROLES_PATH} \
 # =============================================================================
 # Download offline packages
 # =============================================================================
-RUN mkdir -p ${CHIMERA_OFFLINE_PACKAGES} \
+RUN mkdir -p ${CRUCIBLE_OFFLINE_PACKAGES} \
     && echo "=== Downloading offline packages ===" \
-    && cd ${CHIMERA_OFFLINE_PACKAGES} \
+    && cd ${CRUCIBLE_OFFLINE_PACKAGES} \
     # AWS CLI v2
     && curl -fsSL -o awscli-exe-linux-x86_64.zip \
         "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
@@ -180,8 +180,8 @@ RUN mkdir -p ${CHIMERA_OFFLINE_PACKAGES} \
     && echo "Base64 encoded AWS STIG Script ($(stat -c%s LinuxAWSConfigureSTIG.tgz.b64) bytes)" \
     && rm LinuxAWSConfigureSTIG.tgz \
     && echo "Offline packages:" \
-    && ls -lh ${CHIMERA_OFFLINE_PACKAGES} \
-    && du -sh ${CHIMERA_OFFLINE_PACKAGES}
+    && ls -lh ${CRUCIBLE_OFFLINE_PACKAGES} \
+    && du -sh ${CRUCIBLE_OFFLINE_PACKAGES}
 
 # =============================================================================
 # Download Python wheels for EC2 offline Ansible installation
@@ -236,7 +236,7 @@ RUN echo "=== Baked-in AMIgen scripts ===" \
 # =============================================================================
 RUN echo "=== Installing AWS CLI v2 ===" \
     && cd /tmp \
-    && unzip -q ${CHIMERA_OFFLINE_PACKAGES}/awscli-exe-linux-x86_64.zip \
+    && unzip -q ${CRUCIBLE_OFFLINE_PACKAGES}/awscli-exe-linux-x86_64.zip \
     && ./aws/install --install-dir /opt/aws-cli --bin-dir /usr/local/bin \
     && rm -rf /tmp/aws \
     && aws --version
@@ -261,7 +261,7 @@ RUN cat > /opt/entrypoint.sh << 'EOF'
 #!/bin/bash
 set -e
 
-echo "=== Chimera Build Container ==="
+echo "=== Crucible Build Container ==="
 echo "Packer: $(packer version | head -1)"
 echo "OpenTofu: $(tofu version 2>/dev/null | head -1 || echo 'not available')"
 echo "Ansible: $(ansible --version | head -1)"
@@ -307,9 +307,9 @@ fi
 
 # Show environment configuration
 echo "Environment:"
-echo "  CHIMERA_IDENTIFIER: ${CHIMERA_IDENTIFIER:-not set}"
-echo "  CHIMERA_VERSION: ${CHIMERA_VERSION:-not set}"
-echo "  CHIMERA_BUILDERS: ${CHIMERA_BUILDERS:-not set}"
+echo "  CRUCIBLE_IDENTIFIER: ${CRUCIBLE_IDENTIFIER:-not set}"
+echo "  CRUCIBLE_VERSION: ${CRUCIBLE_VERSION:-not set}"
+echo "  CRUCIBLE_BUILDERS: ${CRUCIBLE_BUILDERS:-not set}"
 echo "  WINDOWS_BUILDERS: ${WINDOWS_BUILDERS:-not set}"
 echo "  AWS_REGION: ${AWS_REGION:-not set}"
 echo "  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-not set}"
@@ -321,7 +321,7 @@ echo "Baked-in Dependencies:"
 echo "  Packer plugins: ${PACKER_PLUGIN_PATH}"
 echo "  Ansible collections: ${ANSIBLE_COLLECTIONS_PATH}"
 echo "  Ansible roles: ${ANSIBLE_ROLES_PATH}"
-echo "  Offline packages: ${CHIMERA_OFFLINE_PACKAGES}"
+echo "  Offline packages: ${CRUCIBLE_OFFLINE_PACKAGES}"
 echo "  Python wheels (for EC2): ${PYTHON_DEPS_PATH}"
 echo "  Collection tarballs (for EC2): ${ANSIBLE_COLLECTIONS_TARBALLS}"
 echo "  AMIgen8 scripts: ${AMIGEN8_PATH}"
@@ -356,15 +356,15 @@ if [ "${SKIP_WORKSPACE_CHECK}" = "false" ]; then
         echo "ERROR: Makefile not found in ${WORKSPACE}"
         echo ""
         echo "Mount your repository to ${WORKSPACE}:"
-        echo "  docker run -v \$(pwd):/workspace chimera-builder make build"
+        echo "  docker run -v \$(pwd):/workspace crucible-builder make build"
         exit 1
     fi
 
     # =============================================================================
     # Symlink baked-in Ansible roles to workspace location
-    # Packer templates expect roles at chimera/ansible/roles/<ROLE_NAME>
+    # Packer templates expect roles at crucible/ansible/roles/<ROLE_NAME>
     # =============================================================================
-    ROLES_DEST="${WORKSPACE}/chimera/ansible/roles"
+    ROLES_DEST="${WORKSPACE}/crucible/ansible/roles"
     if [ -d "${ANSIBLE_ROLES_PATH}" ] && [ -d "${ROLES_DEST}" ]; then
         echo "Symlinking baked-in Ansible roles to workspace..."
         for role in "${ANSIBLE_ROLES_PATH}"/*; do
@@ -404,9 +404,9 @@ if [ "${SKIP_WORKSPACE_CHECK}" = "false" ]; then
 
     # =============================================================================
     # Symlink/copy baked-in Ansible collection tarballs to workspace location
-    # Packer file provisioner uploads chimera/ansible/collections/ to EC2
+    # Packer file provisioner uploads crucible/ansible/collections/ to EC2
     # =============================================================================
-    COLLECTIONS_DEST="${WORKSPACE}/chimera/ansible/collections"
+    COLLECTIONS_DEST="${WORKSPACE}/crucible/ansible/collections"
     if [ -d "${ANSIBLE_COLLECTIONS_TARBALLS}" ]; then
         echo "Populating Ansible collection tarballs in workspace..."
         mkdir -p "${COLLECTIONS_DEST}"
@@ -470,7 +470,7 @@ FROM registry1.dso.mil/ironbank/opensource/rockylinux/rockylinux9-minimal:9.7-mi
 ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
     ANSIBLE_COLLECTIONS_PATH=/opt/ansible/collections \
     ANSIBLE_ROLES_PATH=/opt/ansible/roles \
-    CHIMERA_OFFLINE_PACKAGES=/opt/offline-packages \
+    CRUCIBLE_OFFLINE_PACKAGES=/opt/offline-packages \
     PYTHON_DEPS_PATH=/opt/python-deps \
     ANSIBLE_COLLECTIONS_TARBALLS=/opt/ansible-collections-tarballs \
     AMIGEN8_PATH=/opt/amigen8 \
@@ -606,6 +606,6 @@ ENTRYPOINT ["/entrypoint.sh"]
 CMD ["make", "build"]
 
 # Labels
-LABEL org.opencontainers.image.title="Chimera Builder" \
-      org.opencontainers.image.description="Build environment for Chimera AMIs with offline dependencies" \
-      org.opencontainers.image.source="https://github.com/MetroStar/chimera"
+LABEL org.opencontainers.image.title="Crucible Builder" \
+      org.opencontainers.image.description="Build environment for Crucible AMIs with offline dependencies" \
+      org.opencontainers.image.source="https://github.com/MetroStar/crucible"

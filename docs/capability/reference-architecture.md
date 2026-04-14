@@ -1,6 +1,6 @@
 # Reference Architecture
 
-> **Chimera Platform** — Automated STIG-hardened AMI builds with air-gapped delivery and continuous compliance.
+> **Crucible Platform** — Automated STIG-hardened AMI builds with air-gapped delivery and continuous compliance.
 
 This document describes the end-to-end architecture for building, delivering, and operating DISA STIG-compliant Amazon Machine Images across connected and disconnected AWS environments.
 
@@ -55,10 +55,10 @@ flowchart TB
 
 | Component | Role | Key Files |
 |-----------|------|-----------|
-| **Packer** (1.11.2) | Orchestrates EC2 instance launch, provisioning, and AMI creation | `chimera/minimal.pkr.hcl`, `chimera/hardened.pkr.hcl` |
+| **Packer** (1.11.2) | Orchestrates EC2 instance launch, provisioning, and AMI creation | `crucible/minimal.pkr.hcl`, `crucible/hardened.pkr.hcl` |
 | **AMIgen Scripts** | Chroot-based disk partitioning, OS install, AWS tooling for minimal AMIs | `vendor/amigen9/DiskSetup.sh`, `OSpackages.sh`, `AWSutils.sh` |
-| **Ansible Lockdown** | STIG hardening for RHEL 8/9 and clones via upstream roles | `chimera/ansible/`, `requirements.yml` |
-| **AWS STIG Script** | AL2023 hardening (no DISA benchmark exists; uses RHEL 9 STIG baseline) | `chimera/ansible/roles/AL2023-STIG/` |
+| **Ansible Lockdown** | STIG hardening for RHEL 8/9 and clones via upstream roles | `crucible/ansible/`, `requirements.yml` |
+| **AWS STIG Script** | AL2023 hardening (no DISA benchmark exists; uses RHEL 9 STIG baseline) | `crucible/ansible/roles/AL2023-STIG/` |
 | **OpenTofu** | Provisions VPC, IAM, and SSM infrastructure as code | `infra/main.tf`, `infra/modules/{networking,iam,ssm}` |
 | **Docker** | Packages all build dependencies into a portable, air-gap-ready container | `Dockerfile` |
 | **SSM State Manager** | Post-deployment STIG enforcement, compliance scanning, patching | `infra/modules/ssm/ssm-stig-enforcement.tf`, `ssm-associations.tf` |
@@ -76,7 +76,7 @@ The pipeline supports a complete low-to-high transfer workflow for disconnected 
 flowchart LR
     subgraph high ["Connected Environment (High Side / GitHub)"]
         Prep["offline-prepare.yml<br/>Build Docker image"]
-        Tar["chimera-builder.tar.gz<br/>(~305 MB)"]
+        Tar["crucible-builder.tar.gz<br/>(~305 MB)"]
         B64["Base64-encoded copy<br/>(for SharePoint)"]
         Prep --> Tar
         Prep --> B64
@@ -112,7 +112,7 @@ Additional air-gapped configuration:
 - **Local YUM mirror**: Set `REPO_MIRROR_BASEURL` (e.g., `http://mirror.internal.mil`)
 - **Package sources**: Use `file:///tmp/offline-packages/*` prefix for AWS CLI, CFN Bootstrap, SSM Agent
 - **VPC endpoints**: EC2 + STS endpoints for Packer API calls; SSM + S3 + KMS + CloudWatch endpoints for operational model
-- **Docker image**: Pre-staged at `/transfer/chimera-builder-*.tar.gz` on the GitLab runner
+- **Docker image**: Pre-staged at `/transfer/crucible-builder-*.tar.gz` on the GitLab runner
 
 ## Security Boundaries
 
@@ -156,7 +156,7 @@ flowchart TB
 | **CloudWatch Logs** | KMS encryption | `infra/modules/ssm/cloudwatch.tf` |
 | **SSM sessions** | KMS encryption + S3 logging | `infra/modules/ssm/ssm-documents.tf` (Session Manager prefs) |
 | **In transit** | VPC endpoints (private link, no internet traversal) | `infra/modules/ssm/vpc-endpoints.tf` |
-| **FIPS 140-2** | `dracut-fips` + kernel HMAC validation | `chimera/scripts/boot-fips-wrapper.sh` |
+| **FIPS 140-2** | `dracut-fips` + kernel HMAC validation | `crucible/scripts/boot-fips-wrapper.sh` |
 
 ### Authentication
 

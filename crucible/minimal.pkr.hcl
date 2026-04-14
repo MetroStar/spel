@@ -14,14 +14,14 @@ packer {
 # Guidance on naming and organizing variables
 #
 # Variable names are prefixed by builder, or by amigen project. Any variables
-# used by many builders are prefixed with the keyword `chimera`. Variables are grouped
+# used by many builders are prefixed with the keyword `crucible`. Variables are grouped
 # by their prefix. Current prefixes
 # include:
 #   * aws - amazon-ebs builder
 #   * amigen - used across amigen versions ( amigen8 and amigen9)
 #   * amigen8 - amigen8 only
 #   * amigen9 - amigen9 only
-#   * chimera - everything else
+#   * crucible - everything else
 #
 # For variables passed to a builder argument, just apply prefix to the argument
 # name. Do not "reinterpret" the argument and create a new name. E.g. for the
@@ -93,11 +93,11 @@ variable "aws_source_ami_filter_alma9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "AlmaLinux OS 9.* x86_64-*,chimera-bootstrap-alma-9*.x86_64-gp*"
+    name = "AlmaLinux OS 9.* x86_64-*,crucible-bootstrap-alma-9*.x86_64-gp*"
     owners = [
       "679593333241", # Alma Commercial, https://wiki.almalinux.org/cloud/AWS.html#aws-marketplace
-      "174003430611", # Chimera Commercial, https://github.com/MetroStar/chimera
-      "216406534498", # Chimera GovCloud, https://github.com/MetroStar/chimera
+      "174003430611", # Crucible Commercial, https://github.com/MetroStar/crucible
+      "216406534498", # Crucible GovCloud, https://github.com/MetroStar/crucible
     ]
   }
 }
@@ -109,11 +109,11 @@ variable "aws_source_ami_filter_ol8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "OL8.*-x86_64-HVM-*,chimera-bootstrap-oraclelinux-8-hvm-*.x86_64-gp*,chimera-bootstrap-ol-8-*.x86_64-gp*"
+    name = "OL8.*-x86_64-HVM-*,crucible-bootstrap-oraclelinux-8-hvm-*.x86_64-gp*,crucible-bootstrap-ol-8-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "204182206073", # Chimera Commercial, https://github.com/MetroStar/chimera
-      "317517796843", # Chimera GovCloud, https://github.com/MetroStar/chimera
+      "204182206073", # Crucible Commercial, https://github.com/MetroStar/crucible
+      "317517796843", # Crucible GovCloud, https://github.com/MetroStar/crucible
     ]
   }
 }
@@ -125,11 +125,11 @@ variable "aws_source_ami_filter_ol9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "OL9.*-x86_64-HVM-*,chimera-bootstrap-oraclelinux-9-hvm-*.x86_64-gp*,chimera-bootstrap-ol-9-*.x86_64-gp*"
+    name = "OL9.*-x86_64-HVM-*,crucible-bootstrap-oraclelinux-9-hvm-*.x86_64-gp*,crucible-bootstrap-ol-9-*.x86_64-gp*"
     owners = [
       "131827586825", # Oracle Commercial, https://blogs.oracle.com/linux/post/running-oracle-linux-in-public-clouds
-      "204182206073", # Chimera Commercial, https://github.com/MetroStar/chimera
-      "317517796843", # Chimera GovCloud, https://github.com/MetroStar/chimera
+      "204182206073", # Crucible Commercial, https://github.com/MetroStar/crucible
+      "317517796843", # Crucible GovCloud, https://github.com/MetroStar/crucible
     ]
   }
 }
@@ -141,12 +141,12 @@ variable "aws_source_ami_filter_rhel8_hvm" {
     owners = list(string)
   })
   default = {
-    name = "RHEL-8.*_HVM-*-x86_64-*-Hourly*-GP*,chimera-bootstrap-rhel-8-*.x86_64-gp*"
+    name = "RHEL-8.*_HVM-*-x86_64-*-Hourly*-GP*,crucible-bootstrap-rhel-8-*.x86_64-gp*"
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "204182206073", # Chimera Commercial, https://github.com/MetroStar/chimera
-      "317517796843", # Chimera GovCloud, https://github.com/MetroStar/chimera
+      "204182206073", # Crucible Commercial, https://github.com/MetroStar/crucible
+      "317517796843", # Crucible GovCloud, https://github.com/MetroStar/crucible
     ]
   }
 }
@@ -158,12 +158,12 @@ variable "aws_source_ami_filter_rhel9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "RHEL-9.*_HVM-*-x86_64-*-Hourly*-GP*,chimera-bootstrap-rhel-9-*.x86_64-gp*"
+    name = "RHEL-9.*_HVM-*-x86_64-*-Hourly*-GP*,crucible-bootstrap-rhel-9-*.x86_64-gp*"
     owners = [
       "309956199498", # Red Hat Commercial, https://access.redhat.com/solutions/15356
       "219670896067", # Red Hat GovCloud, https://access.redhat.com/solutions/15356
-      "204182206073", # Chimera Commercial, https://github.com/MetroStar/chimera
-      "317517796843", # Chimera GovCloud, https://github.com/MetroStar/chimera
+      "204182206073", # Crucible Commercial, https://github.com/MetroStar/crucible
+      "317517796843", # Crucible GovCloud, https://github.com/MetroStar/crucible
     ]
   }
 }
@@ -175,11 +175,11 @@ variable "aws_source_ami_filter_rl9_hvm" {
     owners = list(string)
   })
   default = {
-    name = "Rocky-9-EC2-Base-9.*-*.x86_64,chimera-bootstrap-rl-9-*.x86_64-gp*"
+    name = "Rocky-9-EC2-Base-9.*-*.x86_64,crucible-bootstrap-rl-9-*.x86_64-gp*"
     owners = [
       "792107900819", # Rocky Linux, https://rockylinux.org/download (search for "AWS" tag and click)
-      "204182206073", # Chimera Commercial, https://github.com/MetroStar/chimera
-      "317517796843", # Chimera GovCloud, https://github.com/MetroStar/chimera
+      "204182206073", # Crucible Commercial, https://github.com/MetroStar/crucible
+      "317517796843", # Crucible GovCloud, https://github.com/MetroStar/crucible
     ]
   }
 }
@@ -266,7 +266,7 @@ variable "amigen_amiutils_source_url" {
 }
 
 variable "amigen_aws_cfnbootstrap" {
-  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Use file:// prefix for offline/Offline builds. Defaults to chimera_cfnbootstrap_source for Offline support"
+  description = "URL of the tar.gz bundle containing the CFN bootstrap utilities. Use file:// prefix for offline/Offline builds. Defaults to crucible_cfnbootstrap_source for Offline support"
   type        = string
   default     = ""
 }
@@ -519,62 +519,62 @@ variable "amigen9_uefi_dev_label" {
 
 
 ###
-# Variables specific to chimera
+# Variables specific to crucible
 ###
 
-variable "chimera_deprecation_lifetime" {
+variable "crucible_deprecation_lifetime" {
   description = "Duration after which image will be marked deprecated. If null, image will not be marked deprecated. The accepted units are: ns, us (or µs), ms, s, m, and h. For example, one day is 24h, and one year is 8760h."
   type        = string
   default     = null
 }
 
-variable "chimera_description_url" {
+variable "crucible_description_url" {
   description = "URL included in the AMI description"
   type        = string
-  default     = "https://github.com/MetroStar/chimera"
+  default     = "https://github.com/MetroStar/crucible"
 }
 
-variable "chimera_http_proxy" {
+variable "crucible_http_proxy" {
   description = "Used as the value for the git config http.proxy setting in the builder nodes"
   type        = string
   default     = ""
 }
 
-variable "chimera_identifier" {
+variable "crucible_identifier" {
   description = "Namespace that prefixes the name of the built images"
   type        = string
 }
 
-variable "chimera_root_volume_size" {
+variable "crucible_root_volume_size" {
   description = "Size in GB of the root volume"
   type        = number
   default     = 20
 }
 
-variable "chimera_ssh_username" {
-  description = "Name of the user for the ssh connection to the instance. Defaults to `chimera`, which is set by cloud-config userdata. If your starting image does not have `cloud-init` installed, override the default user name"
+variable "crucible_ssh_username" {
+  description = "Name of the user for the ssh connection to the instance. Defaults to `crucible`, which is set by cloud-config userdata. If your starting image does not have `cloud-init` installed, override the default user name"
   type        = string
-  default     = "chimera"
+  default     = "crucible"
 }
 
-variable "chimera_version" {
+variable "crucible_version" {
   description = "Version appended to the name of the built images"
   type        = string
 }
 
-variable "chimera_cfnbootstrap_source" {
+variable "crucible_cfnbootstrap_source" {
   description = "Source URL or file path for AWS CloudFormation Bootstrap package. Use file:// for offline/Offline builds"
   type        = string
   default     = "https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz"
 }
 
-variable "chimera_awscli_source" {
+variable "crucible_awscli_source" {
   description = "Source URL or file path for AWS CLI v2 package. Use file:// for offline/Offline builds"
   type        = string
   default     = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
 }
 
-variable "chimera_ssm_agent_source" {
+variable "crucible_ssm_agent_source" {
   description = "Source URL or file path for AWS SSM Agent RPM. Use file:// for offline/Offline builds"
   type        = string
   default     = "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
@@ -591,11 +591,11 @@ source "amazon-ebssurrogate" "base" {
     source_device_name    = "/dev/xvdf"
     delete_on_termination = true
     device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
-    volume_size           = var.chimera_root_volume_size
+    volume_size           = var.crucible_root_volume_size
     volume_type           = "gp3"
   }
   ami_groups                  = var.aws_ami_groups
-  ami_name                    = "${var.chimera_identifier}-${source.name}-${var.chimera_version}.x86_64-gp3"
+  ami_name                    = "${var.crucible_identifier}-${source.name}-${var.crucible_version}.x86_64-gp3"
   ami_regions                 = local.effective_ami_regions
   ami_users                   = var.aws_ami_users
   ami_virtualization_type     = "hvm"
@@ -608,13 +608,13 @@ source "amazon-ebssurrogate" "base" {
   launch_block_device_mappings {
     delete_on_termination = true
     device_name           = source.name == "minimal-amzn-2023-hvm" ? "/dev/xvda" : "/dev/sda1"
-    volume_size           = var.chimera_root_volume_size
+    volume_size           = var.crucible_root_volume_size
     volume_type           = "gp3"
   }
   launch_block_device_mappings {
     delete_on_termination = true
     device_name           = "/dev/xvdf"
-    volume_size           = var.chimera_root_volume_size
+    volume_size           = var.crucible_root_volume_size
     volume_type           = "gp3"
   }
   max_retries   = 20
@@ -623,7 +623,7 @@ source "amazon-ebssurrogate" "base" {
   ssh_interface = var.aws_ssh_interface
   ssh_port      = 22
   ssh_pty       = true
-  ssh_username  = var.chimera_ssh_username
+  ssh_username  = var.crucible_ssh_username
   ssh_timeout   = "10m"
   ssh_key_exchange_algorithms = [
     "ecdh-sha2-nistp521",
@@ -678,10 +678,10 @@ locals {
   effective_rhel9_owners         = local.use_offline_ami_owners ? [var.aws_offline_account_id] : var.aws_source_ami_filter_rhel9_hvm.owners
 
   # Template the description string
-  description = "STIG-partitioned [*NOT HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.chimera_description_url}."
+  description = "STIG-partitioned [*NOT HARDENED*], LVM-enabled, \"minimal\" %s, with updates through ${formatdate("YYYY-MM-DD", local.timestamp)}. Default username `maintuser`. See ${var.crucible_description_url}."
 
   # Calculate AWS AMI deprecate_at timestamp
-  aws_ami_deprecate_at = var.chimera_deprecation_lifetime != null ? timeadd(local.timestamp, var.chimera_deprecation_lifetime) : null
+  aws_ami_deprecate_at = var.crucible_deprecation_lifetime != null ? timeadd(local.timestamp, var.crucible_deprecation_lifetime) : null
 
   timestamp = timestamp()
 }
@@ -882,12 +882,12 @@ build {
     environment_vars = [
       "DNF_VAR_ociregion=",
       "DNF_VAR_ocidomain=oracle.com",
-      "CHIMERA_AMIGEN9SOURCE=${var.amigen9_source_url}",
-      "CHIMERA_AMIGENREPOS=${local.amigen9_repo_names}",
-      "CHIMERA_AMIGENREPOSRC=${local.amigen9_repo_sources}",
-      "CHIMERA_BUILDDEPS=dosfstools git lvm2 parted python3-pip unzip yum-utils",
-      "CHIMERA_EXTRARPMS=${local.amigen9_extra_rpms}",
-      "CHIMERA_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "CRUCIBLE_AMIGEN9SOURCE=${var.amigen9_source_url}",
+      "CRUCIBLE_AMIGENREPOS=${local.amigen9_repo_names}",
+      "CRUCIBLE_AMIGENREPOSRC=${local.amigen9_repo_sources}",
+      "CRUCIBLE_BUILDDEPS=dosfstools git lvm2 parted python3-pip unzip yum-utils",
+      "CRUCIBLE_EXTRARPMS=${local.amigen9_extra_rpms}",
+      "CRUCIBLE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     scripts = [
@@ -904,12 +904,12 @@ build {
   # Want to try to run this pre-step early on AL2023
   provisioner "shell" {
     environment_vars = [
-      "CHIMERA_AMIGEN9SOURCE=${var.amigen9_source_url}",
-      "CHIMERA_AMIGENREPOS=${local.amigen9_repo_names}",
-      "CHIMERA_AMIGENREPOSRC=${local.amigen9_repo_sources}",
-      "CHIMERA_BUILDDEPS=dnf-utils dosfstools git lvm2 parted python3-pip unzip",
-      "CHIMERA_EXTRARPMS=${local.amigen9_extra_rpms}",
-      "CHIMERA_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "CRUCIBLE_AMIGEN9SOURCE=${var.amigen9_source_url}",
+      "CRUCIBLE_AMIGENREPOS=${local.amigen9_repo_names}",
+      "CRUCIBLE_AMIGENREPOSRC=${local.amigen9_repo_sources}",
+      "CRUCIBLE_BUILDDEPS=dnf-utils dosfstools git lvm2 parted python3-pip unzip",
+      "CRUCIBLE_EXTRARPMS=${local.amigen9_extra_rpms}",
+      "CRUCIBLE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     scripts = [
@@ -925,31 +925,31 @@ build {
     environment_vars = [
       "DNF_VAR_ocidomain=oracle.com",
       "DNF_VAR_ociregion=",
-      "CHIMERA_AMIGEN8SOURCE=${var.amigen8_source_url}",
-      "CHIMERA_AMIGENBOOTDEVMULT=${var.amigen8_bootdev_mult}",
-      "CHIMERA_AMIGENBOOTDEVSZ=${var.amigen8_bootdev_size}",
-      "CHIMERA_AMIGENBOOTSIZE=17m",
-      "CHIMERA_AMIGENBRANCH=${var.amigen8_source_branch}",
-      "CHIMERA_AMIGENCHROOT=/mnt/ec2-root",
-      "CHIMERA_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
-      "CHIMERA_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
-      "CHIMERA_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
-      "CHIMERA_AMIGENMANFST=${var.amigen8_package_manifest}",
-      "CHIMERA_AMIGENPKGGRP=${local.amigen8_package_groups}",
-      "CHIMERA_AMIGENREPOS=${local.amigen8_repo_names}",
-      "CHIMERA_AMIGENREPOSRC=${local.amigen8_repo_sources}",
-      "CHIMERA_AMIGENROOTNM=${var.amigen8_filesystem_label}",
-      "CHIMERA_AMIGENSTORLAY=${local.amigen8_storage_layout}",
-      "CHIMERA_AMIGENVGNAME=RootVG",
-      "CHIMERA_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.chimera_cfnbootstrap_source}",
-      "CHIMERA_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "CHIMERA_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.chimera_awscli_source}",
-      "CHIMERA_CLOUDPROVIDER=aws",
-      "CHIMERA_EXTRARPMS=${local.amigen8_extra_rpms}",
-      "CHIMERA_FIPSDISABLE=${var.amigen_fips_disable}",
-      "CHIMERA_GRUBTMOUT=${var.amigen_grub_timeout}",
-      "CHIMERA_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
-      "CHIMERA_USEROOTDEVICE=false",
+      "CRUCIBLE_AMIGEN8SOURCE=${var.amigen8_source_url}",
+      "CRUCIBLE_AMIGENBOOTDEVMULT=${var.amigen8_bootdev_mult}",
+      "CRUCIBLE_AMIGENBOOTDEVSZ=${var.amigen8_bootdev_size}",
+      "CRUCIBLE_AMIGENBOOTSIZE=17m",
+      "CRUCIBLE_AMIGENBRANCH=${var.amigen8_source_branch}",
+      "CRUCIBLE_AMIGENCHROOT=/mnt/ec2-root",
+      "CRUCIBLE_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
+      "CRUCIBLE_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
+      "CRUCIBLE_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
+      "CRUCIBLE_AMIGENMANFST=${var.amigen8_package_manifest}",
+      "CRUCIBLE_AMIGENPKGGRP=${local.amigen8_package_groups}",
+      "CRUCIBLE_AMIGENREPOS=${local.amigen8_repo_names}",
+      "CRUCIBLE_AMIGENREPOSRC=${local.amigen8_repo_sources}",
+      "CRUCIBLE_AMIGENROOTNM=${var.amigen8_filesystem_label}",
+      "CRUCIBLE_AMIGENSTORLAY=${local.amigen8_storage_layout}",
+      "CRUCIBLE_AMIGENVGNAME=RootVG",
+      "CRUCIBLE_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.crucible_cfnbootstrap_source}",
+      "CRUCIBLE_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
+      "CRUCIBLE_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.crucible_awscli_source}",
+      "CRUCIBLE_CLOUDPROVIDER=aws",
+      "CRUCIBLE_EXTRARPMS=${local.amigen8_extra_rpms}",
+      "CRUCIBLE_FIPSDISABLE=${var.amigen_fips_disable}",
+      "CRUCIBLE_GRUBTMOUT=${var.amigen_grub_timeout}",
+      "CRUCIBLE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "CRUCIBLE_USEROOTDEVICE=false",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     only = [
@@ -966,34 +966,34 @@ build {
     environment_vars = [
       "DNF_VAR_ocidomain=oracle.com",
       "DNF_VAR_ociregion=",
-      "CHIMERA_AMIGEN9SOURCE=${var.amigen9_source_url}",
-      "CHIMERA_AMIGENBOOTDEVLBL=${var.amigen9_boot_dev_label}",
-      "CHIMERA_AMIGENBOOTDEVSZ=${var.amigen9_boot_dev_size}",
-      "CHIMERA_AMIGENBOOTDEVSZMLT=${var.amigen9_boot_dev_size_mult}",
-      "CHIMERA_AMIGENBRANCH=${var.amigen9_source_branch}",
-      "CHIMERA_AMIGENCHROOT=/mnt/ec2-root",
-      "CHIMERA_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
-      "CHIMERA_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
-      "CHIMERA_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
-      "CHIMERA_AMIGENMANFST=${var.amigen9_package_manifest}",
-      "CHIMERA_AMIGENMANFSTAL2023=${var.amigen9_package_manifest_al2023}",
-      "CHIMERA_AMIGENPKGGRP=${local.amigen9_package_groups}",
-      "CHIMERA_AMIGENREPOS=${local.amigen9_repo_names}",
-      "CHIMERA_AMIGENREPOSRC=${local.amigen9_repo_sources}",
-      "CHIMERA_AMIGENROOTNM=${var.amigen9_filesystem_label}",
-      "CHIMERA_AMIGENSTORLAY=${local.amigen9_storage_layout}",
-      "CHIMERA_AMIGENUEFIDEVLBL=${var.amigen9_uefi_dev_label}",
-      "CHIMERA_AMIGENUEFIDEVSZ=${var.amigen9_uefi_dev_size}",
-      "CHIMERA_AMIGENVGNAME=RootVG",
-      "CHIMERA_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.chimera_cfnbootstrap_source}",
-      "CHIMERA_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
-      "CHIMERA_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.chimera_awscli_source}",
-      "CHIMERA_CLOUDPROVIDER=aws",
-      "CHIMERA_EXTRARPMS=${local.amigen9_extra_rpms}",
-      "CHIMERA_FIPSDISABLE=${var.amigen_fips_disable}",
-      "CHIMERA_GRUBTMOUT=${var.amigen_grub_timeout}",
-      "CHIMERA_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
-      "CHIMERA_USEROOTDEVICE=false",
+      "CRUCIBLE_AMIGEN9SOURCE=${var.amigen9_source_url}",
+      "CRUCIBLE_AMIGENBOOTDEVLBL=${var.amigen9_boot_dev_label}",
+      "CRUCIBLE_AMIGENBOOTDEVSZ=${var.amigen9_boot_dev_size}",
+      "CRUCIBLE_AMIGENBOOTDEVSZMLT=${var.amigen9_boot_dev_size_mult}",
+      "CRUCIBLE_AMIGENBRANCH=${var.amigen9_source_branch}",
+      "CRUCIBLE_AMIGENCHROOT=/mnt/ec2-root",
+      "CRUCIBLE_AMIGENCROSSDISTRO=${var.amigen_cross_distro}",
+      "CRUCIBLE_AMIGENNOSIGNATURE=${var.amigen_repo_nosignature}",
+      "CRUCIBLE_AMIGENSSLVERIFY=${var.amigen_sslverify_disable ? "false" : "true"}",
+      "CRUCIBLE_AMIGENMANFST=${var.amigen9_package_manifest}",
+      "CRUCIBLE_AMIGENMANFSTAL2023=${var.amigen9_package_manifest_al2023}",
+      "CRUCIBLE_AMIGENPKGGRP=${local.amigen9_package_groups}",
+      "CRUCIBLE_AMIGENREPOS=${local.amigen9_repo_names}",
+      "CRUCIBLE_AMIGENREPOSRC=${local.amigen9_repo_sources}",
+      "CRUCIBLE_AMIGENROOTNM=${var.amigen9_filesystem_label}",
+      "CRUCIBLE_AMIGENSTORLAY=${local.amigen9_storage_layout}",
+      "CRUCIBLE_AMIGENUEFIDEVLBL=${var.amigen9_uefi_dev_label}",
+      "CRUCIBLE_AMIGENUEFIDEVSZ=${var.amigen9_uefi_dev_size}",
+      "CRUCIBLE_AMIGENVGNAME=RootVG",
+      "CRUCIBLE_AWSCFNBOOTSTRAP=${var.amigen_aws_cfnbootstrap != "" ? var.amigen_aws_cfnbootstrap : var.crucible_cfnbootstrap_source}",
+      "CRUCIBLE_AWSCLIV1SOURCE=${var.amigen_aws_cliv1_source}",
+      "CRUCIBLE_AWSCLIV2SOURCE=${var.amigen_aws_cliv2_source != "" ? var.amigen_aws_cliv2_source : var.crucible_awscli_source}",
+      "CRUCIBLE_CLOUDPROVIDER=aws",
+      "CRUCIBLE_EXTRARPMS=${local.amigen9_extra_rpms}",
+      "CRUCIBLE_FIPSDISABLE=${var.amigen_fips_disable}",
+      "CRUCIBLE_GRUBTMOUT=${var.amigen_grub_timeout}",
+      "CRUCIBLE_USEDEFAULTREPOS=${var.amigen_use_default_repos}",
+      "CRUCIBLE_USEROOTDEVICE=false",
     ]
     execute_command = "{{ .Vars }} sudo -E /bin/bash '{{ .Path }}'"
     only = [
@@ -1010,19 +1010,19 @@ build {
 
   # Common post-processors
   provisioner "file" {
-    destination = ".chimera/${var.chimera_version}/${var.chimera_identifier}-${source.name}.${source.type}.manifest.txt"
+    destination = ".crucible/${var.crucible_version}/${var.crucible_identifier}-${source.name}.${source.type}.manifest.txt"
     direction   = "download"
     source      = "/tmp/manifest.txt"
   }
 
   post-processor "artifice" {
     files = [
-      ".chimera/${var.chimera_version}/${var.chimera_identifier}-${source.name}.${source.type}.manifest.txt",
+      ".crucible/${var.crucible_version}/${var.crucible_identifier}-${source.name}.${source.type}.manifest.txt",
     ]
   }
 
   post-processor "manifest" {
-    output = ".chimera/${var.chimera_version}/packer-manifest.json"
+    output = ".crucible/${var.crucible_version}/packer-manifest.json"
   }
 }
 

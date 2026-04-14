@@ -202,7 +202,7 @@ resource "aws_iam_instance_profile" "ssm" {
 
 resource "aws_iam_policy" "ssm_caller" {
   name        = "${var.name_prefix}-ssm-caller-policy"
-  description = "Permissions for CI runners and operators to invoke SSM operations on Chimera instances"
+  description = "Permissions for CI runners and operators to invoke SSM operations on Crucible instances"
 
   policy = jsonencode({
     Version = "2012-10-17"

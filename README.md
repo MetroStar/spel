@@ -1,8 +1,8 @@
-# Chimera
+# Crucible
 
 Build STIG-hardened, LVM-partitioned Amazon Machine Images for Enterprise Linux.
 
-Chimera produces AMIs where every DISA STIG filesystem-separation requirement is satisfied from first boot. No post-launch repartitioning needed. Builds run entirely through CI/CD — GitHub Actions or GitLab CI — using a self-contained Docker image with all dependencies baked in.
+Crucible produces AMIs where every DISA STIG filesystem-separation requirement is satisfied from first boot. No post-launch repartitioning needed. Builds run entirely through CI/CD — GitHub Actions or GitLab CI — using a self-contained Docker image with all dependencies baked in.
 
 ## Supported Builds
 
@@ -22,7 +22,7 @@ Each Linux build produces two AMIs: a **minimal** base image and a **hardened** 
 
 ## Building AMIs
 
-Chimera supports three build paths — **GitHub Actions** (connected), **GitLab CI** (air-gapped), and **local Docker** — all using the same self-contained `chimera-builder` container image.
+Crucible supports three build paths — **GitHub Actions** (connected), **GitLab CI** (air-gapped), and **local Docker** — all using the same self-contained `crucible-builder` container image.
 
 The full step-by-step walkthrough for each path, including prerequisites, input variables, and air-gapped configuration, is in the **[Onboarding Guide](docs/capability/onboarding-guide.md)**.
 
@@ -38,8 +38,8 @@ For variable reference tables and deployment profiles, see the **[Template Packa
 
 Each build is a two-phase Packer pipeline running inside the Docker container:
 
-1. **Minimal** (`chimera/minimal.pkr.hcl`) — Launches a surrogate EC2, partitions disks with LVM per STIG layout, installs a minimal OS via amigen scripts, snapshots the volume as an AMI.
-2. **Hardened** (`chimera/hardened.pkr.hcl`) — Launches instances from the minimal AMIs, applies STIG hardening, and produces final hardened AMIs.
+1. **Minimal** (`crucible/minimal.pkr.hcl`) — Launches a surrogate EC2, partitions disks with LVM per STIG layout, installs a minimal OS via amigen scripts, snapshots the volume as an AMI.
+2. **Hardened** (`crucible/hardened.pkr.hcl`) — Launches instances from the minimal AMIs, applies STIG hardening, and produces final hardened AMIs.
 
 After a successful hardened build, `build.sh` automatically **deregisters the intermediate minimal AMIs** and deletes their backing snapshots. Only the final hardened AMIs are retained.
 
@@ -57,7 +57,7 @@ The Docker container (`Dockerfile`) packages Packer 1.11.2, Ansible, AWS CLI v2,
 
 Compliance is verified at build time using two tools:
 
-- **Goss** (via Ansible Lockdown roles) — Runs before and after Ansible remediation to produce JSON delta reports showing pre- and post-hardening posture. For air-gapped builds, set `chimera_goss_binary_url` to an internal mirror.
+- **Goss** (via Ansible Lockdown roles) — Runs before and after Ansible remediation to produce JSON delta reports showing pre- and post-hardening posture. For air-gapped builds, set `crucible_goss_binary_url` to an internal mirror.
 - **OpenSCAP** — Runs after hardening using the DISA STIG profile from `scap-security-guide`. Produces `/tmp/oscap-report.html` and `/tmp/oscap-results.xml`, downloaded as build artifacts.
 
 See [docs/STIG_EXCEPTIONS.md](docs/STIG_EXCEPTIONS.md) for controls that are intentionally skipped and why.
@@ -109,7 +109,7 @@ Some STIG controls cannot be applied at AMI build time. See [docs/STIG_EXCEPTION
 ├── Dockerfile                 Self-contained builder image (Iron Bank Rocky Linux 9)
 ├── Makefile                   Entry point called by CI: env setup → build.sh
 ├── build.sh                   Packer orchestration (minimal → hardened)
-├── chimera/
+├── crucible/
 │   ├── minimal.pkr.hcl        Packer template: STIG-partitioned base AMIs
 │   ├── hardened.pkr.hcl        Packer template: STIG-hardened AMIs
 │   ├── scripts/                Shell scripts run inside surrogate EC2s
@@ -135,7 +135,7 @@ See the **[Troubleshooting Guide](docs/capability/troubleshooting-guide.md)** fo
 
 ## Documentation
 
-The **[Chimera Capability Package](docs/capability/README.md)** is the main documentation hub. It includes an onboarding guide, runbook, troubleshooting guide, reference architecture, operating model, and proposal-ready value brief.
+The **[Crucible Capability Package](docs/capability/README.md)** is the main documentation hub. It includes an onboarding guide, runbook, troubleshooting guide, reference architecture, operating model, and proposal-ready value brief.
 
 Additional deep-reference docs:
 

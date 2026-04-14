@@ -8,7 +8,7 @@
 # before `tofu init`.
 #
 # Options:
-#   --prefix PREFIX     Resource name prefix (default: chimera-offline)
+#   --prefix PREFIX     Resource name prefix (default: crucible-offline)
 #   --region REGION     AWS region (default: $AWS_DEFAULT_REGION or us-east-1)
 #   --bucket NAME       Override S3 bucket name (default: ${PREFIX}-ssm-tfstate-${ACCOUNT_ID})
 #   --table NAME        Override DynamoDB table name (default: ${PREFIX}-ssm-tflock)
@@ -26,7 +26,7 @@
 set -euo pipefail
 
 # Defaults
-PREFIX="${INFRA_PREFIX:-chimera-offline}"
+PREFIX="${INFRA_PREFIX:-crucible-offline}"
 REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}"
 BUCKET_OVERRIDE=""
 TABLE_OVERRIDE=""
@@ -125,7 +125,7 @@ else
     --key-schema AttributeName=LockID,KeyType=HASH \
     --billing-mode PAY_PER_REQUEST \
     --region "$REGION" \
-    --tags Key=Project,Value=CHIMERA Key=ManagedBy,Value=opentofu-bootstrap >/dev/null
+    --tags Key=Project,Value=CRUCIBLE Key=ManagedBy,Value=opentofu-bootstrap >/dev/null
 
   echo "Waiting for table to become active..."
   aws dynamodb wait table-exists --table-name "$TABLE" --region "$REGION"

@@ -1,23 +1,23 @@
 # This directory is for Docker image tarballs transferred from connected environments
 # 
 # The GitLab CI pipeline expects Docker image tarballs at:
-#   /transfer/chimera-builder-*.tar.gz (or .tar.gz.b64 if using SharePoint)
+#   /transfer/crucible-builder-*.tar.gz (or .tar.gz.b64 if using SharePoint)
 #
 # To prepare the tarball:
 #   1. Run the offline-prepare.yml workflow in GitHub Actions
-#   2. Download the chimera-builder-YYYYMMDD artifact
+#   2. Download the crucible-builder-YYYYMMDD artifact
 #   3. Choose the appropriate format for your transfer method:
 #
 # BINARY FORMAT (recommended for most transfers):
-#   - File: chimera-builder-YYYYMMDD.tar.gz (~305 MB)
+#   - File: crucible-builder-YYYYMMDD.tar.gz (~305 MB)
 #   - Use for: Direct downloads, USB drives, DVDs, SCP, SFTP
 #   - Transfer to: this directory
 #
 # BASE64 FORMAT (required for SharePoint):
-#   - File: chimera-builder-YYYYMMDD.tar.gz.b64 (~407 MB)
+#   - File: crucible-builder-YYYYMMDD.tar.gz.b64 (~407 MB)
 #   - Use for: SharePoint transfers (avoids binary corruption)
 #   - Transfer to: this directory
 #   - Note: GitLab CI automatically decodes .b64 files before import
 #
 # Optional: Include checksum file for verification:
-#   sha256sum chimera-builder-YYYYMMDD.tar.gz > chimera-builder-YYYYMMDD.tar.gz.sha256
+#   sha256sum crucible-builder-YYYYMMDD.tar.gz > crucible-builder-YYYYMMDD.tar.gz.sha256

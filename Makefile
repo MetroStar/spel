@@ -1,26 +1,26 @@
 SHELL := /bin/bash
 
 PACKER_LOG ?= '1'
-PACKER_LOG_PATH = .chimera/$(CHIMERA_VERSION)/packer.log
+PACKER_LOG_PATH = .crucible/$(CRUCIBLE_VERSION)/packer.log
 CHECKPOINT_DISABLE ?= '1'
 BUILDER_REGION = $(or $(PKR_VAR_aws_region),$(AWS_REGION))
 
-export PKR_VAR_chimera_deprecation_lifetime ?= 8760h
+export PKR_VAR_crucible_deprecation_lifetime ?= 8760h
 
 .PHONY: build
 .EXPORT_ALL_VARIABLES:
 
-$(info CHIMERA_IDENTIFIER=$(CHIMERA_IDENTIFIER))
-$(info CHIMERA_VERSION=$(CHIMERA_VERSION))
+$(info CRUCIBLE_IDENTIFIER=$(CRUCIBLE_IDENTIFIER))
+$(info CRUCIBLE_VERSION=$(CRUCIBLE_VERSION))
 
-ifndef CHIMERA_IDENTIFIER
-$(error CHIMERA_IDENTIFIER is not set)
+nifndef CRUCIBLE_IDENTIFIER
+$(error CRUCIBLE_IDENTIFIER is not set)
 endif
 
-ifndef CHIMERA_VERSION
-$(error CHIMERA_VERSION is not set)
+nifndef CRUCIBLE_VERSION
+$(error CRUCIBLE_VERSION is not set)
 else
-$(shell mkdir -p ".chimera/$(CHIMERA_VERSION)")
+$(shell mkdir -p ".crucible/$(CRUCIBLE_VERSION)")
 endif
 
 build: export AWS_DEFAULT_REGION := $(BUILDER_REGION)

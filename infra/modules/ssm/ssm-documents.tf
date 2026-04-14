@@ -1,7 +1,7 @@
 # =============================================================================
 # SSM Infrastructure Module — SSM Documents
 # =============================================================================
-# Custom SSM documents for Chimera-specific operations:
+# Custom SSM documents for Crucible-specific operations:
 #
 # 1. OpenSCAP STIG Scan: Runs oscap xccdf eval with configurable profile
 #    and data stream, uploads results to S3. Works on both RHEL 8/9 and
@@ -66,7 +66,7 @@ resource "aws_ssm_document" "oscap_scan" {
             "echo \"Profile:  $PROFILE\"",
             "echo \"Time:     $TIMESTAMP\"",
             "",
-            "# Verify OpenSCAP is installed (should be pre-installed on Chimera AMIs)",
+            "# Verify OpenSCAP is installed (should be pre-installed on Crucible AMIs)",
             "if ! command -v oscap &>/dev/null; then",
             "  echo 'WARN: OpenSCAP not installed. Attempting install (requires repo access)...'",
             "  yum install -y openscap-scanner scap-security-guide 2>/dev/null || dnf install -y openscap-scanner scap-security-guide || {",

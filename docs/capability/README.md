@@ -1,8 +1,8 @@
-# Chimera Platform — Capability Package
+# Crucible Platform — Capability Package
 
 Automated STIG-hardened AMI builds with air-gapped delivery and continuous compliance for AWS GovCloud and commercial environments.
 
-The Chimera Platform is a reusable capability that produces DISA STIG-compliant Amazon Machine Images for 9 operating systems. It automates the full lifecycle — infrastructure provisioning, image hardening, compliance evidence generation, and post-deployment enforcement — through CI/CD pipelines that work in both connected and disconnected (air-gapped) AWS environments.
+The Crucible Platform is a reusable capability that produces DISA STIG-compliant Amazon Machine Images for 9 operating systems. It automates the full lifecycle — infrastructure provisioning, image hardening, compliance evidence generation, and post-deployment enforcement — through CI/CD pipelines that work in both connected and disconnected (air-gapped) AWS environments.
 
 This directory contains all documentation needed to evaluate, adopt, operate, and extend the platform.
 

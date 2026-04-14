@@ -1,8 +1,8 @@
 # Template Package
 
-> **Chimera Platform** — How to fork, adapt, and deploy for a new program.
+> **Crucible Platform** — How to fork, adapt, and deploy for a new program.
 
-This guide covers configuration, infrastructure customization, pipeline adaptation, STIG customization, and storage planning for adopting the Chimera Platform on a new contract or program.
+This guide covers configuration, infrastructure customization, pipeline adaptation, STIG customization, and storage planning for adopting the Crucible Platform on a new contract or program.
 
 ## Configuration Reference
 
@@ -12,9 +12,9 @@ All build behavior is controlled through environment variables. Set these in you
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `CHIMERA_IDENTIFIER` | **Yes** | — | Prefix for AMI names (e.g., `chimera`) |
-| `CHIMERA_VERSION` | **Yes** | — | Version string in AMI names (e.g., `2026.04.1`) |
-| `CHIMERA_BUILDERS` | **Yes** | — | Comma-delimited list of Linux builders to run |
+| `CRUCIBLE_IDENTIFIER` | **Yes** | — | Prefix for AMI names (e.g., `crucible`) |
+| `CRUCIBLE_VERSION` | **Yes** | — | Version string in AMI names (e.g., `2026.04.1`) |
+| `CRUCIBLE_BUILDERS` | **Yes** | — | Comma-delimited list of Linux builders to run |
 | `WINDOWS_BUILDERS` | No | `""` | Comma-delimited list of Windows builders to run |
 
 ### AWS & Networking
@@ -39,7 +39,7 @@ All build behavior is controlled through environment variables. Set these in you
 | `AMIGEN_REPO_NOSIGNATURE` | No | `false` | Accept unsigned RPMs |
 | `AMIGEN_SSLVERIFY_DISABLE` | No | `false` | Skip SSL verification for internal mirrors |
 | `REPO_MIRROR_BASEURL` | No | — | Local YUM mirror URL (e.g., `http://mirror.internal.mil`) |
-| `DOCKER_IMAGE_PATH` | No | `/transfer/chimera-builder-*.tar.gz` | Path to Docker image tarball |
+| `DOCKER_IMAGE_PATH` | No | `/transfer/crucible-builder-*.tar.gz` | Path to Docker image tarball |
 
 ### Package Sources (Offline Overrides)
 
@@ -51,7 +51,7 @@ All build behavior is controlled through environment variables. Set these in you
 | `AMIGEN8_REPO_NAMES` | `""` | JSON array of EL8 repo names |
 | `AMIGEN8_REPO_SOURCES` | `""` | JSON array of EL8 repo-config RPM URLs |
 | `AMIGEN8_EXTRA_RPMS` | `""` | JSON array of additional EL8 RPMs |
-| `CHIMERA_GOSS_BINARY_URL` | `""` | URL to Goss binary for STIG auditing |
+| `CRUCIBLE_GOSS_BINARY_URL` | `""` | URL to Goss binary for STIG auditing |
 
 ### Storage Layout (Advanced)
 
@@ -146,13 +146,13 @@ jobs:
 ```yaml
 # Replace the upload-artifact step with your artifact manager
 - name: Upload to Artifactory
-  run: curl -T chimera-builder-*.tar.gz https://artifactory.example.com/chimera/
+  run: curl -T crucible-builder-*.tar.gz https://artifactory.example.com/crucible/
 ```
 
 ### GitLab CI (Air-Gapped)
 
 **Runner configuration**:
-- Tag: `chimera-offline-runner`
+- Tag: `crucible-offline-runner`
 - Docker must be installed
 - `/transfer/` directory must be accessible (mount or volume)
 
@@ -162,7 +162,7 @@ jobs:
 ```bash
 # On the runner host:
 mkdir -p /transfer
-cp chimera-builder-*.tar.gz /transfer/
+cp crucible-builder-*.tar.gz /transfer/
 ```
 
 **Integration with ITSM / ServiceNow**:
@@ -177,7 +177,7 @@ cp chimera-builder-*.tar.gz /transfer/
 Override STIG role defaults without forking the role. Create a variable file and pass it to Ansible:
 
 ```yaml
-# chimera/ansible/my-org-overrides.yml
+# crucible/ansible/my-org-overrides.yml
 # Example: Adjust password complexity to match org policy
 rhel9stig_pass_min_length: 15
 rhel9stig_pass_min_days: 1
@@ -205,8 +205,8 @@ For controls that cannot be remediated at AMI build time, document them in `docs
 
 ### Adding a Custom STIG Role
 
-1. Create a new role under `chimera/ansible/roles/YOUR-STIG/`
-2. Reference it in the hardened Packer template (`chimera/hardened.pkr.hcl`)
+1. Create a new role under `crucible/ansible/roles/YOUR-STIG/`
+2. Reference it in the hardened Packer template (`crucible/hardened.pkr.hcl`)
 3. Add an SSM association for post-deployment enforcement if needed
 4. Update the platform support matrix in `docs/capability/reference-architecture.md`
 
@@ -248,10 +248,10 @@ For controls that cannot be remediated at AMI build time, document them in `docs
 Each Docker image build produces:
 
 ```
-chimera-builder-YYYYMMDD/
-├── chimera-builder-YYYYMMDD.tar.gz         # ~305 MB
-├── chimera-builder-YYYYMMDD.tar.gz.sha256  # <1 KB
-└── chimera-builder-YYYYMMDD-manifest.txt   # <2 KB
+crucible-builder-YYYYMMDD/
+├── crucible-builder-YYYYMMDD.tar.gz         # ~305 MB
+├── crucible-builder-YYYYMMDD.tar.gz.sha256  # <1 KB
+└── crucible-builder-YYYYMMDD-manifest.txt   # <2 KB
 ```
 
 | Transfer Medium | Considerations |
@@ -272,8 +272,8 @@ chimera-builder-YYYYMMDD/
 
 ```bash
 # Remove old Docker images
-docker images chimera-builder --format '{{.Tag}}' | sort | head -n -2 | \
-  xargs -I{} docker rmi chimera-builder:{}
+docker images crucible-builder --format '{{.Tag}}' | sort | head -n -2 | \
+  xargs -I{} docker rmi crucible-builder:{}
 
 # Remove Packer cache
 rm -rf ~/.cache/packer/* ~/.packer.d/tmp/*
@@ -281,7 +281,7 @@ rm -rf ~/.cache/packer/* ~/.packer.d/tmp/*
 
 ## Pre-Flight Checklist for New Program Adoption
 
-Use this checklist when deploying Chimera on a new program:
+Use this checklist when deploying Crucible on a new program:
 
 ### AWS Account Readiness
 - [ ] AWS account provisioned (Commercial or GovCloud)

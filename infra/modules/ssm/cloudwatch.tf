@@ -51,7 +51,7 @@ resource "aws_cloudwatch_log_metric_filter" "ssm_errors" {
 
   metric_transformation {
     name          = "${var.name_prefix}-SSMErrors"
-    namespace     = "CHIMERA/SSM"
+    namespace     = "CRUCIBLE/SSM"
     value         = "1"
     default_value = "0"
   }
@@ -64,7 +64,7 @@ resource "aws_cloudwatch_log_metric_filter" "compliance_failures" {
 
   metric_transformation {
     name          = "${var.name_prefix}-ComplianceFailures"
-    namespace     = "CHIMERA/SSM"
+    namespace     = "CRUCIBLE/SSM"
     value         = "1"
     default_value = "0"
   }
@@ -80,7 +80,7 @@ resource "aws_cloudwatch_metric_alarm" "ssm_errors" {
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "${var.name_prefix}-SSMErrors"
-  namespace           = "CHIMERA/SSM"
+  namespace           = "CRUCIBLE/SSM"
   period              = 300
   statistic           = "Sum"
   threshold           = 0
@@ -100,7 +100,7 @@ resource "aws_cloudwatch_metric_alarm" "compliance_failures" {
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "${var.name_prefix}-ComplianceFailures"
-  namespace           = "CHIMERA/SSM"
+  namespace           = "CRUCIBLE/SSM"
   period              = 300
   statistic           = "Sum"
   threshold           = 0

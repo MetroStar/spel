@@ -1,11 +1,11 @@
 #cloud-config
 
 ##############################################################################
-# Set the default cloud-init user to `chimera`
+# Set the default cloud-init user to `crucible`
 ##############################################################################
 user:
-  name: chimera
-  gecos: chimera admin account
+  name: crucible
+  gecos: crucible admin account
   lock_passwd: true
   sudo: "ALL=(root) NOPASSWD:ALL"
   selinux_user: unconfined_u

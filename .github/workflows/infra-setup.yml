@@ -1,7 +1,7 @@
 # =============================================================================
-# Infrastructure Setup for Chimera Builds
+# Infrastructure Setup for Crucible Builds
 # =============================================================================
-# This workflow manages ALL Chimera AWS infrastructure using a single OpenTofu
+# This workflow manages ALL Crucible AWS infrastructure using a single OpenTofu
 # root module (infra/). One `tofu apply` creates everything; one
 # `tofu destroy` tears it all down.
 #
@@ -177,7 +177,7 @@ jobs:
         with:
           aws-region: ${{ inputs.aws_region }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
-          role-session-name: chimera-infra-setup
+          role-session-name: crucible-infra-setup
           role-duration-seconds: 3600
 
       - name: Setup OpenTofu
@@ -192,7 +192,7 @@ jobs:
           AWS_DEFAULT_REGION: ${{ inputs.aws_region }}
         run: |
           source ./bootstrap-backend.sh \
-            --prefix "chimera" \
+            --prefix "crucible" \
             --region "${{ inputs.aws_region }}"
 
       - name: OpenTofu init
@@ -237,7 +237,7 @@ jobs:
         working-directory: infra
         run: |
           cat > ci.auto.tfvars <<EOF
-          name_prefix             = "chimera"
+          name_prefix             = "crucible"
           vpc_cidr                = "${{ inputs.vpc_cidr }}"
           subnet_cidr             = "${{ inputs.subnet_cidr }}"
           public_subnet           = ${{ !inputs.airgap_mode }}
@@ -317,7 +317,7 @@ jobs:
           cat >> $GITHUB_STEP_SUMMARY << EOF
           | Action | \`${{ inputs.action }}\` |
           | Region | \`${{ inputs.aws_region }}\` |
-          | Prefix | \`chimera\` |
+          | Prefix | \`crucible\` |
           | Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
           EOF
 

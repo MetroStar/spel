@@ -1,6 +1,6 @@
 # Operating Model
 
-> **Chimera Platform** — Day 0 through steady-state operations for STIG-hardened AMI builds and continuous compliance.
+> **Crucible Platform** — Day 0 through steady-state operations for STIG-hardened AMI builds and continuous compliance.
 
 This document defines responsibilities, schedules, and workflows for each phase of the platform lifecycle.
 
@@ -52,7 +52,7 @@ Day 0 is the one-time manual work needed before CI/CD can take over. Infrastruct
 
 ### Steps
 
-1. **Build Docker image** (if not already available) — Run the `offline-prepare.yml` workflow. Produces `chimera-builder-YYYYMMDD.tar.gz` (~305 MB). For air-gapped environments, transfer the tarball to the GitLab runner.
+1. **Build Docker image** (if not already available) — Run the `offline-prepare.yml` workflow. Produces `crucible-builder-YYYYMMDD.tar.gz` (~305 MB). For air-gapped environments, transfer the tarball to the GitLab runner.
 
 2. **Run AMI builds** — Trigger the build pipeline with desired OS targets. The pipeline automatically provisions infrastructure on the first run:
    - **GitHub Actions**: `build.yml` calls `infra-setup.yml` (`action=apply`, idempotent) before building — backend bootstrap, tfvars generation, and `tofu apply` all happen automatically.
@@ -110,7 +110,7 @@ Once hardened AMIs are in production, the SSM infrastructure handles continuous 
 
 Rebuild AMIs monthly (or when new STIG benchmarks or OS patches are released):
 
-1. Increment `CHIMERA_VERSION` (e.g., `2026.04.1`)
+1. Increment `CRUCIBLE_VERSION` (e.g., `2026.04.1`)
 2. Trigger the build pipeline
 3. Validate new AMIs (compliance scan + SSM connectivity)
 4. Update launch templates / ASGs to reference new AMI IDs
@@ -185,11 +185,11 @@ Configure via `notification_email` variable in `infra/modules/ssm/variables.tf`.
 
 ## Scaling to Multiple Programs
 
-When deploying Chimera across multiple programs or AWS accounts:
+When deploying Crucible across multiple programs or AWS accounts:
 
 1. **One SSM infrastructure per account** — SSM resources (DHMC, associations, patch baselines) are account-wide. The first build in each account provisions infrastructure automatically via the pipeline.
 2. **Ephemeral networking per build** — VPCs and subnets are created and destroyed per build cycle (or kept persistent if preferred). Cost is minimal.
-3. **Shared Docker image** — The same `chimera-builder` Docker image works across all accounts and programs. Build once, distribute to each environment.
-4. **Per-program STIG customization** — Override Ansible variables via `chimera/ansible/` role defaults or add program-specific exception documentation.
+3. **Shared Docker image** — The same `crucible-builder` Docker image works across all accounts and programs. Build once, distribute to each environment.
+4. **Per-program STIG customization** — Override Ansible variables via `crucible/ansible/` role defaults or add program-specific exception documentation.
 
 See [Template Package](template-package.md) for the full adaptation guide.

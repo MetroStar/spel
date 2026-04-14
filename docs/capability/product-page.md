@@ -1,18 +1,18 @@
 # STIG-Hardened AMIs. Automated. Air-Gap Ready. Mission-Deployed.
 
-## Compliance isn't a post-deployment problem. It's a build-time guarantee. Chimera delivers both.
+## Compliance isn't a post-deployment problem. It's a build-time guarantee. Crucible delivers both.
 
 ---
 
-## Introducing Chimera:
+## Introducing Crucible:
 
 ## Automated STIG Compliance for Enterprise Cloud Infrastructure
 
-Chimera is a fully automated platform that builds DISA STIG-hardened Amazon Machine Images across 9 operating systems — from RHEL and Oracle Linux to Windows Server — and enforces continuous compliance post-deployment through AWS Systems Manager.
+Crucible is a fully automated platform that builds DISA STIG-hardened Amazon Machine Images across 9 operating systems — from RHEL and Oracle Linux to Windows Server — and enforces continuous compliance post-deployment through AWS Systems Manager.
 
-Rather than relying on manual hardening scripts, ad-hoc scanning, or months of security engineering per OS, Chimera packages the entire STIG lifecycle — partitioning, hardening, scanning, evidence generation, and ongoing enforcement — into an unattended CI/CD pipeline that runs in connected and air-gapped AWS environments.
+Rather than relying on manual hardening scripts, ad-hoc scanning, or months of security engineering per OS, Crucible packages the entire STIG lifecycle — partitioning, hardening, scanning, evidence generation, and ongoing enforcement — into an unattended CI/CD pipeline that runs in connected and air-gapped AWS environments.
 
-Designed for GovCloud and IL environments where internet access is restricted and compliance timelines are non-negotiable, Chimera ships as a self-contained Docker image with all dependencies baked in. Transfer it to any network. Build hardened AMIs in hours, not months.
+Designed for GovCloud and IL environments where internet access is restricted and compliance timelines are non-negotiable, Crucible ships as a self-contained Docker image with all dependencies baked in. Transfer it to any network. Build hardened AMIs in hours, not months.
 
 ---
 
@@ -26,7 +26,7 @@ Designed for GovCloud and IL environments where internet access is restricted an
 
 ## The Real Challenge
 
-ATO timelines slip when STIG hardening is manual, undocumented, or inconsistent across operating systems. Chimera eliminates the gap between security requirements and operational delivery.
+ATO timelines slip when STIG hardening is manual, undocumented, or inconsistent across operating systems. Crucible eliminates the gap between security requirements and operational delivery.
 
 ##### Fragmented Hardening Across OS Targets
 
@@ -61,7 +61,7 @@ ATO timelines slip when STIG hardening is manual, undocumented, or inconsistent 
 
 ---
 
-## Who Chimera Supports
+## Who Crucible Supports
 
 ##### Cloud Engineers & Platform Teams
 
@@ -83,7 +83,7 @@ Fork the platform, customize variables for your program, and deploy to new accou
 
 ## How It Works
 
-Chimera's two-phase Packer pipeline runs inside a portable Docker container — the same image works in GitHub Actions, GitLab CI, or a local workstation.
+Crucible's two-phase Packer pipeline runs inside a portable Docker container — the same image works in GitHub Actions, GitLab CI, or a local workstation.
 
 ##### Build
 
@@ -101,7 +101,7 @@ The entire platform ships as a ~305 MB Docker tarball. Transfer it via SCP, USB,
 
 ## Results + Impact
 
-| Metric | Without Chimera | With Chimera | Reduction |
+| Metric | Without Crucible | With Crucible | Reduction |
 |--------|----------------|--------------|-----------|
 | First hardened AMI (1 OS) | 80–120 engineer-hours | 4–6 hours | ~95% |
 | Full platform (9 OS) | 720–1,080 hours | 36–54 hours | ~95% |
@@ -111,8 +111,8 @@ The entire platform ships as a ~305 MB Docker tarball. Transfer it via SCP, USB,
 
 ---
 
-## Bring Chimera to Your Program
+## Bring Crucible to Your Program
 
-Whether you're standing up a new GovCloud environment, hardening AMIs for an active ATO, or packaging infrastructure for a proposal, Chimera is ready to deploy. MetroStar's Innovation Lab team can help you adapt, scale, and operationalize it for your mission.
+Whether you're standing up a new GovCloud environment, hardening AMIs for an active ATO, or packaging infrastructure for a proposal, Crucible is ready to deploy. MetroStar's Innovation Lab team can help you adapt, scale, and operationalize it for your mission.
 
 [Request A Demo](https://www.metrostar.com/contact-us/)

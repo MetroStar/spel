@@ -6,7 +6,7 @@
 #
 # PREREQUISITES:
 #   1. Run the "Prepare Offline Docker Image" workflow first (offline-prepare.yml)
-#   2. Download the chimera-builder-YYYYMMDD artifact from that workflow
+#   2. Download the crucible-builder-YYYYMMDD artifact from that workflow
 #   3. Provide the artifact name when running this workflow
 #   4. IAM role MaxSessionDuration must be >= 21600 (6 hours):
 #        aws iam update-role --role-name Packer_Amazon --max-session-duration 21600
@@ -27,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       docker_image_artifact:
-        description: "Docker image artifact name (e.g., chimera-builder-20251231)"
+        description: "Docker image artifact name (e.g., crucible-builder-20251231)"
         required: true
         type: string
       aws_region:
@@ -146,7 +146,7 @@ jobs:
   # Build Job — build STIGed AMIs using Docker container
   # ==========================================================================
   build:
-    name: Build Chimera AMI's
+    name: Build Crucible AMI's
     needs: infra
     runs-on: ubuntu-latest
     timeout-minutes: 360  # 6 hours for multiple AMI builds
@@ -171,7 +171,7 @@ jobs:
           echo "=== Importing Docker Image ==="
           
           # Decode base64 file if present
-          B64_FILE=$(ls ./docker-image/chimera-builder-*.tar.gz.b64 2>/dev/null | head -1)
+          B64_FILE=$(ls ./docker-image/crucible-builder-*.tar.gz.b64 2>/dev/null | head -1)
           if [ -n "$B64_FILE" ]; then
             echo "Found base64-encoded file: ${B64_FILE}"
             echo "Decoding base64 tarball..."
@@ -180,12 +180,12 @@ jobs:
           fi
           
           # Find the tarball
-          TARBALL=$(ls ./docker-image/chimera-builder-*.tar.gz 2>/dev/null | head -1)
+          TARBALL=$(ls ./docker-image/crucible-builder-*.tar.gz 2>/dev/null | head -1)
           
           if [ -z "$TARBALL" ]; then
             echo "ERROR: No Docker image tarball found in artifact!"
             echo ""
-            echo "Expected file: chimera-builder-*.tar.gz"
+            echo "Expected file: crucible-builder-*.tar.gz"
             echo "Artifact contents:"
             ls -la ./docker-image/
             echo ""
@@ -219,26 +219,26 @@ jobs:
           gunzip -c "${TARBALL}" | docker load
           
           # Extract the image tag from tarball name
-          IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/chimera-builder-//')
+          IMAGE_TAG=$(basename "${TARBALL}" .tar.gz | sed 's/crucible-builder-//')
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
           
           echo ""
           echo "=== Import Complete ==="
-          docker images chimera-builder
+          docker images crucible-builder
 
       - name: Verify Docker image
         run: |
           echo "=== Docker Image Verification ==="
           
-          docker run --rm "chimera-builder:${IMAGE_TAG}" packer version
-          docker run --rm "chimera-builder:${IMAGE_TAG}" ansible --version | head -3
-          docker run --rm "chimera-builder:${IMAGE_TAG}" aws --version
+          docker run --rm "crucible-builder:${IMAGE_TAG}" packer version
+          docker run --rm "crucible-builder:${IMAGE_TAG}" ansible --version | head -3
+          docker run --rm "crucible-builder:${IMAGE_TAG}" aws --version
           
           echo ""
           echo "=== Image Details ==="
-          docker inspect "chimera-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
-          docker inspect "chimera-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
-          docker inspect "chimera-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
+          docker inspect "crucible-builder:${IMAGE_TAG}" --format='Image ID: {{.Id}}'
+          docker inspect "crucible-builder:${IMAGE_TAG}" --format='Created: {{.Created}}'
+          docker inspect "crucible-builder:${IMAGE_TAG}" --format='Size: {{.Size}} bytes'
 
       - name: Validate AWS role ARN
         run: |
@@ -254,7 +254,7 @@ jobs:
         with:
           aws-region: ${{ inputs.aws_region }}
           role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
-          role-session-name: chimera-build
+          role-session-name: crucible-build
           role-duration-seconds: 21600  # 6 hours - must be <= IAM role MaxSessionDuration
 
       - name: Upload STIG playbooks to S3
@@ -264,12 +264,12 @@ jobs:
 
           S3_BUCKET="${{ needs.infra.outputs.s3_bucket_name }}"
           echo "Target bucket: ${S3_BUCKET}"
-          echo "Extracting roles from chimera-builder:${IMAGE_TAG}"
+          echo "Extracting roles from crucible-builder:${IMAGE_TAG}"
 
           # Extract Ansible Lockdown roles from the Docker image
-          ROLES_DIR="${GITHUB_WORKSPACE}/chimera/ansible/roles"
+          ROLES_DIR="${GITHUB_WORKSPACE}/crucible/ansible/roles"
           mkdir -p "$ROLES_DIR"
-          CID=$(docker create "chimera-builder:${IMAGE_TAG}" /bin/true)
+          CID=$(docker create "crucible-builder:${IMAGE_TAG}" /bin/true)
           for ROLE in RHEL8-STIG RHEL9-STIG; do
             docker cp "${CID}:/opt/ansible/roles/${ROLE}" "$ROLES_DIR/" 2>/dev/null && \
               echo "  [OK] Extracted ${ROLE}" || \
@@ -296,7 +296,7 @@ jobs:
           echo "--- Packaging AL2023 STIG script ---"
           AL2023_STAGING=$(mktemp -d)
           # Extract the base64-encoded AWS STIG tarball from the Docker image
-          CID=$(docker create "chimera-builder:${IMAGE_TAG}" /bin/true)
+          CID=$(docker create "crucible-builder:${IMAGE_TAG}" /bin/true)
           docker cp "${CID}:/opt/offline-packages/LinuxAWSConfigureSTIG.tgz.b64" "$AL2023_STAGING/" 2>/dev/null && \
             echo "  [OK] Extracted LinuxAWSConfigureSTIG.tgz.b64" || \
             { echo "  [ERROR] LinuxAWSConfigureSTIG.tgz.b64 not found in image"; docker rm "$CID" > /dev/null; exit 1; }
@@ -334,8 +334,8 @@ jobs:
         run: |
           echo "=== Setting up Build Environment ==="
           
-          echo "CHIMERA_IDENTIFIER=chimera" >> $GITHUB_ENV
-          echo "CHIMERA_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
+          echo "CRUCIBLE_IDENTIFIER=crucible" >> $GITHUB_ENV
+          echo "CRUCIBLE_VERSION=$(date +%Y.%m).1" >> $GITHUB_ENV
           
           # Build builder list from inputs
           builders=""
@@ -355,7 +355,7 @@ jobs:
             builders+="amazon-ebssurrogate.minimal-rhel-8-hvm,"
           fi
           builders="${builders%,}"
-          echo "CHIMERA_BUILDERS=${builders}" >> $GITHUB_ENV
+          echo "CRUCIBLE_BUILDERS=${builders}" >> $GITHUB_ENV
           
           # Windows builders
           windows_builders=""
@@ -377,16 +377,16 @@ jobs:
           # Display configuration
           echo ""
           echo "Build Configuration:"
-          echo "  CHIMERA_BUILDERS: ${builders:-none}"
+          echo "  CRUCIBLE_BUILDERS: ${builders:-none}"
           echo "  WINDOWS_BUILDERS: ${windows_builders:-none}"
-          echo "  CHIMERA_VERSION: $(date +%Y.%m).1"
-          echo "  Docker Image: chimera-builder:${IMAGE_TAG}"
+          echo "  CRUCIBLE_VERSION: $(date +%Y.%m).1"
+          echo "  Docker Image: crucible-builder:${IMAGE_TAG}"
 
       - name: Build STIGed AMI's
         run: |
-          echo "=== Starting Chimera Build ==="
-          echo "Docker Image: chimera-builder:${IMAGE_TAG}"
-          echo "Builders: ${CHIMERA_BUILDERS}"
+          echo "=== Starting Crucible Build ==="
+          echo "Docker Image: crucible-builder:${IMAGE_TAG}"
+          echo "Builders: ${CRUCIBLE_BUILDERS}"
           echo "Windows Builders: ${WINDOWS_BUILDERS}"
           echo ""
           
@@ -397,9 +397,9 @@ jobs:
             -e AWS_SECRET_ACCESS_KEY
             -e AWS_SESSION_TOKEN
             -e AWS_DEFAULT_REGION=${{ inputs.aws_region }}
-            -e CHIMERA_IDENTIFIER="${CHIMERA_IDENTIFIER}"
-            -e CHIMERA_VERSION="${CHIMERA_VERSION}"
-            -e CHIMERA_BUILDERS="${CHIMERA_BUILDERS}"
+            -e CRUCIBLE_IDENTIFIER="${CRUCIBLE_IDENTIFIER}"
+            -e CRUCIBLE_VERSION="${CRUCIBLE_VERSION}"
+            -e CRUCIBLE_BUILDERS="${CRUCIBLE_BUILDERS}"
             -e WINDOWS_BUILDERS="${WINDOWS_BUILDERS}"
             -e PKR_VAR_aws_region="${PKR_VAR_aws_region}"
             -e PKR_VAR_aws_force_deregister="${PKR_VAR_aws_force_deregister}"
@@ -439,25 +439,25 @@ jobs:
           [[ -n "${{ github.event.inputs.amigen9_repo_sources }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_repo_sources=${{ github.event.inputs.amigen9_repo_sources }}")
           [[ -n "${{ github.event.inputs.amigen8_extra_rpms }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen8_extra_rpms=${{ github.event.inputs.amigen8_extra_rpms }}")
           [[ -n "${{ github.event.inputs.amigen9_extra_rpms }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_amigen9_extra_rpms=${{ github.event.inputs.amigen9_extra_rpms }}")
-          [[ -n "${{ github.event.inputs.goss_binary_url }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_chimera_goss_binary_url=${{ github.event.inputs.goss_binary_url }}")
+          [[ -n "${{ github.event.inputs.goss_binary_url }}" ]] && DOCKER_ENV_ARGS+=(-e "PKR_VAR_crucible_goss_binary_url=${{ github.event.inputs.goss_binary_url }}")
           
           docker run --rm \
             -v "$(pwd):/workspace" \
             "${DOCKER_ENV_ARGS[@]}" \
-            "chimera-builder:${IMAGE_TAG}" \
+            "crucible-builder:${IMAGE_TAG}" \
             make build
 
       - name: Create build summary
         if: always()
         run: |
           cat >> $GITHUB_STEP_SUMMARY << EOF
-          ## Chimera Build Summary
+          ## Crucible Build Summary
           
           ### Build Configuration
           | Property | Value |
           |----------|-------|
-          | Docker Image | \`chimera-builder:${IMAGE_TAG}\` |
-          | Chimera Version | \`${CHIMERA_VERSION}\` |
+          | Docker Image | \`crucible-builder:${IMAGE_TAG}\` |
+          | Crucible Version | \`${CRUCIBLE_VERSION}\` |
           | Build Time | $(date -u +%Y-%m-%dT%H:%M:%SZ) |
           | Git Commit | \`${GITHUB_SHA:0:8}\` |
           
@@ -527,7 +527,7 @@ jobs:
           echo "=== Testing SSM Validation on Linux AMIs ==="
           echo ""
           
-          MANIFEST=".chimera/${CHIMERA_VERSION}/packer-manifest.json"
+          MANIFEST=".crucible/${CRUCIBLE_VERSION}/packer-manifest.json"
           if [[ ! -f "$MANIFEST" ]]; then
             echo "WARNING: Packer manifest not found - skipping SSM validation"
             exit 0
@@ -595,7 +595,7 @@ jobs:
             --iam-instance-profile "Name=${INSTANCE_PROFILE}" \
             --metadata-options "HttpTokens=optional,HttpPutResponseHopLimit=2,HttpEndpoint=enabled" \
             --user-data "$SSM_USERDATA" \
-            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=chimera-ssm-test-${GITHUB_RUN_ID}},{Key=Project,Value=CHIMERA}]" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=crucible-ssm-test-${GITHUB_RUN_ID}},{Key=Project,Value=CRUCIBLE}]" \
             --query 'Instances[0].InstanceId' --output text)
           
           echo "Launched instance: $INSTANCE_ID"

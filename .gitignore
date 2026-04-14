@@ -50,8 +50,8 @@ Temporary Items
 *.bundle
 packer_cache
 .vagrant
-.chimera
-!.chimera/.gitkeep
+.crucible
+!.crucible/.gitkeep
 *.zip
 *.exe
 /packer

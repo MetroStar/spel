@@ -1,6 +1,6 @@
 # Onboarding Guide
 
-> **Chimera Platform** — From zero to your first hardened AMI.
+> **Crucible Platform** — From zero to your first hardened AMI.
 
 This guide walks a new delivery team through environment setup, first build, and validation. Follow it sequentially; each section builds on the previous one.
 
@@ -11,16 +11,16 @@ Before starting, confirm you have:
 - [ ] **AWS account** — Commercial or GovCloud, with admin-level access for initial setup
 - [ ] **IAM OIDC provider + role** — An OIDC identity provider for GitHub Actions or GitLab, and an IAM role with permissions for EC2, IAM, KMS, S3, SSM, and VPC. `MaxSessionDuration` must be ≥ 21600. See [CI-CD-Setup — IAM Configuration](../CI-CD-Setup.md#aws-iam-configuration) for exact policies.
 - [ ] **Docker** — Installed on your workstation or CI runner (`docker version` succeeds)
-- [ ] **CI/CD runner** — GitHub Actions (hosted or self-hosted) or GitLab Runner with Docker and the `chimera-offline-runner` tag
+- [ ] **CI/CD runner** — GitHub Actions (hosted or self-hosted) or GitLab Runner with Docker and the `crucible-offline-runner` tag
 - [ ] **Iron Bank credentials** — Username and CLI token from [registry1.dso.mil](https://registry1.dso.mil) (for Docker image build; tokens expire every 6 months)
 - [ ] **Repository access** — Clone of this repo on your workstation
 - [ ] **OpenTofu** *(optional)* — Only required if running infrastructure commands locally instead of through CI/CD (`tofu version` succeeds)
 
 ### Air-Gapped Additional Prerequisites
 
-- [ ] **Docker image tarball** — Pre-built `chimera-builder-YYYYMMDD.tar.gz` transferred from a connected environment
+- [ ] **Docker image tarball** — Pre-built `crucible-builder-YYYYMMDD.tar.gz` transferred from a connected environment
 - [ ] **Local YUM mirror** — URL to an internal mirror hosting RHEL/EL packages
-- [ ] **GitLab Runner** — With Docker installed, tagged `chimera-offline-runner`, and access to the `/transfer/` directory
+- [ ] **GitLab Runner** — With Docker installed, tagged `crucible-offline-runner`, and access to the `/transfer/` directory
 
 ## Step 1 — Configure IAM Prerequisites (one-time)
 
@@ -37,28 +37,28 @@ See [CI-CD-Setup — IAM Configuration](../CI-CD-Setup.md#aws-iam-configuration)
 
 ## Step 2 — Build the Docker Image
 
-> **Skip this step** if you already have a `chimera-builder-YYYYMMDD.tar.gz` tarball.
+> **Skip this step** if you already have a `crucible-builder-YYYYMMDD.tar.gz` tarball.
 
 ### Via GitHub Actions
 
 1. Go to **Actions** → **Prepare Offline Docker Image** → **Run workflow**
 2. Optionally set `image_tag` (defaults to `YYYYMMDD`)
 3. Wait 5–10 minutes
-4. Download the artifact: `chimera-builder-YYYYMMDD`
+4. Download the artifact: `crucible-builder-YYYYMMDD`
 
 The artifact contains:
-- `chimera-builder-YYYYMMDD.tar.gz` — Docker image (~305 MB)
-- `chimera-builder-YYYYMMDD.tar.gz.sha256` — Checksum
+- `crucible-builder-YYYYMMDD.tar.gz` — Docker image (~305 MB)
+- `crucible-builder-YYYYMMDD.tar.gz.sha256` — Checksum
 - Base64-encoded copy (for SharePoint transfer)
 
 ### Via Local Docker Build
 
 ```bash
 # From repo root
-docker build -t chimera-builder:$(date +%Y%m%d) .
+docker build -t crucible-builder:$(date +%Y%m%d) .
 
 # Export as tarball
-docker save chimera-builder:$(date +%Y%m%d) | gzip > chimera-builder-$(date +%Y%m%d).tar.gz
+docker save crucible-builder:$(date +%Y%m%d) | gzip > crucible-builder-$(date +%Y%m%d).tar.gz
 ```
 
 ## Step 3 — Build Your First AMI
@@ -66,7 +66,7 @@ docker save chimera-builder:$(date +%Y%m%d) | gzip > chimera-builder-$(date +%Y%
 ### Option A: Connected Build (GitHub Actions)
 
 1. Go to **Actions** → **Build STIGed AMI's** → **Run workflow**
-2. Enter the Docker image artifact name (e.g., `chimera-builder-20260413`)
+2. Enter the Docker image artifact name (e.g., `crucible-builder-20260413`)
 3. Select your target region
 4. Enable one or more OS targets (e.g., `run_rhel9: true`)
 5. Click **Run workflow** and wait 2–5 hours
@@ -79,7 +79,7 @@ docker save chimera-builder:$(date +%Y%m%d) | gzip > chimera-builder-$(date +%Y%
 
 ```bash
 # Import the Docker image
-gunzip -c chimera-builder-*.tar.gz | docker load
+gunzip -c crucible-builder-*.tar.gz | docker load
 
 # Run a single-OS build
 docker run --rm \
@@ -88,14 +88,14 @@ docker run --rm \
   -e AWS_SECRET_ACCESS_KEY \
   -e AWS_SESSION_TOKEN \
   -e AWS_DEFAULT_REGION=us-gov-west-1 \
-  -e CHIMERA_IDENTIFIER=chimera \
-  -e CHIMERA_VERSION=2026.04.1 \
-  -e CHIMERA_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \
+  -e CRUCIBLE_IDENTIFIER=crucible \
+  -e CRUCIBLE_VERSION=2026.04.1 \
+  -e CRUCIBLE_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \
   -e WINDOWS_BUILDERS="" \
-  chimera-builder:latest make build
+  crucible-builder:latest make build
 ```
 
-`CHIMERA_IDENTIFIER` and `CHIMERA_VERSION` are **required** — the Makefile will refuse to run without them.
+`CRUCIBLE_IDENTIFIER` and `CRUCIBLE_VERSION` are **required** — the Makefile will refuse to run without them.
 
 ### Option C: Air-Gapped Build (GitLab CI)
 
@@ -103,7 +103,7 @@ docker run --rm \
 
 ```bash
 # From connected environment to air-gapped GitLab runner:
-scp chimera-builder-*.tar.gz runner:/transfer/
+scp crucible-builder-*.tar.gz runner:/transfer/
 ```
 
 **Run the pipeline:**
@@ -131,7 +131,7 @@ scp chimera-builder-*.tar.gz runner:/transfer/
 | `AMIGEN9_REPO_NAMES` | JSON array of repo names (e.g., `["rhel-9-baseos","rhel-9-appstream"]`) |
 | `AMIGEN9_REPO_SOURCES` | JSON array of repo-config RPM URLs |
 | `AMIGEN9_EXTRA_RPMS` | JSON array of additional RPMs |
-| `CHIMERA_GOSS_BINARY_URL` | URL to Goss binary for STIG auditing |
+| `CRUCIBLE_GOSS_BINARY_URL` | URL to Goss binary for STIG auditing |
 
 ## Step 4 — Validate
 

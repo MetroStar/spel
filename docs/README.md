@@ -1,4 +1,4 @@
-# Chimera Documentation
+# Crucible Documentation
 
 Start here → **[Capability Package](capability/README.md)** — the main documentation hub with onboarding guides, runbooks, architecture, and proposal-ready materials.
 

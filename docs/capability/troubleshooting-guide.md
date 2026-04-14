@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-> **Chimera Platform** — Decision-tree diagnosis for common failure modes.
+> **Crucible Platform** — Decision-tree diagnosis for common failure modes.
 
 Find the symptom that matches your situation, then follow the resolution steps. Each entry includes diagnostic commands you can run immediately.
 
@@ -44,7 +44,7 @@ aws ec2 describe-vpc-endpoints \
 **Check 3 — Instance profile:**
 
 ```bash
-aws iam get-instance-profile --instance-profile-name chimera-packer
+aws iam get-instance-profile --instance-profile-name crucible-packer
 ```
 
 Verify the profile exists and has a role attached.
@@ -68,7 +68,7 @@ Symptom: "No AMI was found matching filters" or empty source_ami
 | Commercial (`aws`) | `309956199498` | `137112412989` |
 | GovCloud (`aws-us-gov`) | `219670896067` | `045324592363` |
 
-Verify the owner ID in `chimera/hardened.pkr.hcl` source blocks matches your partition.
+Verify the owner ID in `crucible/hardened.pkr.hcl` source blocks matches your partition.
 
 **Check 2 — AMI name filter:**
 
@@ -126,9 +126,9 @@ grep boot=UUID /etc/default/grub
 
 **Fix:**
 
-The `chimera/scripts/boot-fips-wrapper.sh` script handles this automatically during builds. If you see this failure:
+The `crucible/scripts/boot-fips-wrapper.sh` script handles this automatically during builds. If you see this failure:
 
-1. Verify `boot-fips-wrapper.sh` is in the provisioner sequence in `chimera/hardened.pkr.hcl`
+1. Verify `boot-fips-wrapper.sh` is in the provisioner sequence in `crucible/hardened.pkr.hcl`
 2. Check the build log for errors during the FIPS wrapper execution
 3. Ensure `dracut-fips` was installed successfully
 
@@ -144,8 +144,8 @@ Symptom: "role 'RHEL9-STIG' was not found" or collection import errors
 
 ```bash
 # Inside the Docker container:
-ls chimera/ansible/roles/
-ls chimera/ansible/collections/ansible_collections/
+ls crucible/ansible/roles/
+ls crucible/ansible/collections/ansible_collections/
 ```
 
 Roles and collections must be present in the Docker image. If missing, rebuild the Docker image (`offline-prepare.yml`).
@@ -206,8 +206,8 @@ Wait for it to complete. If you are certain no other operation is running:
 ```bash
 # View the lock info
 aws dynamodb get-item \
-  --table-name chimera-tfstate-lock \
-  --key '{"LockID":{"S":"chimera-tfstate-ACCOUNT/terraform.tfstate"}}'
+  --table-name crucible-tfstate-lock \
+  --key '{"LockID":{"S":"crucible-tfstate-ACCOUNT/terraform.tfstate"}}'
 
 # Force unlock (ONLY if you're certain no other operation is running):
 cd infra/
@@ -234,7 +234,7 @@ All endpoints should show `State: available`.
 
 **Check 2 — DNS resolution:**
 
-The `chimera/userdata/offline-vpc-config.sh` script configures `/etc/hosts` entries for offline DNS. Verify it ran during instance startup:
+The `crucible/userdata/offline-vpc-config.sh` script configures `/etc/hosts` entries for offline DNS. Verify it ran during instance startup:
 
 ```bash
 # On the build instance:
@@ -328,7 +328,7 @@ Symptom: SSM State Manager association shows "Failed" status
 **Check 1 — Review output in S3:**
 
 ```bash
-aws s3 ls s3://chimera-ssm-ACCOUNT/ssm-output/ --recursive | tail
+aws s3 ls s3://crucible-ssm-ACCOUNT/ssm-output/ --recursive | tail
 # Download the latest output for the failed association
 ```
 
@@ -412,8 +412,8 @@ Symptom: "Error processing tar file" or checksum mismatch
 **Check 1 — Tarball integrity:**
 
 ```bash
-ls -lh /transfer/chimera-builder-*.tar.gz
-sha256sum -c /transfer/chimera-builder-*.tar.gz.sha256
+ls -lh /transfer/crucible-builder-*.tar.gz
+sha256sum -c /transfer/crucible-builder-*.tar.gz.sha256
 ```
 
 **Check 2 — Disk space:**
@@ -445,10 +445,10 @@ SharePoint and some email systems inject line breaks or modify binary content du
 
 ```bash
 # Re-decode with explicit settings:
-base64 -d chimera-builder-*.tar.gz.b64 > chimera-builder-decoded.tar.gz
+base64 -d crucible-builder-*.tar.gz.b64 > crucible-builder-decoded.tar.gz
 
 # Verify checksum:
-sha256sum chimera-builder-decoded.tar.gz
+sha256sum crucible-builder-decoded.tar.gz
 ```
 
 If the checksum still doesn't match, the file was corrupted during upload to SharePoint. Re-upload using a method that preserves binary integrity (e.g., zip the `.b64` file first, or use SFTP/SCP instead).

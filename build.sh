@@ -4,35 +4,35 @@ set -u -o pipefail
 
 echo "==========STARTING BUILD=========="
 
-CHIMERA_BUILDERS="${CHIMERA_BUILDERS:-}"
+CRUCIBLE_BUILDERS="${CRUCIBLE_BUILDERS:-}"
 WINDOWS_BUILDERS="${WINDOWS_BUILDERS:-}"
 ANSIBLE_LOCKDOWNS=""
 MINIMAL_AMIS=()
 
-if [[ -n "$CHIMERA_BUILDERS" ]]; then
+if [[ -n "$CRUCIBLE_BUILDERS" ]]; then
     FAILED_BUILDS=()
     SUCCESS_BUILDS=()
 
-    packer init chimera/minimal.pkr.hcl
+    packer init crucible/minimal.pkr.hcl
 
     packer validate \
-        -only "${CHIMERA_BUILDERS}" \
-        -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
-        -var "chimera_version=${CHIMERA_VERSION:?}" \
-        chimera/minimal.pkr.hcl
+        -only "${CRUCIBLE_BUILDERS}" \
+        -var "crucible_identifier=${CRUCIBLE_IDENTIFIER:?}" \
+        -var "crucible_version=${CRUCIBLE_VERSION:?}" \
+        crucible/minimal.pkr.hcl
 
     packer build \
-        -only "${CHIMERA_BUILDERS}" \
-        -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
-        -var "chimera_version=${CHIMERA_VERSION:?}" \
+        -only "${CRUCIBLE_BUILDERS}" \
+        -var "crucible_identifier=${CRUCIBLE_IDENTIFIER:?}" \
+        -var "crucible_version=${CRUCIBLE_VERSION:?}" \
         -var "aws_ami_groups=[]" \
-        chimera/minimal.pkr.hcl
+        crucible/minimal.pkr.hcl
 
     BUILDEXIT=$?
 
-    for BUILDER in ${CHIMERA_BUILDERS//,/ }; do
+    for BUILDER in ${CRUCIBLE_BUILDERS//,/ }; do
         BUILD_NAME="${BUILDER//*./}"
-        AMI_NAME="${CHIMERA_IDENTIFIER}-${BUILD_NAME}-${CHIMERA_VERSION}.x86_64-gp3"
+        AMI_NAME="${CRUCIBLE_IDENTIFIER}-${BUILD_NAME}-${CRUCIBLE_VERSION}.x86_64-gp3"
         BUILDER_AMI=$(aws ec2 describe-images \
             --filters Name=name,Values="$AMI_NAME" \
             --owners self \
@@ -66,23 +66,23 @@ if [[ -n "$WINDOWS_BUILDERS" ]]; then
 fi
 
 if [[ -z "$ANSIBLE_LOCKDOWNS" ]]; then
-    echo "ERROR: No builders specified. Set CHIMERA_BUILDERS and/or WINDOWS_BUILDERS."
+    echo "ERROR: No builders specified. Set CRUCIBLE_BUILDERS and/or WINDOWS_BUILDERS."
     exit 1
 fi
 
-packer init chimera/hardened.pkr.hcl
+packer init crucible/hardened.pkr.hcl
 
 packer validate \
     -only "${ANSIBLE_LOCKDOWNS}" \
-    -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
-    -var "chimera_version=${CHIMERA_VERSION:?}" \
-    chimera/hardened.pkr.hcl
+    -var "crucible_identifier=${CRUCIBLE_IDENTIFIER:?}" \
+    -var "crucible_version=${CRUCIBLE_VERSION:?}" \
+    crucible/hardened.pkr.hcl
 
 packer build \
     -only "${ANSIBLE_LOCKDOWNS}" \
-    -var "chimera_identifier=${CHIMERA_IDENTIFIER:?}" \
-    -var "chimera_version=${CHIMERA_VERSION:?}" \
-    chimera/hardened.pkr.hcl
+    -var "crucible_identifier=${CRUCIBLE_IDENTIFIER:?}" \
+    -var "crucible_version=${CRUCIBLE_VERSION:?}" \
+    crucible/hardened.pkr.hcl
 
 LOCKEXIT=$?
 
@@ -111,7 +111,7 @@ fi
 echo "==========BUILD SUMMARY=========="
 for BUILDER in ${ANSIBLE_LOCKDOWNS//,/ }; do
     BUILD_NAME="${BUILDER//*./}"
-    AMI_NAME="${CHIMERA_IDENTIFIER}-${BUILD_NAME}-${CHIMERA_VERSION}.x86_64-gp3"
+    AMI_NAME="${CRUCIBLE_IDENTIFIER}-${BUILD_NAME}-${CRUCIBLE_VERSION}.x86_64-gp3"
     AMI_ID=$(aws ec2 describe-images \
         --filters Name=name,Values="$AMI_NAME" \
         --owners self \

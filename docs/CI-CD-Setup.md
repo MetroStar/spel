@@ -1,6 +1,6 @@
 # CI/CD Setup Guide
 
-This guide covers the CI/CD pipeline configuration for Chimera (STIG-Partitioned Enterprise Linux) AMI builds using Docker containers with baked-in dependencies.
+This guide covers the CI/CD pipeline configuration for Crucible (STIG-Partitioned Enterprise Linux) AMI builds using Docker containers with baked-in dependencies.
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ This guide covers the CI/CD pipeline configuration for Chimera (STIG-Partitioned
 
 ## Overview
 
-The Chimera CI/CD pipeline uses a **Docker-based build system** where all dependencies are baked into a portable container image. This approach offers several advantages:
+The Crucible CI/CD pipeline uses a **Docker-based build system** where all dependencies are baked into a portable container image. This approach offers several advantages:
 
 1. **Portability**: The Docker image can be exported and transferred to air-gapped environments
 2. **Reproducibility**: All builds use identical dependency versions
@@ -45,7 +45,7 @@ The Chimera CI/CD pipeline uses a **Docker-based build system** where all depend
 │  │  3. Export as gzipped tarball                                        │   │
 │  │  4. Upload artifact (30-day retention)                               │   │
 │  │                                                                      │   │
-│  │  Output: chimera-builder-YYYYMMDD.tar.gz (~305 MB)                      │   │
+│  │  Output: crucible-builder-YYYYMMDD.tar.gz (~305 MB)                      │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                               │                                              │
 │                               ▼                                              │
@@ -88,7 +88,7 @@ The Chimera CI/CD pipeline uses a **Docker-based build system** where all depend
 
 ### Docker Image Contents
 
-The `chimera-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes:
+The `crucible-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes:
 
 | Component | Version | Purpose |
 | --------- | ------- | ------- |
@@ -383,8 +383,8 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
         "s3:ListBucketVersions"
       ],
       "Resource": [
-        "arn:*:s3:::chimera-*",
-        "arn:*:s3:::chimera-*/*"
+        "arn:*:s3:::crucible-*",
+        "arn:*:s3:::crucible-*/*"
       ]
     },
     {
@@ -398,7 +398,7 @@ The IAM role also needs permissions to manage infrastructure via OpenTofu. The `
         "dynamodb:DeleteItem",
         "dynamodb:TagResource"
       ],
-      "Resource": "arn:*:dynamodb:*:*:table/chimera-*"
+      "Resource": "arn:*:dynamodb:*:*:table/crucible-*"
     },
     {
       "Sid": "TofuCloudWatch",
@@ -484,7 +484,7 @@ The OpenTofu root module at `infra/` creates an instance profile with minimal pe
 
 - **SSM Access**: For Session Manager connectivity (if using SSH via SSM)
 - **S3 Access**: To AWS-managed SSM buckets for agent operation
-- **S3 Build Artifacts**: `s3:GetObject` and `s3:ListBucket` on the Chimera SSM bucket for downloading build artifacts (STIG playbooks, AL2023 STIG scripts) during AMI builds
+- **S3 Build Artifacts**: `s3:GetObject` and `s3:ListBucket` on the Crucible SSM bucket for downloading build artifacts (STIG playbooks, AL2023 STIG scripts) during AMI builds
 - **CloudWatch Logs**: For optional logging
 
 These are created automatically when you run the `infra:create` job (GitLab) or when `build.yml` calls `infra-setup.yml` (GitHub Actions).
@@ -539,7 +539,7 @@ EOF
 
 # Replace placeholders
 sed -i 's/ACCOUNT_ID/123456789012/' trust-policy.json
-sed -i 's|OWNER/REPO|MetroStar/chimera|' trust-policy.json
+sed -i 's|OWNER/REPO|MetroStar/crucible|' trust-policy.json
 
 # Create the role
 aws iam create-role \
@@ -627,7 +627,7 @@ Create an IAM role that GitLab CI can assume via OIDC. The trust policy restrict
 ACCOUNT_ID="123456789012"
 GITLAB_URL="https://gitlab.example.mil"
 GITLAB_HOST="${GITLAB_URL#https://}"  # e.g., gitlab.example.mil
-PROJECT_PATH="my-group/chimera"         # your GitLab project path
+PROJECT_PATH="my-group/crucible"         # your GitLab project path
 
 # For GovCloud accounts, use "aws-us-gov" partition
 PARTITION="aws-us-gov"  # or "aws" for commercial
@@ -657,18 +657,18 @@ EOF
 
 # Create the role
 aws iam create-role \
-  --role-name Chimera_Packer \
+  --role-name Crucible_Packer \
   --assume-role-policy-document file://trust-policy-gitlab.json \
   --max-session-duration 21600
 
 # Attach the same Packer and OpenTofu permissions (from sections 2 and 3 above)
 aws iam put-role-policy \
-  --role-name Chimera_Packer \
+  --role-name Crucible_Packer \
   --policy-name PackerBuildPolicy \
   --policy-document file://packer-policy.json
 
 aws iam put-role-policy \
-  --role-name Chimera_Packer \
+  --role-name Crucible_Packer \
   --policy-name OpenTofuInfraPolicy \
   --policy-document file://opentofu-policy.json
 ```
@@ -678,7 +678,7 @@ aws iam put-role-policy \
 #### Store Role ARN in GitLab CI/CD
 
 1. Go to **Settings** → **CI/CD** → **Variables**
-2. Add a variable named `CI_AWS_ROLE_ARN` with value `arn:aws-us-gov:iam::ACCOUNT_ID:role/Chimera_Packer`
+2. Add a variable named `CI_AWS_ROLE_ARN` with value `arn:aws-us-gov:iam::ACCOUNT_ID:role/Crucible_Packer`
 3. Mark as **Protected** and **Masked**
 
 When `CI_AWS_ROLE_ARN` is set, the pipeline automatically uses OIDC federation. When empty (the default), it falls back to static `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` variables.
@@ -689,7 +689,7 @@ When `CI_AWS_ROLE_ARN` is set, the pipeline automatically uses OIDC federation. 
 
 **File**: `.github/workflows/offline-prepare.yml`
 
-**Purpose**: Build the Chimera Docker image with all dependencies baked in and export it as a portable tarball artifact.
+**Purpose**: Build the Crucible Docker image with all dependencies baked in and export it as a portable tarball artifact.
 
 #### Trigger
 
@@ -711,7 +711,7 @@ on:
 
 2. **Build Docker image**
    - Uses `docker buildx` for efficient caching
-   - Tags image as `chimera-builder:YYYYMMDD` and `chimera-builder:latest`
+   - Tags image as `crucible-builder:YYYYMMDD` and `crucible-builder:latest`
    - Multi-stage build keeps final image size minimal
 
 3. **Verify Docker image**
@@ -726,7 +726,7 @@ on:
 5. **Upload artifact**
    - Uploads tarball, checksum, and manifest
    - 30-day retention period
-   - Artifact name: `chimera-builder-YYYYMMDD`
+   - Artifact name: `crucible-builder-YYYYMMDD`
 
 #### Usage
 
@@ -739,10 +739,10 @@ on:
 #### Output Artifact Contents
 
 ```text
-chimera-builder-YYYYMMDD/
-├── chimera-builder-YYYYMMDD.tar.gz       # Docker image tarball (~305 MB)
-├── chimera-builder-YYYYMMDD.tar.gz.sha256 # SHA256 checksum
-└── chimera-builder-YYYYMMDD-manifest.txt  # Build manifest with tool versions
+crucible-builder-YYYYMMDD/
+├── crucible-builder-YYYYMMDD.tar.gz       # Docker image tarball (~305 MB)
+├── crucible-builder-YYYYMMDD.tar.gz.sha256 # SHA256 checksum
+└── crucible-builder-YYYYMMDD-manifest.txt  # Build manifest with tool versions
 ```
 
 ### Workflow 2: Build STIGed AMIs
@@ -756,7 +756,7 @@ chimera-builder-YYYYMMDD/
 Before running this workflow:
 
 1. Run the `offline-prepare.yml` workflow first
-2. Note the artifact name (e.g., `chimera-builder-20251230`)
+2. Note the artifact name (e.g., `crucible-builder-20251230`)
 3. Ensure IAM role has `MaxSessionDuration >= 21600`
 
 #### Trigger for Build Workflow
@@ -766,7 +766,7 @@ on:
   workflow_dispatch:
     inputs:
       docker_image_artifact:
-        description: "Docker image artifact name (e.g., chimera-builder-20251231)"
+        description: "Docker image artifact name (e.g., crucible-builder-20251231)"
         required: true
         type: string
       run_amzn2023:
@@ -869,7 +869,7 @@ The workflow uses OIDC to obtain AWS credentials without storing secrets:
   with:
     aws-region: us-east-1
     role-to-assume: ${{ vars.AWS_ROLE_ARN || secrets.AWS_ROLE_ARN }}
-    role-session-name: chimera-build
+    role-session-name: crucible-build
     role-duration-seconds: 21600  # 6 hours
 ```
 
@@ -906,7 +906,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | --- | --- | --- |
 | `AWS_ACCESS_KEY_ID` | AWS access key | `AKIA...` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | `secret` |
-| `DOCKER_IMAGE_PATH` | Path to Docker tarball | `/transfer/chimera-builder-*.tar.gz` |
+| `DOCKER_IMAGE_PATH` | Path to Docker tarball | `/transfer/crucible-builder-*.tar.gz` |
 
 #### Optional Variables
 
@@ -918,7 +918,7 @@ Configure in GitLab project settings (**Settings** → **CI/CD** → **Variables
 | `PKR_VAR_aws_vpc_id` | VPC ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_subnet_id` | Subnet ID for builds | (from OpenTofu) |
 | `PKR_VAR_aws_kms_key_id` | KMS key ARN for CMK-encrypted AMIs | (none) |
-| `INFRA_PREFIX` | Prefix for created resources | `chimera` |
+| `INFRA_PREFIX` | Prefix for created resources | `crucible` |
 | `ENABLE_INTERNET_GATEWAY` | Create IGW and default route (`false` for air-gapped) | `true` |
 | `ENABLE_PACKER_ENDPOINTS` | Create EC2 + STS VPC endpoints (`true` for air-gapped) | `false` |
 | `RUN_RHEL9` | Build RHEL 9 | `false` |
@@ -943,7 +943,7 @@ These variables configure Linux builds to use local repository mirrors instead o
 | `AMIGEN9_EXTRA_RPMS` | JSON array of extra RPMs for EL9 | (none) |
 | `PKR_VAR_amigen8_repo_sources` | JSON array of EL8 repo source RPM URLs | (none) |
 | `PKR_VAR_amigen9_repo_sources` | JSON array of EL9 repo source RPM URLs | (none) |
-| `CHIMERA_GOSS_BINARY_URL` | URL to Goss binary for air-gapped STIG audit scans | (none) |
+| `CRUCIBLE_GOSS_BINARY_URL` | URL to Goss binary for air-gapped STIG audit scans | (none) |
 
 > **Important**: For air-gapped Linux builds, you must create a repo configuration RPM
 > that installs your mirror settings into the chroot. See [Air-Gapped Linux Builds](#air-gapped-linux-builds).
@@ -956,11 +956,11 @@ These variables configure Linux builds to use local repository mirrors instead o
 
 ```bash
 # On transfer workstation
-# Download artifact from GitHub Actions (chimera-builder-YYYYMMDD.tar.gz)
+# Download artifact from GitHub Actions (crucible-builder-YYYYMMDD.tar.gz)
 # Transfer to air-gapped environment
 
 # Place tarball in accessible location
-cp chimera-builder-*.tar.gz /transfer/
+cp crucible-builder-*.tar.gz /transfer/
 ```
 
 ##### Step 2: Run import job
@@ -1010,8 +1010,8 @@ import:docker:
     - gunzip -c "${TARBALL}" | docker load
     
     # Verify image
-    - docker run --rm "chimera-builder:${TAG}" packer version
-    - docker run --rm "chimera-builder:${TAG}" ansible --version
+    - docker run --rm "crucible-builder:${TAG}" packer version
+    - docker run --rm "crucible-builder:${TAG}" ansible --version
 ```
 
 #### infra:create
@@ -1047,8 +1047,8 @@ build:rhel9:
         -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
         -e AWS_DEFAULT_REGION="${PKR_VAR_aws_region}" \
         -e PKR_VAR_aws_region="${PKR_VAR_aws_region}" \
-        -e CHIMERA_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
-        "chimera-builder:${DOCKER_IMAGE_TAG}" \
+        -e CRUCIBLE_BUILDERS="amazon-ebssurrogate.minimal-rhel-9-hvm" \
+        "crucible-builder:${DOCKER_IMAGE_TAG}" \
         make build
 ```
 
@@ -1096,7 +1096,7 @@ configuration RPM.
 
 ### Understanding the Build Process
 
-The Chimera build creates a chroot environment at `/mnt/ec2-root` where the AMI filesystem is built.
+The Crucible build creates a chroot environment at `/mnt/ec2-root` where the AMI filesystem is built.
 This chroot is completely separate from the builder host and does **not** inherit repository
 configurations. The `OSpackages.sh` script:
 

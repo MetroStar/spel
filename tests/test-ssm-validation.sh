@@ -3,7 +3,7 @@
 # Usage: ./test-ssm-validation.sh <INSTANCE_ID> [OPTIONS]
 #
 # This script validates that SSM is fully operational on an instance launched
-# from a Chimera AMI. It checks agent registration, RunCommand capability,
+# from a Crucible AMI. It checks agent registration, RunCommand capability,
 # Session Manager access, and optionally runs an OpenSCAP scan via SSM.
 #
 # Prerequisites:
@@ -257,7 +257,7 @@ test_session_manager() {
     session_id=$(aws ssm start-session \
       --region "$REGION" \
       --target "$INSTANCE_ID" \
-      --reason "Chimera SSM validation test" \
+      --reason "Crucible SSM validation test" \
       --query 'SessionId' \
       --output text 2>/dev/null || echo "FAILED")
 
@@ -277,7 +277,7 @@ test_session_manager() {
   session_id=$(aws ssm start-session \
     --region "$REGION" \
     --target "$INSTANCE_ID" \
-    --reason "Chimera SSM validation test" \
+    --reason "Crucible SSM validation test" \
     --query 'SessionId' \
     --output text 2>/dev/null || echo "FAILED")
 

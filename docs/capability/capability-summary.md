@@ -1,6 +1,6 @@
-# Chimera Platform — Capability Summary
+# Crucible Platform — Capability Summary
 
-Chimera is a reusable, fully automated platform for building DISA STIG-hardened Amazon Machine Images. It produces compliance-ready AMIs for 9 operating systems across connected and air-gapped AWS environments, with continuous post-deployment enforcement via AWS Systems Manager. The entire pipeline — from infrastructure provisioning through STIG hardening to compliance evidence generation — runs unattended through CI/CD.
+Crucible is a reusable, fully automated platform for building DISA STIG-hardened Amazon Machine Images. It produces compliance-ready AMIs for 9 operating systems across connected and air-gapped AWS environments, with continuous post-deployment enforcement via AWS Systems Manager. The entire pipeline — from infrastructure provisioning through STIG hardening to compliance evidence generation — runs unattended through CI/CD.
 
 ## Architecture at a Glance
 
@@ -42,7 +42,7 @@ flowchart LR
 
 ## Key Value
 
-| Metric | Without Chimera | With Chimera | Reduction |
+| Metric | Without Crucible | With Crucible | Reduction |
 |--------|----------------|--------------|-----------|
 | First hardened AMI (1 OS) | 80–120 engineer-hours | 4–6 hours | **~95%** |
 | Full platform (9 OS) | 720–1,080 hours | 36–54 hours | **~95%** |
@@ -58,7 +58,7 @@ The entire platform operates in disconnected environments. A self-contained Dock
 
 ## What's Included
 
-The Chimera Platform capability package provides:
+The Crucible Platform capability package provides:
 
 - **Reference Architecture** — Mermaid diagrams, component map, security boundaries, platform support matrix
 - **Operating Model** — Day 0/1/2+ lifecycle phases, RACI matrix, automated schedules
@@ -81,4 +81,4 @@ The Chimera Platform capability package provides:
 |---|---|
 | **Team** | Innovation Lab |
 | **Teams** | [Innovation Labs - DevSecOps](https://teams.microsoft.com/l/channel/19%3A516818e578954cd08225ed7b0c3c3e82%40thread.skype/DevSecOps?groupId=514c9ca3-d99b-4e8a-8779-1095ce4a3b1c&tenantId=399ed244-adb0-4a01-91a2-898d9918314a) |
-| **Repository** | https://github.com/MetroStar/chimera |
+| **Repository** | https://github.com/MetroStar/crucible |

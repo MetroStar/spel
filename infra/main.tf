@@ -1,7 +1,7 @@
 # =============================================================================
-# Chimera Infrastructure — Root Module
+# Crucible Infrastructure — Root Module
 # =============================================================================
-# Orchestrates all Chimera infrastructure using submodules:
+# Orchestrates all Crucible infrastructure using submodules:
 #   - modules/networking : VPC, subnet, IGW, security group, Packer endpoints
 #   - modules/iam        : Packer builder IAM role, policy, instance profile
 #   - modules/ssm        : SSM endpoints, KMS, S3, CloudWatch, patching

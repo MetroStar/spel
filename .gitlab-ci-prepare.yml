@@ -1,7 +1,7 @@
 # =============================================================================
 # Prepare Offline Docker Image (GitLab CI)
 # =============================================================================
-# This pipeline builds the Chimera Docker image with all dependencies baked in
+# This pipeline builds the Crucible Docker image with all dependencies baked in
 # and exports it as a portable tarball artifact for use in air-gapped environments.
 #
 # This is the GitLab CI equivalent of: .github/workflows/offline-prepare.yml
@@ -16,14 +16,14 @@
 #     - Renewal: https://registry1.dso.mil → User Profile → CLI Token → Regenerate
 #
 # RUNNER REQUIREMENTS:
-#   - Tag: chimera-prepare-runner (internet-connected)
+#   - Tag: crucible-prepare-runner (internet-connected)
 #   - Docker executor with privileged mode (for Docker-in-Docker), OR
 #   - Shell executor with Docker installed (comment out the services block)
 #   - Sufficient disk space for ~2 GB image build + tarball export
 #   - Admin may need to increase max_artifacts_size (default 100 MB)
 #
 # OUTPUTS:
-#   - Docker image tarball: chimera-builder-YYYYMMDD.tar.gz
+#   - Docker image tarball: crucible-builder-YYYYMMDD.tar.gz
 #   - Artifact retention: 30 days
 #
 # USAGE:
@@ -31,8 +31,8 @@
 #   2. Optionally set IMAGE_TAG variable (defaults to YYYYMMDD)
 #   3. Download artifacts from the export:tarball job
 #   4. Transfer to air-gapped environment
-#   5. Import with: gunzip -c chimera-builder-*.tar.gz | docker load
-#   6. Run with: docker run -v $(pwd):/workspace chimera-builder:<tag> make build
+#   5. Import with: gunzip -c crucible-builder-*.tar.gz | docker load
+#   6. Run with: docker run -v $(pwd):/workspace crucible-builder:<tag> make build
 #
 # NOTE: To use this file as the pipeline config, either:
 #   - Set CI/CD config file path to .gitlab-ci-prepare.yml in project settings, OR
@@ -43,7 +43,7 @@
 variables:
   # Override this when triggering the pipeline to set a custom image tag
   IMAGE_TAG: ""
-  IMAGE_NAME: "chimera-builder"
+  IMAGE_NAME: "crucible-builder"
   # Docker-in-Docker settings
   DOCKER_HOST: tcp://docker:2376
   DOCKER_TLS_CERTDIR: "/certs"
@@ -58,7 +58,7 @@ stages:
 # Default settings for all jobs
 default:
   tags:
-    - chimera-prepare-runner
+    - crucible-prepare-runner
   # Docker-in-Docker service for building images
   # Comment out this block if using a shell executor with Docker installed
   services:
@@ -194,7 +194,7 @@ export:tarball:
     # Generate manifest
     - |
       cat > "${MANIFEST_FILE}" << EOF
-      Chimera Builder Docker Image Manifest
+      Crucible Builder Docker Image Manifest
       ======================================
 
       Image Tag: ${IMAGE_NAME}:${IMAGE_TAG}
@@ -248,9 +248,9 @@ export:tarball:
   # - .tar.gz.b64: SharePoint transfers (avoids binary corruption) - larger, safer
   artifacts:
     paths:
-      - chimera-builder-*.tar.gz
-      - chimera-builder-*.tar.gz.sha256
-      - chimera-builder-*.tar.gz.b64
-      - chimera-builder-*.tar.gz.b64.sha256
-      - chimera-builder-*-manifest.txt
+      - crucible-builder-*.tar.gz
+      - crucible-builder-*.tar.gz.sha256
+      - crucible-builder-*.tar.gz.b64
+      - crucible-builder-*.tar.gz.b64.sha256
+      - crucible-builder-*-manifest.txt
     expire_in: 30 days

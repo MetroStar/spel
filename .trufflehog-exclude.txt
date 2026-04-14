@@ -1,4 +1,4 @@
-# TruffleHog exclusions for Chimera Offline preparation
+# TruffleHog exclusions for Crucible Offline preparation
 # These paths contain expected patterns that trigger false positives
 
 # Documentation files (may contain example credentials)

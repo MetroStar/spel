@@ -20,7 +20,7 @@ locals {
   # Common tags applied to all resources
   common_tags = merge(var.tags, {
     ManagedBy = "opentofu"
-    Module    = "chimera-ssm"
+    Module    = "crucible-ssm"
   })
 
   # Convert extra-variables maps to SSM-compatible "key=value key2=value2" format.

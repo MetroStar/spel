@@ -1,6 +1,6 @@
 # Value Brief
 
-> **Chimera Platform** — Quantified return on investment for automated STIG AMI builds and continuous compliance.
+> **Crucible Platform** — Quantified return on investment for automated STIG AMI builds and continuous compliance.
 
 ## The Problem
 
@@ -8,7 +8,7 @@ Federal and DoD programs spend hundreds of engineer-hours per operating system m
 
 ## The Solution
 
-The Chimera Platform automates the entire STIG AMI lifecycle — from infrastructure provisioning through image hardening to post-deployment enforcement — across 9 operating systems in both connected and air-gapped AWS environments.
+The Crucible Platform automates the entire STIG AMI lifecycle — from infrastructure provisioning through image hardening to post-deployment enforcement — across 9 operating systems in both connected and air-gapped AWS environments.
 
 ## Value Quantification
 
@@ -16,7 +16,7 @@ Estimates are based on industry benchmarks: DISA STIG benchmarks contain 300–5
 
 ### Per-Activity Savings
 
-| Activity | Manual Baseline | With Chimera | Savings | How |
+| Activity | Manual Baseline | With Crucible | Savings | How |
 |----------|----------------|--------------|---------|-----|
 | **Initial STIG hardening** (1 OS) | 80–120 hrs | 4–6 hrs | **~95%** | Automated Ansible Lockdown roles apply 300–500 controls unattended |
 | **Full platform standup** (9 OS) | 720–1,080 hrs | 36–54 hrs | **~95%** | Same automation, parallelized across OS targets |
@@ -53,7 +53,7 @@ Year 1 includes initial setup, first build cycle, and ATO evidence. Ongoing incl
 
 ### Onboarding Time Reduction
 
-| Metric | Without Chimera | With Chimera |
+| Metric | Without Crucible | With Crucible |
 |--------|----------------|--------------|
 | Time to first hardened AMI | 2–4 weeks | 4–6 hours |
 | Time to production-ready compliance pipeline | 4–8 weeks | 1–2 days |
@@ -64,7 +64,7 @@ Year 1 includes initial setup, first build cycle, and ATO evidence. Ongoing incl
 
 The platform directly supports the following NIST 800-53 control families, which map to common ATO requirements:
 
-| Control | Title | How Chimera Supports It |
+| Control | Title | How Crucible Supports It |
 |---------|-------|------------------------|
 | **CM-6** | Configuration Settings | STIG hardening applied at build time; drift correction via SSM enforcement |
 | **CM-2** | Baseline Configuration | AMIs serve as immutable baselines; rebuilt monthly from code |

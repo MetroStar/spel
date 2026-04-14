@@ -1,5 +1,5 @@
 # =============================================================================
-# Chimera Infrastructure — Root Variables
+# Crucible Infrastructure — Root Variables
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 
 variable "name_prefix" {
-  description = "Prefix for all resource names (e.g., 'chimera', 'chimera-ci')"
+  description = "Prefix for all resource names (e.g., 'crucible', 'crucible-ci')"
   type        = string
 
   validation {
@@ -150,7 +150,7 @@ variable "tags" {
 
 locals {
   common_tags = merge(var.tags, {
-    Project   = "CHIMERA"
+    Project   = "CRUCIBLE"
     ManagedBy = "opentofu"
   })
 }

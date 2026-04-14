@@ -2,11 +2,11 @@
 # This file installs the Ansible Lockdown roles from vendored local copies
 # For Offline air-gapped environments, roles are cloned from GitHub and committed to this repo
 roles:
-  - src: ./chimera/ansible/roles/Windows-2019-STIG
+  - src: ./crucible/ansible/roles/Windows-2019-STIG
     name: Windows-2019-STIG
-  - src: ./chimera/ansible/roles/Windows-2022-STIG
+  - src: ./crucible/ansible/roles/Windows-2022-STIG
     name: Windows-2022-STIG
-  - src: ./chimera/ansible/roles/RHEL8-STIG
+  - src: ./crucible/ansible/roles/RHEL8-STIG
     name: RHEL8-STIG
-  - src: ./chimera/ansible/roles/RHEL9-STIG
+  - src: ./crucible/ansible/roles/RHEL9-STIG
     name: RHEL9-STIG
