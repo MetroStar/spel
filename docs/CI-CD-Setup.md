@@ -32,56 +32,47 @@ The Crucible CI/CD pipeline uses a **Docker-based build system** where all depen
 
 ### Workflow Summary
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        GitHub Actions (Online)                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ offline-prepare.yml                                                  │   │
-│  │                                                                      │   │
-│  │  1. Checkout repository                                              │   │
-│  │  2. Build Docker image with all dependencies                         │   │
-│  │  3. Export as gzipped tarball                                        │   │
-│  │  4. Upload artifact (30-day retention)                               │   │
-│  │                                                                      │   │
-│  │  Output: crucible-builder-YYYYMMDD.tar.gz (~305 MB)                      │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-│                               │                                              │
-│                               ▼                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ build.yml (Optional - Test in GitHub Actions)                        │   │
-│  │                                                                      │   │
-│  │  1. Download Docker image artifact                                   │   │
-│  │  2. Import Docker image                                              │   │
-│  │  3. Configure AWS credentials (OIDC)                                 │   │
-│  │  4. Run builds inside container                                      │   │
-│  │                                                                      │   │
-│  │  Output: STIGed AMIs in AWS Commercial                               │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                               │
-                   (Transfer tarball to air-gapped)
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        GitLab CI (Air-Gapped)                                │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │ .gitlab-ci.yml                                                        │   │
-│  │                                                                      │   │
-│  │  Stage 1: import - Import Docker image from tarball                  │   │
-│  │  Stage 2: infra  - Provision persistent AWS infrastructure via        │   │
-│  │                    OpenTofu (one-time, from .gitlab/infra.gitlab-ci)   │   │
-│  │  Stage 3: build  - Build AMIs using Docker container                 │   │
-│  │  Stage 4: test   - Test AMIs (optional)                              │   │
-│  │                                                                      │   │
-│  │  Output: STIGed AMIs in AWS GovCloud                                 │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph GH["<b>GitHub Actions (Online)</b>"]
+        direction TB
+        prep["<b>offline-prepare.yml</b>
+        1. Checkout repository
+        2. Build Docker image with all dependencies
+        3. Export as gzipped tarball
+        4. Upload artifact (30-day retention)"]
+
+        prep -- "crucible-builder-YYYYMMDD.tar.gz (~305 MB)" --> build
+
+        build["<b>build.yml</b> (Optional — Test in GitHub Actions)
+        1. Download Docker image artifact
+        2. Import Docker image
+        3. Configure AWS credentials (OIDC)
+        4. Run builds inside container"]
+
+        build -- "STIGed AMIs → AWS Commercial" --> buildout((" "))
+    end
+
+    GH -- "Transfer tarball to air-gapped network" --> GL
+
+    subgraph GL["<b>GitLab CI (Air-Gapped)</b>"]
+        direction TB
+        gl_pipe["<b>.gitlab-ci.yml</b>
+        Stage 1 · import — Import Docker image from tarball
+        Stage 2 · infra — Provision AWS infrastructure via OpenTofu
+        Stage 3 · build — Build AMIs using Docker container
+        Stage 4 · test — Test AMIs (optional)"]
+
+        gl_pipe -- "STIGed AMIs → AWS GovCloud" --> glout((" "))
+    end
+
+    style GH fill:#e8f0fe,stroke:#4285f4,stroke-width:2px,color:#1a1a1a
+    style GL fill:#fce8e6,stroke:#ea4335,stroke-width:2px,color:#1a1a1a
+    style prep fill:#fff,stroke:#4285f4,text-align:left
+    style build fill:#fff,stroke:#4285f4,text-align:left
+    style gl_pipe fill:#fff,stroke:#ea4335,text-align:left
+    style buildout fill:none,stroke:none
+    style glout fill:none,stroke:none
 ```
 
 ## Architecture
