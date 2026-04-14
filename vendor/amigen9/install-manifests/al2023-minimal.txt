@@ -92,8 +92,8 @@ json-c
 kbd
 kbd-misc
 kernel
-kernel-libbpf
 kernel-livepatch-repo-s3
+libbpf
 keyutils-libs
 kmod
 kmod-libs
