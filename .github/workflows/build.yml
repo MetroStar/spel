@@ -230,9 +230,9 @@ jobs:
         run: |
           echo "=== Docker Image Verification ==="
           
-          docker run --rm "crucible-builder:${IMAGE_TAG}" packer version
-          docker run --rm "crucible-builder:${IMAGE_TAG}" ansible --version | head -3
-          docker run --rm "crucible-builder:${IMAGE_TAG}" aws --version
+          docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" packer version
+          docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" ansible --version | head -3
+          docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" aws --version
           
           echo ""
           echo "=== Image Details ==="

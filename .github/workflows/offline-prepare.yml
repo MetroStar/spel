@@ -99,10 +99,10 @@ jobs:
         run: |
           echo "=== Verifying Docker Image ==="
           
-          # Run quick verification
-          docker run --rm "crucible-builder:${IMAGE_TAG}" packer version
-          docker run --rm "crucible-builder:${IMAGE_TAG}" ansible --version
-          docker run --rm "crucible-builder:${IMAGE_TAG}" aws --version
+          # Run quick verification (bypass entrypoint to get clean output)
+          docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" packer version
+          docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" ansible --version
+          docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" aws --version
           
           # Show image details
           echo ""
@@ -165,10 +165,10 @@ jobs:
           
           Baked-in Tools:
           ---------------
-          Packer: $(docker run --rm "crucible-builder:${IMAGE_TAG}" packer version 2>/dev/null | head -1)
-          Ansible: $(docker run --rm "crucible-builder:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1)
-          Python: $(docker run --rm "crucible-builder:${IMAGE_TAG}" python3 --version 2>/dev/null)
-          AWS CLI: $(docker run --rm "crucible-builder:${IMAGE_TAG}" aws --version 2>/dev/null)
+          Packer: $(docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" packer version 2>/dev/null | head -1)
+          Ansible: $(docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1)
+          Python: $(docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" python3 --version 2>/dev/null)
+          AWS CLI: $(docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" aws --version 2>/dev/null)
           
           Tarball:
           --------
@@ -226,10 +226,10 @@ jobs:
           | Tarball Size | $(ls -lh crucible-builder-${IMAGE_TAG}.tar.gz 2>/dev/null | awk '{print $5}' || echo 'N/A') |
           
           ### Baked-in Tools
-          - **Packer**: $(docker run --rm "crucible-builder:${IMAGE_TAG}" packer version 2>/dev/null | head -1 || echo 'N/A')
-          - **Ansible**: $(docker run --rm "crucible-builder:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1 || echo 'N/A')
-          - **Python**: $(docker run --rm "crucible-builder:${IMAGE_TAG}" python3 --version 2>/dev/null || echo 'N/A')
-          - **AWS CLI**: $(docker run --rm "crucible-builder:${IMAGE_TAG}" aws --version 2>/dev/null || echo 'N/A')
+          - **Packer**: $(docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" packer version 2>/dev/null | head -1 || echo 'N/A')
+          - **Ansible**: $(docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" ansible --version 2>/dev/null | head -1 || echo 'N/A')
+          - **Python**: $(docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" python3 --version 2>/dev/null || echo 'N/A')
+          - **AWS CLI**: $(docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" aws --version 2>/dev/null || echo 'N/A')
           
           ### Artifact
           Download the \`crucible-builder-${IMAGE_TAG}\` artifact to get:

@@ -234,9 +234,9 @@ import:docker:
     - |
       echo ""
       echo "=== Verifying Docker Image ==="
-      docker run --rm "crucible-builder:${IMAGE_TAG}" packer version
-      docker run --rm "crucible-builder:${IMAGE_TAG}" ansible --version
-      docker run --rm "crucible-builder:${IMAGE_TAG}" aws --version
+      docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" packer version
+      docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" ansible --version
+      docker run --rm --entrypoint "" "crucible-builder:${IMAGE_TAG}" aws --version
     
     # Show image details (for version tracking)
     - |
