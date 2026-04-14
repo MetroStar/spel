@@ -1,6 +1,6 @@
 # Dockerfile for Crucible build environment
 # Base: Rocky Linux 9 Iron Bank (hardened, minimal image)
-# Uses multi-stage build to keep final image small (~305 MB compressed)
+# Uses multi-stage build to keep final image small (~378 MB compressed)
 #
 # Build:
 #   docker build -t crucible-builder:$(date +%Y%m%d) .

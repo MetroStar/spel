@@ -52,7 +52,7 @@ Day 0 is the one-time manual work needed before CI/CD can take over. Infrastruct
 
 ### Steps
 
-1. **Build Docker image** (if not already available) — Run the `offline-prepare.yml` workflow. Produces `crucible-builder-YYYYMMDD.tar.gz` (~305 MB). For air-gapped environments, transfer the tarball to the GitLab runner.
+1. **Build Docker image** (if not already available) — Run the `offline-prepare.yml` workflow. Produces `crucible-builder-YYYYMMDD.tar.gz` (~378 MB). For air-gapped environments, transfer the tarball to the GitLab runner.
 
 2. **Run AMI builds** — Trigger the build pipeline with desired OS targets. The pipeline automatically provisions infrastructure on the first run:
    - **GitHub Actions**: `build.yml` calls `infra-setup.yml` (`action=apply`, idempotent) before building — backend bootstrap, tfvars generation, and `tofu apply` all happen automatically.

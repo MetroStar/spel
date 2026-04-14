@@ -76,7 +76,7 @@ The pipeline supports a complete low-to-high transfer workflow for disconnected 
 flowchart LR
     subgraph high ["Connected Environment (High Side / GitHub)"]
         Prep["offline-prepare.yml<br/>Build Docker image"]
-        Tar["crucible-builder.tar.gz<br/>(~305 MB)"]
+        Tar["crucible-builder.tar.gz<br/>(~378 MB)"]
         B64["Base64-encoded copy<br/>(for SharePoint)"]
         Prep --> Tar
         Prep --> B64

@@ -95,7 +95,7 @@ Post-deployment, SSM State Manager associations re-apply STIG hardening every 7 
 
 ##### Deliver
 
-The entire platform ships as a ~305 MB Docker tarball. Transfer it via SCP, USB, or secure file share. VPC endpoints provide private AWS API connectivity. No internet access required at build or run time.
+The entire platform ships as a ~378 MB Docker tarball. Transfer it via SCP, USB, or secure file share. VPC endpoints provide private AWS API connectivity. No internet access required at build or run time.
 
 ---
 

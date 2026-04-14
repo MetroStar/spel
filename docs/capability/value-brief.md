@@ -39,7 +39,7 @@ Estimates are based on industry benchmarks: DISA STIG benchmarks contain 300–5
 | Tag instances for STIG enforcement targeting | EventBridge + Lambda — AMI tags auto-propagate to instances |
 | Verify FIPS 140-2 boot integrity (EL8) | `boot-fips-wrapper.sh` — pre/post role validation of `boot=UUID` |
 | Restore Windows admin rename after STIG | Custom SSM document — wraps `AWSEC2-ConfigureSTIG` with `secedit` fix |
-| Transfer build tools to air-gapped environments | Docker image — single ~305 MB tarball with all dependencies |
+| Transfer build tools to air-gapped environments | Docker image — single ~378 MB tarball with all dependencies |
 
 ### Annualized Value Per Program
 

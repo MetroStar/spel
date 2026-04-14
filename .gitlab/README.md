@@ -116,7 +116,7 @@ These variables are required when building Linux AMIs using local repository mir
 
 ## Docker Image Contents
 
-The Docker image (~305 MB compressed) includes:
+The Docker image (~378 MB compressed) includes:
 
 | Component | Version | Notes |
 | --------- | --------- | ------- |

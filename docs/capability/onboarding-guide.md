@@ -47,7 +47,7 @@ See [CI-CD-Setup — IAM Configuration](../CI-CD-Setup.md#aws-iam-configuration)
 4. Download the artifact: `crucible-builder-YYYYMMDD`
 
 The artifact contains:
-- `crucible-builder-YYYYMMDD.tar.gz` — Docker image (~305 MB)
+- `crucible-builder-YYYYMMDD.tar.gz` — Docker image (~378 MB)
 - `crucible-builder-YYYYMMDD.tar.gz.sha256` — Checksum
 - Base64-encoded copy (for SharePoint transfer)
 

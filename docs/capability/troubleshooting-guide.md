@@ -422,7 +422,7 @@ sha256sum -c /transfer/crucible-builder-*.tar.gz.sha256
 df -h /var/lib/docker
 ```
 
-Docker needs at least ~1 GB free to import the ~834 MB uncompressed image.
+Docker needs at least ~1 GB free to import the ~975 MB uncompressed image.
 
 **Check 3 — Docker daemon:**
 

@@ -54,7 +54,7 @@ flowchart LR
 
 ## Air-Gapped Delivery
 
-The entire platform operates in disconnected environments. A self-contained Docker image (~305 MB) carries all dependencies — Packer, Ansible, AWS CLI, STIG roles, and AMIgen scripts. Transfer the tarball to an air-gapped GitLab runner via SCP, USB, or secure file share. No internet access is required at build time. VPC endpoints provide private connectivity for all AWS API calls.
+The entire platform operates in disconnected environments. A self-contained Docker image (~378 MB) carries all dependencies — Packer, Ansible, AWS CLI, STIG roles, and AMIgen scripts. Transfer the tarball to an air-gapped GitLab runner via SCP, USB, or secure file share. No internet access is required at build time. VPC endpoints provide private connectivity for all AWS API calls.
 
 ## What's Included
 

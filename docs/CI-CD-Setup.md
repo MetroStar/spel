@@ -42,7 +42,7 @@ flowchart TD
         3. Export as gzipped tarball
         4. Upload artifact (30-day retention)"]
 
-        prep -- "crucible-builder-YYYYMMDD.tar.gz (~305 MB)" --> build
+        prep -- "crucible-builder-YYYYMMDD.tar.gz (~378 MB)" --> build
 
         build["<b>build.yml</b> (Optional — Test in GitHub Actions)
         1. Download Docker image artifact
@@ -94,8 +94,8 @@ The `crucible-builder` Docker image (based on Rocky Linux 9, Iron Bank) includes
 
 ### Image Size
 
-- **Uncompressed**: ~834 MB
-- **Gzipped Tarball**: ~305 MB
+- **Uncompressed**: ~975 MB
+- **Gzipped Tarball**: ~378 MB
 
 ## Prerequisites
 
@@ -731,7 +731,7 @@ on:
 
 ```text
 crucible-builder-YYYYMMDD/
-├── crucible-builder-YYYYMMDD.tar.gz       # Docker image tarball (~305 MB)
+├── crucible-builder-YYYYMMDD.tar.gz       # Docker image tarball (~378 MB)
 ├── crucible-builder-YYYYMMDD.tar.gz.sha256 # SHA256 checksum
 └── crucible-builder-YYYYMMDD-manifest.txt  # Build manifest with tool versions
 ```
@@ -1218,8 +1218,8 @@ The environment variable is not reaching the build script. Check that:
 
 | Component | Size |
 | ----------- | ------ |
-| Docker image (gzipped) | ~305 MB |
-| Docker image (uncompressed) | ~834 MB |
+| Docker image (gzipped) | ~378 MB |
+| Docker image (uncompressed) | ~975 MB |
 | Build workspace per job | 10-20 GB |
 | Packer cache | 5-10 GB |
 

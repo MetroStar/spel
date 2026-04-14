@@ -216,8 +216,8 @@ For controls that cannot be remediated at AMI build time, document them in `docs
 
 | Format | Size |
 |--------|------|
-| Gzipped tarball | ~305 MB |
-| Uncompressed image | ~834 MB |
+| Gzipped tarball | ~378 MB |
+| Uncompressed image | ~975 MB |
 
 ### Storage by Environment
 
@@ -226,15 +226,15 @@ For controls that cannot be remediated at AMI build time, document them in `docs
 |-----------|------|
 | Repository checkout | ~100 MB |
 | Docker build cache | ~1–2 GB |
-| Final Docker image | ~834 MB |
-| Gzipped tarball | ~305 MB |
+| Final Docker image | ~975 MB |
+| Gzipped tarball | ~378 MB |
 | **Peak usage** | **~3 GB** |
 
 **GitLab Runner** (air-gapped):
 | Component | Size |
 |-----------|------|
-| Docker image tarball | ~305 MB |
-| Imported Docker image | ~834 MB |
+| Docker image tarball | ~378 MB |
+| Imported Docker image | ~975 MB |
 | Repository checkout | ~100 MB |
 | Build workspace per job | 10–20 GB |
 | Packer cache | 5–10 GB |
@@ -249,16 +249,16 @@ Each Docker image build produces:
 
 ```
 crucible-builder-YYYYMMDD/
-├── crucible-builder-YYYYMMDD.tar.gz         # ~305 MB
+├── crucible-builder-YYYYMMDD.tar.gz         # ~378 MB
 ├── crucible-builder-YYYYMMDD.tar.gz.sha256  # <1 KB
 └── crucible-builder-YYYYMMDD-manifest.txt   # <2 KB
 ```
 
 | Transfer Medium | Considerations |
 |----------------|---------------|
-| SCP / SFTP | ~305 MB transfer |
+| SCP / SFTP | ~378 MB transfer |
 | USB drive | Minimum 512 MB |
-| Secure file share | ~305 MB upload; zip `.b64` file first for SharePoint |
+| Secure file share | ~378 MB upload; zip `.b64` file first for SharePoint |
 
 ### Artifact Retention
 
