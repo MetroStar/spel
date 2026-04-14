@@ -13,11 +13,11 @@ export PKR_VAR_crucible_deprecation_lifetime ?= 8760h
 $(info CRUCIBLE_IDENTIFIER=$(CRUCIBLE_IDENTIFIER))
 $(info CRUCIBLE_VERSION=$(CRUCIBLE_VERSION))
 
-nifndef CRUCIBLE_IDENTIFIER
+ifndef CRUCIBLE_IDENTIFIER
 $(error CRUCIBLE_IDENTIFIER is not set)
 endif
 
-nifndef CRUCIBLE_VERSION
+ifndef CRUCIBLE_VERSION
 $(error CRUCIBLE_VERSION is not set)
 else
 $(shell mkdir -p ".crucible/$(CRUCIBLE_VERSION)")
