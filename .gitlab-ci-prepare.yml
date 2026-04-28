@@ -236,8 +236,8 @@ export:tarball:
         -e AWS_ACCESS_KEY_ID \\
         -e AWS_SECRET_ACCESS_KEY \\
         -e AWS_DEFAULT_REGION=us-east-1 \\
-        -e SPEL_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \\
-        -e SPEL_VERSION=\$(date +%Y.%m).1 \\
+        -e CRUCIBLE_BUILDERS=amazon-ebssurrogate.minimal-rhel-9-hvm \\
+        -e CRUCIBLE_VERSION=\$(date +%Y.%m).1 \\
         ${IMAGE_NAME}:${IMAGE_TAG} make build
       EOF
 

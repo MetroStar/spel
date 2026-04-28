@@ -1,6 +1,6 @@
 # AL2023-STIG: Amazon Linux 2023 STIG Hardening
 
-## SPEL Fork of RHEL9-STIG for Amazon Linux 2023
+## Crucible Fork of RHEL9-STIG for Amazon Linux 2023
 
 This role is a **one-time snapshot fork** of [ansible-lockdown/RHEL9-STIG](https://github.com/ansible-lockdown/RHEL9-STIG) with patches to support Amazon Linux 2023.
 

@@ -8,7 +8,7 @@
 # - AL2023-STIG (RHEL9-STIG fork adapted for Amazon Linux 2023, used as fallback)
 #
 # To populate this directory, run from a system with internet access:
-#   cd spel/ansible/roles
+#   cd crucible/ansible/roles
 #   git clone https://github.com/ansible-lockdown/Windows-2019-STIG.git
 #   git clone https://github.com/ansible-lockdown/Windows-2022-STIG.git
 #   git clone https://github.com/ansible-lockdown/RHEL8-STIG.git
